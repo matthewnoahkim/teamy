@@ -18,6 +18,26 @@ export function UserBackgroundApplier() {
 
     const applyBackground = async () => {
       try {
+        // Always enforce header static background
+        const headerCss = `
+          header,
+          header.bg-teamy-primary,
+          header[class*="bg-teamy-primary"] {
+            background-color: #0056C7 !important;
+            background-image: none !important;
+            background: #0056C7 !important;
+          }
+          .dark header,
+          .dark header.bg-teamy-primary,
+          .dark header[class*="bg-teamy-primary"],
+          html.dark header,
+          html.dark header.bg-teamy-primary {
+            background-color: rgb(15 23 42) !important;
+            background-image: none !important;
+            background: rgb(15 23 42) !important;
+          }
+        `
+        
         // Default: reset everything
         let css = `
           :root {
@@ -38,7 +58,7 @@ export function UserBackgroundApplier() {
         `
 
         if (status !== 'authenticated' || !session?.user?.id) {
-          styleEl!.textContent = css + `
+          styleEl!.textContent = headerCss + css + `
             body {
               background: transparent !important;
               background-image: none !important;
@@ -50,7 +70,7 @@ export function UserBackgroundApplier() {
 
         const response = await fetch('/api/user/preferences')
         if (!response.ok) {
-          styleEl!.textContent = css + `
+          styleEl!.textContent = headerCss + css + `
             body {
               background: transparent !important;
               background-image: none !important;
@@ -64,7 +84,7 @@ export function UserBackgroundApplier() {
         const preferences = data.preferences as Record<string, unknown> | null
 
         if (!preferences || !preferences.backgroundType) {
-          styleEl!.textContent = css + `
+          styleEl!.textContent = headerCss + css + `
             body {
               background: transparent !important;
               background-image: none !important;
@@ -78,7 +98,7 @@ export function UserBackgroundApplier() {
         document.body.classList.remove('grid-pattern')
 
         if (bgType === 'grid') {
-          styleEl!.textContent = css + `
+          styleEl!.textContent = headerCss + css + `
             body {
               background: transparent !important;
               background-image: none !important;
@@ -87,20 +107,33 @@ export function UserBackgroundApplier() {
           document.body.classList.add('grid-pattern')
         } else if (bgType === 'solid' && preferences.backgroundColor) {
           const color = preferences.backgroundColor as string
-          styleEl!.textContent = css.replace(
+          styleEl!.textContent = headerCss + css.replace(
             '--user-background: none;',
             `--user-background: ${color};`
           ) + `
             body,
-            html {
+            html,
+            body.grid-pattern,
+            html.grid-pattern,
+            .grid-pattern {
               background: ${color} !important;
+              background-image: none !important;
               background-attachment: fixed !important;
             }
             .bg-slate-50,
             .bg-slate-900,
             .dark\\:bg-slate-900,
-            [class*="bg-slate"] {
+            [class*="bg-slate"],
+            section.bg-slate-50,
+            section.bg-slate-900,
+            section[class*="bg-slate"],
+            div.bg-slate-50,
+            div.bg-slate-900,
+            div[class*="bg-slate"],
+            div.bg-background,
+            section.bg-background {
               background-color: transparent !important;
+              background: transparent !important;
             }
           `
         } else if (bgType === 'gradient') {
@@ -111,24 +144,37 @@ export function UserBackgroundApplier() {
               .join(', ')
             const direction = (preferences.gradientDirection as string) || '135deg'
             const gradient = `linear-gradient(${direction}, ${gradientStops})`
-            styleEl!.textContent = css.replace(
+            styleEl!.textContent = headerCss + css.replace(
               '--user-background: none;',
               `--user-background: ${gradient};`
             ) + `
               body,
-              html {
+              html,
+              body.grid-pattern,
+              html.grid-pattern,
+              .grid-pattern {
                 background: ${gradient} !important;
+                background-image: ${gradient} !important;
                 background-attachment: fixed !important;
               }
               .bg-slate-50,
               .bg-slate-900,
               .dark\\:bg-slate-900,
-              [class*="bg-slate"] {
+              [class*="bg-slate"],
+              section.bg-slate-50,
+              section.bg-slate-900,
+              section[class*="bg-slate"],
+              div.bg-slate-50,
+              div.bg-slate-900,
+              div[class*="bg-slate"],
+              div.bg-background,
+              section.bg-background {
                 background-color: transparent !important;
+                background: transparent !important;
               }
             `
           } else {
-            styleEl!.textContent = css + `
+            styleEl!.textContent = headerCss + css + `
               body {
                 background: transparent !important;
                 background-image: none !important;
@@ -138,12 +184,15 @@ export function UserBackgroundApplier() {
           }
         } else if (bgType === 'image' && preferences.backgroundImageUrl) {
           const imageUrl = preferences.backgroundImageUrl as string
-          styleEl!.textContent = css.replace(
+          styleEl!.textContent = headerCss + css.replace(
             '--user-background-image: none;',
             `--user-background-image: url(${imageUrl});`
           ) + `
             body,
-            html {
+            html,
+            body.grid-pattern,
+            html.grid-pattern,
+            .grid-pattern {
               background-image: url(${imageUrl}) !important;
               background-color: transparent !important;
               background-size: cover !important;
@@ -154,12 +203,21 @@ export function UserBackgroundApplier() {
             .bg-slate-50,
             .bg-slate-900,
             .dark\\:bg-slate-900,
-            [class*="bg-slate"] {
+            [class*="bg-slate"],
+            section.bg-slate-50,
+            section.bg-slate-900,
+            section[class*="bg-slate"],
+            div.bg-slate-50,
+            div.bg-slate-900,
+            div[class*="bg-slate"],
+            div.bg-background,
+            section.bg-background {
               background-color: transparent !important;
+              background: transparent !important;
             }
           `
         } else {
-          styleEl!.textContent = css + `
+          styleEl!.textContent = headerCss + css + `
             body {
               background: transparent !important;
               background-image: none !important;
@@ -169,7 +227,7 @@ export function UserBackgroundApplier() {
         }
       } catch (error) {
         console.error('Error applying user background:', error)
-        styleEl!.textContent = `
+        styleEl!.textContent = headerCss + `
           body {
             background: transparent !important;
             background-image: none !important;

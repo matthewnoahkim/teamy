@@ -108,13 +108,6 @@ export function TDPortalClient({ user, requests }: TDPortalClientProps) {
             <Logo size="md" href="/" variant="light" />
             <div className="h-6 w-px bg-white/20" />
             <span className="text-white font-semibold">TD Portal</span>
-            <button
-              onClick={() => router.push('/dashboard/customization')}
-              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-white/70 hover:text-white text-sm transition-colors"
-            >
-              <Settings className="h-3.5 w-3.5" />
-              <span>Customization</span>
-            </button>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Notifications */}

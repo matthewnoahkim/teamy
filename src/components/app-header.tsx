@@ -40,6 +40,14 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
   const buttonText = isOnTournamentsPage ? 'Clubs' : 'Tournaments'
   const buttonHref = isOnTournamentsPage ? '/dashboard/club' : '/dashboard/tournaments'
   const ButtonIcon = isOnTournamentsPage ? Users : Trophy
+  
+  // Only show customization and billing on club dashboard pages
+  const isOnClubDashboard = pathname?.startsWith('/dashboard/club') || 
+                            pathname === '/dashboard/customization' || 
+                            pathname === '/dashboard/billing'
+  const isOnESPortal = pathname?.startsWith('/es')
+  const isOnTDPortal = pathname?.startsWith('/td')
+  const showCustomizationBilling = isOnClubDashboard && !isOnESPortal && !isOnTDPortal
 
   const handleSignOut = async () => {
     try {
@@ -79,20 +87,32 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
               <ButtonIcon className="h-4 w-4" />
               <span className="text-sm font-medium">{buttonText}</span>
             </Button>
-            <button
-              onClick={() => router.push('/dashboard/customization')}
-              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-white/70 hover:text-white text-sm transition-colors"
-            >
-              <Settings className="h-3.5 w-3.5" />
-              <span>Customization</span>
-            </button>
-            <button
-              onClick={() => router.push('/dashboard/billing')}
-              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-white/70 hover:text-white text-sm transition-colors"
-            >
-              <CreditCard className="h-3.5 w-3.5" />
-              <span>Billing</span>
-            </button>
+            {showCustomizationBilling && (
+              <>
+                <button
+                  onClick={() => router.push('/dashboard/customization')}
+                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-all rounded-lg ${
+                    pathname === '/dashboard/customization'
+                      ? 'bg-white/20 text-white shadow-sm'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  <span>Customization</span>
+                </button>
+                <button
+                  onClick={() => router.push('/dashboard/billing')}
+                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-all rounded-lg ${
+                    pathname === '/dashboard/billing'
+                      ? 'bg-white/20 text-white shadow-sm'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <CreditCard className="h-3.5 w-3.5" />
+                  <span>Billing</span>
+                </button>
+              </>
+            )}
           </div>
           
           <div className="flex items-center gap-2 md:gap-3">
@@ -128,14 +148,18 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit Username
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/dashboard/customization')} className="md:hidden">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Customization
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/dashboard/billing')} className="md:hidden">
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Billing
-                </DropdownMenuItem>
+                {showCustomizationBilling && (
+                  <>
+                    <DropdownMenuItem onClick={() => router.push('/dashboard/customization')} className="md:hidden">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Customization
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/dashboard/billing')} className="md:hidden">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Billing
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
                   <LogOut className="mr-2 h-4 w-4" />
