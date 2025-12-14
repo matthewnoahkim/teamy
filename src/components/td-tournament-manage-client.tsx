@@ -16,6 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/components/ui/use-toast'
 import { 
   LogOut, 
@@ -38,6 +39,8 @@ import {
   FileText,
   RefreshCw,
   Search,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -91,6 +94,44 @@ interface OtherDiscount {
   amount: number
 }
 
+interface Registration {
+  id: string
+  status: string
+  paid: boolean
+  createdAt: string
+  club: {
+    id: string
+    name: string
+    division: string
+    memberships: Array<{
+      user: {
+        id: string
+        name: string | null
+        email: string
+        image: string | null
+      }
+    }>
+  }
+  team: {
+    id: string
+    name: string
+    members?: Array<{
+      id: string
+      user: {
+        id: string
+        name: string | null
+        email: string
+        image: string | null
+      }
+    }>
+  } | null
+  registeredBy: {
+    id: string
+    name: string | null
+    email: string
+  }
+}
+
 interface Tournament {
   id: string
   name: string
@@ -130,6 +171,7 @@ interface TDTournamentManageClientProps {
   initialStaff: StaffMember[]
   initialTimeline: TimelineItem[]
   events: EventInfo[]
+  initialRegistrations?: Registration[]
 }
 
 // Helper function to highlight search terms in text
@@ -158,21 +200,22 @@ export function TDTournamentManageClient({
   tournament, 
   initialStaff, 
   initialTimeline, 
-  events 
+  events,
+  initialRegistrations = []
 }: TDTournamentManageClientProps) {
   const router = useRouter()
   const { toast } = useToast()
   
   // Persist active tab in localStorage
   const storageKey = `td-tournament-tab-${tournament.id}`
-  const [activeTab, setActiveTab] = useState<'staff' | 'timeline' | 'settings' | 'events'>('staff')
+  const [activeTab, setActiveTab] = useState<'staff' | 'timeline' | 'settings' | 'events' | 'teams'>('staff')
   const [isHydrated, setIsHydrated] = useState(false)
   
   // Load saved tab from localStorage on mount and mark as hydrated
   useEffect(() => {
     try {
-      const savedTab = localStorage.getItem(storageKey) as 'staff' | 'timeline' | 'settings' | 'events' | null
-      if (savedTab && ['staff', 'timeline', 'settings', 'events'].includes(savedTab)) {
+      const savedTab = localStorage.getItem(storageKey) as 'staff' | 'timeline' | 'settings' | 'events' | 'teams' | null
+      if (savedTab && ['staff', 'timeline', 'settings', 'events', 'teams'].includes(savedTab)) {
         setActiveTab(savedTab)
       }
     } catch (e) {
@@ -194,10 +237,14 @@ export function TDTournamentManageClient({
   
   // Handle tab changes
   const handleTabChange = (value: string) => {
-    setActiveTab(value as 'staff' | 'timeline' | 'settings' | 'events')
+    setActiveTab(value as 'staff' | 'timeline' | 'settings' | 'events' | 'teams')
   }
   
   const [staff, setStaff] = useState<StaffMember[]>(initialStaff)
+  const [registrations, setRegistrations] = useState<Registration[]>(initialRegistrations)
+  const [loadingRegistrations, setLoadingRegistrations] = useState(false)
+  const [expandedRegistrations, setExpandedRegistrations] = useState<Set<string>>(new Set())
+  const [teamsSearchQuery, setTeamsSearchQuery] = useState('')
   const [timeline, setTimeline] = useState<TimelineItem[]>(initialTimeline)
   const [loadingStaff, setLoadingStaff] = useState(false)
   const [loadingTimeline, setLoadingTimeline] = useState(false)
@@ -335,6 +382,26 @@ export function TDTournamentManageClient({
     }
   }
 
+  const fetchRegistrations = async () => {
+    setLoadingRegistrations(true)
+    try {
+      const res = await fetch(`/api/tournaments/${tournament.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setRegistrations(data.tournament.registrations || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch registrations:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load registrations',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingRegistrations(false)
+    }
+  }
+
   const handleInviteStaff = async () => {
     if (!inviteForm.email) return
 
@@ -455,6 +522,84 @@ export function TDTournamentManageClient({
     } finally {
       setUpdatingStaff(false)
     }
+  }
+
+  const handleEmailClubAdmins = (registration: Registration) => {
+    const adminEmails = registration.club.memberships
+      .map((m) => m.user.email)
+      .filter(Boolean)
+      .join(',')
+
+    if (!adminEmails) {
+      toast({
+        title: 'No admins found',
+        description: 'This club has no admin emails available.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const subject = encodeURIComponent(`${tournament.name} - Tournament Communication`)
+    const mailtoLink = `mailto:${adminEmails}?subject=${subject}`
+    window.location.href = mailtoLink
+  }
+
+  const toggleRegistrationExpansion = (registrationId: string) => {
+    setExpandedRegistrations(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(registrationId)) {
+        newSet.delete(registrationId)
+      } else {
+        newSet.add(registrationId)
+      }
+      return newSet
+    })
+  }
+
+  // Filter registrations based on search query
+  const filteredRegistrations = registrations.filter((reg) => {
+    if (!teamsSearchQuery.trim()) return true
+    
+    const query = teamsSearchQuery.toLowerCase().trim()
+    const clubName = reg.club.name.toLowerCase()
+    const teamName = reg.team?.name.toLowerCase() || ''
+    
+    return clubName.includes(query) || teamName.includes(query)
+  })
+
+  const handleEmailAllClubAdmins = () => {
+    if (registrations.length === 0) {
+      toast({
+        title: 'No registrations',
+        description: 'There are no registered teams to email.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    // Collect all unique admin emails from all registrations
+    const allAdminEmails = new Set<string>()
+    registrations.forEach((reg) => {
+      reg.club.memberships.forEach((m) => {
+        if (m.user.email) {
+          allAdminEmails.add(m.user.email)
+        }
+      })
+    })
+
+    if (allAdminEmails.size === 0) {
+      toast({
+        title: 'No admins found',
+        description: 'No admin emails available for registered clubs.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const emailList = Array.from(allAdminEmails).join(',')
+    const subject = encodeURIComponent(`${tournament.name} - Tournament Communication`)
+    const mailtoLink = `mailto:?bcc=${encodeURIComponent(emailList)}&subject=${subject}`
+    window.location.href = mailtoLink
   }
 
   const handleEmailAllStaff = () => {
@@ -860,10 +1005,14 @@ export function TDTournamentManageClient({
         {/* Tabs */}
         {isHydrated && (
           <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+          <TabsList className="grid grid-cols-5 w-full max-w-3xl">
             <TabsTrigger value="staff" className="gap-2">
               <Users className="h-4 w-4" />
               Staff
+            </TabsTrigger>
+            <TabsTrigger value="teams" className="gap-2">
+              <Trophy className="h-4 w-4" />
+              Teams
             </TabsTrigger>
             <TabsTrigger value="events" className="gap-2">
               <ClipboardList className="h-4 w-4" />
@@ -1747,6 +1896,216 @@ export function TDTournamentManageClient({
                       </div>
                     )}
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Teams Tab */}
+          <TabsContent value="teams" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Trophy className="h-5 w-5" />
+                      Registered Teams
+                    </CardTitle>
+                    <CardDescription>
+                      View teams registered for this tournament and contact club administrators
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {registrations.length > 0 && (
+                      <Button 
+                        variant="outline" 
+                        onClick={handleEmailAllClubAdmins}
+                      >
+                        <Mail className="h-4 w-4 mr-2" />
+                        Email All
+                      </Button>
+                    )}
+                    <Button 
+                      variant="outline" 
+                      onClick={fetchRegistrations}
+                      disabled={loadingRegistrations}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${loadingRegistrations ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingRegistrations ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin" />
+                    <p>Loading registrations...</p>
+                  </div>
+                ) : registrations.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Trophy className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No teams registered yet.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by club name or team name..."
+                          value={teamsSearchQuery}
+                          onChange={(e) => setTeamsSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      {teamsSearchQuery && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Showing {filteredRegistrations.length} of {registrations.length} registration{registrations.length !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                    {filteredRegistrations.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Search className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No registrations found matching "{teamsSearchQuery}"</p>
+                      </div>
+                    ) : (
+                      <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]"></TableHead>
+                        <TableHead>Club</TableHead>
+                        <TableHead>Team</TableHead>
+                        <TableHead>Division</TableHead>
+                        <TableHead>Members</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Registered</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredRegistrations.map((reg) => {
+                        const isExpanded = expandedRegistrations.has(reg.id)
+                        const teamMembers = reg.team?.members || []
+                        const memberCount = teamMembers.length
+                        const hasTeam = !!reg.team
+                        
+                        return (
+                          <>
+                            <TableRow key={reg.id}>
+                              <TableCell>
+                                {hasTeam && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleRegistrationExpansion(reg.id)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {highlightText(reg.club.name, teamsSearchQuery)}
+                              </TableCell>
+                              <TableCell>
+                                {reg.team?.name ? (
+                                  highlightText(reg.team.name, teamsSearchQuery)
+                                ) : (
+                                  <span className="text-muted-foreground italic">Club Registration</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{formatDivision(reg.club.division)}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                {hasTeam ? (
+                                  <span className="font-medium">
+                                    {memberCount}/15
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  className={
+                                    reg.status === 'CONFIRMED' 
+                                      ? 'bg-green-500' 
+                                      : reg.status === 'PENDING'
+                                        ? 'bg-yellow-500'
+                                        : reg.status === 'WAITLISTED'
+                                          ? 'bg-blue-500'
+                                          : 'bg-red-500'
+                                  }
+                                >
+                                  {reg.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {format(new Date(reg.createdAt), 'MMM d, yyyy')}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEmailClubAdmins(reg)}
+                                  className="gap-2"
+                                >
+                                  <Mail className="h-4 w-4" />
+                                  Email Admins
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded && hasTeam && (
+                              <TableRow>
+                                <TableCell colSpan={8} className="bg-muted/30">
+                                  <div className="py-4 px-4">
+                                    <div className="mb-3">
+                                      <h4 className="font-semibold mb-2">Team Members ({memberCount}/15)</h4>
+                                      {memberCount === 0 ? (
+                                        <p className="text-sm text-muted-foreground">No members assigned to this team.</p>
+                                      ) : (
+                                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                          {teamMembers.map((member) => (
+                                            <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg bg-background border">
+                                              <Avatar className="h-8 w-8">
+                                                <AvatarImage src={member.user.image || ''} />
+                                                <AvatarFallback className="text-xs">
+                                                  {member.user.name?.charAt(0) || member.user.email.charAt(0).toUpperCase()}
+                                                </AvatarFallback>
+                                              </Avatar>
+                                              <div className="flex-1 min-w-0">
+                                                <p className="font-medium text-sm truncate">
+                                                  {member.user.name || member.user.email}
+                                                </p>
+                                                {member.user.name && (
+                                                  <p className="text-xs text-muted-foreground truncate">
+                                                    {member.user.email}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

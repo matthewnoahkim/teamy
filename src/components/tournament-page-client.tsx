@@ -442,7 +442,7 @@ export function TournamentPageClient({ hostingRequest, tournament, isDirector, u
           
           {/* Register Button */}
           {tournament && (
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3 justify-center">
               <Link href={`/tournaments/${tournament.slug || tournament.id}/register`}>
                 <Button size="lg" className="gap-2">
                   <Trophy className="h-5 w-5" />

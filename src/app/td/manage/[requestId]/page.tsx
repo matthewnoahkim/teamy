@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
+import { Role } from '@prisma/client'
 import { TDTournamentManageClient } from '@/components/td-tournament-manage-client'
 
 interface Props {
@@ -143,6 +144,65 @@ export default async function TournamentManageByRequestPage({ params }: Props) {
   // Use hosting request division for display (supports "B&C"), but fallback to tournament division
   const displayDivision = request.division || tournament.division
 
+  // Fetch registrations for this tournament
+  const registrations = await prisma.tournamentRegistration.findMany({
+    where: {
+      tournamentId: tournament.id,
+    },
+    include: {
+      club: {
+        select: {
+          id: true,
+          name: true,
+          division: true,
+          memberships: {
+            where: {
+              role: Role.ADMIN,
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  image: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      team: {
+        select: {
+          id: true,
+          name: true,
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  image: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      registeredBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  })
+
   // Fetch events for this division - handle B&C tournaments
   let events
   if (displayDivision === 'B&C' || (typeof displayDivision === 'string' && displayDivision.includes('B') && displayDivision.includes('C'))) {
@@ -215,6 +275,11 @@ export default async function TournamentManageByRequestPage({ params }: Props) {
     dueDate: t.dueDate.toISOString(),
   }))
 
+  const serializedRegistrations = registrations.map(r => ({
+    ...r,
+    createdAt: r.createdAt.toISOString(),
+  }))
+
   return (
     <TDTournamentManageClient
       user={session.user}
@@ -222,6 +287,7 @@ export default async function TournamentManageByRequestPage({ params }: Props) {
       initialStaff={serializedStaff}
       initialTimeline={serializedTimeline}
       events={events}
+      initialRegistrations={serializedRegistrations}
     />
   )
 }

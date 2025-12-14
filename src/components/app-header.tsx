@@ -91,25 +91,35 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
               <>
                 <button
                   onClick={() => router.push('/dashboard/customization')}
-                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-all rounded-lg ${
+                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
                     pathname === '/dashboard/customization'
-                      ? 'bg-white/20 text-white shadow-sm'
-                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                      ? 'text-white font-semibold'
+                      : 'text-white/80 hover:text-white'
                   }`}
                 >
-                  <Settings className="h-3.5 w-3.5" />
-                  <span>Customization</span>
+                  <span className="relative flex items-center gap-1.5">
+                    <Settings className="h-3.5 w-3.5" />
+                    <span>Customization</span>
+                    {pathname === '/dashboard/customization' && (
+                      <span className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-white" />
+                    )}
+                  </span>
                 </button>
                 <button
                   onClick={() => router.push('/dashboard/billing')}
-                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-all rounded-lg ${
+                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
                     pathname === '/dashboard/billing'
-                      ? 'bg-white/20 text-white shadow-sm'
-                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                      ? 'text-white font-semibold'
+                      : 'text-white/80 hover:text-white'
                   }`}
                 >
-                  <CreditCard className="h-3.5 w-3.5" />
-                  <span>Billing</span>
+                  <span className="relative flex items-center gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5" />
+                    <span>Billing</span>
+                    {pathname === '/dashboard/billing' && (
+                      <span className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-white" />
+                    )}
+                  </span>
                 </button>
               </>
             )}

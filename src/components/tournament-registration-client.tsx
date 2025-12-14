@@ -218,21 +218,22 @@ export function TournamentRegistrationClient({
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-teamy-primary dark:bg-slate-900 border-b">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Logo className="h-8 w-8" />
-            <span className="font-semibold text-lg text-white">Teamy</span>
-          </Link>
+          <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-4">
-            <ThemeToggle />
+            <ThemeToggle variant="header" />
             {user ? (
               <Link href="/dashboard">
-                <Button variant="outline" size="sm">Dashboard</Button>
+                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
+                  Dashboard
+                </Button>
               </Link>
             ) : (
               <Link href="/login">
-                <Button variant="outline" size="sm">Sign In</Button>
+                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
+                  Sign In
+                </Button>
               </Link>
             )}
           </div>
@@ -461,21 +462,21 @@ export function TournamentRegistrationClient({
                 {/* Status Badges */}
                 <div className="space-y-2">
                   {!registrationOpen && tournament.registrationStartDate && (
-                    <Badge variant="outline" className="w-full justify-center py-2">
-                      <Clock className="h-4 w-4 mr-2" />
+                    <Badge variant="outline" className="w-full justify-center h-12 items-center text-base font-semibold">
+                      <Clock className="h-5 w-5 mr-2" />
                       Opens {format(new Date(tournament.registrationStartDate), 'MMM d, yyyy')}
                     </Badge>
                   )}
                   
                   {registrationClosed && (
-                    <Badge variant="destructive" className="w-full justify-center py-2">
+                    <Badge variant="destructive" className="w-full justify-center h-12 items-center text-base font-semibold">
                       Registration Closed
                     </Badge>
                   )}
 
                   {canRegister && registrationOpen && (
-                    <Badge className="w-full justify-center py-2 bg-green-500">
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                    <Badge className="w-full justify-center h-12 items-center text-base font-semibold bg-green-500">
+                      <CheckCircle2 className="h-5 w-5 mr-2" />
                       Registration Open
                     </Badge>
                   )}
@@ -656,7 +657,7 @@ export function TournamentRegistrationClient({
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Logo className="h-6 w-6" />
+              <Logo size="sm" showText={false} />
               <span className="text-sm text-muted-foreground">
                 © {new Date().getFullYear()} Teamy. All rights reserved.
               </span>
