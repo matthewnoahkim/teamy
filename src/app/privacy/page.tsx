@@ -89,7 +89,7 @@ export default function PrivacyPolicyPage() {
               <li><strong>Portability:</strong> Export your data</li>
             </ul>
             <p className="mt-4">
-              To exercise these rights, please contact us at privacy@teamy.site.
+              To exercise these rights, please contact us at support@teamy.site.
             </p>
           </section>
 
@@ -106,7 +106,7 @@ export default function PrivacyPolicyPage() {
               If you have any questions about this Privacy Policy, please contact us at:
             </p>
             <p className="mt-4">
-              <strong>Email:</strong> privacy@teamy.site
+              <strong>Email:</strong> support@teamy.site
             </p>
           </section>
         </div>
