@@ -343,6 +343,10 @@ export function CustomizationClient({ user, preferences }: CustomizationClientPr
       setBackgroundType('image')
 
       toast({ title: 'Image uploaded', description: 'Background image has been uploaded successfully' })
+      
+      // Dispatch event to update background immediately
+      window.dispatchEvent(new Event('userBackgroundUpdated'))
+      
       router.refresh()
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to upload image', variant: 'destructive' })
@@ -367,6 +371,10 @@ export function CustomizationClient({ user, preferences }: CustomizationClientPr
       setBackgroundType('grid')
 
       toast({ title: 'Image deleted', description: 'Background image has been removed' })
+      
+      // Dispatch event to update background immediately
+      window.dispatchEvent(new Event('userBackgroundUpdated'))
+      
       router.refresh()
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to delete image', variant: 'destructive' })
@@ -449,6 +457,10 @@ export function CustomizationClient({ user, preferences }: CustomizationClientPr
       }
 
       toast({ title: 'Background updated', description: 'Your background has been updated across the entire site' })
+      
+      // Dispatch event to update background immediately
+      window.dispatchEvent(new Event('userBackgroundUpdated'))
+      
       router.refresh()
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to update background', variant: 'destructive' })

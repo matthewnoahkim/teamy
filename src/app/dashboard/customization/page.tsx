@@ -11,7 +11,7 @@ export default async function CustomizationPage() {
     redirect('/login?redirect=/dashboard/customization')
   }
 
-  // Fetch user preferences
+  // Fetch user data including preferences
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
@@ -23,6 +23,8 @@ export default async function CustomizationPage() {
     },
   })
 
+  const preferences = (user?.preferences as Record<string, unknown>) || null
+
   return (
     <CustomizationClient 
       user={{
@@ -31,7 +33,7 @@ export default async function CustomizationPage() {
         email: user?.email || session.user.email || '',
         image: user?.image || session.user.image,
       }}
-      preferences={(user?.preferences as Record<string, unknown>) || null}
+      preferences={preferences}
     />
   )
 }
