@@ -17,27 +17,27 @@ export function UserBackgroundApplier() {
     }
 
     const applyBackground = async () => {
+      // Always enforce header static background - defined outside try block so it's accessible in catch
+      const headerCss = `
+        header,
+        header.bg-teamy-primary,
+        header[class*="bg-teamy-primary"] {
+          background-color: #0056C7 !important;
+          background-image: none !important;
+          background: #0056C7 !important;
+        }
+        .dark header,
+        .dark header.bg-teamy-primary,
+        .dark header[class*="bg-teamy-primary"],
+        html.dark header,
+        html.dark header.bg-teamy-primary {
+          background-color: rgb(15 23 42) !important;
+          background-image: none !important;
+          background: rgb(15 23 42) !important;
+        }
+      `
+      
       try {
-        // Always enforce header static background
-        const headerCss = `
-          header,
-          header.bg-teamy-primary,
-          header[class*="bg-teamy-primary"] {
-            background-color: #0056C7 !important;
-            background-image: none !important;
-            background: #0056C7 !important;
-          }
-          .dark header,
-          .dark header.bg-teamy-primary,
-          .dark header[class*="bg-teamy-primary"],
-          html.dark header,
-          html.dark header.bg-teamy-primary {
-            background-color: rgb(15 23 42) !important;
-            background-image: none !important;
-            background: rgb(15 23 42) !important;
-          }
-        `
-        
         // Default: reset everything
         let css = `
           :root {
