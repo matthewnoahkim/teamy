@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { AppHeader } from '@/components/app-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -233,6 +233,11 @@ function SortableColorItem({
 export function CustomizationClient({ user, preferences }: CustomizationClientProps) {
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // Determine back destination based on where user came from
+  const from = searchParams.get('from')
+  const backHref = from === 'tournaments' ? '/dashboard/tournaments' : '/dashboard/club'
 
   const defaultColors = {
     backgroundColor: '#f8fafc',
@@ -661,7 +666,7 @@ export function CustomizationClient({ user, preferences }: CustomizationClientPr
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8">
           <Link 
-            href="/dashboard/club" 
+            href={backHref} 
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
           >
             <ArrowLeft className="h-4 w-4" />

@@ -1029,6 +1029,24 @@ model MemberPreferences {
   @@index([membershipId])
 }
 
+model StudyNote {
+  id           String          @id @default(cuid())
+  clubId       String
+  membershipId String
+  eventSlug    String          // e.g., "anatomy", "chemistry-lab"
+  title        String
+  content      String          @db.Text // Rich text HTML content
+  noteType     StudyNoteType   // NOTE_SHEET or BINDER
+  sheetCount   Int             @default(1) // Number of note sheets (1, 2, or 4 for note sheets)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  
+  @@unique([clubId, membershipId, eventSlug])
+  @@index([clubId])
+  @@index([membershipId])
+  @@index([eventSlug])
+}
+
 model AIRosterGeneration {
   id              String    @id @default(cuid())
   clubId          String
@@ -1062,6 +1080,7 @@ model Tournament {
   paymentInstructions     String?
   isOnline                Boolean                   @default(false)
   approved                Boolean                   @default(false)
+  published               Boolean                   @default(false)
   rejectionReason         String?
   hostingRequestId        String?                   @unique
   pageContent             String?
@@ -1091,6 +1110,7 @@ model Tournament {
   @@index([endDate])
   @@index([division])
   @@index([approved])
+  @@index([published])
   @@index([slug])
   @@index([hostingRequestId])
 }
@@ -1528,4 +1548,9 @@ enum StaffInviteStatus {
   PENDING
   ACCEPTED
   DECLINED
+}
+
+enum StudyNoteType {
+  NOTE_SHEET
+  BINDER
 }

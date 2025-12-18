@@ -41,8 +41,9 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
   const buttonHref = isOnTournamentsPage ? '/dashboard/club' : '/dashboard/tournaments'
   const ButtonIcon = isOnTournamentsPage ? Users : Trophy
   
-  // Only show customization and billing on club dashboard pages
+  // Show customization and billing on club and tournaments dashboard pages
   const isOnClubDashboard = pathname?.startsWith('/dashboard/club') || 
+                            pathname?.startsWith('/dashboard/tournaments') ||
                             pathname === '/dashboard/customization' || 
                             pathname === '/dashboard/billing'
   const isOnESPortal = pathname?.startsWith('/es')
@@ -90,7 +91,10 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
             {showCustomizationBilling && (
               <>
                 <button
-                  onClick={() => router.push('/dashboard/customization')}
+                  onClick={() => {
+                    const from = isOnTournamentsPage ? 'tournaments' : 'clubs'
+                    router.push(`/dashboard/customization?from=${from}`)
+                  }}
                   className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
                     pathname === '/dashboard/customization'
                       ? 'text-white font-semibold'
@@ -106,7 +110,10 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
                   </span>
                 </button>
                 <button
-                  onClick={() => router.push('/dashboard/billing')}
+                  onClick={() => {
+                    const from = isOnTournamentsPage ? 'tournaments' : 'clubs'
+                    router.push(`/dashboard/billing?from=${from}`)
+                  }}
                   className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
                     pathname === '/dashboard/billing'
                       ? 'text-white font-semibold'
@@ -160,11 +167,23 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
                 </DropdownMenuItem>
                 {showCustomizationBilling && (
                   <>
-                    <DropdownMenuItem onClick={() => router.push('/dashboard/customization')} className="md:hidden">
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        const from = isOnTournamentsPage ? 'tournaments' : 'clubs'
+                        router.push(`/dashboard/customization?from=${from}`)
+                      }} 
+                      className="md:hidden"
+                    >
                       <Settings className="mr-2 h-4 w-4" />
                       Customization
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/dashboard/billing')} className="md:hidden">
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        const from = isOnTournamentsPage ? 'tournaments' : 'clubs'
+                        router.push(`/dashboard/billing?from=${from}`)
+                      }} 
+                      className="md:hidden"
+                    >
                       <CreditCard className="mr-2 h-4 w-4" />
                       Billing
                     </DropdownMenuItem>

@@ -150,6 +150,7 @@ export default async function TournamentManagePage({ params }: Props) {
     eligibilityRequirements: request.tournament.eligibilityRequirements,
     eventsRun: request.tournament.eventsRun,
     level: request.tournamentLevel || null,
+    published: request.tournament.published,
   }
 
   const serializedStaff = staff.map(s => ({

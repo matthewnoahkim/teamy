@@ -2,6 +2,31 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+/**
+ * Get the base URL for the app.
+ * Uses NEXTAUTH_URL if set, otherwise VERCEL_URL for production, or localhost for development.
+ */
+function getBaseUrl(): string {
+  // First priority: explicitly set NEXTAUTH_URL
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL
+  }
+  // Second priority: Vercel deployment URL (automatically set by Vercel)
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+  // Third priority: custom APP_URL env var
+  if (process.env.APP_URL) {
+    return process.env.APP_URL
+  }
+  // Production fallback
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://teamy.site'
+  }
+  // Development fallback
+  return 'http://localhost:3000'
+}
+
 export interface StaffInviteEmailParams {
   to: string
   staffName?: string
@@ -30,7 +55,7 @@ export async function sendStaffInviteEmail({
       return { messageId: null }
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    const baseUrl = getBaseUrl()
     const portalUrl = role === 'EVENT_SUPERVISOR' 
       ? `${baseUrl}/es?token=${inviteToken}`
       : `${baseUrl}/td?token=${inviteToken}`
@@ -214,7 +239,7 @@ export async function sendAnnouncementEmail({
     }
 
     // Build the club stream URL
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    const baseUrl = getBaseUrl()
     const clubStreamUrl = `${baseUrl}/club/${clubId}?tab=stream`
 
     // Build event details section if this is an event announcement

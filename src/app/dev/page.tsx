@@ -3,7 +3,13 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy } from 'lucide-react'
+import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -15,17 +21,21 @@ import {
 import { HealthTools } from '@/components/dev/health-tools'
 import { BlogManager } from '@/components/dev/blog-manager'
 import { TournamentRequests } from '@/components/dev/tournament-requests'
+import { EmailManager } from '@/components/dev/email-manager'
+import { AnalyticsDashboard } from '@/components/dev/analytics-dashboard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 
-type Section = 'blog' | 'security' | 'tournaments' | 'payments'
+type Section = 'blog' | 'security' | 'tournaments' | 'email' | 'analytics' | 'payments'
 
 const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'email', label: 'Email', icon: Mail },
   { id: 'blog', label: 'Blog', icon: FileText },
-  { id: 'security', label: 'Security', icon: Shield },
   { id: 'tournaments', label: 'Tournaments', icon: Trophy },
+  { id: 'security', label: 'Security', icon: Shield },
   { id: 'payments', label: 'Payments', icon: CreditCard },
 ]
 
@@ -33,11 +43,11 @@ export default function DevPage() {
   const [activeSection, setActiveSection] = useState<Section>(() => {
     if (typeof window !== 'undefined') {
       const savedSection = localStorage.getItem('dev-panel-active-section') as Section
-      if (savedSection && ['blog', 'security', 'tournaments', 'payments'].includes(savedSection)) {
+      if (savedSection && ['blog', 'security', 'tournaments', 'email', 'analytics', 'payments'].includes(savedSection)) {
         return savedSection
       }
     }
-    return 'blog'
+    return 'analytics'
   })
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -314,17 +324,30 @@ export default function DevPage() {
             <span className="text-lg font-semibold text-white">Dev Panel</span>
           </div>
           <div className="flex items-center gap-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 outline-none text-white hover:text-white/80 transition-colors">
+                  <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
+                    <span className="text-sm font-semibold">D</span>
+                  </div>
+                  <span className="text-sm font-medium hidden sm:block">Developer</span>
+                  <ChevronDown className="h-4 w-4 text-white/60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setIsAuthenticated(false)
+                    sessionStorage.removeItem('dev_auth')
+                  }}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ThemeToggle variant="header" />
-            <button
-              onClick={() => {
-                setIsAuthenticated(false)
-                sessionStorage.removeItem('dev_auth')
-              }}
-              className="flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign Out
-            </button>
           </div>
         </div>
       </header>
@@ -362,6 +385,10 @@ export default function DevPage() {
               {navItems.find(item => item.id === activeSection)?.label}
             </h1>
           </div>
+
+          {activeSection === 'analytics' && <AnalyticsDashboard />}
+
+          {activeSection === 'email' && <EmailManager />}
 
           {activeSection === 'blog' && <BlogManager />}
           

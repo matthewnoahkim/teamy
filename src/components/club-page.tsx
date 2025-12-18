@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Home, MessageSquare, Users, Calendar, Settings, ClipboardCheck, DollarSign, FileText, Pencil, Image, File, Menu, CheckSquare, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Home, MessageSquare, Users, Calendar, Settings, ClipboardCheck, DollarSign, FileText, Pencil, Image, File, Menu, CheckSquare, BarChart3, BookOpen, Wrench } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
 import { HomePageTab } from '@/components/tabs/homepage-tab'
 import { PageLoading } from '@/components/ui/loading-spinner'
@@ -43,6 +43,12 @@ const TodoTab = dynamic(() => import('@/components/tabs/todo-tab').then(mod => (
 })
 const StatsTab = dynamic(() => import('@/components/tabs/stats-tab').then(mod => ({ default: mod.StatsTab })), {
   loading: () => <PageLoading title="Loading stats" description="Fetching analytics and insights..." variant="orbit" />
+})
+const NotesTab = dynamic(() => import('@/components/tabs/notes-tab').then(mod => ({ default: mod.NotesTab })), {
+  loading: () => <PageLoading title="Loading notes" description="Fetching study materials..." variant="orbit" />
+})
+const ToolsTab = dynamic(() => import('@/components/tabs/tools-tab').then(mod => ({ default: mod.ToolsTab })), {
+  loading: () => <PageLoading title="Loading tools" description="Preparing study tools..." variant="orbit" />
 })
 import {
   Dialog,
@@ -588,6 +594,22 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
           </span>
         )}
       </Button>
+      <Button
+        variant={activeTab === 'notes' ? 'default' : 'ghost'}
+        className="w-full justify-start text-xs sm:text-sm font-semibold h-10 sm:h-11 rounded-2xl"
+        onClick={() => handleTabChange('notes')}
+      >
+        <BookOpen className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        Notes
+      </Button>
+      <Button
+        variant={activeTab === 'tools' ? 'default' : 'ghost'}
+        className="w-full justify-start text-xs sm:text-sm font-semibold h-10 sm:h-11 rounded-2xl"
+        onClick={() => handleTabChange('tools')}
+      >
+        <Wrench className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        Tools
+      </Button>
       <div className="h-px bg-border my-2" />
       {isAdmin && (
         <Button
@@ -787,6 +809,23 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
                 currentMembershipId={currentMembership.id}
                 user={user}
                 isAdmin={isAdmin}
+              />
+            )}
+
+            {activeTab === 'notes' && (
+              <NotesTab
+                clubId={club.id}
+                membershipId={currentMembership.id}
+                division={club.division}
+                user={user}
+                isAdmin={isAdmin}
+              />
+            )}
+
+            {activeTab === 'tools' && (
+              <ToolsTab
+                clubId={club.id}
+                division={club.division}
               />
             )}
 

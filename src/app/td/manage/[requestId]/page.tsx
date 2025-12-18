@@ -261,6 +261,7 @@ export default async function TournamentManageByRequestPage({ params }: Props) {
     otherDiscounts: tournament.otherDiscounts,
     eligibilityRequirements: tournament.eligibilityRequirements,
     eventsRun: tournament.eventsRun,
+    published: tournament.published,
     level: request.tournamentLevel || null,
   }
 

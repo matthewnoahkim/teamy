@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { AppHeader } from '@/components/app-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,12 @@ const boostTiers = [
 ]
 
 export function BillingClient({ user, clubs }: BillingClientProps) {
+  const searchParams = useSearchParams()
+  
+  // Determine back destination based on where user came from
+  const from = searchParams.get('from')
+  const backHref = from === 'tournaments' ? '/dashboard/tournaments' : '/dashboard/club'
+  
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
       <AppHeader user={user} />
@@ -43,7 +50,7 @@ export function BillingClient({ user, clubs }: BillingClientProps) {
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="mb-8">
           <Link 
-            href="/dashboard/club" 
+            href={backHref} 
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
           >
             <ArrowLeft className="h-4 w-4" />

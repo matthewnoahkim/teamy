@@ -41,6 +41,9 @@ import {
   Search,
   ChevronDown,
   ChevronRight,
+  Globe,
+  Lock,
+  Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -156,6 +159,7 @@ interface Tournament {
   otherDiscounts: string | null
   eligibilityRequirements: string | null
   eventsRun: string | null
+  published: boolean
   // From hosting request
   level: string | null
 }
@@ -243,6 +247,8 @@ export function TDTournamentManageClient({
   const [staff, setStaff] = useState<StaffMember[]>(initialStaff)
   const [registrations, setRegistrations] = useState<Registration[]>(initialRegistrations)
   const [loadingRegistrations, setLoadingRegistrations] = useState(false)
+  const [isPublished, setIsPublished] = useState(tournament.published)
+  const [publishing, setPublishing] = useState(false)
   const [expandedRegistrations, setExpandedRegistrations] = useState<Set<string>>(new Set())
   const [teamsSearchQuery, setTeamsSearchQuery] = useState('')
   const [timeline, setTimeline] = useState<TimelineItem[]>(initialTimeline)
@@ -363,6 +369,38 @@ export function TDTournamentManageClient({
       console.error('Failed to fetch staff:', error)
     } finally {
       setLoadingStaff(false)
+    }
+  }
+
+  // Toggle publish status
+  const togglePublish = async () => {
+    setPublishing(true)
+    try {
+      const res = await fetch(`/api/tournaments/${tournament.id}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published: !isPublished }),
+      })
+      if (res.ok) {
+        setIsPublished(!isPublished)
+        toast({
+          title: !isPublished ? 'Tournament Published' : 'Tournament Unpublished',
+          description: !isPublished 
+            ? 'Your tournament page is now visible to the public.' 
+            : 'Your tournament page is now hidden from the public.',
+        })
+      } else {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update publish status')
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update publish status',
+        variant: 'destructive',
+      })
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -989,16 +1027,43 @@ export function TDTournamentManageClient({
                     <Badge variant="outline">Division {formatDivision(tournament.division)}</Badge>
                   </div>
                 </div>
-                {tournament.slug && (
-                  <Link href={`/tournaments/${tournament.slug}`} target="_blank">
-                    <Button variant="outline" size="sm">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      View Public Page
-                    </Button>
-                  </Link>
-                )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={togglePublish}
+                    disabled={publishing}
+                    variant={isPublished ? "outline" : "default"}
+                    size="sm"
+                    className={isPublished ? "" : "bg-green-600 hover:bg-green-700 text-white"}
+                  >
+                    {publishing ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : isPublished ? (
+                      <Lock className="h-4 w-4 mr-2" />
+                    ) : (
+                      <Globe className="h-4 w-4 mr-2" />
+                    )}
+                    {publishing ? 'Updating...' : isPublished ? 'Unpublish' : 'Publish'}
+                  </Button>
+                  {tournament.slug && isPublished && (
+                    <Link href={`/tournaments/${tournament.slug}`} target="_blank">
+                      <Button variant="outline" size="sm">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View Public Page
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               </div>
             </CardHeader>
+            {!isPublished && (
+              <CardContent className="pt-0">
+                <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    <strong>Not Published:</strong> Your tournament page is currently hidden from the public. Click &quot;Publish&quot; to make it visible.
+                  </p>
+                </div>
+              </CardContent>
+            )}
           </Card>
         </div>
 

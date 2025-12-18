@@ -87,8 +87,13 @@ export default async function TournamentPage({ params }: Props) {
     notFound()
   }
 
-  // Check if user is the tournament director
+  // Check if user is the tournament director (they can see unpublished)
   const isDirector = session?.user?.email?.toLowerCase() === hostingRequest.directorEmail.toLowerCase()
+
+  // Check if tournament is published (or user is director)
+  if (!hostingRequest.tournament?.published && !isDirector) {
+    notFound()
+  }
 
   // Get user's clubs if logged in (for registration)
   let userClubs: { id: string; name: string; division: string; teams: { id: string; name: string }[] }[] = []

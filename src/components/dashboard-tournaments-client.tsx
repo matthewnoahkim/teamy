@@ -265,6 +265,8 @@ export function DashboardTournamentsClient({ user }: DashboardTournamentsClientP
               <Link 
                 key={tournament.id} 
                 href={`/tournaments/${getTournamentSlug(tournament)}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="block"
               >
                 <Card className="hover:shadow-lg transition-all hover:border-teamy-primary/50 cursor-pointer h-full">
