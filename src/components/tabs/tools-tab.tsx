@@ -33,12 +33,24 @@ import {
   Code,
   FlaskConical,
   Microscope,
+  StopCircle,
+  Flag,
+  Settings2,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Calculator } from '@/components/tests/calculator'
 
 interface ToolsTabProps {
@@ -46,32 +58,184 @@ interface ToolsTabProps {
   division: 'B' | 'C'
 }
 
-// Timer Component
-function StudyTimer() {
-  const [time, setTime] = useState(50 * 60) // 50 minutes default
+// Ring tone types for Web Audio API
+type RingToneType = 'beep' | 'chime' | 'bell' | 'alarm' | 'none'
+
+const RING_TONE_NAMES: Record<RingToneType, string> = {
+  beep: 'Simple Beep',
+  chime: 'Gentle Chime',
+  bell: 'School Bell',
+  alarm: 'Alarm Clock',
+  none: 'Silent',
+}
+
+// Web Audio API sound generator
+function playSound(type: RingToneType, volume: number = 0.5) {
+  if (type === 'none') return
+  
+  try {
+    const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+    
+    switch (type) {
+      case 'beep': {
+        // Simple beep - two short tones
+        const playBeep = (startTime: number, freq: number) => {
+          const osc = audioContext.createOscillator()
+          const gain = audioContext.createGain()
+          osc.connect(gain)
+          gain.connect(audioContext.destination)
+          osc.frequency.value = freq
+          osc.type = 'sine'
+          gain.gain.setValueAtTime(volume, startTime)
+          gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15)
+          osc.start(startTime)
+          osc.stop(startTime + 0.15)
+        }
+        playBeep(audioContext.currentTime, 880)
+        playBeep(audioContext.currentTime + 0.2, 880)
+        playBeep(audioContext.currentTime + 0.4, 1100)
+        break
+      }
+      case 'chime': {
+        // Gentle chime - ascending tones
+        const frequencies = [523.25, 659.25, 783.99, 1046.50] // C5, E5, G5, C6
+        frequencies.forEach((freq, i) => {
+          const osc = audioContext.createOscillator()
+          const gain = audioContext.createGain()
+          osc.connect(gain)
+          gain.connect(audioContext.destination)
+          osc.frequency.value = freq
+          osc.type = 'sine'
+          const startTime = audioContext.currentTime + i * 0.15
+          gain.gain.setValueAtTime(volume * 0.6, startTime)
+          gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.5)
+          osc.start(startTime)
+          osc.stop(startTime + 0.5)
+        })
+        break
+      }
+      case 'bell': {
+        // School bell - ringing sound
+        const playRing = (startTime: number) => {
+          const osc1 = audioContext.createOscillator()
+          const osc2 = audioContext.createOscillator()
+          const gain = audioContext.createGain()
+          osc1.connect(gain)
+          osc2.connect(gain)
+          gain.connect(audioContext.destination)
+          osc1.frequency.value = 800
+          osc2.frequency.value = 1200
+          osc1.type = 'sine'
+          osc2.type = 'sine'
+          gain.gain.setValueAtTime(volume * 0.4, startTime)
+          gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3)
+          osc1.start(startTime)
+          osc2.start(startTime)
+          osc1.stop(startTime + 0.3)
+          osc2.stop(startTime + 0.3)
+        }
+        for (let i = 0; i < 4; i++) {
+          playRing(audioContext.currentTime + i * 0.35)
+        }
+        break
+      }
+      case 'alarm': {
+        // Alarm clock - alternating high-low tones
+        const playAlarm = (startTime: number, freq: number) => {
+          const osc = audioContext.createOscillator()
+          const gain = audioContext.createGain()
+          osc.connect(gain)
+          gain.connect(audioContext.destination)
+          osc.frequency.value = freq
+          osc.type = 'square'
+          gain.gain.setValueAtTime(volume * 0.3, startTime)
+          gain.gain.setValueAtTime(0, startTime + 0.1)
+          osc.start(startTime)
+          osc.stop(startTime + 0.1)
+        }
+        for (let i = 0; i < 6; i++) {
+          playAlarm(audioContext.currentTime + i * 0.15, i % 2 === 0 ? 880 : 660)
+        }
+        break
+      }
+    }
+    
+    // Clean up after sounds finish
+    setTimeout(() => audioContext.close(), 2000)
+  } catch (error) {
+    console.error('Audio playback failed:', error)
+  }
+}
+
+// Tool wrapper with expand button
+interface ToolCardProps {
+  title: string
+  icon: React.ReactNode
+  isExpanded: boolean
+  onExpand: () => void
+  onCollapse: () => void
+  children: React.ReactNode
+  headerExtra?: React.ReactNode
+}
+
+function ToolCard({ title, icon, isExpanded, onExpand, onCollapse, children, headerExtra }: ToolCardProps) {
+  return (
+    <Card className={`h-full flex flex-col ${isExpanded ? 'col-span-full row-span-full' : ''}`}>
+      <CardHeader className="pb-3 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            {icon}
+            {title}
+          </CardTitle>
+          <div className="flex items-center gap-1">
+            {headerExtra}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={isExpanded ? onCollapse : onExpand}
+              className="h-8 w-8 p-0"
+              title={isExpanded ? 'Minimize' : 'Expand'}
+            >
+              {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className={`flex-1 ${isExpanded ? 'overflow-auto' : ''}`}>
+        {children}
+      </CardContent>
+    </Card>
+  )
+}
+
+// Compact Timer Component with customizable ringtone
+function StudyTimer({ isExpanded, onExpand, onCollapse }: { isExpanded: boolean; onExpand: () => void; onCollapse: () => void }) {
+  const [time, setTime] = useState(50 * 60)
   const [isRunning, setIsRunning] = useState(false)
   const [initialTime, setInitialTime] = useState(50 * 60)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [customMinutes, setCustomMinutes] = useState('50')
+  const [customSeconds, setCustomSeconds] = useState('00')
+  const [ringTone, setRingTone] = useState<RingToneType>('beep')
+  const [showSettings, setShowSettings] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  // Load saved ringtone preference
   useEffect(() => {
-    // Try to load audio, but don't fail if it doesn't exist
     if (typeof window !== 'undefined') {
-      try {
-        const audio = new Audio()
-        // Use a built-in beep sound approach or try to load audio
-        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleRZT7gHbq3t0c4qb2u7HlkMeCWalyOLBawoFd7HU5qBvEwJRoMzauW4QAGZ+ttvPqGYKDXWt1eGnaQwAW5rQ47RuEABkotHhq2cNAGOe0+KubRABUpnO4bRuDwBgoNTjr2kMAF2e0OK1bxAAZaTV47BqDwBcnNHhtW8RAGek1+Sxaw4AWJzS4rZwEABjotXjsm0OAFqf1OO2cBAAYqPX5LNtDgBZntTjt3ESAGSl2eW0bQ4AWJ7V5LhxEQBkptvmtm4PAFef1+W5cRIAZKjc57dvDwBVntfmunETAGOo3ei4cA8AU57Y57txFABiqN7puHIPAFKf2em7chQAYanf6rlyEABQn9rqvHMVAGGq4Ou6cxEATp/b671zFQBfquLsvHQSAEyg3O2+dBYAXqrj7b11EgBKoNzuv3UXAF2q5O2+dhMAR6Dd7sB2GABbqeXuwHcUAESg3u/BdxkAWanm78F4FgBBn9/vw3oaAFap5/DCeRcAPZ/f8MR6GgBTqOjxw3oYADmf4PHFexsBUKjp8sR7GQA0nuHyx3waAE2n6fPFfBsAL57i88h+GwBJpurzyX4bACue4/TJfhsARKXq9Mp/GwAnneT1yn8cAD+k6vXLgBwAIp3l9syBHQA6o+v2zYEdAB2c5ffNgh4ANaLr982CHgAYnOb4zoMfADCh7PjPhB8AEpvn+M+EHwAroez5z4UgAAya6PnQhiAAJaDs+dGGIAAHmen50YchAB+f7PrSiCEAApnp+tOIIgAZnuz70oksAAya5/vTiisACZjg+9KHLwAKmOH81IktAAaa4vzUii4ABJfg/NWKLwACluD91ootAACU4PzWiS8AAZXS/NWJLwABlcz91IkwAAKVyv3ViTAAAJXI/dWJMQABlcn91okxAAGVyf3ViTEAAJTK/taJMAABlcn91YkxAAGVyf3WiTIAAZTH/NaJMgABlMj91ok0AAGUx/3WiTQAAZTI/daJMwAAlMj91Yk0AAGUyP3ViTQAAJPJ/taJNAABk8n91ok0AACT'
-        audioRef.current = audio
-      } catch {
-        // Silently fail if audio can't be created
+      const saved = localStorage.getItem('timer-ringtone')
+      if (saved && saved in RING_TONE_NAMES) {
+        setRingTone(saved as RingToneType)
       }
     }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
   }, [])
+
+  // Save ringtone preference
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('timer-ringtone', ringTone)
+    }
+  }, [ringTone])
 
   useEffect(() => {
     if (isRunning && time > 0) {
@@ -79,8 +243,8 @@ function StudyTimer() {
         setTime(prev => {
           if (prev <= 1) {
             setIsRunning(false)
-            if (soundEnabled && audioRef.current) {
-              audioRef.current.play().catch(() => {})
+            if (soundEnabled) {
+              playSound(ringTone)
             }
             return 0
           }
@@ -93,7 +257,7 @@ function StudyTimer() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [isRunning, soundEnabled])
+  }, [isRunning, soundEnabled, ringTone])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -102,7 +266,6 @@ function StudyTimer() {
   }
 
   const toggleTimer = () => setIsRunning(!isRunning)
-
   const resetTimer = () => {
     setIsRunning(false)
     setTime(initialTime)
@@ -116,176 +279,553 @@ function StudyTimer() {
   }
 
   const handleCustomTime = () => {
-    const mins = parseInt(customMinutes)
-    if (!isNaN(mins) && mins > 0 && mins <= 180) {
-      setPresetTime(mins)
+    const mins = parseInt(customMinutes) || 0
+    const secs = parseInt(customSeconds) || 0
+    const totalSeconds = mins * 60 + secs
+    if (totalSeconds > 0 && totalSeconds <= 10800) { // Max 3 hours
+      setInitialTime(totalSeconds)
+      setTime(totalSeconds)
+      setIsRunning(false)
     }
   }
 
-  const progress = (time / initialTime) * 100
+  const testSound = () => {
+    playSound(ringTone)
+  }
+
+  const progress = initialTime > 0 ? (time / initialTime) * 100 : 0
+
+  const settingsButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setShowSettings(!showSettings)}
+      className="h-8 w-8 p-0"
+    >
+      <Settings2 className="h-4 w-4" />
+    </Button>
+  )
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Timer className="h-5 w-5" />
-          Study Timer
-        </CardTitle>
-        <CardDescription>Track your study sessions with preset or custom times</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Timer Display */}
-        <div className="text-center">
-          <div className="relative inline-flex items-center justify-center">
-            <svg className="w-48 h-48 transform -rotate-90">
-              <circle
-                cx="96"
-                cy="96"
-                r="88"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                className="text-muted/20"
-              />
-              <circle
-                cx="96"
-                cy="96"
-                r="88"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                strokeDasharray={553}
-                strokeDashoffset={553 - (553 * progress) / 100}
-                className={`transition-all duration-1000 ${
-                  time < 60 ? 'text-red-500' : time < 300 ? 'text-yellow-500' : 'text-primary'
-                }`}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={`text-4xl font-mono font-bold ${time < 60 ? 'text-red-500 animate-pulse' : ''}`}>
-                {formatTime(time)}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {isRunning ? 'Running' : time === 0 ? 'Complete!' : 'Paused'}
-              </span>
+    <ToolCard
+      title="Timer"
+      icon={<Timer className="h-5 w-5" />}
+      isExpanded={isExpanded}
+      onExpand={onExpand}
+      onCollapse={onCollapse}
+      headerExtra={settingsButton}
+    >
+      <div className={`space-y-4 ${isExpanded ? 'max-w-md mx-auto' : ''}`}>
+        {showSettings ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm">Ring Tone</Label>
+              <Select value={ringTone} onValueChange={(v) => setRingTone(v as RingToneType)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(RING_TONE_NAMES).map(([key, name]) => (
+                    <SelectItem key={key} value={key}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={testSound} disabled={ringTone === 'none'} className="w-full">
+                <Volume2 className="h-4 w-4 mr-2" />
+                Test Sound
+              </Button>
             </div>
+            <Button variant="secondary" size="sm" onClick={() => setShowSettings(false)} className="w-full">
+              Done
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* Timer Display */}
+            <div className="text-center">
+              <div className="relative inline-flex items-center justify-center">
+                <svg className={`transform -rotate-90 ${isExpanded ? 'w-48 h-48' : 'w-32 h-32'}`}>
+                  <circle
+                    cx={isExpanded ? '96' : '64'}
+                    cy={isExpanded ? '96' : '64'}
+                    r={isExpanded ? '84' : '56'}
+                    stroke="currentColor"
+                    strokeWidth="6"
+                    fill="none"
+                    className="text-muted/20"
+                  />
+                  <circle
+                    cx={isExpanded ? '96' : '64'}
+                    cy={isExpanded ? '96' : '64'}
+                    r={isExpanded ? '84' : '56'}
+                    stroke="currentColor"
+                    strokeWidth="6"
+                    fill="none"
+                    strokeDasharray={isExpanded ? 528 : 352}
+                    strokeDashoffset={(isExpanded ? 528 : 352) - ((isExpanded ? 528 : 352) * progress) / 100}
+                    className={`transition-all duration-1000 ${
+                      time < 60 ? 'text-red-500' : time < 300 ? 'text-yellow-500' : 'text-primary'
+                    }`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className={`font-mono font-bold ${time < 60 ? 'text-red-500 animate-pulse' : ''} ${isExpanded ? 'text-4xl' : 'text-2xl'}`}>
+                    {formatTime(time)}
+                  </span>
+                  <span className={`text-muted-foreground ${isExpanded ? 'text-sm' : 'text-xs'}`}>
+                    {isRunning ? 'Running' : time === 0 ? 'Done!' : 'Paused'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                size="sm"
+                variant={isRunning ? 'secondary' : 'default'}
+                onClick={toggleTimer}
+              >
+                {isRunning ? <Pause className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
+                {isRunning ? 'Pause' : 'Start'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={resetTimer}>
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSoundEnabled(!soundEnabled)}
+              >
+                {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            {/* Presets */}
+            <div className="flex flex-wrap gap-1 justify-center">
+              {[15, 25, 30, 45, 50, 60].map((mins) => (
+                <Button
+                  key={mins}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPresetTime(mins)}
+                  className={`text-xs h-7 px-2 ${initialTime === mins * 60 ? 'border-primary bg-primary/10' : ''}`}
+                >
+                  {mins}m
+                </Button>
+              ))}
+            </div>
+
+            {/* Custom Time - Compact layout */}
+            <div className="flex items-center gap-1 justify-center flex-wrap">
+              <Input
+                type="number"
+                min="0"
+                max="180"
+                value={customMinutes}
+                onChange={(e) => setCustomMinutes(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCustomTime()}
+                className="h-7 text-xs w-12 text-center px-1"
+                placeholder="mm"
+              />
+              <span className="text-sm font-bold">:</span>
+              <Input
+                type="number"
+                min="0"
+                max="59"
+                value={customSeconds}
+                onChange={(e) => setCustomSeconds(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCustomTime()}
+                className="h-7 text-xs w-12 text-center px-1"
+                placeholder="ss"
+              />
+              <Button size="sm" onClick={handleCustomTime} className="h-7 text-xs px-2">Set</Button>
+            </div>
+          </>
+        )}
+      </div>
+    </ToolCard>
+  )
+}
+
+// Stopwatch Component
+function Stopwatch({ isExpanded, onExpand, onCollapse }: { isExpanded: boolean; onExpand: () => void; onCollapse: () => void }) {
+  const [time, setTime] = useState(0) // in centiseconds
+  const [isRunning, setIsRunning] = useState(false)
+  const [laps, setLaps] = useState<number[]>([])
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    if (isRunning) {
+      intervalRef.current = setInterval(() => {
+        setTime(prev => prev + 1)
+      }, 10) // Update every 10ms for centiseconds
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [isRunning])
+
+  const formatTime = (centiseconds: number) => {
+    const mins = Math.floor(centiseconds / 6000)
+    const secs = Math.floor((centiseconds % 6000) / 100)
+    const cs = centiseconds % 100
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${cs.toString().padStart(2, '0')}`
+  }
+
+  const toggleStopwatch = () => setIsRunning(!isRunning)
+  
+  const resetStopwatch = () => {
+    setIsRunning(false)
+    setTime(0)
+    setLaps([])
+  }
+
+  const addLap = () => {
+    if (isRunning) {
+      setLaps(prev => [time, ...prev])
+    }
+  }
+
+  return (
+    <ToolCard
+      title="Stopwatch"
+      icon={<StopCircle className="h-5 w-5" />}
+      isExpanded={isExpanded}
+      onExpand={onExpand}
+      onCollapse={onCollapse}
+    >
+      <div className={`space-y-4 ${isExpanded ? 'max-w-md mx-auto' : ''}`}>
+        {/* Display */}
+        <div className="text-center">
+          <div className={`font-mono font-bold tracking-tight ${isExpanded ? 'text-6xl' : 'text-4xl'}`}>
+            {formatTime(time)}
           </div>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-2">
           <Button
-            size="lg"
+            size="sm"
             variant={isRunning ? 'secondary' : 'default'}
-            onClick={toggleTimer}
-            className="w-24"
+            onClick={toggleStopwatch}
           >
-            {isRunning ? <Pause className="h-5 w-5 mr-1" /> : <Play className="h-5 w-5 mr-1" />}
-            {isRunning ? 'Pause' : 'Start'}
+            {isRunning ? <Pause className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
+            {isRunning ? 'Stop' : 'Start'}
           </Button>
-          <Button size="lg" variant="outline" onClick={resetTimer}>
-            <RotateCcw className="h-5 w-5 mr-1" />
-            Reset
+          <Button size="sm" variant="outline" onClick={addLap} disabled={!isRunning}>
+            <Flag className="h-4 w-4 mr-1" />
+            Lap
           </Button>
-          <Button
-            size="lg"
-            variant="ghost"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-          >
-            {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+          <Button size="sm" variant="outline" onClick={resetStopwatch}>
+            <RotateCcw className="h-4 w-4" />
           </Button>
         </div>
 
-        {/* Presets */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium">Quick Presets</Label>
-          <div className="flex flex-wrap gap-2">
-            {[15, 25, 30, 45, 50, 60, 90, 120].map((mins) => (
-              <Button
-                key={mins}
-                variant="outline"
-                size="sm"
-                onClick={() => setPresetTime(mins)}
-                className={initialTime === mins * 60 ? 'border-primary bg-primary/10' : ''}
-              >
-                {mins} min
-              </Button>
-            ))}
+        {/* Laps */}
+        {laps.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Laps</Label>
+            <ScrollArea className={isExpanded ? 'h-64' : 'h-24'}>
+              <div className="space-y-1">
+                {laps.map((lapTime, index) => (
+                  <div key={index} className="flex justify-between text-sm px-2 py-1 bg-muted/50 rounded">
+                    <span className="text-muted-foreground">Lap {laps.length - index}</span>
+                    <span className="font-mono">{formatTime(lapTime)}</span>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
-        </div>
-
-        {/* Custom Time */}
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Label htmlFor="custom-time" className="text-sm">Custom Time (minutes)</Label>
-            <Input
-              id="custom-time"
-              type="number"
-              min="1"
-              max="180"
-              value={customMinutes}
-              onChange={(e) => setCustomMinutes(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCustomTime()}
-            />
-          </div>
-          <Button onClick={handleCustomTime}>Set</Button>
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+    </ToolCard>
   )
 }
 
-// Calculator Selector Component
-function CalculatorSelector() {
-  const [calculatorType, setCalculatorType] = useState<'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' | null>(null)
+// Inline Calculator Components
+function FourFunctionCalculator({ isExpanded, onExpand, onCollapse }: { isExpanded: boolean; onExpand: () => void; onCollapse: () => void }) {
+  const [display, setDisplay] = useState('0')
+  const [previousValue, setPreviousValue] = useState<number | null>(null)
+  const [operation, setOperation] = useState<string | null>(null)
+  const [newNumber, setNewNumber] = useState(true)
+
+  const appendNumber = (num: string) => {
+    if (newNumber) {
+      setDisplay(num === '.' ? '0.' : num)
+      setNewNumber(false)
+    } else {
+      if (num === '.' && display.includes('.')) return
+      setDisplay(display === '0' && num !== '.' ? num : display + num)
+    }
+  }
+
+  const handleOperation = (op: string) => {
+    const current = parseFloat(display)
+    if (previousValue !== null && operation && !newNumber) {
+      const result = calculate(previousValue, current, operation)
+      setDisplay(String(result))
+      setPreviousValue(result)
+    } else {
+      setPreviousValue(current)
+    }
+    setOperation(op)
+    setNewNumber(true)
+  }
+
+  const calculate = (a: number, b: number, op: string): number => {
+    switch (op) {
+      case '+': return a + b
+      case '-': return a - b
+      case '×': return a * b
+      case '÷': return b !== 0 ? a / b : 0
+      default: return b
+    }
+  }
+
+  const equals = () => {
+    if (previousValue === null || operation === null) return
+    const current = parseFloat(display)
+    const result = calculate(previousValue, current, operation)
+    setDisplay(String(result))
+    setPreviousValue(null)
+    setOperation(null)
+    setNewNumber(true)
+  }
+
+  const clear = () => {
+    setDisplay('0')
+    setNewNumber(true)
+  }
+
+  const clearAll = () => {
+    setDisplay('0')
+    setPreviousValue(null)
+    setOperation(null)
+    setNewNumber(true)
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalcIcon className="h-5 w-5" />
-          Calculator
-        </CardTitle>
-        <CardDescription>Choose your calculator type for practice</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
+    <ToolCard
+      title="4-Function"
+      icon={<CalcIcon className="h-5 w-5" />}
+      isExpanded={isExpanded}
+      onExpand={onExpand}
+      onCollapse={onCollapse}
+    >
+      <div className={`space-y-2 ${isExpanded ? 'max-w-sm mx-auto' : ''}`}>
+        <div className="bg-muted rounded-md p-3 text-right">
+          <span className={`font-mono ${isExpanded ? 'text-4xl' : 'text-2xl'}`}>{display}</span>
+        </div>
+        <div className={`grid grid-cols-4 ${isExpanded ? 'gap-2' : 'gap-1'}`}>
+          <Button variant="outline" size="sm" onClick={clearAll} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>AC</Button>
+          <Button variant="outline" size="sm" onClick={clear} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>C</Button>
+          <Button variant="outline" size="sm" onClick={() => setDisplay(String(-parseFloat(display)))} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>±</Button>
+          <Button variant="outline" size="sm" onClick={() => handleOperation('÷')} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>÷</Button>
+          
+          {['7', '8', '9'].map(n => (
+            <Button key={n} variant="outline" size="sm" onClick={() => appendNumber(n)} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>{n}</Button>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => handleOperation('×')} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>×</Button>
+          
+          {['4', '5', '6'].map(n => (
+            <Button key={n} variant="outline" size="sm" onClick={() => appendNumber(n)} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>{n}</Button>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => handleOperation('-')} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>-</Button>
+          
+          {['1', '2', '3'].map(n => (
+            <Button key={n} variant="outline" size="sm" onClick={() => appendNumber(n)} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>{n}</Button>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => handleOperation('+')} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>+</Button>
+          
+          <Button variant="outline" size="sm" onClick={() => appendNumber('0')} className={`col-span-2 ${isExpanded ? 'h-12 text-lg' : 'h-9'}`}>0</Button>
+          <Button variant="outline" size="sm" onClick={() => appendNumber('.')} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>.</Button>
+          <Button variant="default" size="sm" onClick={equals} className={isExpanded ? 'h-12 text-lg' : 'h-9'}>=</Button>
+        </div>
+      </div>
+    </ToolCard>
+  )
+}
+
+function ScientificCalculator({ isExpanded, onExpand, onCollapse }: { isExpanded: boolean; onExpand: () => void; onCollapse: () => void }) {
+  const [display, setDisplay] = useState('0')
+  const [previousValue, setPreviousValue] = useState<number | null>(null)
+  const [operation, setOperation] = useState<string | null>(null)
+  const [newNumber, setNewNumber] = useState(true)
+  const [angleMode, setAngleMode] = useState<'DEG' | 'RAD'>('DEG')
+
+  const appendNumber = (num: string) => {
+    if (newNumber) {
+      setDisplay(num === '.' ? '0.' : num)
+      setNewNumber(false)
+    } else {
+      if (num === '.' && display.includes('.')) return
+      setDisplay(display === '0' && num !== '.' ? num : display + num)
+    }
+  }
+
+  const toRadians = (deg: number) => deg * (Math.PI / 180)
+
+  const handleScientific = (func: string) => {
+    const current = parseFloat(display)
+    let result: number
+    const angle = angleMode === 'DEG' ? toRadians(current) : current
+
+    switch (func) {
+      case 'sin': result = Math.sin(angle); break
+      case 'cos': result = Math.cos(angle); break
+      case 'tan': result = Math.tan(angle); break
+      case 'log': result = Math.log10(current); break
+      case 'ln': result = Math.log(current); break
+      case '√': result = Math.sqrt(current); break
+      case 'x²': result = current * current; break
+      case 'x³': result = current * current * current; break
+      case '1/x': result = 1 / current; break
+      case 'π': result = Math.PI; break
+      case 'e': result = Math.E; break
+      case '|x|': result = Math.abs(current); break
+      default: result = current
+    }
+    setDisplay(String(result))
+    setNewNumber(true)
+  }
+
+  const handleOperation = (op: string) => {
+    const current = parseFloat(display)
+    if (previousValue !== null && operation && !newNumber) {
+      const result = calculate(previousValue, current, operation)
+      setDisplay(String(result))
+      setPreviousValue(result)
+    } else {
+      setPreviousValue(current)
+    }
+    setOperation(op)
+    setNewNumber(true)
+  }
+
+  const calculate = (a: number, b: number, op: string): number => {
+    switch (op) {
+      case '+': return a + b
+      case '-': return a - b
+      case '×': return a * b
+      case '÷': return b !== 0 ? a / b : 0
+      case '^': return Math.pow(a, b)
+      default: return b
+    }
+  }
+
+  const equals = () => {
+    if (previousValue === null || operation === null) return
+    const current = parseFloat(display)
+    const result = calculate(previousValue, current, operation)
+    setDisplay(String(result))
+    setPreviousValue(null)
+    setOperation(null)
+    setNewNumber(true)
+  }
+
+  const clearAll = () => {
+    setDisplay('0')
+    setPreviousValue(null)
+    setOperation(null)
+    setNewNumber(true)
+  }
+
+  return (
+    <ToolCard
+      title="Scientific"
+      icon={<CalcIcon className="h-5 w-5" />}
+      isExpanded={isExpanded}
+      onExpand={onExpand}
+      onCollapse={onCollapse}
+    >
+      <div className={`space-y-2 ${isExpanded ? 'max-w-md mx-auto' : ''}`}>
+        <div className="flex items-center justify-between mb-1">
           <Button
-            variant={calculatorType === 'FOUR_FUNCTION' ? 'default' : 'outline'}
-            className="h-24 flex-col gap-2"
-            onClick={() => setCalculatorType('FOUR_FUNCTION')}
+            variant="outline"
+            size="sm"
+            onClick={() => setAngleMode(angleMode === 'DEG' ? 'RAD' : 'DEG')}
+            className="h-6 text-xs"
           >
-            <span className="text-2xl">🧮</span>
-            <span className="text-xs">4-Function</span>
-          </Button>
-          <Button
-            variant={calculatorType === 'SCIENTIFIC' ? 'default' : 'outline'}
-            className="h-24 flex-col gap-2"
-            onClick={() => setCalculatorType('SCIENTIFIC')}
-          >
-            <span className="text-2xl">📐</span>
-            <span className="text-xs">Scientific</span>
-          </Button>
-          <Button
-            variant={calculatorType === 'GRAPHING' ? 'default' : 'outline'}
-            className="h-24 flex-col gap-2"
-            onClick={() => setCalculatorType('GRAPHING')}
-          >
-            <span className="text-2xl">📈</span>
-            <span className="text-xs">Graphing</span>
+            {angleMode}
           </Button>
         </div>
+        <div className="bg-muted rounded-md p-2 text-right">
+          <span className={`font-mono ${isExpanded ? 'text-3xl' : 'text-xl'}`}>{display}</span>
+        </div>
+        
+        {/* Scientific functions */}
+        <div className={`grid grid-cols-5 ${isExpanded ? 'gap-2' : 'gap-1'}`}>
+          {['sin', 'cos', 'tan', 'log', 'ln'].map(f => (
+            <Button key={f} variant="secondary" size="sm" onClick={() => handleScientific(f)} className={isExpanded ? 'h-10' : 'h-7 text-xs'}>{f}</Button>
+          ))}
+          {['√', 'x²', 'x³', '^', '1/x'].map(f => (
+            <Button key={f} variant="secondary" size="sm" onClick={() => f === '^' ? handleOperation('^') : handleScientific(f)} className={isExpanded ? 'h-10' : 'h-7 text-xs'}>{f}</Button>
+          ))}
+          {['π', 'e', '|x|', '(', ')'].map(f => (
+            <Button key={f} variant="secondary" size="sm" onClick={() => handleScientific(f)} className={isExpanded ? 'h-10' : 'h-7 text-xs'}>{f}</Button>
+          ))}
+        </div>
 
-        {calculatorType && (
-          <Calculator
-            type={calculatorType}
-            open={!!calculatorType}
-            onOpenChange={(open) => !open && setCalculatorType(null)}
-          />
-        )}
-      </CardContent>
-    </Card>
+        {/* Number pad */}
+        <div className={`grid grid-cols-4 ${isExpanded ? 'gap-2' : 'gap-1'}`}>
+          <Button variant="outline" size="sm" onClick={clearAll} className={isExpanded ? 'h-10' : 'h-8 text-xs'}>AC</Button>
+          <Button variant="outline" size="sm" onClick={() => setDisplay(display.slice(0, -1) || '0')} className={isExpanded ? 'h-10' : 'h-8 text-xs'}>⌫</Button>
+          <Button variant="outline" size="sm" onClick={() => setDisplay(String(-parseFloat(display)))} className={isExpanded ? 'h-10' : 'h-8 text-xs'}>±</Button>
+          <Button variant="outline" size="sm" onClick={() => handleOperation('÷')} className={isExpanded ? 'h-10' : 'h-8 text-xs'}>÷</Button>
+          
+          {['7', '8', '9'].map(n => (
+            <Button key={n} variant="outline" size="sm" onClick={() => appendNumber(n)} className={isExpanded ? 'h-10' : 'h-8'}>{n}</Button>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => handleOperation('×')} className={isExpanded ? 'h-10' : 'h-8 text-xs'}>×</Button>
+          
+          {['4', '5', '6'].map(n => (
+            <Button key={n} variant="outline" size="sm" onClick={() => appendNumber(n)} className={isExpanded ? 'h-10' : 'h-8'}>{n}</Button>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => handleOperation('-')} className={isExpanded ? 'h-10' : 'h-8 text-xs'}>-</Button>
+          
+          {['1', '2', '3'].map(n => (
+            <Button key={n} variant="outline" size="sm" onClick={() => appendNumber(n)} className={isExpanded ? 'h-10' : 'h-8'}>{n}</Button>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => handleOperation('+')} className={isExpanded ? 'h-10' : 'h-8 text-xs'}>+</Button>
+          
+          <Button variant="outline" size="sm" onClick={() => appendNumber('0')} className={`col-span-2 ${isExpanded ? 'h-10' : 'h-8'}`}>0</Button>
+          <Button variant="outline" size="sm" onClick={() => appendNumber('.')} className={isExpanded ? 'h-10' : 'h-8'}>.</Button>
+          <Button variant="default" size="sm" onClick={equals} className={isExpanded ? 'h-10' : 'h-8'}>=</Button>
+        </div>
+      </div>
+    </ToolCard>
+  )
+}
+
+// Graphing Calculator Button (opens full calculator)
+function GraphingCalculatorButton({ isExpanded, onExpand, onCollapse }: { isExpanded: boolean; onExpand: () => void; onCollapse: () => void }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <ToolCard
+        title="Graphing"
+        icon={<CalcIcon className="h-5 w-5" />}
+        isExpanded={isExpanded}
+        onExpand={onExpand}
+        onCollapse={onCollapse}
+      >
+        <div className={`flex flex-col items-center justify-center ${isExpanded ? 'h-96' : 'h-full'}`}>
+          <div className="text-center space-y-3">
+            <CalcIcon className={`mx-auto text-muted-foreground ${isExpanded ? 'h-20 w-20' : 'h-12 w-12'}`} />
+            <p className="text-sm text-muted-foreground">Full-featured graphing calculator</p>
+            <Button onClick={() => setOpen(true)}>
+              Open Graphing Calculator
+            </Button>
+          </div>
+        </div>
+      </ToolCard>
+      <Calculator type="GRAPHING" open={open} onOpenChange={setOpen} />
+    </>
   )
 }
 
@@ -441,7 +981,7 @@ const SCIENCE_OLYMPIAD_RESOURCES: EventResources[] = [
 ]
 
 // Resources Component
-function ResourcesSection({ division }: { division: 'B' | 'C' }) {
+function ResourcesSection() {
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set(['general']))
 
@@ -477,137 +1017,147 @@ function ResourcesSection({ division }: { division: 'B' | 'C' }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5" />
-          Study Resources
-        </CardTitle>
-        <CardDescription>
-          Curated resources for Science Olympiad events
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search resources..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search resources..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
 
-        {/* Resource List */}
-        <ScrollArea className="h-[500px] pr-2">
-          <div className="space-y-2">
-            {filteredResources.map((event) => (
-              <Collapsible
-                key={event.slug}
-                open={expandedEvents.has(event.slug)}
-                onOpenChange={() => toggleEvent(event.slug)}
-              >
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-between h-auto py-3 px-4"
-                  >
-                    <div className="flex items-center gap-2">
-                      {event.icon}
-                      <span className="font-medium">{event.name}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {event.resources.length}
-                      </Badge>
-                    </div>
-                    {expandedEvents.has(event.slug) ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pl-10 pr-4 pb-2">
-                  <div className="space-y-2">
-                    {event.resources.map((resource, idx) => (
-                      <a
-                        key={idx}
-                        href={resource.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-muted transition-colors group"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">{resource.title}</span>
-                          <Badge className={`text-xs ${getTypeColor(resource.type)}`}>
-                            {resource.type}
-                          </Badge>
-                        </div>
-                        <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </a>
-                    ))}
+      <ScrollArea className="h-[600px] pr-2">
+        <div className="space-y-1">
+          {filteredResources.map((event) => (
+            <Collapsible
+              key={event.slug}
+              open={expandedEvents.has(event.slug)}
+              onOpenChange={() => toggleEvent(event.slug)}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between h-auto py-3 px-4"
+                >
+                  <div className="flex items-center gap-2">
+                    {event.icon}
+                    <span className="font-medium">{event.name}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {event.resources.length}
+                    </Badge>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+                  {expandedEvents.has(event.slug) ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-10 pr-4 pb-2">
+                <div className="space-y-1">
+                  {event.resources.map((resource, idx) => (
+                    <a
+                      key={idx}
+                      href={resource.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-2 rounded hover:bg-muted transition-colors group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{resource.title}</span>
+                        <Badge className={`text-xs ${getTypeColor(resource.type)}`}>
+                          {resource.type}
+                        </Badge>
+                      </div>
+                      <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </a>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   )
 }
 
+type ExpandedTool = 'timer' | 'stopwatch' | 'fourFunc' | 'scientific' | 'graphing' | null
+
 export function ToolsTab({ clubId, division }: ToolsTabProps) {
-  const [activeSection, setActiveSection] = useState<'timer' | 'calculator' | 'resources'>('timer')
+  const [activeTab, setActiveTab] = useState<'tools' | 'resources'>('tools')
+  const [expandedTool, setExpandedTool] = useState<ExpandedTool>(null)
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Study Tools</h2>
-          <p className="text-muted-foreground">
-            Timer, calculator, and curated resources for Science Olympiad
-          </p>
-        </div>
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Study Tools</h2>
+        <p className="text-muted-foreground">
+          Timer, stopwatch, calculators, and curated resources
+        </p>
       </div>
 
-      <Tabs value={activeSection} onValueChange={(v) => setActiveSection(v as any)} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
-          <TabsTrigger value="timer" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">Timer</span>
-          </TabsTrigger>
-          <TabsTrigger value="calculator" className="flex items-center gap-2">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tools' | 'resources')}>
+        <TabsList>
+          <TabsTrigger value="tools" className="flex items-center gap-2">
             <CalcIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Calculator</span>
+            Tools
           </TabsTrigger>
           <TabsTrigger value="resources" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
-            <span className="hidden sm:inline">Resources</span>
+            Resources
           </TabsTrigger>
         </TabsList>
 
-        <div className="mt-6">
-          <TabsContent value="timer" className="mt-0">
-            <div className="max-w-lg mx-auto">
-              <StudyTimer />
-            </div>
-          </TabsContent>
+        <TabsContent value="tools" className="mt-6">
+          {/* Timer, Stopwatch, and Calculators Grid */}
+          <div className={`grid gap-4 ${expandedTool ? '' : 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'}`}>
+            {(!expandedTool || expandedTool === 'timer') && (
+              <StudyTimer
+                isExpanded={expandedTool === 'timer'}
+                onExpand={() => setExpandedTool('timer')}
+                onCollapse={() => setExpandedTool(null)}
+              />
+            )}
+            {(!expandedTool || expandedTool === 'stopwatch') && (
+              <Stopwatch
+                isExpanded={expandedTool === 'stopwatch'}
+                onExpand={() => setExpandedTool('stopwatch')}
+                onCollapse={() => setExpandedTool(null)}
+              />
+            )}
+            {(!expandedTool || expandedTool === 'fourFunc') && (
+              <FourFunctionCalculator
+                isExpanded={expandedTool === 'fourFunc'}
+                onExpand={() => setExpandedTool('fourFunc')}
+                onCollapse={() => setExpandedTool(null)}
+              />
+            )}
+            {(!expandedTool || expandedTool === 'scientific') && (
+              <ScientificCalculator
+                isExpanded={expandedTool === 'scientific'}
+                onExpand={() => setExpandedTool('scientific')}
+                onCollapse={() => setExpandedTool(null)}
+              />
+            )}
+            {(!expandedTool || expandedTool === 'graphing') && (
+              <GraphingCalculatorButton
+                isExpanded={expandedTool === 'graphing'}
+                onExpand={() => setExpandedTool('graphing')}
+                onCollapse={() => setExpandedTool(null)}
+              />
+            )}
+          </div>
+        </TabsContent>
 
-          <TabsContent value="calculator" className="mt-0">
-            <div className="max-w-lg mx-auto">
-              <CalculatorSelector />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="resources" className="mt-0">
-            <ResourcesSection division={division} />
-          </TabsContent>
-        </div>
+        <TabsContent value="resources" className="mt-6">
+          <ResourcesSection />
+        </TabsContent>
       </Tabs>
     </div>
   )
 }
 
 export default ToolsTab
-

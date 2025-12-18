@@ -48,6 +48,7 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
   const desmosCalculatorRef = useRef<any>(null)
   const desmosContainerRef = useRef<HTMLDivElement>(null)
   const [desmosLoaded, setDesmosLoaded] = useState(false)
+  const [desmosInitialized, setDesmosInitialized] = useState(false)
   const savedDesmosStateRef = useRef<any>(null)
   
   // Helper function to calculate centered position
@@ -363,6 +364,8 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
                       console.error('Error restoring Desmos state:', error)
                     }
                   }
+                  // Mark as initialized to hide loading indicator
+                  setDesmosInitialized(true)
                 } catch (error) {
                   console.error('Failed to initialize Desmos calculator:', error)
                 }
@@ -387,6 +390,7 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
         console.error('Error destroying Desmos calculator:', error)
       }
       desmosCalculatorRef.current = null
+      setDesmosInitialized(false)
     }
   }, [type, open, isMinimized, desmosLoaded])
 
@@ -401,6 +405,7 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
         console.error('Error destroying Desmos calculator:', error)
       }
       desmosCalculatorRef.current = null
+      setDesmosInitialized(false)
     }
   }, [type])
 
@@ -988,7 +993,7 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
           className="w-full h-full"
           style={{ minHeight: '600px', width: '100%' }}
         />
-        {(!desmosLoaded || !desmosCalculatorRef.current) && (
+        {(!desmosLoaded || !desmosInitialized) && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
             <div className="text-center space-y-2 bg-background/90 rounded-lg p-4 border">
               <CalcIcon className="h-8 w-8 mx-auto text-muted-foreground animate-pulse" />

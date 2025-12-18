@@ -56,6 +56,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { PageLoading, ButtonLoading } from '@/components/ui/loading-spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import ReactMarkdown from 'react-markdown'
 
 interface NotesTabProps {
   clubId: string
@@ -141,24 +142,42 @@ const DIV_B_EVENT_RULES: EventNoteRules[] = [
 ]
 
 // Simple text editor component
-function RichTextEditor({ 
-  content, 
-  onChange, 
-  onSave,
-  maxPages,
-  noteType,
-  saving
-}: { 
+import React from 'react'
+
+interface RichTextEditorProps {
   content: string
   onChange: (content: string) => void
   onSave: () => void
   maxPages: number
   noteType: 'NOTE_SHEET' | 'BINDER'
   saving: boolean
-}) {
+}
+
+export interface RichTextEditorRef {
+  appendContent: (html: string) => void
+}
+
+const RichTextEditor = React.forwardRef<RichTextEditorRef, RichTextEditorProps>(({ 
+  content, 
+  onChange, 
+  onSave,
+  maxPages,
+  noteType,
+  saving
+}, ref) => {
   const editorRef = useRef<HTMLDivElement>(null)
   const [showImageDialog, setShowImageDialog] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
+
+  // Expose methods to parent via ref
+  React.useImperativeHandle(ref, () => ({
+    appendContent: (html: string) => {
+      if (editorRef.current) {
+        editorRef.current.innerHTML += html
+        onChange(editorRef.current.innerHTML)
+      }
+    }
+  }))
 
   // Initialize content
   useEffect(() => {
@@ -354,6 +373,46 @@ function RichTextEditor({
       </Dialog>
     </div>
   )
+})
+
+RichTextEditor.displayName = 'RichTextEditor'
+
+// Simple markdown to HTML converter for notes
+function markdownToHtml(markdown: string): string {
+  let html = markdown
+  // Headers
+  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>')
+  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>')
+  html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>')
+  // Bold
+  html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+  html = html.replace(/__(.*?)__/gim, '<strong>$1</strong>')
+  // Italic
+  html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>')
+  html = html.replace(/_(.*?)_/gim, '<em>$1</em>')
+  // Lists - process line by line
+  const lines = html.split('\n')
+  let inList = false
+  const processedLines = lines.map(line => {
+    const listMatch = line.match(/^\s*[-*]\s+(.*)$/)
+    if (listMatch) {
+      const prefix = !inList ? '<ul>' : ''
+      inList = true
+      return prefix + '<li>' + listMatch[1] + '</li>'
+    } else if (inList && line.trim() === '') {
+      inList = false
+      return '</ul>' + line
+    }
+    return line
+  })
+  if (inList) processedLines.push('</ul>')
+  html = processedLines.join('\n')
+  // Line breaks (but not inside tags)
+  html = html.replace(/\n/gim, '<br>')
+  // Clean up <br> after block elements
+  html = html.replace(/<\/(h[1-6]|ul|ol|li|p)><br>/gi, '</$1>')
+  html = html.replace(/<br><(h[1-6]|ul|ol)/gi, '<$1')
+  return html
 }
 
 // AI Chat Assistant
@@ -405,6 +464,12 @@ function AIChatAssistant({
     }
   }
 
+  const handleAddToNotes = (content: string) => {
+    // Convert markdown to HTML for the notes editor
+    const htmlContent = markdownToHtml(content)
+    onAddToNotes(htmlContent)
+  }
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-2">
@@ -433,13 +498,41 @@ function AIChatAssistant({
                     ? 'bg-primary text-primary-foreground' 
                     : 'bg-muted'
                 }`}>
-                  {msg.content}
+                  {msg.role === 'assistant' ? (
+                    <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                      <ReactMarkdown
+                        components={{
+                          // Style headings
+                          h1: ({ children }) => <h1 className="text-base font-bold mt-2 mb-1">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-sm font-bold mt-2 mb-1">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-sm font-semibold mt-1 mb-1">{children}</h3>,
+                          // Style lists
+                          ul: ({ children }) => <ul className="list-disc list-inside my-1 space-y-0.5">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal list-inside my-1 space-y-0.5">{children}</ol>,
+                          li: ({ children }) => <li className="text-sm">{children}</li>,
+                          // Style paragraphs
+                          p: ({ children }) => <p className="my-1">{children}</p>,
+                          // Style code
+                          code: ({ children }) => (
+                            <code className="bg-background/50 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                          ),
+                          // Style bold/italic
+                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                          em: ({ children }) => <em className="italic">{children}</em>,
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
                   {msg.role === 'assistant' && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 text-xs mt-1 w-full"
-                      onClick={() => onAddToNotes(msg.content)}
+                      className="h-6 text-xs mt-2 w-full border border-border/50"
+                      onClick={() => handleAddToNotes(msg.content)}
                     >
                       Add to notes
                     </Button>
@@ -483,14 +576,24 @@ export function NotesTab({ clubId, membershipId, division, user, isAdmin }: Note
   const [currentNote, setCurrentNote] = useState<StudyNote | null>(null)
   const [editorContent, setEditorContent] = useState('')
   const [showAIChat, setShowAIChat] = useState(false)
-  const editorRef = useRef<HTMLDivElement>(null)
+  const editorRef = useRef<RichTextEditorRef>(null)
 
   const eventRules = division === 'C' ? DIV_C_EVENT_RULES : DIV_B_EVENT_RULES
 
-  // Get events that allow notes/binders
+  // Normalize event name for matching (lowercase, remove special chars)
+  const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+  // Get events that allow notes/binders - match by normalized name
   const getAssignedNoteEvents = useCallback(() => {
-    const assignedSlugs = new Set(assignedEvents.map(a => a.event.slug))
-    return eventRules.filter(rule => assignedSlugs.has(rule.slug))
+    // Create a map of normalized names to assigned events
+    const assignedNormalizedNames = new Set(
+      assignedEvents.map(a => normalizeName(a.event.name))
+    )
+    
+    // Filter event rules by matching normalized names
+    return eventRules.filter(rule => 
+      assignedNormalizedNames.has(normalizeName(rule.name))
+    )
   }, [assignedEvents, eventRules])
 
   const fetchData = useCallback(async () => {
@@ -584,12 +687,19 @@ export function NotesTab({ clubId, membershipId, division, user, isAdmin }: Note
     }
   }
 
-  const addToNotes = (text: string) => {
-    const newContent = editorContent + `<p>${text}</p>`
-    setEditorContent(newContent)
+  const addToNotes = (htmlContent: string) => {
+    // Content may already be HTML (from markdown conversion) or plain text
+    const wrappedContent = htmlContent.startsWith('<') ? htmlContent : `<p>${htmlContent}</p>`
     if (editorRef.current) {
-      editorRef.current.innerHTML = newContent
+      editorRef.current.appendContent(wrappedContent)
+    } else {
+      // Fallback if ref not available
+      setEditorContent(prev => prev + wrappedContent)
     }
+    toast({
+      title: 'Added to notes',
+      description: 'The content has been added to your notes.',
+    })
   }
 
   const printNote = () => {
@@ -667,6 +777,7 @@ export function NotesTab({ clubId, membershipId, division, user, isAdmin }: Note
         <div className="flex gap-4">
           <div className={showAIChat ? 'flex-1' : 'w-full'}>
             <RichTextEditor
+              ref={editorRef}
               content={editorContent}
               onChange={setEditorContent}
               onSave={saveNote}
@@ -703,17 +814,82 @@ export function NotesTab({ clubId, membershipId, division, user, isAdmin }: Note
         </Badge>
       </div>
 
-      {availableEvents.length === 0 ? (
+      {availableEvents.length === 0 && assignedEvents.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <FileQuestion className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Events Assigned</h3>
             <p className="text-muted-foreground max-w-md mx-auto">
-              You need to be assigned to events that allow notes or binders to create study materials.
+              You need to be assigned to events to create study materials.
               Ask your club admin to assign you to events in the People tab.
             </p>
           </CardContent>
         </Card>
+      ) : availableEvents.length === 0 && assignedEvents.length > 0 ? (
+        /* User has assigned events but none match note sheet rules - show all their events */
+        <div className="space-y-4">
+          <Card className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+            <CardContent className="py-4">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                You are assigned to {assignedEvents.length} event{assignedEvents.length !== 1 ? 's' : ''}, 
+                but none have specific note sheet rules. You can still create study notes for any of your assigned events below.
+              </p>
+            </CardContent>
+          </Card>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {assignedEvents.map((assignment) => {
+              const existingNote = notes.find(n => n.eventSlug === assignment.event.slug)
+              const hasNote = !!existingNote
+              
+              // Create a generic rule for this event
+              const genericRule: EventNoteRules = {
+                name: assignment.event.name,
+                slug: assignment.event.slug,
+                noteType: 'BINDER',
+                sheetCount: 999,
+                description: 'Study notes for this event (no specific restrictions)'
+              }
+              
+              return (
+                <Card 
+                  key={assignment.id}
+                  className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+                  onClick={() => selectEvent(genericRule)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-base">{assignment.event.name}</CardTitle>
+                      <Badge variant="secondary">Notes</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-3">Study notes (unlimited)</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm">
+                        {hasNote ? (
+                          <>
+                            <FileText className="h-4 w-4 text-green-500" />
+                            <span className="text-green-600 dark:text-green-400">Notes created</span>
+                          </>
+                        ) : (
+                          <>
+                            <BookOpen className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">No notes yet</span>
+                          </>
+                        )}
+                      </div>
+                      {hasNote && existingNote && (
+                        <span className="text-xs text-muted-foreground">
+                          Updated {new Date(existingNote.updatedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -762,28 +938,6 @@ export function NotesTab({ clubId, membershipId, division, user, isAdmin }: Note
               )
             })}
           </div>
-
-          {/* All events reference */}
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle className="text-lg">All Division {division} Note Sheet Rules</CardTitle>
-              <CardDescription>
-                Reference for all events that allow notes or binders
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {eventRules.map((rule) => (
-                  <div key={rule.slug} className="flex items-center justify-between p-2 rounded bg-muted/50">
-                    <span className="text-sm font-medium">{rule.name}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {rule.noteType === 'BINDER' ? 'Binder' : `${rule.sheetCount} Sheet${rule.sheetCount > 1 ? 's' : ''}`}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </>
       )}
     </div>
