@@ -96,7 +96,7 @@ export async function POST(
 
     const { tournamentId } = await params
     const body = await request.json()
-    const { email, name, role, eventIds = [] } = body as {
+    const { email, name, role, eventIds = [], trialEventNames = [] } = body as {
       email: string
       name?: string
       role: 'EVENT_SUPERVISOR' | 'TOURNAMENT_DIRECTOR'
