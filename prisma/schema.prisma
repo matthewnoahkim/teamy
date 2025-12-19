@@ -106,6 +106,8 @@ model Club {
   tests                     Test[]
   todos                     Todo[]
   tournamentRegistrations   TournamentRegistration[] @relation("TournamentRegistrations")
+  resources                Resource[]
+  resourceRequests         ResourceRequest[]        @relation("ResourceRequests")
 
   @@index([createdById])
 }
@@ -132,6 +134,7 @@ model Membership {
   reviewedNoteSheets  NoteSheet[]         @relation("NoteSheetReviewer")
   rosterAssignments   RosterAssignment[]
   todos               Todo[]
+  resourceRequests    ResourceRequest[]
 
   @@unique([userId, clubId])
   @@index([clubId])
@@ -1572,4 +1575,56 @@ enum StaffInviteStatus {
 enum StudyNoteType {
   NOTE_SHEET
   BINDER
+}
+
+model Resource {
+  id          String   @id @default(cuid())
+  name        String
+  tag         String
+  url         String?
+  category    String   // Event slug or 'general'
+  scope       ResourceScope @default(CLUB)
+  clubId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  club        Club?    @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@index([category])
+  @@index([clubId])
+  @@index([scope])
+}
+
+model ResourceRequest {
+  id          String                @id @default(cuid())
+  name        String
+  tag         String
+  url         String?
+  category    String                // Event slug or 'general'
+  scope       ResourceScope         @default(PUBLIC)
+  clubId      String
+  requestedById String
+  status      ResourceRequestStatus @default(PENDING)
+  reviewedById String?
+  reviewedAt  DateTime?
+  rejectionReason String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  club        Club                  @relation("ResourceRequests", fields: [clubId], references: [id], onDelete: Cascade)
+  requestedBy Membership            @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([clubId])
+  @@index([requestedById])
+  @@index([createdAt])
+}
+
+enum ResourceScope {
+  CLUB
+  PUBLIC
+}
+
+enum ResourceRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

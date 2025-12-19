@@ -1,12 +1,39 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { useToast } from '@/components/ui/use-toast'
+import { 
+  BookOpen, 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  ExternalLink,
+  Search,
+  RefreshCw,
+  Loader2,
+  Trash2,
+  Mail,
+  User,
+  Building2,
+  Tag,
+  FolderOpen,
+} from 'lucide-react'
+import { format } from 'date-fns'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -14,32 +41,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  RefreshCw,
-  Search,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  Trash2,
-  MapPin,
-  Mail,
-  Phone,
-  User,
-  Link as LinkIcon,
-  FileText,
-} from 'lucide-react'
-import { format } from 'date-fns'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { formatDivision } from '@/lib/utils'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog'
 
 // Helper function to highlight search terms in text
 const highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
@@ -62,38 +63,42 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
   )
 }
 
-interface TournamentRequest {
+interface ResourceRequest {
   id: string
-  tournamentName: string
-  tournamentLevel: string
-  division: string
-  tournamentFormat: string
-  location: string | null
-  preferredSlug: string | null
-  directorName: string
-  directorEmail: string
-  directorPhone: string | null
-  otherNotes: string | null
+  name: string
+  tag: string
+  url: string | null
+  category: string
+  scope: 'CLUB' | 'PUBLIC'
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
-  reviewNotes: string | null
+  rejectionReason: string | null
   createdAt: string
+  reviewedAt: string | null
+  club: {
+    id: string
+    name: string
+  }
+  requestedBy: {
+    user: {
+      id: string
+      name: string | null
+      email: string
+    }
+  }
 }
 
-export function TournamentRequests() {
+export function ResourceRequests() {
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING')
-  
-  // Action states
+  const [selectedRequest, setSelectedRequest] = useState<ResourceRequest | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [requestToDelete, setRequestToDelete] = useState<TournamentRequest | null>(null)
-  const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
-  const [requestToReview, setRequestToReview] = useState<TournamentRequest | null>(null)
-  const [reviewAction, setReviewAction] = useState<'APPROVED' | 'REJECTED' | 'PENDING'>('APPROVED')
-  const [reviewNotes, setReviewNotes] = useState('')
+  const [requestToDelete, setRequestToDelete] = useState<ResourceRequest | null>(null)
+  const { toast } = useToast()
 
-  const [allRequests, setAllRequests] = useState<TournamentRequest[]>([])
+  const [allRequests, setAllRequests] = useState<ResourceRequest[]>([])
 
   const fetchRequests = useCallback(async () => {
     setLoading(true)
@@ -104,17 +109,28 @@ export function TournamentRequests() {
       }
       // Don't send search to server - we'll filter client-side
 
-      const response = await fetch(`/api/tournament-requests?${params.toString()}`)
+      const response = await fetch(`/api/resources/requests?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
         setAllRequests(data.requests || [])
+      } else {
+        const errorData = await response.json()
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to fetch resource requests',
+          variant: 'destructive',
+        })
       }
-    } catch (error) {
-      console.error('Failed to fetch requests:', error)
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch resource requests',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
-  }, [statusFilter])
+  }, [statusFilter, toast])
 
   useEffect(() => {
     fetchRequests()
@@ -125,41 +141,93 @@ export function TournamentRequests() {
     if (!search) return true
     const query = search.toLowerCase()
     return (
-      req.tournamentName.toLowerCase().includes(query) ||
-      req.directorName.toLowerCase().includes(query) ||
-      req.directorEmail.toLowerCase().includes(query) ||
-      (req.directorPhone && req.directorPhone.toLowerCase().includes(query)) ||
-      (req.location && req.location.toLowerCase().includes(query)) ||
-      (req.preferredSlug && req.preferredSlug.toLowerCase().includes(query))
+      req.name.toLowerCase().includes(query) ||
+      req.tag.toLowerCase().includes(query) ||
+      req.category.toLowerCase().includes(query) ||
+      req.club.name.toLowerCase().includes(query) ||
+      req.requestedBy.user.email.toLowerCase().includes(query) ||
+      (req.requestedBy.user.name && req.requestedBy.user.name.toLowerCase().includes(query)) ||
+      (req.url && req.url.toLowerCase().includes(query))
     )
   })
 
-  const handleUpdateStatus = async () => {
-    if (!requestToReview) return
-
-    setActionLoading(requestToReview.id)
+  const handleApprove = async (request: ResourceRequest) => {
+    setActionLoading(request.id)
     try {
-      const response = await fetch(`/api/tournament-requests/${requestToReview.id}`, {
+      const response = await fetch(`/api/resources/requests/${request.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: reviewAction,
-          reviewNotes: reviewNotes.trim() || null,
+        body: JSON.stringify({ action: 'approve' }),
+      })
+
+      if (response.ok) {
+        await fetchRequests()
+        toast({
+          title: 'Success',
+          description: 'Resource request approved and added to public resources',
+        })
+      } else {
+        const errorData = await response.json()
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to approve request',
+          variant: 'destructive',
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to approve request',
+        variant: 'destructive',
+      })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!selectedRequest || !rejectionReason.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please provide a rejection reason',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setActionLoading(selectedRequest.id)
+    try {
+      const response = await fetch(`/api/resources/requests/${selectedRequest.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'reject',
+          rejectionReason: rejectionReason.trim(),
         }),
       })
 
       if (response.ok) {
         await fetchRequests()
-        setReviewDialogOpen(false)
-        setRequestToReview(null)
-        setReviewNotes('')
+        setSelectedRequest(null)
+        setRejectionReason('')
+        toast({
+          title: 'Success',
+          description: 'Resource request rejected',
+        })
       } else {
         const errorData = await response.json()
-        alert(errorData.error || 'Failed to update request')
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to reject request',
+          variant: 'destructive',
+        })
       }
-    } catch (error) {
-      console.error('Error updating request:', error)
-      alert('Error updating request')
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reject request',
+        variant: 'destructive',
+      })
     } finally {
       setActionLoading(null)
     }
@@ -170,7 +238,7 @@ export function TournamentRequests() {
 
     setActionLoading(requestToDelete.id)
     try {
-      const response = await fetch(`/api/tournament-requests/${requestToDelete.id}`, {
+      const response = await fetch(`/api/resources/requests/${requestToDelete.id}`, {
         method: 'DELETE',
       })
 
@@ -178,13 +246,24 @@ export function TournamentRequests() {
         await fetchRequests()
         setDeleteDialogOpen(false)
         setRequestToDelete(null)
+        toast({
+          title: 'Success',
+          description: 'Resource request deleted',
+        })
       } else {
         const errorData = await response.json()
-        alert(errorData.error || 'Failed to delete request')
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to delete request',
+          variant: 'destructive',
+        })
       }
-    } catch (error) {
-      console.error('Error deleting request:', error)
-      alert('Error deleting request')
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete request',
+        variant: 'destructive',
+      })
     } finally {
       setActionLoading(null)
     }
@@ -201,32 +280,15 @@ export function TournamentRequests() {
     }
   }
 
-  const getLevelLabel = (level: string) => {
-    return level.charAt(0).toUpperCase() + level.slice(1)
-  }
-
-  const getFormatLabel = (format: string) => {
-    switch (format) {
-      case 'in-person':
-        return 'In-Person'
-      case 'satellite':
-        return 'Satellite'
-      case 'mini-so':
-        return 'Mini SO'
-      default:
-        return format
-    }
-  }
-
   return (
     <div className="space-y-6 animate-fade-in">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Tournament Hosting Requests</CardTitle>
+              <CardTitle>Resource Requests</CardTitle>
               <CardDescription>
-                Review tournament hosting requests submitted through the public form
+                Review and approve resource submissions from clubs
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={fetchRequests} disabled={loading}>
@@ -244,7 +306,7 @@ export function TournamentRequests() {
                 style={{ top: '50%', transform: 'translateY(-50%)' }} 
               />
               <Input
-                placeholder="Search by tournament name, director..."
+                placeholder="Search by resource name, tag, category..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -293,64 +355,50 @@ export function TournamentRequests() {
                         {/* Header */}
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                           {getStatusBadge(req.status)}
-                          <Badge variant="outline">Division {formatDivision(req.division)}</Badge>
-                          <Badge variant="outline">{getLevelLabel(req.tournamentLevel)}</Badge>
-                          <Badge variant="outline">{getFormatLabel(req.tournamentFormat)}</Badge>
+                          <Badge variant="outline">
+                            <Tag className="h-3 w-3 mr-1" />
+                            {highlightText(req.tag, search)}
+                          </Badge>
+                          <Badge variant="outline">
+                            <FolderOpen className="h-3 w-3 mr-1" />
+                            {highlightText(req.category, search)}
+                          </Badge>
                         </div>
                         
-                        {/* Tournament Name */}
-                        <h3 className="font-semibold text-lg mb-2">{highlightText(req.tournamentName, search)}</h3>
+                        {/* Resource Name */}
+                        <h3 className="font-semibold text-lg mb-2">{highlightText(req.name, search)}</h3>
                         
-                        {/* Director Info */}
+                        {/* Resource Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3 text-sm">
+                          {req.url && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <ExternalLink className="h-4 w-4" />
+                              <a href={req.url} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">
+                                {highlightText(req.url, search)}
+                              </a>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Building2 className="h-4 w-4" />
+                            <span>{highlightText(req.club.name, search)}</span>
+                          </div>
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <User className="h-4 w-4" />
-                            <span>{highlightText(req.directorName, search)}</span>
+                            <span>{highlightText(req.requestedBy.user.name || req.requestedBy.user.email, search)}</span>
                           </div>
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <Mail className="h-4 w-4" />
-                            <a href={`mailto:${req.directorEmail}`} className="hover:underline">
-                              {highlightText(req.directorEmail, search)}
+                            <a href={`mailto:${req.requestedBy.user.email}`} className="hover:underline">
+                              {highlightText(req.requestedBy.user.email, search)}
                             </a>
                           </div>
-                          {req.directorPhone && (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Phone className="h-4 w-4" />
-                              <span>{highlightText(req.directorPhone, search)}</span>
-                            </div>
-                          )}
-                          {req.location && (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <MapPin className="h-4 w-4" />
-                              <span>{highlightText(req.location, search)}</span>
-                            </div>
-                          )}
-                          {req.preferredSlug && (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <LinkIcon className="h-4 w-4" />
-                              <span>teamy.site/tournaments/{highlightText(req.preferredSlug, search)}</span>
-                            </div>
-                          )}
                         </div>
                         
-                        {/* Other Notes */}
-                        {req.otherNotes && (
-                          <div className="mb-3">
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-                              <FileText className="h-3 w-3" />
-                              <span>Notes:</span>
-                            </div>
-                            <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
-                              {req.otherNotes}
-                            </p>
-                          </div>
-                        )}
-                        
-                        {/* Review Notes */}
-                        {req.reviewNotes && (
-                          <div className="p-2 mt-2 border border-blue-500/50 bg-blue-500/10 rounded text-xs">
-                            <span className="font-semibold">Review notes: </span>
-                            {req.reviewNotes}
+                        {/* Rejection Reason */}
+                        {req.rejectionReason && (
+                          <div className="p-2 mt-2 border border-red-500/50 bg-red-500/10 rounded text-xs">
+                            <span className="font-semibold">Rejection reason: </span>
+                            {req.rejectionReason}
                           </div>
                         )}
                         
@@ -367,12 +415,7 @@ export function TournamentRequests() {
                           <>
                             <Button
                               size="sm"
-                              onClick={() => {
-                                setRequestToReview(req)
-                                setReviewAction('APPROVED')
-                                setReviewNotes('')
-                                setReviewDialogOpen(true)
-                              }}
+                              onClick={() => handleApprove(req)}
                               disabled={actionLoading === req.id}
                             >
                               <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -382,10 +425,8 @@ export function TournamentRequests() {
                               size="sm"
                               variant="destructive"
                               onClick={() => {
-                                setRequestToReview(req)
-                                setReviewAction('REJECTED')
-                                setReviewNotes('')
-                                setReviewDialogOpen(true)
+                                setSelectedRequest(req)
+                                setRejectionReason('')
                               }}
                               disabled={actionLoading === req.id}
                             >
@@ -398,10 +439,11 @@ export function TournamentRequests() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              setRequestToReview(req)
-                              setReviewAction('PENDING')
-                              setReviewNotes(req.reviewNotes || '')
-                              setReviewDialogOpen(true)
+                              // Reset to pending - would need API endpoint for this
+                              toast({
+                                title: 'Info',
+                                description: 'Reset to pending functionality coming soon',
+                              })
                             }}
                             disabled={actionLoading === req.id}
                           >
@@ -429,60 +471,48 @@ export function TournamentRequests() {
         </CardContent>
       </Card>
 
-      {/* Review Dialog */}
-      <Dialog open={reviewDialogOpen} onOpenChange={(open) => {
-        setReviewDialogOpen(open)
+      {/* Rejection Dialog */}
+      <Dialog open={!!selectedRequest} onOpenChange={(open) => {
         if (!open) {
-          setRequestToReview(null)
-          setReviewNotes('')
+          setSelectedRequest(null)
+          setRejectionReason('')
         }
       }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {reviewAction === 'APPROVED' 
-                ? 'Approve Request' 
-                : reviewAction === 'REJECTED'
-                  ? 'Reject Request'
-                  : 'Reset Request'}
-            </DialogTitle>
+            <DialogTitle>Reject Resource Request</DialogTitle>
             <DialogDescription>
-              {reviewAction === 'APPROVED' 
-                ? `Are you sure you want to approve "${requestToReview?.tournamentName}"?`
-                : reviewAction === 'REJECTED'
-                  ? `Are you sure you want to reject "${requestToReview?.tournamentName}"?`
-                  : `Reset "${requestToReview?.tournamentName}" to pending status?`}
+              Are you sure you want to reject &quot;{selectedRequest?.name}&quot;?
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="review-notes">Review Notes (Optional)</Label>
+              <Label htmlFor="rejection-reason">Rejection Reason *</Label>
               <Textarea
-                id="review-notes"
+                id="rejection-reason"
                 placeholder="Add any notes about this decision..."
-                value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setSelectedRequest(null)
+              setRejectionReason('')
+            }}>
               Cancel
             </Button>
             <Button
-              variant={reviewAction === 'REJECTED' ? 'destructive' : 'default'}
-              onClick={handleUpdateStatus}
-              disabled={actionLoading === requestToReview?.id}
+              variant="destructive"
+              onClick={handleReject}
+              disabled={actionLoading === selectedRequest?.id || !rejectionReason.trim()}
             >
-              {actionLoading === requestToReview?.id ? (
+              {actionLoading === selectedRequest?.id ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}
-              {reviewAction === 'APPROVED' 
-                ? 'Approve' 
-                : reviewAction === 'REJECTED'
-                  ? 'Reject'
-                  : 'Reset to Pending'}
+              Reject
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -494,7 +524,7 @@ export function TournamentRequests() {
           <DialogHeader>
             <DialogTitle>Delete Request</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete the request for &quot;{requestToDelete?.tournamentName}&quot;?
+              Are you sure you want to delete the request for &quot;{requestToDelete?.name}&quot;?
               This action cannot be undone.
             </DialogDescription>
           </DialogHeader>

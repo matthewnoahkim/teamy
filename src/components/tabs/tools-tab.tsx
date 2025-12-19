@@ -38,6 +38,9 @@ import {
   Settings2,
   Maximize2,
   Minimize2,
+  Plus,
+  X,
+  AlertCircle,
 } from 'lucide-react'
 import {
   Collapsible,
@@ -52,10 +55,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Calculator } from '@/components/tests/calculator'
+import { useToast } from '@/components/ui/use-toast'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 interface ToolsTabProps {
   clubId: string
   division: 'B' | 'C'
+  currentMembershipId: string
 }
 
 // Ring tone types for Web Audio API
@@ -981,9 +987,35 @@ const SCIENCE_OLYMPIAD_RESOURCES: EventResources[] = [
 ]
 
 // Resources Component
-function ResourcesSection() {
+function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; currentMembershipId: string }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set(['general']))
+  const [showAddForm, setShowAddForm] = useState<Record<string, boolean>>({})
+  const [addingResource, setAddingResource] = useState<Record<string, boolean>>({})
+  const [resourceForm, setResourceForm] = useState<Record<string, { name: string; tag: string; url: string; scope: 'CLUB' | 'PUBLIC' }>>({})
+  const [clubResources, setClubResources] = useState<any[]>([])
+  const [loadingResources, setLoadingResources] = useState(true)
+  const { toast } = useToast()
+
+  // Fetch club resources
+  useEffect(() => {
+    fetchClubResources()
+  }, [clubId])
+
+  const fetchClubResources = async () => {
+    try {
+      setLoadingResources(true)
+      const response = await fetch(`/api/resources?clubId=${clubId}`)
+      const data = await response.json()
+      if (response.ok) {
+        setClubResources(data.resources || [])
+      }
+    } catch (error) {
+      console.error('Error fetching club resources:', error)
+    } finally {
+      setLoadingResources(false)
+    }
+  }
 
   const toggleEvent = (slug: string) => {
     setExpandedEvents(prev => {
@@ -997,7 +1029,28 @@ function ResourcesSection() {
     })
   }
 
-  const filteredResources = SCIENCE_OLYMPIAD_RESOURCES.filter(event => {
+  // Merge hardcoded resources with club resources
+  const getResourcesForCategory = useCallback((categorySlug: string) => {
+    const hardcodedEvent = SCIENCE_OLYMPIAD_RESOURCES.find(e => e.slug === categorySlug)
+    const hardcoded = hardcodedEvent?.resources || []
+    
+    // Get club resources for this category
+    const club = clubResources
+      .filter(r => r.category === categorySlug)
+      .map(r => ({
+        title: r.name,
+        url: r.url || null,
+        type: r.tag as Resource['type'],
+        isClubResource: r.scope === 'CLUB',
+      }))
+    
+    return [...hardcoded, ...club]
+  }, [clubResources])
+
+  const filteredResources = SCIENCE_OLYMPIAD_RESOURCES.map(event => ({
+    ...event,
+    resources: getResourcesForCategory(event.slug),
+  })).filter(event => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     return (
@@ -1016,9 +1069,74 @@ function ResourcesSection() {
     }
   }
 
+  const handleAddResource = async (category: string) => {
+    const form = resourceForm[category]
+    if (!form || !form.name.trim() || !form.tag.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in the resource name and tag',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setAddingResource(prev => ({ ...prev, [category]: true }))
+    try {
+      const response = await fetch('/api/resources/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          tag: form.tag.trim(),
+          url: form.url.trim() || null,
+          category,
+          scope: form.scope,
+          clubId,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit resource request')
+      }
+
+      toast({
+        title: form.scope === 'PUBLIC' ? 'Request submitted' : 'Resource added',
+        description: form.scope === 'PUBLIC' 
+          ? 'Your resource request has been submitted and will be reviewed before being made public.'
+          : 'Resource has been added to your club.',
+      })
+
+      // Refresh club resources if it was a club resource
+      if (form.scope === 'CLUB') {
+        await fetchClubResources()
+      }
+
+      // Reset form
+      setResourceForm(prev => ({ ...prev, [category]: { name: '', tag: '', url: '', scope: 'CLUB' } }))
+      setShowAddForm(prev => ({ ...prev, [category]: false }))
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to submit resource request',
+        variant: 'destructive',
+      })
+    } finally {
+      setAddingResource(prev => ({ ...prev, [category]: false }))
+    }
+  }
+
+  const toggleAddForm = (category: string) => {
+    setShowAddForm(prev => ({ ...prev, [category]: !prev[category] }))
+    if (!resourceForm[category]) {
+      setResourceForm(prev => ({ ...prev, [category]: { name: '', tag: '', url: '', scope: 'CLUB' } }))
+    }
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="relative">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="relative flex-shrink-0 mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search resources..."
@@ -1028,7 +1146,7 @@ function ResourcesSection() {
         />
       </div>
 
-      <ScrollArea className="h-[600px] pr-2">
+      <ScrollArea className="flex-1 min-h-0 pr-2">
         <div className="space-y-1">
           {filteredResources.map((event) => (
             <Collapsible
@@ -1045,7 +1163,7 @@ function ResourcesSection() {
                     {event.icon}
                     <span className="font-medium">{event.name}</span>
                     <Badge variant="secondary" className="text-xs">
-                      {event.resources.length}
+                      {getResourcesForCategory(event.slug).length}
                     </Badge>
                   </div>
                   {expandedEvents.has(event.slug) ? (
@@ -1057,23 +1175,144 @@ function ResourcesSection() {
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-10 pr-4 pb-2">
                 <div className="space-y-1">
-                  {event.resources.map((resource, idx) => (
-                    <a
-                      key={idx}
-                      href={resource.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-2 rounded hover:bg-muted transition-colors group"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{resource.title}</span>
-                        <Badge className={`text-xs ${getTypeColor(resource.type)}`}>
-                          {resource.type}
-                        </Badge>
+                  {event.resources.map((resource, idx) => {
+                    const hasUrl = resource.url && resource.url !== '#'
+                    const ResourceWrapper = hasUrl ? 'a' : 'div'
+                    const wrapperProps = hasUrl
+                      ? {
+                          href: resource.url,
+                          target: '_blank',
+                          rel: 'noopener noreferrer',
+                        }
+                      : {}
+
+                    return (
+                      <ResourceWrapper
+                        key={idx}
+                        {...wrapperProps}
+                        className="flex items-center justify-between p-2 rounded hover:bg-muted transition-colors group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">{resource.title}</span>
+                          <Badge className={`text-xs ${getTypeColor(resource.type)}`}>
+                            {resource.type}
+                          </Badge>
+                          {resource.isClubResource && (
+                            <Badge variant="outline" className="text-xs">
+                              Club
+                            </Badge>
+                          )}
+                        </div>
+                        {hasUrl && (
+                          <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        )}
+                      </ResourceWrapper>
+                    )
+                  })}
+                  
+                  {/* Add Resource Row */}
+                  {showAddForm[event.slug] ? (
+                    <div className="p-3 rounded-lg border border-dashed bg-muted/30 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Add Resource</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleAddForm(event.slug)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </a>
-                  ))}
+                      <div className="space-y-2">
+                        <div>
+                          <Label htmlFor={`resource-name-${event.slug}`} className="text-xs">Resource Name *</Label>
+                          <Input
+                            id={`resource-name-${event.slug}`}
+                            value={resourceForm[event.slug]?.name || ''}
+                            onChange={(e) => setResourceForm(prev => ({
+                              ...prev,
+                              [event.slug]: { ...prev[event.slug], name: e.target.value }
+                            }))}
+                            placeholder="e.g., Khan Academy Chemistry"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`resource-tag-${event.slug}`} className="text-xs">Tag *</Label>
+                          <Input
+                            id={`resource-tag-${event.slug}`}
+                            value={resourceForm[event.slug]?.tag || ''}
+                            onChange={(e) => setResourceForm(prev => ({
+                              ...prev,
+                              [event.slug]: { ...prev[event.slug], tag: e.target.value }
+                            }))}
+                            placeholder="e.g., video, textbook, wiki"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`resource-url-${event.slug}`} className="text-xs">Link (optional)</Label>
+                          <Input
+                            id={`resource-url-${event.slug}`}
+                            type="url"
+                            value={resourceForm[event.slug]?.url || ''}
+                            onChange={(e) => setResourceForm(prev => ({
+                              ...prev,
+                              [event.slug]: { ...prev[event.slug], url: e.target.value }
+                            }))}
+                            placeholder="https://example.com"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs mb-2 block">Visibility</Label>
+                          <RadioGroup
+                            value={resourceForm[event.slug]?.scope || 'CLUB'}
+                            onValueChange={(value) => setResourceForm(prev => ({
+                              ...prev,
+                              [event.slug]: { ...prev[event.slug], scope: value as 'CLUB' | 'PUBLIC' }
+                            }))}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="CLUB" id={`scope-club-${event.slug}`} />
+                              <Label htmlFor={`scope-club-${event.slug}`} className="text-xs font-normal cursor-pointer">
+                                Club Only
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <RadioGroupItem value="PUBLIC" id={`scope-public-${event.slug}`} />
+                              <Label htmlFor={`scope-public-${event.slug}`} className="text-xs font-normal cursor-pointer">
+                                General Public
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                          {resourceForm[event.slug]?.scope === 'PUBLIC' && (
+                            <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-xs text-yellow-600 dark:text-yellow-400 flex items-start gap-2">
+                              <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                              <span>Public resources must be approved by our team before being made available to everyone.</span>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddResource(event.slug)}
+                          disabled={addingResource[event.slug]}
+                          className="w-full h-8"
+                        >
+                          {addingResource[event.slug] ? 'Submitting...' : 'Submit'}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => toggleAddForm(event.slug)}
+                      className="flex items-center gap-2 p-2 rounded hover:bg-muted transition-colors text-sm text-muted-foreground w-full"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add Resource</span>
+                    </button>
+                  )}
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -1086,30 +1325,47 @@ function ResourcesSection() {
 
 type ExpandedTool = 'timer' | 'stopwatch' | 'fourFunc' | 'scientific' | 'graphing' | null
 
-export function ToolsTab({ clubId, division }: ToolsTabProps) {
-  const [activeTab, setActiveTab] = useState<'tools' | 'resources'>('tools')
+export function ToolsTab({ clubId, division, currentMembershipId }: ToolsTabProps) {
+  const [activeTab, setActiveTab] = useState<'tools' | 'resources'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`tools-tab-active-${clubId}`)
+      if (saved === 'tools' || saved === 'resources') {
+        return saved
+      }
+    }
+    return 'tools'
+  })
   const [expandedTool, setExpandedTool] = useState<ExpandedTool>(null)
 
+  // Save active tab to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`tools-tab-active-${clubId}`, activeTab)
+    }
+  }, [activeTab, clubId])
+
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="flex flex-col h-full space-y-6 min-h-0">
+      <div className="flex-shrink-0">
         <h2 className="text-2xl font-bold tracking-tight">Study Tools</h2>
         <p className="text-muted-foreground">
           Timer, stopwatch, calculators, and curated resources
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tools' | 'resources')}>
-        <TabsList>
-          <TabsTrigger value="tools" className="flex items-center gap-2">
-            <CalcIcon className="h-4 w-4" />
-            Tools
-          </TabsTrigger>
-          <TabsTrigger value="resources" className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            Resources
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tools' | 'resources')} className="flex-1 flex flex-col min-h-0">
+        <div className="w-fit">
+          <TabsList>
+            <TabsTrigger value="tools" className="flex items-center gap-2">
+              <CalcIcon className="h-4 w-4" />
+              Tools
+            </TabsTrigger>
+            <TabsTrigger value="resources" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Resources
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="tools" className="mt-6">
           {/* Timer, Stopwatch, and Calculators Grid */}
@@ -1152,8 +1408,8 @@ export function ToolsTab({ clubId, division }: ToolsTabProps) {
           </div>
         </TabsContent>
 
-        <TabsContent value="resources" className="mt-6">
-          <ResourcesSection />
+        <TabsContent value="resources" className="mt-6 flex-1 flex flex-col min-h-0">
+          <ResourcesSection clubId={clubId} currentMembershipId={currentMembershipId} />
         </TabsContent>
       </Tabs>
     </div>

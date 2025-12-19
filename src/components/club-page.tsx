@@ -44,9 +44,6 @@ const TodoTab = dynamic(() => import('@/components/tabs/todo-tab').then(mod => (
 const StatsTab = dynamic(() => import('@/components/tabs/stats-tab').then(mod => ({ default: mod.StatsTab })), {
   loading: () => <PageLoading title="Loading stats" description="Fetching analytics and insights..." variant="orbit" />
 })
-const NotesTab = dynamic(() => import('@/components/tabs/notes-tab').then(mod => ({ default: mod.NotesTab })), {
-  loading: () => <PageLoading title="Loading notes" description="Fetching study materials..." variant="orbit" />
-})
 const ToolsTab = dynamic(() => import('@/components/tabs/tools-tab').then(mod => ({ default: mod.ToolsTab })), {
   loading: () => <PageLoading title="Loading tools" description="Preparing study tools..." variant="orbit" />
 })
@@ -595,14 +592,6 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
         )}
       </Button>
       <Button
-        variant={activeTab === 'notes' ? 'default' : 'ghost'}
-        className="w-full justify-start text-xs sm:text-sm font-semibold h-10 sm:h-11 rounded-2xl"
-        onClick={() => handleTabChange('notes')}
-      >
-        <BookOpen className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        Notes
-      </Button>
-      <Button
         variant={activeTab === 'tools' ? 'default' : 'ghost'}
         className="w-full justify-start text-xs sm:text-sm font-semibold h-10 sm:h-11 rounded-2xl"
         onClick={() => handleTabChange('tools')}
@@ -683,7 +672,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
             </SheetContent>
           </Sheet>
 
-          <div className="flex-1 min-w-0 md:pl-0 pl-9 sm:pl-10">
+          <div className="flex-1 min-w-0 md:pl-0 pl-9 sm:pl-10 flex flex-col min-h-0">
             {activeTab === 'settings' && (
               <div className="mb-4 sm:mb-5 md:mb-6 p-4 sm:p-5 md:p-6 rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-800/50">
                 <div className="flex items-center justify-between flex-wrap gap-3 sm:gap-4">
@@ -812,20 +801,11 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
               />
             )}
 
-            {activeTab === 'notes' && (
-              <NotesTab
-                clubId={club.id}
-                membershipId={currentMembership.id}
-                division={club.division}
-                user={user}
-                isAdmin={isAdmin}
-              />
-            )}
-
             {activeTab === 'tools' && (
               <ToolsTab
                 clubId={club.id}
                 division={club.division}
+                currentMembershipId={currentMembership.id}
               />
             )}
 

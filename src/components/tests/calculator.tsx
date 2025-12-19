@@ -19,8 +19,8 @@ interface Position {
   y: number
 }
 
-// Desmos API Key
-const DESMOS_API_KEY = '9137aaf02b21418d829ad8c574d2a358'
+// Desmos API Key - loaded from environment variable
+const DESMOS_API_KEY = process.env.NEXT_PUBLIC_DESMOS_API_KEY || ''
 
 // TypeScript declaration for Desmos
 declare global {
@@ -280,6 +280,11 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
       }
 
       // Load the script
+      if (!DESMOS_API_KEY) {
+        console.error('Desmos API key is not configured. Please set NEXT_PUBLIC_DESMOS_API_KEY in your .env.local file.')
+        return
+      }
+
       const script = document.createElement('script')
       script.src = `https://www.desmos.com/api/v1.8/calculator.js?apiKey=${DESMOS_API_KEY}`
       script.async = true
