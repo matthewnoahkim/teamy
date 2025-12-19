@@ -13,12 +13,12 @@ const features = [
       {
         icon: Users,
         title: 'Clubs & Teams',
-        description: 'Division B/C clubs with multiple teams, dual-role system (Admin/Member), invite codes & links'
+        description: 'Division B/C clubs with multiple teams, admin/member roles, invite codes & links'
       },
       {
         icon: ClipboardCheck,
-        title: 'Event Roster',
-        description: '2026 SO events, conflict detection, capacity enforcement, AI-assisted assignments'
+        title: 'Event Rosters',
+        description: '2026 SO events, conflict detection/capacity limits, AI-assisted event assignments'
       },
       {
         icon: Bell,
@@ -28,12 +28,12 @@ const features = [
       {
         icon: Calendar,
         title: 'Calendar',
-        description: 'Personal/team/club events, RSVP, recurring events, role/event targeting'
+        description: 'Personal, team, and club events with RSVP, recurring events, and role targeting'
       },
       {
         icon: Shield,
         title: 'Attendance',
-        description: 'Check-in codes, manual check-in, grace periods, CSV export, rate limiting'
+        description: 'Check-in codes, grace periods, and CSV export'
       }
     ]
   },
@@ -42,19 +42,14 @@ const features = [
     items: [
       {
         icon: DollarSign,
-        title: 'Budgets',
-        description: 'Per-event budgets (optionally per-team)'
+        title: 'Event Budgets',
+        description: 'Per-event budgets with automatic expense tracking'
       },
       {
         icon: FileCheck,
         title: 'Purchase Requests',
-        description: 'Approval workflow, budget enforcement'
+        description: 'Approval system with budget enforcement'
       },
-      {
-        icon: Zap,
-        title: 'Expenses',
-        description: 'Categorized tracking linked to events/teams'
-      }
     ]
   },
   {
@@ -63,17 +58,17 @@ const features = [
       {
         icon: FileText,
         title: 'Question Types',
-        description: 'MCQ (single/multi), short text, long text, numeric'
+        description: 'MCQ (single/multi answer), short text, long text, numeric'
       },
       {
         icon: Shield,
         title: 'Proctoring',
-        description: 'Tab tracking, fullscreen enforcement, paste/copy detection'
+        description: 'Tab switch tracking, fullscreen enforcement, copy/paste detection'
       },
       {
         icon: Sparkles,
         title: 'Tools',
-        description: 'Built-in calculator (4-function/scientific/graphing), note sheet upload with admin review'
+        description: 'Built-in calculator (4-func/scientific/graphing), note sheet upload, admin review'
       },
       {
         icon: Bot,
@@ -122,7 +117,7 @@ const features = [
       },
       {
         icon: CheckSquare,
-        title: 'Todos',
+        title: 'To -Do\'s',
         description: 'Personal task lists with priorities & due dates'
       },
       {
@@ -198,7 +193,7 @@ export default function FeaturesPage() {
           <div className="mt-20 text-center">
             <Link href="/login">
               <button className="px-8 py-4 text-lg font-semibold bg-teamy-primary text-white rounded-full hover:bg-teamy-primary-dark transition-colors shadow-lg hover:shadow-xl">
-                Get started today
+                Get started
               </button>
             </Link>
           </div>

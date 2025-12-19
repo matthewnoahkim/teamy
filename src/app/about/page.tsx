@@ -57,7 +57,7 @@ export default function AboutPage() {
               </p>
               <p className="text-lg text-muted-foreground leading-relaxed">
                 <strong className="text-foreground">We believe that coaches, captains, and tournament directors 
-                should spend their time mentoring students and building great teams—not wrestling with 
+                should spend their time mentoring students and building their teams—not wrestling with 
                 spreadsheets and scattered tools.</strong> That&apos;s why we built Teamy: to give every 
                 Science Olympiad team access to the same powerful management tools, regardless of their 
                 school&apos;s resources.
@@ -89,7 +89,7 @@ export default function AboutPage() {
               <ul className="space-y-3 text-lg text-muted-foreground mb-6">
                 <li className="flex items-start gap-3">
                   <Trophy className="h-5 w-5 text-teamy-primary mt-1 flex-shrink-0" />
-                  <span>Professional-grade practice test creation with AI-powered grading</span>
+                  <span>Instant AI-powered test uploads and grading</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Trophy className="h-5 w-5 text-teamy-primary mt-1 flex-shrink-0" />
@@ -101,12 +101,12 @@ export default function AboutPage() {
                 </li>
                 <li className="flex items-start gap-3">
                   <Trophy className="h-5 w-5 text-teamy-primary mt-1 flex-shrink-0" />
-                  <span>Tournament hosting tools that simplify the entire process</span>
+                  <span>A comprehensive, easy-to-use tournament hosting platform</span>
                 </li>
               </ul>
               <p className="text-lg font-medium text-foreground">
                 Great Science Olympiad programs shouldn&apos;t be limited to schools with the most resources. 
-                With Teamy, every team can operate like a champion.
+                With Teamy, every team has the tools to succeed.
               </p>
             </CardContent>
           </Card>
@@ -162,7 +162,7 @@ export default function AboutPage() {
               </p>
               <p className="text-lg text-slate-300 leading-relaxed mb-8">
                 We&apos;re building this in the open because Science Olympiad is a community—and 
-                Teamy should be too.
+                Teamy should be one too.
               </p>
               <Link 
                 href="https://github.com/matthewnoahkim/teamy" 
@@ -189,7 +189,7 @@ export default function AboutPage() {
               </h2>
               <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
                 Join hundreds of Science Olympiad teams already using Teamy to streamline 
-                their operations and focus on what matters most: competing.
+                their operations and elevate their programs.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/login">
