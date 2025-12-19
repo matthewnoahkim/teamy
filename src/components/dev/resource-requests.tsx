@@ -42,6 +42,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
+// Predefined resource tags (same as tools-tab.tsx)
+const RESOURCE_TAGS = [
+  { value: 'wiki', label: 'Wiki' },
+  { value: 'textbook', label: 'Textbook' },
+  { value: 'video', label: 'Video' },
+  { value: 'practice', label: 'Practice' },
+  { value: 'misc', label: 'Miscellaneous' },
+]
+
 // Helper function to highlight search terms in text
 const highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
   if (!text || !searchQuery) return text || ''
@@ -300,6 +309,40 @@ export function ResourceRequests() {
     }
   }
 
+  const handleReset = async (request: ResourceRequest) => {
+    setActionLoading(request.id)
+    try {
+      const response = await fetch(`/api/resources/requests/${request.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset' }),
+      })
+
+      if (response.ok) {
+        await fetchRequests()
+        toast({
+          title: 'Success',
+          description: 'Resource request reset to pending',
+        })
+      } else {
+        const errorData = await response.json()
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to reset request',
+          variant: 'destructive',
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reset request',
+        variant: 'destructive',
+      })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'APPROVED':
@@ -469,15 +512,14 @@ export function ResourceRequests() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              // Reset to pending - would need API endpoint for this
-                              toast({
-                                title: 'Info',
-                                description: 'Reset to pending functionality coming soon',
-                              })
-                            }}
+                            onClick={() => handleReset(req)}
                             disabled={actionLoading === req.id}
                           >
+                            {actionLoading === req.id ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                            )}
                             Reset to Pending
                           </Button>
                         )}
@@ -602,13 +644,19 @@ export function ResourceRequests() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-tag">Tag *</Label>
-              <Input
-                id="edit-tag"
-                value={editedTag}
-                onChange={(e) => setEditedTag(e.target.value)}
-                placeholder="Resource tag (e.g., 2024, Practice)"
-              />
+              <Label htmlFor="edit-tag">Type *</Label>
+              <Select value={editedTag} onValueChange={setEditedTag}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {RESOURCE_TAGS.map((tag) => (
+                    <SelectItem key={tag.value} value={tag.value}>
+                      {tag.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-url">URL</Label>

@@ -18,9 +18,9 @@ export async function PATCH(
     const body = await req.json()
     const { action, rejectionReason, editedName, editedTag, editedUrl } = body
 
-    if (!['approve', 'reject'].includes(action)) {
+    if (!['approve', 'reject', 'reset'].includes(action)) {
       return NextResponse.json(
-        { error: 'Invalid action. Must be "approve" or "reject"' },
+        { error: 'Invalid action. Must be "approve", "reject", or "reset"' },
         { status: 400 }
       )
     }
@@ -33,6 +33,78 @@ export async function PATCH(
       return NextResponse.json({ error: 'Resource request not found' }, { status: 404 })
     }
 
+    // Handle reset action - can reset approved or rejected requests back to pending
+    if (action === 'reset') {
+      if (request.status === 'PENDING') {
+        return NextResponse.json(
+          { error: 'Resource request is already pending' },
+          { status: 400 }
+        )
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // If it was approved, the resource is now PUBLIC - convert it back to CLUB
+        if (request.status === 'APPROVED') {
+          const publicResource = await tx.resource.findFirst({
+            where: {
+              name: request.name,
+              tag: request.tag,
+              category: request.category,
+              scope: 'PUBLIC',
+            },
+          })
+
+          if (publicResource) {
+            // Convert back to CLUB-scoped resource
+            await tx.resource.update({
+              where: { id: publicResource.id },
+              data: {
+                scope: 'CLUB',
+                clubId: request.clubId,
+              },
+            })
+          } else {
+            // Create a CLUB-scoped resource if it doesn't exist
+            await tx.resource.create({
+              data: {
+                name: request.name,
+                tag: request.tag,
+                url: request.url,
+                category: request.category,
+                scope: 'CLUB',
+                clubId: request.clubId,
+              },
+            })
+          }
+        } else if (request.status === 'REJECTED') {
+          // If it was rejected, recreate the CLUB-scoped resource
+          await tx.resource.create({
+            data: {
+              name: request.name,
+              tag: request.tag,
+              url: request.url,
+              category: request.category,
+              scope: 'CLUB',
+              clubId: request.clubId,
+            },
+          })
+        }
+
+        // Reset the request status to PENDING
+        await tx.resourceRequest.update({
+          where: { id },
+          data: {
+            status: 'PENDING',
+            rejectionReason: null,
+            reviewedAt: null,
+          },
+        })
+      })
+
+      return NextResponse.json({ success: true, message: 'Resource request reset to pending' })
+    }
+
+    // For approve/reject, request must be PENDING
     if (request.status !== 'PENDING') {
       return NextResponse.json(
         { error: 'Resource request has already been processed' },

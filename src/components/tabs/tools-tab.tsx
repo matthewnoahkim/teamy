@@ -1548,11 +1548,6 @@ function ResourcesSection({ clubId, currentMembershipId, isAdmin }: { clubId: st
                           <Badge className={`text-xs flex-shrink-0 ${getTypeColor(resource.type)}`}>
                             {resource.type}
                           </Badge>
-                          {resource.isClubResource && (
-                            <Badge variant="outline" className="text-xs flex-shrink-0">
-                              Club
-                            </Badge>
-                          )}
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           {hasUrl && (
