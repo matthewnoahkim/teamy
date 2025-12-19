@@ -720,7 +720,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
         open={editUsernameOpen}
         onOpenChange={setEditUsernameOpen}
         currentName={currentUserName}
-        onSuccess={(newName) => {
+        onNameUpdated={(newName) => {
           setCurrentUserName(newName)
           setEditUsernameOpen(false)
         }}
