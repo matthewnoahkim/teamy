@@ -1,0 +1,731 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { signOut } from 'next-auth/react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Logo } from '@/components/logo'
+import { ThemeToggle } from '@/components/theme-toggle'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { EditUsernameDialog } from '@/components/edit-username-dialog'
+import { useToast } from '@/components/ui/use-toast'
+import { PageLoading } from '@/components/ui/loading-spinner'
+import { Calendar, MapPin, Trophy, FileText, ChevronRight, LogOut, Pencil, ChevronDown, Clock, HelpCircle, ListChecks, AlertCircle, Calculator, FileCheck } from 'lucide-react'
+import { formatDivision } from '@/lib/utils'
+import Link from 'next/link'
+import { format } from 'date-fns'
+
+interface Tournament {
+  tournament: {
+    id: string
+    name: string
+    division: string
+    startDate: string
+    endDate: string
+    location: string | null
+    slug: string | null
+  }
+  registration: {
+    id: string
+    team: {
+      id: string
+      name: string
+    } | null
+    club: {
+      id: string
+      name: string
+    }
+  }
+  events: Array<{
+    event: {
+      id: string
+      name: string
+      slug: string
+      division: string
+    }
+    tests: Array<{
+      id: string
+      name: string
+      description: string | null
+      instructions: string | null
+      durationMinutes: number
+      startAt: string | null
+      endAt: string | null
+      allowLateUntil: string | null
+      requireFullscreen: boolean
+      allowCalculator: boolean
+      calculatorType: string | null
+      allowNoteSheet: boolean
+      noteSheetInstructions: string | null
+      maxAttempts: number | null
+      scoreReleaseMode: string | null
+      releaseScoresAt: string | null
+      questionCount: number
+      clubId: string
+      club: {
+        id: string
+        name: string
+      }
+    }>
+  }>
+  generalTests: Array<{
+    id: string
+    name: string
+    description: string | null
+    instructions: string | null
+    durationMinutes: number
+    startAt: string | null
+    endAt: string | null
+    allowLateUntil: string | null
+    requireFullscreen: boolean
+    allowCalculator: boolean
+    calculatorType: string | null
+    allowNoteSheet: boolean
+    noteSheetInstructions: string | null
+    maxAttempts: number | null
+    scoreReleaseMode: string | null
+    releaseScoresAt: string | null
+    questionCount: number
+    clubId: string
+    club: {
+      id: string
+      name: string
+    }
+  }>
+}
+
+interface TestingPortalClientProps {
+  user: {
+    id: string
+    name?: string | null
+    email: string
+    image?: string | null
+  }
+}
+
+const STORAGE_KEY = 'testing-portal-selected-tournament'
+
+export function TestingPortalClient({ user }: TestingPortalClientProps) {
+  const { toast } = useToast()
+  const [tournaments, setTournaments] = useState<Tournament[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedTournament, setSelectedTournament] = useState<string | null>(null)
+  const [editUsernameOpen, setEditUsernameOpen] = useState(false)
+  const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
+
+  // Load tournaments
+  useEffect(() => {
+    loadTournaments()
+  }, [])
+
+  // Restore selected tournament from localStorage after tournaments are loaded (only once)
+  useEffect(() => {
+    if (!loading && tournaments.length > 0 && selectedTournament === null) {
+      const savedTournamentId = localStorage.getItem(STORAGE_KEY)
+      if (savedTournamentId) {
+        // Verify the tournament still exists in the list
+        const tournamentExists = tournaments.some(t => t.tournament.id === savedTournamentId)
+        if (tournamentExists) {
+          setSelectedTournament(savedTournamentId)
+        } else {
+          // Tournament no longer exists, clear it from storage
+          localStorage.removeItem(STORAGE_KEY)
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, tournaments])
+
+  // Save selected tournament to localStorage whenever user changes selection
+  const handleSetSelectedTournament = (tournamentId: string | null) => {
+    setSelectedTournament(tournamentId)
+    if (tournamentId) {
+      localStorage.setItem(STORAGE_KEY, tournamentId)
+    } else {
+      localStorage.removeItem(STORAGE_KEY)
+    }
+  }
+
+  const loadTournaments = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/testing/tournaments')
+      if (!response.ok) throw new Error('Failed to load tournaments')
+      
+      const data = await response.json()
+      setTournaments(data.tournaments || [])
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to load tournaments',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const selectedTournamentData = selectedTournament
+    ? tournaments.find((t) => t.tournament.id === selectedTournament)
+    : null
+
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'MMM d, yyyy')
+    } catch {
+      return dateString
+    }
+  }
+
+  const formatDateTime = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'MMM d, yyyy h:mm a')
+    } catch {
+      return dateString
+    }
+  }
+
+  const formatDateRange = (start: string, end: string) => {
+    try {
+      const startDate = new Date(start)
+      const endDate = new Date(end)
+      // If same day, show start date/time and end time
+      if (startDate.toDateString() === endDate.toDateString()) {
+        const dateStr = format(new Date(start), 'MMM d, yyyy')
+        const startTime = format(new Date(start), 'h:mm a')
+        const endTime = format(new Date(end), 'h:mm a')
+        return `${dateStr} ${startTime} - ${endTime}`
+      }
+      // Different days, show full date/time for both
+      return `${formatDateTime(start)} - ${formatDateTime(end)}`
+    } catch {
+      return `${start} - ${end}`
+    }
+  }
+
+  const formatTestTimeRange = (startAt: string | null | undefined, endAt: string | null | undefined, allowLateUntil: string | null | undefined) => {
+    if (!startAt || !endAt) {
+      return null
+    }
+    try {
+      // Handle both string and Date serialization (in case it comes as ISO string or Date object)
+      const startDate = new Date(startAt)
+      const endDate = new Date(endAt)
+      const deadlineDate = allowLateUntil ? new Date(allowLateUntil) : endDate
+      
+      // Check if dates are valid
+      if (isNaN(startDate.getTime()) || isNaN(deadlineDate.getTime())) {
+        return null
+      }
+      
+      // If same day, show start date/time and deadline time
+      if (startDate.toDateString() === deadlineDate.toDateString()) {
+        const dateStr = format(startDate, 'MMM d, yyyy')
+        const startTime = format(startDate, 'h:mm a')
+        const deadlineTime = format(deadlineDate, 'h:mm a')
+        return `${dateStr} ${startTime} - ${deadlineTime}`
+      }
+      // Different days, show full date/time for both
+      return `${formatDateTime(startAt)} - ${formatDateTime(allowLateUntil || endAt)}`
+    } catch {
+      return null
+    }
+  }
+
+  const handleTakeTest = (testId: string, clubId: string) => {
+    window.location.href = `/club/${clubId}/tests/${testId}/take`
+  }
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: '/testing' })
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern flex flex-col">
+        <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+          <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Logo size="md" href="/" variant="light" />
+              <div className="h-6 w-px bg-white/20" />
+              <span className="text-white font-semibold">Testing Portal</span>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 sm:gap-3 outline-none">
+                    <Avatar className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all">
+                      <AvatarImage src={user.image || ''} />
+                      <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
+                        {currentUserName?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="hidden sm:block text-left max-w-[120px] md:max-w-none">
+                      <p className="text-xs sm:text-sm font-medium text-white truncate">
+                        {currentUserName || user.email}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-white/60 truncate">{user.email}</p>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-white/60 hidden sm:block" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Username
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <ThemeToggle variant="header" />
+            </div>
+          </div>
+        </header>
+        <PageLoading title="Loading tournaments" description="Fetching your tournament registrations..." />
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern flex flex-col">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Logo size="md" href="/" variant="light" />
+            <div className="h-6 w-px bg-white/20" />
+            <span className="text-white font-semibold">Testing Portal</span>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 sm:gap-3 outline-none">
+                  <Avatar className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all">
+                    <AvatarImage src={user.image || ''} />
+                    <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
+                      {currentUserName?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden sm:block text-left max-w-[120px] md:max-w-none">
+                    <p className="text-xs sm:text-sm font-medium text-white truncate">
+                      {currentUserName || user.email}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-white/60 truncate">{user.email}</p>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-white/60 hidden sm:block" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Username
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <ThemeToggle variant="header" />
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8 max-w-7xl flex-1">
+        {selectedTournamentData ? (
+          // Tournament detail view
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => handleSetSelectedTournament(null)}
+                className="gap-2"
+              >
+                <ChevronRight className="h-4 w-4 rotate-180" />
+                Back to Tournaments
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">{selectedTournamentData.tournament.name}</h1>
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <Badge variant="outline">Division {formatDivision(selectedTournamentData.tournament.division)}</Badge>
+                  {selectedTournamentData.tournament.location && (
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      {selectedTournamentData.tournament.location}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    {formatDateRange(
+                      selectedTournamentData.tournament.startDate,
+                      selectedTournamentData.tournament.endDate
+                    )}
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Team: {selectedTournamentData.registration.team?.name || selectedTournamentData.registration.club.name}
+                </p>
+              </div>
+
+              {/* Events with tests */}
+              {selectedTournamentData.events.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-semibold">Your Events</h2>
+                  {selectedTournamentData.events.map((eventData) => (
+                    <Card key={eventData.event.id}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Trophy className="h-5 w-5" />
+                          {eventData.event.name}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {eventData.tests.length > 0 ? (
+                          <div className="space-y-3">
+                            {eventData.tests.map((test) => (
+                              <Card key={test.id} className="bg-slate-50 dark:bg-slate-800">
+                                <CardContent className="pt-6">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1 space-y-3">
+                                      <div>
+                                        <h3 className="font-semibold mb-1">{test.name}</h3>
+                                        {test.description && (
+                                          <p className="text-sm text-muted-foreground mb-2">{test.description}</p>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Main details grid */}
+                                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                          <Clock className="h-4 w-4" />
+                                          <span>{test.durationMinutes} minutes</span>
+                                        </div>
+                                        {test.questionCount > 0 && (
+                                          <div className="flex items-center gap-2 text-muted-foreground">
+                                            <ListChecks className="h-4 w-4" />
+                                            <span>{test.questionCount} question{test.questionCount !== 1 ? 's' : ''}</span>
+                                          </div>
+                                        )}
+                                        {test.maxAttempts && (
+                                          <div className="flex items-center gap-2 text-muted-foreground">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <span>Max {test.maxAttempts} attempt{test.maxAttempts !== 1 ? 's' : ''}</span>
+                                          </div>
+                                        )}
+                                        {test.startAt && test.endAt && formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil) && (
+                                          <div className="flex items-center gap-2 text-muted-foreground col-span-2 md:col-span-1">
+                                            <Calendar className="h-4 w-4" />
+                                            <span className="text-xs">{formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil)}</span>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Features and settings */}
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {test.allowCalculator && (
+                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                            <Calculator className="h-3 w-3" />
+                                            {test.calculatorType 
+                                              ? (test.calculatorType === 'FOUR_FUNCTION' ? 'Four Function' : 
+                                                 test.calculatorType === 'SCIENTIFIC' ? 'Scientific' : 
+                                                 'Graphing') + ' Calculator'
+                                              : 'Calculator Allowed'}
+                                          </Badge>
+                                        )}
+                                        {test.allowNoteSheet && (
+                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                            <FileCheck className="h-3 w-3" />
+                                            Note Sheet Allowed
+                                            {test.noteSheetInstructions && (
+                                              <span className="ml-1" title={test.noteSheetInstructions}>
+                                                <HelpCircle className="h-3 w-3" />
+                                              </span>
+                                            )}
+                                          </Badge>
+                                        )}
+                                        {test.requireFullscreen && (
+                                          <Badge variant="outline" className="text-xs">
+                                            Fullscreen Required
+                                          </Badge>
+                                        )}
+                                        {test.scoreReleaseMode && (
+                                          <Badge variant="outline" className="text-xs">
+                                            {test.scoreReleaseMode === 'FULL_TEST' ? 'Full Review' :
+                                             test.scoreReleaseMode === 'SCORE_WITH_WRONG' ? 'Score + Wrong' :
+                                             test.scoreReleaseMode === 'SCORE_ONLY' ? 'Score Only' :
+                                             'No Review'}
+                                          </Badge>
+                                        )}
+                                      </div>
+
+                                      {/* Instructions tooltip if available */}
+                                      {test.instructions && (
+                                        <div className="text-xs text-muted-foreground flex items-start gap-1">
+                                          <HelpCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                          <span className="line-clamp-2" title={test.instructions}>
+                                            {test.instructions}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <Button
+                                      onClick={() => handleTakeTest(test.id, test.clubId)}
+                                      className="ml-4 flex-shrink-0"
+                                    >
+                                      Take Test
+                                    </Button>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No tests released for this event yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {/* General tests (not assigned to a specific event) */}
+              {selectedTournamentData.generalTests.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-semibold">General Tests</h2>
+                  <div className="space-y-3">
+                    {selectedTournamentData.generalTests.map((test) => (
+                      <Card key={test.id} className="bg-slate-50 dark:bg-slate-800">
+                        <CardContent className="pt-6">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-3">
+                              <div>
+                                <h3 className="font-semibold mb-1">{test.name}</h3>
+                                {test.description && (
+                                  <p className="text-sm text-muted-foreground mb-2">{test.description}</p>
+                                )}
+                              </div>
+                              
+                              {/* Main details grid */}
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <Clock className="h-4 w-4" />
+                                  <span>{test.durationMinutes} minutes</span>
+                                </div>
+                                {test.questionCount > 0 && (
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <ListChecks className="h-4 w-4" />
+                                    <span>{test.questionCount} question{test.questionCount !== 1 ? 's' : ''}</span>
+                                  </div>
+                                )}
+                                {test.maxAttempts && (
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <span>Max {test.maxAttempts} attempt{test.maxAttempts !== 1 ? 's' : ''}</span>
+                                  </div>
+                                )}
+                                {test.startAt && test.endAt && formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil) && (
+                                  <div className="flex items-center gap-2 text-muted-foreground col-span-2 md:col-span-1">
+                                    <Calendar className="h-4 w-4" />
+                                    <span className="text-xs">{formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil)}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Features and settings */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                {test.allowCalculator && (
+                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                    <Calculator className="h-3 w-3" />
+                                    {test.calculatorType 
+                                      ? (test.calculatorType === 'FOUR_FUNCTION' ? 'Four Function' : 
+                                         test.calculatorType === 'SCIENTIFIC' ? 'Scientific' : 
+                                         'Graphing') + ' Calculator'
+                                      : 'Calculator Allowed'}
+                                  </Badge>
+                                )}
+                                {test.allowNoteSheet && (
+                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                    <FileCheck className="h-3 w-3" />
+                                    Note Sheet Allowed
+                                    {test.noteSheetInstructions && (
+                                      <span className="ml-1" title={test.noteSheetInstructions}>
+                                        <HelpCircle className="h-3 w-3" />
+                                      </span>
+                                    )}
+                                  </Badge>
+                                )}
+                                {test.requireFullscreen && (
+                                  <Badge variant="outline" className="text-xs">
+                                    Fullscreen Required
+                                  </Badge>
+                                )}
+                                {test.scoreReleaseMode && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {test.scoreReleaseMode === 'FULL_TEST' ? 'Full Review' :
+                                     test.scoreReleaseMode === 'SCORE_WITH_WRONG' ? 'Score + Wrong' :
+                                     test.scoreReleaseMode === 'SCORE_ONLY' ? 'Score Only' :
+                                     'No Review'}
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* Instructions tooltip if available */}
+                              {test.instructions && (
+                                <div className="text-xs text-muted-foreground flex items-start gap-1">
+                                  <HelpCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                  <span className="line-clamp-2" title={test.instructions}>
+                                    {test.instructions}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              onClick={() => handleTakeTest(test.id, test.clubId)}
+                              className="ml-4 flex-shrink-0"
+                            >
+                              Take Test
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedTournamentData.events.length === 0 && selectedTournamentData.generalTests.length === 0 && (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold mb-2">No tests available</h3>
+                    <p className="text-muted-foreground">
+                      No tests have been released for this tournament yet.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        ) : (
+          // Tournament list view
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">Testing Portal</h1>
+              <p className="text-muted-foreground">
+                View tournaments your team is registered for and access released tests
+              </p>
+            </div>
+
+            {tournaments.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">No tournaments found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Your team is not registered for any tournaments yet.
+                  </p>
+                  <Link href="/tournaments">
+                    <Button>Browse Tournaments</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {tournaments.map((tournament) => {
+                  const totalTests = tournament.events.reduce(
+                    (sum, e) => sum + e.tests.length,
+                    0
+                  ) + tournament.generalTests.length
+                  const totalEvents = tournament.events.length
+
+                  return (
+                    <Card
+                      key={tournament.tournament.id}
+                      className="hover:shadow-lg transition-all cursor-pointer"
+                      onClick={() => handleSetSelectedTournament(tournament.tournament.id)}
+                    >
+                      <CardHeader>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline">
+                            Division {formatDivision(tournament.tournament.division)}
+                          </Badge>
+                        </div>
+                        <CardTitle className="text-xl">{tournament.tournament.name}</CardTitle>
+                        {tournament.tournament.location && (
+                          <CardDescription className="flex items-center gap-1 mt-2">
+                            <MapPin className="h-3 w-3" />
+                            {tournament.tournament.location}
+                          </CardDescription>
+                        )}
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <Calendar className="h-4 w-4" />
+                            {formatDateRange(
+                              tournament.tournament.startDate,
+                              tournament.tournament.endDate
+                            )}
+                          </div>
+                          <div className="pt-2 border-t">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Events:</span>
+                              <span className="font-medium">{totalEvents}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Tests:</span>
+                              <span className="font-medium">{totalTests}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          className="w-full mt-4"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleSetSelectedTournament(tournament.tournament.id)
+                          }}
+                        >
+                          View Details
+                          <ChevronRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* Edit Username Dialog */}
+      <EditUsernameDialog
+        open={editUsernameOpen}
+        onOpenChange={setEditUsernameOpen}
+        currentName={currentUserName}
+        onSuccess={(newName) => {
+          setCurrentUserName(newName)
+          setEditUsernameOpen(false)
+        }}
+      />
+    </div>
+  )
+}
+

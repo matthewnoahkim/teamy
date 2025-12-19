@@ -1292,6 +1292,9 @@ model ESTest {
   content          String?
   status           TestStatus           @default(DRAFT)
   durationMinutes  Int                  @default(60)
+  startAt          DateTime?
+  endAt            DateTime?
+  allowLateUntil   DateTime?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   event            Event?               @relation(fields: [eventId], references: [id])

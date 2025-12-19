@@ -475,7 +475,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { testId, name, description, instructions, durationMinutes, status, eventId, questions } = body as {
+    const { testId, name, description, instructions, durationMinutes, status, eventId, startAt, endAt, allowLateUntil, questions } = body as {
       testId: string
       name?: string
       description?: string
@@ -483,6 +483,9 @@ export async function PUT(request: NextRequest) {
       durationMinutes?: number
       status?: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
       eventId?: string
+      startAt?: string
+      endAt?: string
+      allowLateUntil?: string
       questions?: Array<{
         id?: string
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
@@ -587,10 +590,41 @@ export async function PUT(request: NextRequest) {
     if (durationMinutes && durationMinutes !== existingTest.durationMinutes) changedFields.push('durationMinutes')
     if (status && status !== existingTest.status) changedFields.push('status')
     if (eventId !== undefined && eventId !== existingTest.eventId) changedFields.push('eventId')
+    if (startAt !== undefined) {
+      const newStartAt = startAt ? new Date(startAt) : null
+      const existingStartAt = existingTest.startAt
+      if ((newStartAt?.getTime() || null) !== (existingStartAt?.getTime() || null)) changedFields.push('startAt')
+    }
+    if (endAt !== undefined) {
+      const newEndAt = endAt ? new Date(endAt) : null
+      const existingEndAt = existingTest.endAt
+      if ((newEndAt?.getTime() || null) !== (existingEndAt?.getTime() || null)) changedFields.push('endAt')
+    }
+    if (allowLateUntil !== undefined) {
+      const newAllowLateUntil = allowLateUntil ? new Date(allowLateUntil) : null
+      const existingAllowLateUntil = existingTest.allowLateUntil
+      if ((newAllowLateUntil?.getTime() || null) !== (existingAllowLateUntil?.getTime() || null)) changedFields.push('allowLateUntil')
+    }
     if (questions) changedFields.push('questions')
 
     // Use a transaction to update test and questions
     const updatedTest = await prisma.$transaction(async (tx) => {
+      // Validate start/end times if both are provided
+      const newStartAt = startAt !== undefined ? (startAt ? new Date(startAt) : null) : undefined
+      const newEndAt = endAt !== undefined ? (endAt ? new Date(endAt) : null) : undefined
+      const newAllowLateUntil = allowLateUntil !== undefined ? (allowLateUntil ? new Date(allowLateUntil) : null) : undefined
+      
+      if (newStartAt !== undefined && newEndAt !== undefined) {
+        const finalStartAt = newStartAt ?? existingTest.startAt
+        const finalEndAt = newEndAt ?? existingTest.endAt
+        if (finalStartAt && finalEndAt && finalEndAt <= finalStartAt) {
+          return NextResponse.json(
+            { error: 'End time must be after start time' },
+            { status: 400 }
+          )
+        }
+      }
+
       // Update the test
       const test = await tx.eSTest.update({
         where: { id: testId },
@@ -601,6 +635,9 @@ export async function PUT(request: NextRequest) {
           ...(durationMinutes && { durationMinutes }),
           ...(status && { status }),
           ...(eventId !== undefined && { eventId }),
+          ...(startAt !== undefined && { startAt: newStartAt }),
+          ...(endAt !== undefined && { endAt: newEndAt }),
+          ...(allowLateUntil !== undefined && { allowLateUntil: newAllowLateUntil }),
         },
       })
 

@@ -361,6 +361,7 @@ export function NewTestBuilder({
   const [publishFormData, setPublishFormData] = useState({
     startAt: '',
     endAt: '',
+    allowLateUntil: '',
     testPassword: '',
     testPasswordConfirm: '',
     releaseScoresAt: '',
@@ -1363,27 +1364,31 @@ export function NewTestBuilder({
       return
     }
 
-    if (!publishFormData.startAt || !publishFormData.endAt) {
-      toast({
-        title: 'Error',
-        description: 'Start and end times are required',
-        variant: 'destructive',
-      })
-      return
+    // Validate startAt/endAt if provided (now supported for ES tests too)
+    if (publishFormData.startAt || publishFormData.endAt) {
+      if (!publishFormData.startAt || !publishFormData.endAt) {
+        toast({
+          title: 'Error',
+          description: 'Both start and end times are required if time restrictions are set',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const start = new Date(publishFormData.startAt)
+      const end = new Date(publishFormData.endAt)
+      if (end <= start) {
+        toast({
+          title: 'Error',
+          description: 'End time must be after start time',
+          variant: 'destructive',
+        })
+        return
+      }
     }
 
-    const start = new Date(publishFormData.startAt)
-    const end = new Date(publishFormData.endAt)
-    if (end <= start) {
-      toast({
-        title: 'Error',
-        description: 'End time must be after start time',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    if (publishFormData.testPassword) {
+    // Skip password validation for ES tests (ESTest doesn't support passwords)
+    if (!esMode && publishFormData.testPassword) {
       if (publishFormData.testPassword.length < 6) {
         toast({
           title: 'Error',
@@ -1414,6 +1419,68 @@ export function NewTestBuilder({
 
     setPublishing(true)
     try {
+      // For ES mode (ESTest), use the PUT endpoint to update status to PUBLISHED
+      if (esMode) {
+        const startAtISO = publishFormData.startAt ? new Date(publishFormData.startAt).toISOString() : undefined
+        const endAtISO = publishFormData.endAt ? new Date(publishFormData.endAt).toISOString() : undefined
+        const allowLateUntilISO = publishFormData.allowLateUntil && publishFormData.allowLateUntil.trim()
+          ? new Date(publishFormData.allowLateUntil).toISOString()
+          : undefined
+
+        const response = await fetch('/api/es/tests', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            testId,
+            status: 'PUBLISHED',
+            durationMinutes: details.durationMinutes,
+            startAt: startAtISO,
+            endAt: endAtISO,
+            allowLateUntil: allowLateUntilISO,
+          }),
+        })
+
+        let data: any = null
+        try {
+          const text = await response.text()
+          data = text ? JSON.parse(text) : {}
+        } catch (parseError) {
+          console.error('Failed to parse response:', parseError)
+          throw new Error(`Server error (${response.status}): Unable to parse response. Please check server logs.`)
+        }
+
+        if (!response.ok) {
+          const errorMsg = data.error || data.details || 'Failed to publish test'
+          throw new Error(errorMsg)
+        }
+
+        const savedTournamentId = sessionStorage.getItem('tournamentId') || tournamentId
+
+        toast({
+          title: 'Test Published',
+          description: 'The test is now published.',
+        })
+
+        if (!isEditMode) {
+          sessionStorage.removeItem('newTestId')
+        }
+        setPublishDialogOpen(false)
+        setAddToCalendar(false)
+        if (isInTDPortal && tournamentId) {
+          // Set events tab in localStorage and redirect to TD tournament manage page
+          const storageKey = `td-tournament-tab-${tournamentId}`
+          localStorage.setItem(storageKey, 'events')
+          router.push(`/td/tournament/${tournamentId}`)
+        } else if (esMode && tournamentId) {
+          router.push(`/es?tournament=${tournamentId}`)
+        } else if (esMode) {
+          router.push('/es')
+        }
+        router.refresh()
+        return
+      }
+
+      // Regular test publish flow
       const startAtISO = publishFormData.startAt ? new Date(publishFormData.startAt).toISOString() : undefined
       const endAtISO = publishFormData.endAt ? new Date(publishFormData.endAt).toISOString() : undefined
       const releaseScoresAtISO = publishFormData.releaseScoresAt && publishFormData.releaseScoresAt.trim() 
@@ -1809,25 +1876,35 @@ export function NewTestBuilder({
 
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="startAt">Start Date/Time *</Label>
+              <Label htmlFor="startAt">Start Date/Time {!esMode && '*'}</Label>
               <Input
                 id="startAt"
                 type="datetime-local"
                 value={publishFormData.startAt}
                 onChange={(e) => setPublishFormData((prev) => ({ ...prev, startAt: e.target.value }))}
-                required
+                required={!esMode}
               />
+              {esMode && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Optional: Set when the test becomes available
+                </p>
+              )}
             </div>
 
             <div>
-              <Label htmlFor="endAt">End Date/Time *</Label>
+              <Label htmlFor="endAt">End Date/Time {!esMode && '*'}</Label>
               <Input
                 id="endAt"
                 type="datetime-local"
                 value={publishFormData.endAt}
                 onChange={(e) => setPublishFormData((prev) => ({ ...prev, endAt: e.target.value }))}
-                required
+                required={!esMode}
               />
+              {esMode && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Optional: Set when the test closes (both start and end must be set together)
+                </p>
+              )}
             </div>
 
             <div>
@@ -2025,7 +2102,13 @@ export function NewTestBuilder({
             <Button
               onClick={() => {
                 setPublishDialogOpen(false)
-                setCalendarModalOpen(true)
+                if (tournamentId) {
+                  // Skip calendar modal for tournament tests
+                  setAddToCalendar(false)
+                  setConfirmPublishOpen(true)
+                } else {
+                  setCalendarModalOpen(true)
+                }
               }}
               disabled={publishing}
             >
