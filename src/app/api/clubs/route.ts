@@ -20,13 +20,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Ensure user exists in database (fix for JWT session strategy)
-    console.log('[Club Create] Session user ID:', session.user.id)
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
     })
 
     if (!user) {
-      console.log('[Club Create] User not found in database, creating...')
       // Create the user if they don't exist (shouldn't happen with proper OAuth, but safeguard)
       try {
         await prisma.user.create({
@@ -37,13 +35,10 @@ export async function POST(req: NextRequest) {
             image: session.user.image,
           },
         })
-        console.log('[Club Create] User created successfully')
       } catch (createError) {
         console.error('[Club Create] Error creating user:', createError)
         throw createError
       }
-    } else {
-      console.log('[Club Create] User found in database:', user.email)
     }
 
     const body = await req.json()

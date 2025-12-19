@@ -90,7 +90,6 @@ export function PaperworkTab({ clubId, user, isAdmin }: PaperworkTabProps) {
     } catch (error: any) {
       // Don't show error on abort (user navigated away)
       if (error.name === 'AbortError') {
-        console.log('Request cancelled')
         return
       }
       

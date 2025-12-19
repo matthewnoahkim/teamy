@@ -95,32 +95,8 @@ export async function GET(request: NextRequest) {
       membership.events.forEach(e => userEventIds.add(e.event.id))
     })
 
-    console.log('Fetching ES tests for user:', session.user.email)
-    console.log('User event IDs:', Array.from(userEventIds))
-    console.log('User tournament IDs:', staffMemberships.map(m => m.tournament.id))
-
-    // First, let's check ALL tests in the tournaments to see what exists
     const tournamentIds = staffMemberships.map(m => m.tournament.id)
-    const allTournamentTests = await prisma.eSTest.findMany({
-      where: {
-        tournamentId: { in: tournamentIds },
-      },
-      select: {
-        id: true,
-        name: true,
-        eventId: true,
-        tournamentId: true,
-        staffId: true,
-        createdByStaffId: true,
-      },
-    })
-    console.log('ALL tests in user tournaments:', allTournamentTests)
-
-    // Fetch all tests for events the user is assigned to (collaborative access)
-    // This returns ALL tests for events the user is assigned to, regardless of who created them
-    // IMPORTANT: We don't filter by staffId - all staff assigned to an event can see all tests for that event
     const eventIdsArray = Array.from(userEventIds)
-    console.log('Querying tests with:', { tournamentIds, eventIdsArray })
     
     const allTests = await prisma.eSTest.findMany({
       where: {
@@ -159,23 +135,11 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    console.log('Found tests:', allTests.length)
-    console.log('Tests details:', allTests.map(t => ({ 
-      id: t.id, 
-      name: t.name, 
-      eventId: t.eventId, 
-      tournamentId: t.tournamentId,
-      staffId: t.staffId, 
-      createdBy: t.createdByStaffId,
-      createdByEmail: t.createdBy?.email 
-    })))
-
     // Organize tests by tournament and event
     const testsByTournament = new Map<string, Map<string, typeof allTests>>()
     
     for (const test of allTests) {
       if (!test.eventId) {
-        console.log('Skipping test without eventId:', test.id, test.name)
         continue
       }
       
@@ -188,14 +152,6 @@ export async function GET(request: NextRequest) {
         testsByEvent.set(test.eventId, [])
       }
       testsByEvent.get(test.eventId)!.push(test)
-    }
-    
-    console.log('Tests organized by tournament:', Array.from(testsByTournament.keys()))
-    for (const [tournamentId, eventMap] of testsByTournament.entries()) {
-      console.log(`Tournament ${tournamentId} has tests for events:`, Array.from(eventMap.keys()))
-      for (const [eventId, tests] of eventMap.entries()) {
-        console.log(`  Event ${eventId} has ${tests.length} tests:`, tests.map(t => t.name))
-      }
     }
 
     // Get hosting request divisions for all tournaments
@@ -253,7 +209,6 @@ export async function GET(request: NextRequest) {
             const testsForEventInTournament = eventMap.get(e.event.id) || []
             eventTests = [...eventTests, ...testsForEventInTournament]
           }
-          console.log(`Mapping tests for membership ${membership.id}, tournament ${membership.tournament.id}, event ${e.event.id}:`, eventTests.length, 'tests')
           return {
             event: {
               id: e.event.id,
@@ -298,7 +253,6 @@ export async function GET(request: NextRequest) {
           }
         }),
       }
-      console.log(`Membership ${membership.id} has ${membershipData.events.length} events with tests`)
       return membershipData
     })
 
@@ -362,8 +316,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authorized to create tests for this staff membership' }, { status: 403 })
     }
 
-    console.log('Creating ES test:', { staffId, tournamentId, eventId, name })
-    
     // Create the test with questions and audit log in a transaction
     const test = await prisma.$transaction(async (tx) => {
       const createdTest = await tx.eSTest.create({

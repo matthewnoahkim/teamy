@@ -197,15 +197,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Debug logging
-      console.log('Email sending debug:', {
-        authorEmail,
-        adminCount: adminEmails.length,
-        memberCount: targetMembers.length,
-        scope: validated.scope,
-        teamIds: validated.teamIds,
-      })
-
       // Only send email if we have valid recipients
       if (authorEmail && (adminEmails.length > 0 || targetMembers.length > 0)) {
         // Send one email with CC and BCC (don't await to not block response)
@@ -223,8 +214,6 @@ export async function POST(req: NextRequest) {
               announcementId: announcement.id,
               calendarEvent: calendarEventDetails || undefined,
             })
-
-            console.log('Email sent successfully:', result)
 
             // Log email for all recipients (admins + members, not the author)
             const allRecipients = [

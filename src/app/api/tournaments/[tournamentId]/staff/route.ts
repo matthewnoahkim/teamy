@@ -181,8 +181,8 @@ export async function POST(
 
     // Get event names for email (including trial events)
     const eventNames = staff.events.map(e => e.event.name)
-    const trialEventNames = staff.trialEvents ? JSON.parse(staff.trialEvents) as string[] : []
-    const allEventNames = [...eventNames, ...trialEventNames]
+    const parsedTrialEventNames = staff.trialEvents ? JSON.parse(staff.trialEvents) as string[] : []
+    const allEventNames = [...eventNames, ...parsedTrialEventNames]
 
     // Send invitation email
     await sendStaffInviteEmail({

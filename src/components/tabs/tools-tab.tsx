@@ -21,7 +21,6 @@ import {
   Search,
   ChevronDown,
   ChevronRight,
-  Clock,
   Beaker,
   Atom,
   Bug,
@@ -29,7 +28,6 @@ import {
   Mountain,
   Leaf,
   Zap,
-  Cpu,
   Code,
   FlaskConical,
   Microscope,
@@ -41,6 +39,12 @@ import {
   Plus,
   X,
   AlertCircle,
+  Send,
+  Bot,
+  User,
+  Loader2,
+  Trash2,
+  Sparkles,
 } from 'lucide-react'
 import {
   Collapsible,
@@ -54,14 +58,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Calculator } from '@/components/tests/calculator'
 import { useToast } from '@/components/ui/use-toast'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { MarkdownRenderer } from '@/components/markdown-renderer'
 
 interface ToolsTabProps {
   clubId: string
   division: 'B' | 'C'
   currentMembershipId: string
+  isAdmin?: boolean
 }
 
 // Ring tone types for Web Audio API
@@ -835,6 +848,244 @@ function GraphingCalculatorButton({ isExpanded, onExpand, onCollapse }: { isExpa
   )
 }
 
+// AI Chat Component - Full Page Version
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+const CHAT_STORAGE_KEY = 'scioly-ai-chat-history'
+
+function AIAssistantPage() {
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
+
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(CHAT_STORAGE_KEY)
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed)) {
+            setMessages(parsed)
+          }
+        } catch {
+          // Invalid JSON, ignore
+        }
+      }
+    }
+  }, [])
+
+  // Save chat history to localStorage whenever messages change
+  useEffect(() => {
+    if (typeof window !== 'undefined' && messages.length > 0) {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages))
+    }
+  }, [messages])
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages])
+
+  // Focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading) return
+
+    const userMessage: ChatMessage = { role: 'user', content: input.trim() }
+    const updatedMessages = [...messages, userMessage]
+    setMessages(updatedMessages)
+    setInput('')
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: updatedMessages }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get response')
+      }
+
+      setMessages([...updatedMessages, { role: 'assistant', content: data.message }])
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send message',
+        variant: 'destructive',
+      })
+      // Remove the user message on error
+      setMessages(messages)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const clearChat = () => {
+    setMessages([])
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(CHAT_STORAGE_KEY)
+    }
+  }
+
+  const suggestedQuestions = [
+    "What topics are covered in Anatomy and Physiology?",
+    "How should I build a tower for Tower event?",
+    "What formulas do I need for Circuit Lab?",
+    "Explain the rules for Codebusters",
+    "What organisms are tested in Entomology?",
+    "How do I identify rocks in Rocks and Minerals?",
+  ]
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-16rem)] max-h-[700px]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <Bot className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold">Science Olympiad Assistant</h3>
+            <p className="text-xs text-muted-foreground">Ask about events, rules, and study strategies</p>
+          </div>
+        </div>
+        {messages.length > 0 && (
+          <Button variant="outline" size="sm" onClick={clearChat}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Clear Chat
+          </Button>
+        )}
+      </div>
+
+      {/* Chat Area */}
+      <Card className="flex-1 flex flex-col min-h-0">
+        <CardContent className="flex-1 flex flex-col p-4 min-h-0">
+          {/* Messages */}
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2"
+          >
+            {messages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center px-4">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Bot className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">How can I help you today?</h3>
+                <p className="text-sm text-muted-foreground mb-6 max-w-md">
+                  I&apos;m your Science Olympiad assistant. Ask me about specific events, 
+                  rules, study strategies, and science concepts!
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
+                  {suggestedQuestions.map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setInput(q)
+                        inputRef.current?.focus()
+                      }}
+                      className="text-sm px-4 py-2.5 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  {msg.role === 'assistant' && (
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                      msg.role === 'user'
+                        ? 'bg-primary text-primary-foreground rounded-br-md'
+                        : 'bg-muted rounded-bl-md'
+                    }`}
+                  >
+                    {msg.role === 'assistant' ? (
+                      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2">
+                        <MarkdownRenderer content={msg.content} />
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{msg.content}</p>
+                    )}
+                  </div>
+                  {msg.role === 'user' && (
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-1">
+                      <User className="h-4 w-4" />
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+            {isLoading && (
+              <div className="flex gap-3 justify-start">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                  <Bot className="h-4 w-4 text-primary" />
+                </div>
+                <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Input Area */}
+          <div className="flex gap-3 flex-shrink-0 pt-2 border-t">
+            <Input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  sendMessage()
+                }
+              }}
+              placeholder="Ask about Science Olympiad..."
+              disabled={isLoading}
+              className="flex-1 h-11"
+            />
+            <Button
+              onClick={sendMessage}
+              disabled={!input.trim() || isLoading}
+              className="h-11 px-4"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Send
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // Resources organized by event
 interface Resource {
   title: string
@@ -987,15 +1238,28 @@ const SCIENCE_OLYMPIAD_RESOURCES: EventResources[] = [
 ]
 
 // Resources Component
-function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; currentMembershipId: string }) {
+function ResourcesSection({ clubId, currentMembershipId, isAdmin }: { clubId: string; currentMembershipId: string; isAdmin?: boolean }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set(['general']))
   const [showAddForm, setShowAddForm] = useState<Record<string, boolean>>({})
   const [addingResource, setAddingResource] = useState<Record<string, boolean>>({})
-  const [resourceForm, setResourceForm] = useState<Record<string, { name: string; tag: string; url: string; scope: 'CLUB' | 'PUBLIC' }>>({})
+  const [resourceForm, setResourceForm] = useState<Record<string, { name: string; tag: string; url: string }>>({})
   const [clubResources, setClubResources] = useState<any[]>([])
   const [loadingResources, setLoadingResources] = useState(true)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deletingResource, setDeletingResource] = useState(false)
+  const [syncConfirmOpen, setSyncConfirmOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const { toast } = useToast()
+
+  // Predefined resource tags
+  const RESOURCE_TAGS = [
+    { value: 'wiki', label: 'Wiki' },
+    { value: 'textbook', label: 'Textbook' },
+    { value: 'video', label: 'Video' },
+    { value: 'practice', label: 'Practice' },
+    { value: 'misc', label: 'Miscellaneous' },
+  ]
 
   // Fetch club resources
   useEffect(() => {
@@ -1038,14 +1302,17 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
     const club = clubResources
       .filter(r => r.category === categorySlug)
       .map(r => ({
+        id: r.id,
         title: r.name,
         url: r.url || null,
         type: r.tag as Resource['type'],
         isClubResource: r.scope === 'CLUB',
+        isApproved: r.scope === 'PUBLIC',
+        canDelete: r.clubId === clubId, // Can delete any resource added by this club
       }))
     
     return [...hardcoded, ...club]
-  }, [clubResources])
+  }, [clubResources, clubId])
 
   const filteredResources = SCIENCE_OLYMPIAD_RESOURCES.map(event => ({
     ...event,
@@ -1071,10 +1338,10 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
 
   const handleAddResource = async (category: string) => {
     const form = resourceForm[category]
-    if (!form || !form.name.trim() || !form.tag.trim()) {
+    if (!form || !form.name.trim() || !form.tag) {
       toast({
         title: 'Error',
-        description: 'Please fill in the resource name and tag',
+        description: 'Please fill in the resource name and select a tag',
         variant: 'destructive',
       })
       return
@@ -1087,10 +1354,9 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name.trim(),
-          tag: form.tag.trim(),
+          tag: form.tag,
           url: form.url.trim() || null,
           category,
-          scope: form.scope,
           clubId,
         }),
       })
@@ -1098,28 +1364,24 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit resource request')
+        throw new Error(data.error || 'Failed to submit resource')
       }
 
       toast({
-        title: form.scope === 'PUBLIC' ? 'Request submitted' : 'Resource added',
-        description: form.scope === 'PUBLIC' 
-          ? 'Your resource request has been submitted and will be reviewed before being made public.'
-          : 'Resource has been added to your club.',
+        title: 'Resource added',
+        description: 'Your resource has been added and is now visible to your club. It will be available to everyone once approved.',
       })
 
-      // Refresh club resources if it was a club resource
-      if (form.scope === 'CLUB') {
-        await fetchClubResources()
-      }
+      // Refresh club resources
+      await fetchClubResources()
 
       // Reset form
-      setResourceForm(prev => ({ ...prev, [category]: { name: '', tag: '', url: '', scope: 'CLUB' } }))
+      setResourceForm(prev => ({ ...prev, [category]: { name: '', tag: '', url: '' } }))
       setShowAddForm(prev => ({ ...prev, [category]: false }))
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to submit resource request',
+        description: error.message || 'Failed to submit resource',
         variant: 'destructive',
       })
     } finally {
@@ -1130,20 +1392,97 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
   const toggleAddForm = (category: string) => {
     setShowAddForm(prev => ({ ...prev, [category]: !prev[category] }))
     if (!resourceForm[category]) {
-      setResourceForm(prev => ({ ...prev, [category]: { name: '', tag: '', url: '', scope: 'CLUB' } }))
+      setResourceForm(prev => ({ ...prev, [category]: { name: '', tag: '', url: '' } }))
+    }
+  }
+
+  const handleDeleteResource = async (resourceId: string) => {
+    setDeletingResource(true)
+    try {
+      const response = await fetch(`/api/resources/${resourceId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete resource')
+      }
+
+      toast({
+        title: 'Resource deleted',
+        description: 'The resource has been removed from your club.',
+      })
+
+      // Refresh club resources
+      await fetchClubResources()
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete resource',
+        variant: 'destructive',
+      })
+    } finally {
+      setDeletingResource(false)
+      setDeleteConfirmId(null)
+    }
+  }
+
+  const handleSyncResources = async () => {
+    setSyncing(true)
+    try {
+      const response = await fetch('/api/resources/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clubId }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to sync resources')
+      }
+
+      toast({
+        title: 'Resources synced',
+        description: 'Manually added resources have been removed.',
+      })
+
+      // Refresh club resources
+      await fetchClubResources()
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to sync resources',
+        variant: 'destructive',
+      })
+    } finally {
+      setSyncing(false)
+      setSyncConfirmOpen(false)
     }
   }
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="relative flex-shrink-0 mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search resources..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex items-center gap-2 flex-shrink-0 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search resources..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {isAdmin && clubResources.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSyncConfirmOpen(true)}
+            className="flex-shrink-0"
+          >
+            <RotateCcw className="h-4 w-4 mr-1" />
+            Sync
+          </Button>
+        )}
       </div>
 
       <ScrollArea className="flex-1 min-h-0 pr-2">
@@ -1177,36 +1516,60 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
                 <div className="space-y-1">
                   {event.resources.map((resource, idx) => {
                     const hasUrl = resource.url && resource.url !== '#'
-                    const ResourceWrapper = hasUrl ? 'a' : 'div'
-                    const wrapperProps = hasUrl
-                      ? {
-                          href: resource.url,
-                          target: '_blank',
-                          rel: 'noopener noreferrer',
-                        }
-                      : {}
+                    const canDeleteThis = isAdmin && 'canDelete' in resource && resource.canDelete
+                    // Approved = PUBLIC scope OR hardcoded default resources (no id = hardcoded)
+                    const isApprovedOrDefault = ('isApproved' in resource && resource.isApproved) || !('id' in resource)
+                    const resourceId = 'id' in resource ? resource.id : null
 
                     return (
-                      <ResourceWrapper
+                      <div
                         key={idx}
-                        {...wrapperProps}
                         className="flex items-center justify-between p-2 rounded hover:bg-muted transition-colors group"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">{resource.title}</span>
-                          <Badge className={`text-xs ${getTypeColor(resource.type)}`}>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {hasUrl ? (
+                            <a
+                              href={resource.url!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`text-sm hover:underline truncate ${isApprovedOrDefault ? 'font-medium' : ''}`}
+                            >
+                              {resource.title}
+                            </a>
+                          ) : (
+                            <span className={`text-sm truncate ${isApprovedOrDefault ? 'font-medium' : ''}`}>
+                              {resource.title}
+                            </span>
+                          )}
+                          <Badge className={`text-xs flex-shrink-0 ${getTypeColor(resource.type)}`}>
                             {resource.type}
                           </Badge>
                           {resource.isClubResource && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs flex-shrink-0">
                               Club
                             </Badge>
                           )}
                         </div>
-                        {hasUrl && (
-                          <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        )}
-                      </ResourceWrapper>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {hasUrl && (
+                            <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                          )}
+                          {canDeleteThis && resourceId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setDeleteConfirmId(resourceId)
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     )
                   })}
                   
@@ -1239,17 +1602,25 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
                           />
                         </div>
                         <div>
-                          <Label htmlFor={`resource-tag-${event.slug}`} className="text-xs">Tag *</Label>
-                          <Input
-                            id={`resource-tag-${event.slug}`}
+                          <Label htmlFor={`resource-tag-${event.slug}`} className="text-xs">Type *</Label>
+                          <Select
                             value={resourceForm[event.slug]?.tag || ''}
-                            onChange={(e) => setResourceForm(prev => ({
+                            onValueChange={(value) => setResourceForm(prev => ({
                               ...prev,
-                              [event.slug]: { ...prev[event.slug], tag: e.target.value }
+                              [event.slug]: { ...prev[event.slug], tag: value }
                             }))}
-                            placeholder="e.g., video, textbook, wiki"
-                            className="h-8 text-sm"
-                          />
+                          >
+                            <SelectTrigger className="h-8 text-sm">
+                              <SelectValue placeholder="Select type..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {RESOURCE_TAGS.map((tag) => (
+                                <SelectItem key={tag.value} value={tag.value}>
+                                  {tag.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div>
                           <Label htmlFor={`resource-url-${event.slug}`} className="text-xs">Link (optional)</Label>
@@ -1265,34 +1636,9 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
                             className="h-8 text-sm"
                           />
                         </div>
-                        <div>
-                          <Label className="text-xs mb-2 block">Visibility</Label>
-                          <RadioGroup
-                            value={resourceForm[event.slug]?.scope || 'CLUB'}
-                            onValueChange={(value) => setResourceForm(prev => ({
-                              ...prev,
-                              [event.slug]: { ...prev[event.slug], scope: value as 'CLUB' | 'PUBLIC' }
-                            }))}
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="CLUB" id={`scope-club-${event.slug}`} />
-                              <Label htmlFor={`scope-club-${event.slug}`} className="text-xs font-normal cursor-pointer">
-                                Club Only
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2 mt-1">
-                              <RadioGroupItem value="PUBLIC" id={`scope-public-${event.slug}`} />
-                              <Label htmlFor={`scope-public-${event.slug}`} className="text-xs font-normal cursor-pointer">
-                                General Public
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                          {resourceForm[event.slug]?.scope === 'PUBLIC' && (
-                            <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-xs text-yellow-600 dark:text-yellow-400 flex items-start gap-2">
-                              <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                              <span>Public resources must be approved by our team before being made available to everyone.</span>
-                            </div>
-                          )}
+                        <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-600 dark:text-blue-400 flex items-start gap-2">
+                          <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                          <span>Your resource will be visible to your club immediately. It will become available to everyone once approved.</span>
                         </div>
                         <Button
                           size="sm"
@@ -1300,7 +1646,7 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
                           disabled={addingResource[event.slug]}
                           className="w-full h-8"
                         >
-                          {addingResource[event.slug] ? 'Submitting...' : 'Submit'}
+                          {addingResource[event.slug] ? 'Adding...' : 'Add Resource'}
                         </Button>
                       </div>
                     </div>
@@ -1319,17 +1665,73 @@ function ResourcesSection({ clubId, currentMembershipId }: { clubId: string; cur
           ))}
         </div>
       </ScrollArea>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Resource</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this resource? This action cannot be undone and will remove the resource from your club.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmId(null)}
+              disabled={deletingResource}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && handleDeleteResource(deleteConfirmId)}
+              disabled={deletingResource}
+            >
+              {deletingResource ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sync Confirmation Dialog */}
+      <Dialog open={syncConfirmOpen} onOpenChange={setSyncConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sync Resources</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to sync resources? All manually added resources from your club will be deleted. Only the default resources will remain. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSyncConfirmOpen(false)}
+              disabled={syncing}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleSyncResources}
+              disabled={syncing}
+            >
+              {syncing ? 'Syncing...' : 'Sync Resources'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
 type ExpandedTool = 'timer' | 'stopwatch' | 'fourFunc' | 'scientific' | 'graphing' | null
 
-export function ToolsTab({ clubId, division, currentMembershipId }: ToolsTabProps) {
-  const [activeTab, setActiveTab] = useState<'tools' | 'resources'>(() => {
+export function ToolsTab({ clubId, division, currentMembershipId, isAdmin }: ToolsTabProps) {
+  const [activeTab, setActiveTab] = useState<'tools' | 'resources' | 'ai'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(`tools-tab-active-${clubId}`)
-      if (saved === 'tools' || saved === 'resources') {
+      if (saved === 'tools' || saved === 'resources' || saved === 'ai') {
         return saved
       }
     }
@@ -1353,12 +1755,16 @@ export function ToolsTab({ clubId, division, currentMembershipId }: ToolsTabProp
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tools' | 'resources')} className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tools' | 'resources' | 'ai')} className="flex-1 flex flex-col min-h-0">
         <div className="w-fit">
           <TabsList>
             <TabsTrigger value="tools" className="flex items-center gap-2">
               <CalcIcon className="h-4 w-4" />
               Tools
+            </TabsTrigger>
+            <TabsTrigger value="ai" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              SciOly AI
             </TabsTrigger>
             <TabsTrigger value="resources" className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
@@ -1408,8 +1814,12 @@ export function ToolsTab({ clubId, division, currentMembershipId }: ToolsTabProp
           </div>
         </TabsContent>
 
+        <TabsContent value="ai" className="mt-6 flex-1 flex flex-col min-h-0">
+          <AIAssistantPage />
+        </TabsContent>
+
         <TabsContent value="resources" className="mt-6 flex-1 flex flex-col min-h-0">
-          <ResourcesSection clubId={clubId} currentMembershipId={currentMembershipId} />
+          <ResourcesSection clubId={clubId} currentMembershipId={currentMembershipId} isAdmin={isAdmin} />
         </TabsContent>
       </Tabs>
     </div>

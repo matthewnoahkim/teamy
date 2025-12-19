@@ -609,7 +609,6 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
   const getEventStyle = (event: any) => {
     const style: any = {}
     if (event.color) {
-      console.log('Event color:', event.color, 'for event:', event.title)
       style.backgroundColor = event.color
       style.color = '#ffffff'
     }

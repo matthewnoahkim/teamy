@@ -36,6 +36,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Not a member of this club' }, { status: 403 })
     }
 
+    // Check if resource model exists
+    if (!prisma.resource) {
+      // Return empty array if model doesn't exist yet
+      return NextResponse.json({ resources: [] })
+    }
+
     // Get club resources and public resources
     const where: any = {
       OR: [
@@ -58,10 +64,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ resources })
   } catch (error: any) {
     console.error('Error fetching resources:', error)
+    // If the error is about the model not existing, return empty array
+    if (error.message?.includes('resource') || error.code === 'P2021') {
+      return NextResponse.json({ resources: [] })
+    }
     return NextResponse.json(
       { error: error.message || 'Failed to fetch resources' },
       { status: 500 }
     )
   }
 }
-

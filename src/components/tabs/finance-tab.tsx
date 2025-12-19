@@ -722,7 +722,6 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
       }
 
       const result = await response.json()
-      console.log('Budget saved response:', result)
       
       // Optimistically update budgets
       if (result.budget) {
@@ -976,20 +975,6 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
     acc[subclubId].total += exp.amount
     return acc
   }, {} as Record<string, { id: string; name: string; total: number }>)
-
-  // Debug: Log expenses to verify grouping
-  useEffect(() => {
-    if (expenses.length > 0) {
-      console.log('Expenses with purchaser info:', expenses.map(exp => ({
-        id: exp.id,
-        description: exp.description,
-        amount: exp.amount,
-        purchaserTeam: exp.addedBy?.team?.name || 'Club-wide',
-        fromPurchaseRequest: !!exp.purchaseRequest,
-      })))
-      console.log('Team expenses breakdown:', teamExpenses)
-    }
-  }, [expenses, teamExpenses])
 
   const teamExpensesList = Object.values(teamExpenses).sort((a, b) => {
     // Put "Club-wide" at the end

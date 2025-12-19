@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // Approve or reject a resource request
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -14,10 +14,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is admin (you may want to add a proper admin check)
-    // For now, we'll allow any authenticated user to approve/reject
-    // In production, you should add proper admin verification
-
+    const { id } = await params
     const body = await req.json()
     const { action, rejectionReason } = body
 
@@ -29,7 +26,7 @@ export async function PATCH(
     }
 
     const request = await prisma.resourceRequest.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!request) {
@@ -44,28 +41,63 @@ export async function PATCH(
     }
 
     if (action === 'approve') {
-      // Create the resource
-      const resource = await prisma.resource.create({
-        data: {
+      // Find the existing CLUB-scoped resource that was created when the request was submitted
+      const existingResource = await prisma.resource.findFirst({
+        where: {
           name: request.name,
-          tag: request.tag,
-          url: request.url,
           category: request.category,
-          scope: 'PUBLIC',
-          clubId: null, // Public resources are not tied to a specific club
+          clubId: request.clubId,
+          scope: 'CLUB',
         },
       })
 
-      // Update the request status
-      await prisma.resourceRequest.update({
-        where: { id: params.id },
-        data: {
-          status: 'APPROVED',
-          reviewedAt: new Date(),
-        },
-      })
+      if (existingResource) {
+        // Upgrade the existing resource to PUBLIC scope
+        await prisma.$transaction(async (tx) => {
+          // Update the resource to PUBLIC
+          await tx.resource.update({
+            where: { id: existingResource.id },
+            data: {
+              scope: 'PUBLIC',
+              clubId: null, // Public resources are not tied to a specific club
+            },
+          })
 
-      return NextResponse.json({ resource, request })
+          // Update the request status
+          await tx.resourceRequest.update({
+            where: { id },
+            data: {
+              status: 'APPROVED',
+              reviewedAt: new Date(),
+            },
+          })
+        })
+      } else {
+        // Fallback: Create a new PUBLIC resource if the original wasn't found
+        // (This handles legacy requests or edge cases)
+        await prisma.$transaction(async (tx) => {
+          await tx.resource.create({
+            data: {
+              name: request.name,
+              tag: request.tag,
+              url: request.url,
+              category: request.category,
+              scope: 'PUBLIC',
+              clubId: null,
+            },
+          })
+
+          await tx.resourceRequest.update({
+            where: { id },
+            data: {
+              status: 'APPROVED',
+              reviewedAt: new Date(),
+            },
+          })
+        })
+      }
+
+      return NextResponse.json({ success: true, message: 'Resource approved and made public' })
     } else {
       // Reject the request
       if (!rejectionReason) {
@@ -75,16 +107,36 @@ export async function PATCH(
         )
       }
 
-      await prisma.resourceRequest.update({
-        where: { id: params.id },
-        data: {
-          status: 'REJECTED',
-          rejectionReason,
-          reviewedAt: new Date(),
-        },
+      // When rejecting, also delete the CLUB-scoped resource
+      await prisma.$transaction(async (tx) => {
+        // Find and delete the CLUB-scoped resource
+        const existingResource = await tx.resource.findFirst({
+          where: {
+            name: request.name,
+            category: request.category,
+            clubId: request.clubId,
+            scope: 'CLUB',
+          },
+        })
+
+        if (existingResource) {
+          await tx.resource.delete({
+            where: { id: existingResource.id },
+          })
+        }
+
+        // Update the request status
+        await tx.resourceRequest.update({
+          where: { id },
+          data: {
+            status: 'REJECTED',
+            rejectionReason,
+            reviewedAt: new Date(),
+          },
+        })
       })
 
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true, message: 'Resource request rejected' })
     }
   } catch (error: any) {
     console.error('Error processing resource request:', error)
@@ -98,7 +150,7 @@ export async function PATCH(
 // Delete a resource request
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -106,16 +158,35 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const request = await prisma.resourceRequest.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!request) {
       return NextResponse.json({ error: 'Resource request not found' }, { status: 404 })
     }
 
-    await prisma.resourceRequest.delete({
-      where: { id: params.id },
+    // Also delete the associated CLUB-scoped resource if it exists
+    await prisma.$transaction(async (tx) => {
+      const existingResource = await tx.resource.findFirst({
+        where: {
+          name: request.name,
+          category: request.category,
+          clubId: request.clubId,
+          scope: 'CLUB',
+        },
+      })
+
+      if (existingResource) {
+        await tx.resource.delete({
+          where: { id: existingResource.id },
+        })
+      }
+
+      await tx.resourceRequest.delete({
+        where: { id },
+      })
     })
 
     return NextResponse.json({ success: true })

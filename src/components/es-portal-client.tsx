@@ -317,16 +317,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
       const res = await fetch(`/api/es/tests?t=${Date.now()}`)
       if (res.ok) {
         const data = await res.json()
-        console.log('Fetched ES tests data:', data)
-        console.log('Staff memberships with tests:', data.staffMemberships?.map((m: any) => ({
-          id: m.id,
-          tournament: m.tournament.name,
-          events: m.events?.map((e: any) => ({
-            event: e.event.name,
-            testCount: e.tests?.length || 0,
-            tests: e.tests?.map((t: any) => ({ name: t.name, createdBy: t.createdBy?.name || t.createdBy?.email }))
-          }))
-        })))
         setStaffMembershipsWithTests(data.staffMemberships)
       } else {
         const errorData = await res.json().catch(() => ({}))
@@ -495,13 +485,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
             
             {(() => {
               const membership = staffMembershipsWithTests.find(m => m.tournament.id === activeTournament) || staffMemberships.find(m => m.tournament.id === activeTournament)!
-              console.log('Active tournament:', activeTournament)
-              console.log('Selected membership:', membership?.id, membership?.tournament.name)
-              console.log('Membership events with tests:', membership?.events?.map((e: any) => ({
-                eventId: e.event.id,
-                eventName: e.event.name,
-                testCount: e.tests?.length || 0
-              })))
               return (
                 <>
                   {/* Tournament Info */}

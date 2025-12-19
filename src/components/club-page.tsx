@@ -806,6 +806,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
                 clubId={club.id}
                 division={club.division}
                 currentMembershipId={currentMembership.id}
+                isAdmin={isAdmin}
               />
             )}
 

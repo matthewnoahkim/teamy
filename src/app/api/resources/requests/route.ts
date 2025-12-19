@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-// Create a resource request
+// Create a resource request (also creates club-visible resource immediately)
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { name, tag, url, category, scope, clubId } = body
+    const { name, tag, url, category, clubId } = body
 
     if (!name || !tag || !category || !clubId) {
       return NextResponse.json(
@@ -35,18 +35,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not a member of this club' }, { status: 403 })
     }
 
-    // If scope is CLUB, create resource directly
-    if (scope === 'CLUB') {
-      // Check if Resource model exists in Prisma client
-      if (!prisma.resource) {
-        console.error('Prisma Resource model not found. Please run: npx prisma generate')
-        return NextResponse.json(
-          { error: 'Resource model not available. Please regenerate Prisma client.' },
-          { status: 500 }
-        )
-      }
+    // Check if resource model exists (handles case where Prisma client needs regeneration)
+    if (!prisma.resource) {
+      return NextResponse.json(
+        { error: 'Database not fully configured. Please contact administrator to run: npx prisma generate' },
+        { status: 503 }
+      )
+    }
 
-      const resource = await prisma.resource.create({
+    // Create the resource with CLUB scope (visible to submitting club immediately)
+    let resource
+    try {
+      resource = await prisma.resource.create({
         data: {
           name,
           tag,
@@ -56,33 +56,42 @@ export async function POST(req: NextRequest) {
           clubId,
         },
       })
-
-      return NextResponse.json({ resource }, { status: 201 })
-    }
-
-    // If scope is PUBLIC, create a request
-    // Check if ResourceRequest model exists in Prisma client
-    if (!prisma.resourceRequest) {
-      console.error('Prisma ResourceRequest model not found. Please run: npx prisma generate')
+    } catch (resourceError: any) {
+      console.error('Error creating resource:', resourceError)
       return NextResponse.json(
-        { error: 'ResourceRequest model not available. Please regenerate Prisma client.' },
+        { error: 'Failed to create resource. Database may need migration.' },
         { status: 500 }
       )
     }
 
-    const request = await prisma.resourceRequest.create({
-      data: {
-        name,
-        tag,
-        url: url || null,
-        category,
-        scope: 'PUBLIC',
-        clubId,
-        requestedById: membership.id,
-      },
-    })
+    // Create the request for admin review
+    let request
+    try {
+      request = await prisma.resourceRequest.create({
+        data: {
+          name,
+          tag,
+          url: url || null,
+          category,
+          scope: 'PUBLIC',
+          clubId,
+          requestedById: membership.id,
+        },
+      })
+    } catch (requestError: any) {
+      console.error('Error creating resource request:', requestError)
+      // Resource was created but request failed - still return success
+      return NextResponse.json({ 
+        resource,
+        request: null,
+        warning: 'Resource created but approval request failed'
+      }, { status: 201 })
+    }
 
-    return NextResponse.json({ request }, { status: 201 })
+    return NextResponse.json({ 
+      resource, 
+      request 
+    }, { status: 201 })
   } catch (error: any) {
     console.error('Error creating resource request:', error)
     return NextResponse.json(
@@ -100,9 +109,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is admin (you may want to add a proper admin check)
-    // For now, we'll allow any authenticated user to view requests
-    // In production, you should add proper admin verification
+    // Check if resourceRequest model exists
+    if (!prisma.resourceRequest) {
+      return NextResponse.json({ requests: [] })
+    }
 
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status') as 'PENDING' | 'APPROVED' | 'REJECTED' | null
@@ -113,13 +123,11 @@ export async function GET(req: NextRequest) {
       where.status = status
     }
     if (search) {
-      const searchLower = search.toLowerCase()
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { tag: { contains: search, mode: 'insensitive' } },
         { category: { contains: search, mode: 'insensitive' } },
       ]
-      // For nested relations, we'll filter in memory or use a different approach
     }
 
     const requests = await prisma.resourceRequest.findMany({
@@ -157,4 +165,3 @@ export async function GET(req: NextRequest) {
     )
   }
 }
-
