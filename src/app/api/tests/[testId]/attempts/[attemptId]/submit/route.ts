@@ -112,6 +112,11 @@ export async function POST(
       }
     }
 
+    // TypeScript safety check (logically this should never happen due to the 404 return above)
+    if (!attempt) {
+      return NextResponse.json({ error: 'Attempt not found' }, { status: 404 })
+    }
+
     if (attempt.status !== 'IN_PROGRESS') {
       return NextResponse.json(
         { error: 'Attempt already submitted' },
