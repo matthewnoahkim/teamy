@@ -18,7 +18,7 @@ import {
 import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { PageLoading } from '@/components/ui/loading-spinner'
-import { Calendar, MapPin, Trophy, FileText, ChevronRight, LogOut, Pencil, ChevronDown, Clock, HelpCircle, ListChecks, AlertCircle, Calculator, FileCheck } from 'lucide-react'
+import { Calendar, MapPin, Trophy, FileText, ChevronRight, LogOut, Pencil, ChevronDown, Clock, HelpCircle, ListChecks, AlertCircle, Calculator, FileCheck, Play, ArrowRight } from 'lucide-react'
 import { formatDivision } from '@/lib/utils'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -240,8 +240,9 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
     }
   }
 
-  const handleTakeTest = (testId: string, clubId: string) => {
-    window.location.href = `/club/${clubId}/tests/${testId}/take`
+  const handleTakeTest = (testId: string, clubId: string, isESTest?: boolean) => {
+    // Use the new universal testing portal route for tournament tests
+    window.location.href = `/testing/tests/${testId}/take`
   }
 
   const handleSignOut = () => {
@@ -400,66 +401,146 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                         {eventData.tests.length > 0 ? (
                           <div className="space-y-3">
                             {eventData.tests.map((test) => (
-                              <Card key={test.id} className="bg-slate-50 dark:bg-slate-800">
-                                <CardContent className="pt-6">
-                                  <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1 space-y-3">
-                                      <div>
-                                        <h3 className="font-semibold mb-1">{test.name}</h3>
-                                        {test.description && (
-                                          <p className="text-sm text-muted-foreground mb-2">{test.description}</p>
+                              <Card key={test.id} className="bg-slate-50 dark:bg-slate-800 hover:shadow-lg transition-shadow">
+                                <CardContent className="p-6">
+                                  <div className="space-y-4">
+                                    {/* Header */}
+                                    <div>
+                                      <h3 className="text-lg font-semibold mb-1">{test.name}</h3>
+                                      {test.description && (
+                                        <p className="text-sm text-muted-foreground">{test.description}</p>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Test Details - Theme Aligned */}
+                                    <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                        {/* Duration */}
+                                        <div className="flex items-center gap-3">
+                                          <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                            <Clock className="h-4 w-4 text-teamy-primary" />
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Duration</div>
+                                            <div className="text-sm font-semibold">{test.durationMinutes} min</div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Questions */}
+                                        {test.questionCount > 0 && (
+                                          <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                              <ListChecks className="h-4 w-4 text-teamy-primary" />
+                                            </div>
+                                            <div>
+                                              <div className="text-xs text-muted-foreground">Questions</div>
+                                              <div className="text-sm font-semibold">{test.questionCount}</div>
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Calculator */}
+                                        <div className="flex items-center gap-3">
+                                          <div className={`p-2 rounded-lg ${test.allowCalculator ? 'bg-teamy-accent/20' : 'bg-muted'}`}>
+                                            <Calculator className={`h-4 w-4 ${test.allowCalculator ? 'text-teamy-accent-dark' : 'text-muted-foreground'}`} />
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Calculator</div>
+                                            <div className="text-sm font-semibold">
+                                              {test.allowCalculator ? (
+                                                <span className="text-teamy-primary">
+                                                  {test.calculatorType 
+                                                    ? (test.calculatorType === 'FOUR_FUNCTION' ? 'Four Function' : 
+                                                       test.calculatorType === 'SCIENTIFIC' ? 'Scientific' : 
+                                                       'Graphing')
+                                                    : 'Allowed'}
+                                                </span>
+                                              ) : (
+                                                <span className="text-muted-foreground">Not Allowed</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Note Sheet */}
+                                        <div className="flex items-center gap-3">
+                                          <div className={`p-2 rounded-lg ${test.allowNoteSheet ? 'bg-teamy-accent/20' : 'bg-muted'}`}>
+                                            <FileCheck className={`h-4 w-4 ${test.allowNoteSheet ? 'text-teamy-accent-dark' : 'text-muted-foreground'}`} />
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Note Sheet</div>
+                                            <div className="text-sm font-semibold">
+                                              {test.allowNoteSheet ? (
+                                                <span className="text-teamy-primary">Allowed</span>
+                                              ) : (
+                                                <span className="text-muted-foreground">Not Allowed</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Max Attempts */}
+                                        {test.maxAttempts && (
+                                          <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                              <AlertCircle className="h-4 w-4 text-teamy-primary" />
+                                            </div>
+                                            <div>
+                                              <div className="text-xs text-muted-foreground">Max Attempts</div>
+                                              <div className="text-sm font-semibold">{test.maxAttempts}</div>
+                                            </div>
+                                          </div>
                                         )}
                                       </div>
                                       
-                                      {/* Main details grid */}
-                                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                          <Clock className="h-4 w-4" />
-                                          <span>{test.durationMinutes} minutes</span>
+                                      {/* Availability */}
+                                      <div className="mt-4 pt-4 border-t border-border">
+                                        <div className="flex items-center gap-3">
+                                          <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                            <Calendar className="h-4 w-4 text-teamy-primary" />
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-xs text-muted-foreground mb-1">Availability</div>
+                                            <div className="text-sm font-semibold">
+                                              {test.startAt && test.endAt 
+                                                ? (formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil) || 
+                                                   `${formatDateTime(test.startAt)} - ${formatDateTime(test.endAt)}`)
+                                                : <span className="text-teamy-primary">Always available</span>}
+                                            </div>
+                                          </div>
                                         </div>
-                                        {test.questionCount > 0 && (
-                                          <div className="flex items-center gap-2 text-muted-foreground">
-                                            <ListChecks className="h-4 w-4" />
-                                            <span>{test.questionCount} question{test.questionCount !== 1 ? 's' : ''}</span>
-                                          </div>
-                                        )}
-                                        {test.maxAttempts && (
-                                          <div className="flex items-center gap-2 text-muted-foreground">
-                                            <AlertCircle className="h-4 w-4" />
-                                            <span>Max {test.maxAttempts} attempt{test.maxAttempts !== 1 ? 's' : ''}</span>
-                                          </div>
-                                        )}
-                                        {test.startAt && test.endAt && formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil) && (
-                                          <div className="flex items-center gap-2 text-muted-foreground col-span-2 md:col-span-1">
-                                            <Calendar className="h-4 w-4" />
-                                            <span className="text-xs">{formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil)}</span>
-                                          </div>
-                                        )}
                                       </div>
+                                    </div>
 
-                                      {/* Features and settings */}
+                                    {/* Note sheet instructions if available */}
+                                    {test.allowNoteSheet && test.noteSheetInstructions && (
+                                      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-md p-3 border border-blue-200 dark:border-blue-800">
+                                        <div className="flex items-start gap-2">
+                                          <FileCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                          <div>
+                                            <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Note Sheet Guidelines</div>
+                                            <p className="text-sm text-blue-900 dark:text-blue-100">{test.noteSheetInstructions}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Instructions if available */}
+                                    {test.instructions && (
+                                      <div className="bg-slate-100 dark:bg-slate-900/50 rounded-md p-3 border border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-start gap-2">
+                                          <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                          <div>
+                                            <div className="text-xs font-semibold text-muted-foreground mb-1">Instructions</div>
+                                            <p className="text-sm whitespace-pre-wrap">{test.instructions}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Badges and Action Button */}
+                                    <div className="flex items-center justify-between gap-4 pt-2">
                                       <div className="flex flex-wrap items-center gap-2">
-                                        {test.allowCalculator && (
-                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                            <Calculator className="h-3 w-3" />
-                                            {test.calculatorType 
-                                              ? (test.calculatorType === 'FOUR_FUNCTION' ? 'Four Function' : 
-                                                 test.calculatorType === 'SCIENTIFIC' ? 'Scientific' : 
-                                                 'Graphing') + ' Calculator'
-                                              : 'Calculator Allowed'}
-                                          </Badge>
-                                        )}
-                                        {test.allowNoteSheet && (
-                                          <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                            <FileCheck className="h-3 w-3" />
-                                            Note Sheet Allowed
-                                            {test.noteSheetInstructions && (
-                                              <span className="ml-1" title={test.noteSheetInstructions}>
-                                                <HelpCircle className="h-3 w-3" />
-                                              </span>
-                                            )}
-                                          </Badge>
-                                        )}
                                         {test.requireFullscreen && (
                                           <Badge variant="outline" className="text-xs">
                                             Fullscreen Required
@@ -474,23 +555,17 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                           </Badge>
                                         )}
                                       </div>
-
-                                      {/* Instructions tooltip if available */}
-                                      {test.instructions && (
-                                        <div className="text-xs text-muted-foreground flex items-start gap-1">
-                                          <HelpCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                                          <span className="line-clamp-2" title={test.instructions}>
-                                            {test.instructions}
-                                          </span>
-                                        </div>
-                                      )}
+                                      
+                                      <Button
+                                        onClick={() => handleTakeTest(test.id, test.clubId)}
+                                        size="lg"
+                                        className="bg-teamy-primary hover:bg-teamy-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 gap-2 group"
+                                      >
+                                        <Play className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                                        Take Test
+                                        <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                                      </Button>
                                     </div>
-                                    <Button
-                                      onClick={() => handleTakeTest(test.id, test.clubId)}
-                                      className="ml-4 flex-shrink-0"
-                                    >
-                                      Take Test
-                                    </Button>
                                   </div>
                                 </CardContent>
                               </Card>
@@ -511,66 +586,146 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                   <h2 className="text-2xl font-semibold">General Tests</h2>
                   <div className="space-y-3">
                     {selectedTournamentData.generalTests.map((test) => (
-                      <Card key={test.id} className="bg-slate-50 dark:bg-slate-800">
-                        <CardContent className="pt-6">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-3">
-                              <div>
-                                <h3 className="font-semibold mb-1">{test.name}</h3>
-                                {test.description && (
-                                  <p className="text-sm text-muted-foreground mb-2">{test.description}</p>
+                      <Card key={test.id} className="bg-slate-50 dark:bg-slate-800 hover:shadow-lg transition-shadow">
+                        <CardContent className="p-6">
+                          <div className="space-y-4">
+                            {/* Header */}
+                            <div>
+                              <h3 className="text-lg font-semibold mb-1">{test.name}</h3>
+                              {test.description && (
+                                <p className="text-sm text-muted-foreground">{test.description}</p>
+                              )}
+                            </div>
+                            
+                            {/* Test Details - Theme Aligned */}
+                            <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                {/* Duration */}
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                    <Clock className="h-4 w-4 text-teamy-primary" />
+                                  </div>
+                                  <div>
+                                    <div className="text-xs text-muted-foreground">Duration</div>
+                                    <div className="text-sm font-semibold">{test.durationMinutes} min</div>
+                                  </div>
+                                </div>
+                                
+                                {/* Questions */}
+                                {test.questionCount > 0 && (
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                      <ListChecks className="h-4 w-4 text-teamy-primary" />
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-muted-foreground">Questions</div>
+                                      <div className="text-sm font-semibold">{test.questionCount}</div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Calculator */}
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-lg ${test.allowCalculator ? 'bg-teamy-accent/20' : 'bg-muted'}`}>
+                                    <Calculator className={`h-4 w-4 ${test.allowCalculator ? 'text-teamy-accent-dark' : 'text-muted-foreground'}`} />
+                                  </div>
+                                  <div>
+                                    <div className="text-xs text-muted-foreground">Calculator</div>
+                                    <div className="text-sm font-semibold">
+                                      {test.allowCalculator ? (
+                                        <span className="text-teamy-primary">
+                                          {test.calculatorType 
+                                            ? (test.calculatorType === 'FOUR_FUNCTION' ? 'Four Function' : 
+                                               test.calculatorType === 'SCIENTIFIC' ? 'Scientific' : 
+                                               'Graphing')
+                                            : 'Allowed'}
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-foreground">Not Allowed</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Note Sheet */}
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-lg ${test.allowNoteSheet ? 'bg-teamy-accent/20' : 'bg-muted'}`}>
+                                    <FileCheck className={`h-4 w-4 ${test.allowNoteSheet ? 'text-teamy-accent-dark' : 'text-muted-foreground'}`} />
+                                  </div>
+                                  <div>
+                                    <div className="text-xs text-muted-foreground">Note Sheet</div>
+                                    <div className="text-sm font-semibold">
+                                      {test.allowNoteSheet ? (
+                                        <span className="text-teamy-primary">Allowed</span>
+                                      ) : (
+                                        <span className="text-muted-foreground">Not Allowed</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Max Attempts */}
+                                {test.maxAttempts && (
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                      <AlertCircle className="h-4 w-4 text-teamy-primary" />
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-muted-foreground">Max Attempts</div>
+                                      <div className="text-sm font-semibold">{test.maxAttempts}</div>
+                                    </div>
+                                  </div>
                                 )}
                               </div>
                               
-                              {/* Main details grid */}
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                  <Clock className="h-4 w-4" />
-                                  <span>{test.durationMinutes} minutes</span>
+                              {/* Availability */}
+                              <div className="mt-4 pt-4 border-t border-border">
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                    <Calendar className="h-4 w-4 text-teamy-primary" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="text-xs text-muted-foreground mb-1">Availability</div>
+                                    <div className="text-sm font-semibold">
+                                      {test.startAt && test.endAt 
+                                        ? (formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil) || 
+                                           `${formatDateTime(test.startAt)} - ${formatDateTime(test.endAt)}`)
+                                        : <span className="text-teamy-primary">Always available</span>}
+                                    </div>
+                                  </div>
                                 </div>
-                                {test.questionCount > 0 && (
-                                  <div className="flex items-center gap-2 text-muted-foreground">
-                                    <ListChecks className="h-4 w-4" />
-                                    <span>{test.questionCount} question{test.questionCount !== 1 ? 's' : ''}</span>
-                                  </div>
-                                )}
-                                {test.maxAttempts && (
-                                  <div className="flex items-center gap-2 text-muted-foreground">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <span>Max {test.maxAttempts} attempt{test.maxAttempts !== 1 ? 's' : ''}</span>
-                                  </div>
-                                )}
-                                {test.startAt && test.endAt && formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil) && (
-                                  <div className="flex items-center gap-2 text-muted-foreground col-span-2 md:col-span-1">
-                                    <Calendar className="h-4 w-4" />
-                                    <span className="text-xs">{formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil)}</span>
-                                  </div>
-                                )}
                               </div>
+                            </div>
 
-                              {/* Features and settings */}
+                            {/* Note sheet instructions if available */}
+                            {test.allowNoteSheet && test.noteSheetInstructions && (
+                              <div className="bg-blue-50 dark:bg-blue-950/20 rounded-md p-3 border border-blue-200 dark:border-blue-800">
+                                <div className="flex items-start gap-2">
+                                  <FileCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Note Sheet Guidelines</div>
+                                    <p className="text-sm text-blue-900 dark:text-blue-100">{test.noteSheetInstructions}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Instructions if available */}
+                            {test.instructions && (
+                              <div className="bg-slate-100 dark:bg-slate-900/50 rounded-md p-3 border border-slate-200 dark:border-slate-700">
+                                <div className="flex items-start gap-2">
+                                  <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <div className="text-xs font-semibold text-muted-foreground mb-1">Instructions</div>
+                                    <p className="text-sm whitespace-pre-wrap">{test.instructions}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Badges and Action Button */}
+                            <div className="flex items-center justify-between gap-4 pt-2">
                               <div className="flex flex-wrap items-center gap-2">
-                                {test.allowCalculator && (
-                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                    <Calculator className="h-3 w-3" />
-                                    {test.calculatorType 
-                                      ? (test.calculatorType === 'FOUR_FUNCTION' ? 'Four Function' : 
-                                         test.calculatorType === 'SCIENTIFIC' ? 'Scientific' : 
-                                         'Graphing') + ' Calculator'
-                                      : 'Calculator Allowed'}
-                                  </Badge>
-                                )}
-                                {test.allowNoteSheet && (
-                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                    <FileCheck className="h-3 w-3" />
-                                    Note Sheet Allowed
-                                    {test.noteSheetInstructions && (
-                                      <span className="ml-1" title={test.noteSheetInstructions}>
-                                        <HelpCircle className="h-3 w-3" />
-                                      </span>
-                                    )}
-                                  </Badge>
-                                )}
                                 {test.requireFullscreen && (
                                   <Badge variant="outline" className="text-xs">
                                     Fullscreen Required
@@ -585,23 +740,17 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                   </Badge>
                                 )}
                               </div>
-
-                              {/* Instructions tooltip if available */}
-                              {test.instructions && (
-                                <div className="text-xs text-muted-foreground flex items-start gap-1">
-                                  <HelpCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                                  <span className="line-clamp-2" title={test.instructions}>
-                                    {test.instructions}
-                                  </span>
-                                </div>
-                              )}
+                              
+                              <Button
+                                onClick={() => handleTakeTest(test.id, test.clubId)}
+                                size="lg"
+                                className="bg-teamy-primary hover:bg-teamy-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 gap-2 group"
+                              >
+                                <Play className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                                Take Test
+                                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                              </Button>
                             </div>
-                            <Button
-                              onClick={() => handleTakeTest(test.id, test.clubId)}
-                              className="ml-4 flex-shrink-0"
-                            >
-                              Take Test
-                            </Button>
                           </div>
                         </CardContent>
                       </Card>

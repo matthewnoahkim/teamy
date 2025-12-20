@@ -135,6 +135,7 @@ model Membership {
   rosterAssignments   RosterAssignment[]
   todos               Todo[]
   resourceRequests    ResourceRequest[]
+  esTestAttempts     ESTestAttempt[]
 
   @@unique([userId, clubId])
   @@index([clubId])
@@ -1303,6 +1304,7 @@ model ESTest {
   tournament       Tournament           @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   questions        ESTestQuestion[]
   audits           ESTestAudit[]
+  attempts         ESTestAttempt[]
 
   @@index([staffId])
   @@index([createdByStaffId])
@@ -1325,6 +1327,7 @@ model ESTestQuestion {
   updatedAt        DateTime               @updatedAt
   test             ESTest                 @relation(fields: [testId], references: [id], onDelete: Cascade)
   options          ESTestQuestionOption[]
+  answers          ESTestAttemptAnswer[]
 
   @@index([testId])
 }
@@ -1354,6 +1357,54 @@ model ESTestAudit {
   @@index([testId])
   @@index([actorStaffId])
   @@index([createdAt])
+}
+
+model ESTestAttempt {
+  id                    String                @id @default(cuid())
+  testId                String
+  membershipId          String
+  status                AttemptStatus         @default(NOT_STARTED)
+  startedAt             DateTime?
+  submittedAt           DateTime?
+  gradeEarned           Decimal?              @db.Decimal(6, 2)
+  proctoringScore       Int?
+  clientFingerprintHash String?
+  ipAtStart             String?
+  ipAtSubmit            String?
+  userAgentAtStart      String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  tabSwitchCount        Int                   @default(0)
+  timeOffPageSeconds    Int                   @default(0)
+  test                  ESTest                @relation(fields: [testId], references: [id], onDelete: Cascade)
+  membership            Membership             @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  answers               ESTestAttemptAnswer[]
+
+  @@index([testId])
+  @@index([membershipId])
+  @@index([membershipId, testId])
+  @@index([status])
+}
+
+model ESTestAttemptAnswer {
+  id                String                @id @default(cuid())
+  attemptId         String
+  questionId        String
+  answerText        String?
+  selectedOptionIds Json?
+  numericAnswer     Decimal?              @db.Decimal(16, 6)
+  pointsAwarded     Decimal?              @db.Decimal(5, 2)
+  gradedAt          DateTime?
+  graderNote        String?
+  markedForReview   Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  attempt           ESTestAttempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question          ESTestQuestion         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
 }
 
 enum Division {

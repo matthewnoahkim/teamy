@@ -25,7 +25,8 @@ export async function POST(
     const body = await req.json()
     const validatedData = submitSchema.parse(body)
 
-    const attempt = await prisma.testAttempt.findUnique({
+    // Try to find as TestAttempt first
+    let attempt = await prisma.testAttempt.findUnique({
       where: { id: params.attemptId },
       include: {
         test: {
@@ -42,8 +43,73 @@ export async function POST(
       },
     })
 
-    if (!attempt) {
-      return NextResponse.json({ error: 'Attempt not found' }, { status: 404 })
+    let isESTest = false
+    let membership: any = null
+
+    if (attempt) {
+      // Verify ownership - check if user is a member of the club and owns this attempt
+      membership = await getUserMembership(session.user.id, attempt.test.clubId)
+      if (!membership || membership.id !== attempt.membershipId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      }
+    } else {
+      // Try to find as ESTestAttempt
+      const esAttempt = await prisma.eSTestAttempt.findUnique({
+        where: { id: params.attemptId },
+        include: {
+          test: {
+            include: {
+              tournament: { select: { id: true } },
+              questions: {
+                include: {
+                  options: { orderBy: { order: 'asc' } },
+                },
+                orderBy: { order: 'asc' },
+              },
+            },
+          },
+          answers: true,
+        },
+      })
+
+      if (!esAttempt) {
+        return NextResponse.json({ error: 'Attempt not found' }, { status: 404 })
+      }
+
+      isESTest = true
+      attempt = esAttempt as any
+
+      // For ESTest, verify membership through tournament registration
+      const userMemberships = await prisma.membership.findMany({
+        where: { userId: session.user.id },
+        include: {
+          club: { select: { id: true } },
+          team: { select: { id: true } },
+        },
+      })
+
+      const teamIds = userMemberships.map((m) => m.teamId).filter((id): id is string => id !== null)
+      const clubIds = userMemberships.map((m) => m.clubId)
+
+      const registration = await prisma.tournamentRegistration.findFirst({
+        where: {
+          tournamentId: esAttempt.test.tournament.id,
+          status: 'CONFIRMED',
+          OR: [{ teamId: { in: teamIds } }, { clubId: { in: clubIds } }],
+        },
+      })
+
+      if (!registration) {
+        return NextResponse.json({ error: 'Not registered for this tournament' }, { status: 403 })
+      }
+
+      membership = registration.teamId
+        ? userMemberships.find((m) => m.clubId === registration.clubId && m.teamId === registration.teamId)
+        : userMemberships.find((m) => m.clubId === registration.clubId)
+
+      if (!membership || membership.id !== esAttempt.membershipId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      }
     }
 
     if (attempt.status !== 'IN_PROGRESS') {
@@ -51,12 +117,6 @@ export async function POST(
         { error: 'Attempt already submitted' },
         { status: 400 }
       )
-    }
-
-    // Verify ownership - check if user is a member of the club and owns this attempt
-    const membership = await getUserMembership(session.user.id, attempt.test.clubId)
-    if (!membership || membership.id !== attempt.membershipId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     // Auto-grade all objective questions
@@ -102,64 +162,114 @@ export async function POST(
       .filter((r) => !r.needsManualGrade)
       .reduce((sum, r) => sum + r.pointsAwarded, 0)
 
-    // Calculate proctoring score
-    const proctoringScore = calculateProctoringScore(attempt.proctorEvents)
+    // Calculate proctoring score (ESTest doesn't have proctorEvents, so use 0)
+    const proctoringScore = isESTest ? 0 : calculateProctoringScore((attempt as any).proctorEvents || [])
 
     // Get IP at submit
     const ipAtSubmit = getClientIp(req.headers)
 
     // Update attempt and answers in transaction
     await prisma.$transaction(async (tx) => {
-      // Update attempt
-      await tx.testAttempt.update({
-        where: { id: params.attemptId },
-        data: {
-          status: gradingResults.some((r) => r.needsManualGrade) ? 'SUBMITTED' : 'GRADED',
-          submittedAt: new Date(),
-          gradeEarned: totalAutoGraded,
-          proctoringScore,
-          ipAtSubmit,
-        },
-      })
-
-      // Create or update answer records for all questions
-      for (const result of gradingResults) {
-        await tx.attemptAnswer.upsert({
-          where: {
-            attemptId_questionId: {
-              attemptId: params.attemptId,
-              questionId: result.questionId,
-            },
-          },
-          update: {
-            pointsAwarded: result.pointsAwarded,
-            gradedAt: result.needsManualGrade ? null : new Date(),
-          },
-          create: {
-            attemptId: params.attemptId,
-            questionId: result.questionId,
-            answerText: null,
-            selectedOptionIds: undefined,
-            numericAnswer: null,
-            pointsAwarded: result.pointsAwarded,
-            gradedAt: result.needsManualGrade ? null : new Date(),
+      if (isESTest) {
+        // Update ESTestAttempt
+        await tx.eSTestAttempt.update({
+          where: { id: params.attemptId },
+          data: {
+            status: gradingResults.some((r) => r.needsManualGrade) ? 'SUBMITTED' : 'GRADED',
+            submittedAt: new Date(),
+            gradeEarned: totalAutoGraded,
+            proctoringScore,
+            ipAtSubmit,
           },
         })
+
+        // Create or update answer records for all questions
+        for (const result of gradingResults) {
+          await tx.eSTestAttemptAnswer.upsert({
+            where: {
+              attemptId_questionId: {
+                attemptId: params.attemptId,
+                questionId: result.questionId,
+              },
+            },
+            update: {
+              pointsAwarded: result.pointsAwarded,
+              gradedAt: result.needsManualGrade ? null : new Date(),
+            },
+            create: {
+              attemptId: params.attemptId,
+              questionId: result.questionId,
+              answerText: null,
+              selectedOptionIds: undefined,
+              numericAnswer: null,
+              pointsAwarded: result.pointsAwarded,
+              gradedAt: result.needsManualGrade ? null : new Date(),
+            },
+          })
+        }
+      } else {
+        // Update TestAttempt
+        await tx.testAttempt.update({
+          where: { id: params.attemptId },
+          data: {
+            status: gradingResults.some((r) => r.needsManualGrade) ? 'SUBMITTED' : 'GRADED',
+            submittedAt: new Date(),
+            gradeEarned: totalAutoGraded,
+            proctoringScore,
+            ipAtSubmit,
+          },
+        })
+
+        // Create or update answer records for all questions
+        for (const result of gradingResults) {
+          await tx.attemptAnswer.upsert({
+            where: {
+              attemptId_questionId: {
+                attemptId: params.attemptId,
+                questionId: result.questionId,
+              },
+            },
+            update: {
+              pointsAwarded: result.pointsAwarded,
+              gradedAt: result.needsManualGrade ? null : new Date(),
+            },
+            create: {
+              attemptId: params.attemptId,
+              questionId: result.questionId,
+              answerText: null,
+              selectedOptionIds: undefined,
+              numericAnswer: null,
+              pointsAwarded: result.pointsAwarded,
+              gradedAt: result.needsManualGrade ? null : new Date(),
+            },
+          })
+        }
       }
     })
 
     // Fetch updated attempt
-    const updatedAttempt = await prisma.testAttempt.findUnique({
-      where: { id: params.attemptId },
-      include: {
-        answers: {
+    const updatedAttempt = isESTest
+      ? await prisma.eSTestAttempt.findUnique({
+          where: { id: params.attemptId },
           include: {
-            question: true,
+            answers: {
+              include: {
+                question: true,
+              },
+            },
           },
-        },
-        proctorEvents: true,
-      },
-    })
+        })
+      : await prisma.testAttempt.findUnique({
+          where: { id: params.attemptId },
+          include: {
+            answers: {
+              include: {
+                question: true,
+              },
+            },
+            proctorEvents: true,
+          },
+        })
 
     return NextResponse.json({
       attempt: updatedAttempt,

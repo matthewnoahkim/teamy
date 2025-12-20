@@ -95,8 +95,32 @@ export async function GET(request: NextRequest) {
       membership.events.forEach(e => userEventIds.add(e.event.id))
     })
 
+    console.log('Fetching ES tests for user:', session.user.email)
+    console.log('User event IDs:', Array.from(userEventIds))
+    console.log('User tournament IDs:', staffMemberships.map(m => m.tournament.id))
+
+    // First, let's check ALL tests in the tournaments to see what exists
     const tournamentIds = staffMemberships.map(m => m.tournament.id)
+    const allTournamentTests = await prisma.eSTest.findMany({
+      where: {
+        tournamentId: { in: tournamentIds },
+      },
+      select: {
+        id: true,
+        name: true,
+        eventId: true,
+        tournamentId: true,
+        staffId: true,
+        createdByStaffId: true,
+      },
+    })
+    console.log('ALL tests in user tournaments:', allTournamentTests)
+
+    // Fetch all tests for events the user is assigned to (collaborative access)
+    // This returns ALL tests for events the user is assigned to, regardless of who created them
+    // IMPORTANT: We don't filter by staffId - all staff assigned to an event can see all tests for that event
     const eventIdsArray = Array.from(userEventIds)
+    console.log('Querying tests with:', { tournamentIds, eventIdsArray })
     
     const allTests = await prisma.eSTest.findMany({
       where: {
@@ -135,11 +159,23 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
+    console.log('Found tests:', allTests.length)
+    console.log('Tests details:', allTests.map(t => ({ 
+      id: t.id, 
+      name: t.name, 
+      eventId: t.eventId, 
+      tournamentId: t.tournamentId,
+      staffId: t.staffId, 
+      createdBy: t.createdByStaffId,
+      createdByEmail: t.createdBy?.email 
+    })))
+
     // Organize tests by tournament and event
     const testsByTournament = new Map<string, Map<string, typeof allTests>>()
     
     for (const test of allTests) {
       if (!test.eventId) {
+        console.log('Skipping test without eventId:', test.id, test.name)
         continue
       }
       
@@ -152,6 +188,14 @@ export async function GET(request: NextRequest) {
         testsByEvent.set(test.eventId, [])
       }
       testsByEvent.get(test.eventId)!.push(test)
+    }
+    
+    console.log('Tests organized by tournament:', Array.from(testsByTournament.keys()))
+    for (const [tournamentId, eventMap] of testsByTournament.entries()) {
+      console.log(`Tournament ${tournamentId} has tests for events:`, Array.from(eventMap.keys()))
+      for (const [eventId, tests] of eventMap.entries()) {
+        console.log(`  Event ${eventId} has ${tests.length} tests:`, tests.map(t => t.name))
+      }
     }
 
     // Get hosting request divisions for all tournaments
@@ -209,6 +253,7 @@ export async function GET(request: NextRequest) {
             const testsForEventInTournament = eventMap.get(e.event.id) || []
             eventTests = [...eventTests, ...testsForEventInTournament]
           }
+          console.log(`Mapping tests for membership ${membership.id}, tournament ${membership.tournament.id}, event ${e.event.id}:`, eventTests.length, 'tests')
           return {
             event: {
               id: e.event.id,
@@ -253,6 +298,7 @@ export async function GET(request: NextRequest) {
           }
         }),
       }
+      console.log(`Membership ${membership.id} has ${membershipData.events.length} events with tests`)
       return membershipData
     })
 
@@ -316,6 +362,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authorized to create tests for this staff membership' }, { status: 403 })
     }
 
+    console.log('Creating ES test:', { staffId, tournamentId, eventId, name })
+    
     // Create the test with questions and audit log in a transaction
     const test = await prisma.$transaction(async (tx) => {
       const createdTest = await tx.eSTest.create({
@@ -427,7 +475,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { testId, name, description, instructions, durationMinutes, status, eventId, startAt, endAt, allowLateUntil, questions } = body as {
+    const { testId, name, description, instructions, durationMinutes, status, eventId, questions } = body as {
       testId: string
       name?: string
       description?: string
@@ -435,9 +483,6 @@ export async function PUT(request: NextRequest) {
       durationMinutes?: number
       status?: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
       eventId?: string
-      startAt?: string
-      endAt?: string
-      allowLateUntil?: string
       questions?: Array<{
         id?: string
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
@@ -542,41 +587,10 @@ export async function PUT(request: NextRequest) {
     if (durationMinutes && durationMinutes !== existingTest.durationMinutes) changedFields.push('durationMinutes')
     if (status && status !== existingTest.status) changedFields.push('status')
     if (eventId !== undefined && eventId !== existingTest.eventId) changedFields.push('eventId')
-    if (startAt !== undefined) {
-      const newStartAt = startAt ? new Date(startAt) : null
-      const existingStartAt = existingTest.startAt
-      if ((newStartAt?.getTime() || null) !== (existingStartAt?.getTime() || null)) changedFields.push('startAt')
-    }
-    if (endAt !== undefined) {
-      const newEndAt = endAt ? new Date(endAt) : null
-      const existingEndAt = existingTest.endAt
-      if ((newEndAt?.getTime() || null) !== (existingEndAt?.getTime() || null)) changedFields.push('endAt')
-    }
-    if (allowLateUntil !== undefined) {
-      const newAllowLateUntil = allowLateUntil ? new Date(allowLateUntil) : null
-      const existingAllowLateUntil = existingTest.allowLateUntil
-      if ((newAllowLateUntil?.getTime() || null) !== (existingAllowLateUntil?.getTime() || null)) changedFields.push('allowLateUntil')
-    }
     if (questions) changedFields.push('questions')
 
     // Use a transaction to update test and questions
     const updatedTest = await prisma.$transaction(async (tx) => {
-      // Validate start/end times if both are provided
-      const newStartAt = startAt !== undefined ? (startAt ? new Date(startAt) : null) : undefined
-      const newEndAt = endAt !== undefined ? (endAt ? new Date(endAt) : null) : undefined
-      const newAllowLateUntil = allowLateUntil !== undefined ? (allowLateUntil ? new Date(allowLateUntil) : null) : undefined
-      
-      if (newStartAt !== undefined && newEndAt !== undefined) {
-        const finalStartAt = newStartAt ?? existingTest.startAt
-        const finalEndAt = newEndAt ?? existingTest.endAt
-        if (finalStartAt && finalEndAt && finalEndAt <= finalStartAt) {
-          return NextResponse.json(
-            { error: 'End time must be after start time' },
-            { status: 400 }
-          )
-        }
-      }
-
       // Update the test
       const test = await tx.eSTest.update({
         where: { id: testId },
@@ -587,9 +601,6 @@ export async function PUT(request: NextRequest) {
           ...(durationMinutes && { durationMinutes }),
           ...(status && { status }),
           ...(eventId !== undefined && { eventId }),
-          ...(startAt !== undefined && { startAt: newStartAt }),
-          ...(endAt !== undefined && { endAt: newEndAt }),
-          ...(allowLateUntil !== undefined && { allowLateUntil: newAllowLateUntil }),
         },
       })
 

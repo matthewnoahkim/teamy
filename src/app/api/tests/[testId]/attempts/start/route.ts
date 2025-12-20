@@ -8,7 +8,7 @@ import { isTestAvailable, getClientIp, generateClientFingerprint, verifyTestPass
 // POST /api/tests/[testId]/attempts/start
 export async function POST(
   req: NextRequest,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> | { testId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -16,27 +16,290 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Resolve params if it's a Promise (Next.js 15 compatibility)
+    const resolvedParams = params instanceof Promise ? await params : params
+    const testId = resolvedParams.testId
+
     const body = await req.json()
     const { fingerprint, testPassword } = body
 
-    const test = await prisma.test.findUnique({
-      where: { id: params.testId },
+    // First, check if this test is linked to a tournament via TournamentTest
+    const tournamentTest = await prisma.tournamentTest.findFirst({
+      where: {
+        testId: testId,
+      },
       include: {
-        assignments: true,
+        tournament: {
+          select: {
+            id: true,
+          },
+        },
+        event: {
+          select: {
+            id: true,
+          },
+        },
+        test: {
+          include: {
+            assignments: true,
+          },
+        },
       },
     })
 
-    if (!test) {
-      return NextResponse.json({ error: 'Test not found' }, { status: 404 })
+    let test: any = null
+    let membership: any = null
+    let isAdminUser = false
+    let isTournamentTest = false
+
+    if (tournamentTest && tournamentTest.test) {
+      // This is a tournament test
+      isTournamentTest = true
+      test = tournamentTest.test
+
+      // Get all user memberships to find their registered teams/clubs
+      const userMemberships = await prisma.membership.findMany({
+        where: {
+          userId: session.user.id,
+        },
+        include: {
+          club: {
+            select: {
+              id: true,
+            },
+          },
+          team: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      })
+
+      // Get team IDs and club IDs from memberships
+      const teamIds = userMemberships
+        .map((m) => m.teamId)
+        .filter((id): id is string => id !== null)
+      const clubIds = userMemberships.map((m) => m.clubId)
+
+      // Check if user is registered for this tournament
+      const registration = await prisma.tournamentRegistration.findFirst({
+        where: {
+          tournamentId: tournamentTest.tournament.id,
+          status: 'CONFIRMED',
+          OR: [
+            { teamId: { in: teamIds } },
+            { clubId: { in: clubIds } },
+          ],
+        },
+      })
+
+      if (!registration) {
+        return NextResponse.json({ error: 'Not registered for this tournament' }, { status: 403 })
+      }
+
+      // Find the membership that matches this registration
+      membership = registration.teamId
+        ? userMemberships.find(
+            (m) => m.clubId === registration.clubId && m.teamId === registration.teamId
+          )
+        : userMemberships.find((m) => m.clubId === registration.clubId)
+
+      if (!membership) {
+        return NextResponse.json({ error: 'Membership not found' }, { status: 403 })
+      }
+
+      // For tournament tests, check event assignment if test is event-specific
+      if (tournamentTest.eventId) {
+        const userEventAssignments = await prisma.rosterAssignment.findMany({
+          where: {
+            membershipId: membership.id,
+            eventId: tournamentTest.eventId,
+            ...(registration.teamId
+              ? { teamId: registration.teamId }
+              : {
+                  team: {
+                    clubId: registration.clubId,
+                  },
+                }),
+          },
+        })
+
+        if (userEventAssignments.length === 0) {
+          return NextResponse.json({ error: 'Not assigned to this event' }, { status: 403 })
+        }
+      }
+
+      // Tournament tests don't have admin bypass
+      isAdminUser = false
+    } else {
+      // Regular club test - check if test exists first
+      test = await prisma.test.findUnique({
+        where: { id: testId },
+        include: {
+          assignments: true,
+        },
+      })
+
+      if (!test) {
+        // Test doesn't exist as regular Test - check if it might be an ESTest
+        const esTest = await prisma.eSTest.findUnique({
+          where: { id: testId },
+          include: {
+            tournament: {
+              select: { id: true },
+            },
+            event: {
+              select: { id: true },
+            },
+          },
+        })
+
+        if (esTest) {
+          // This is an ESTest - handle it similarly to tournament tests
+          isTournamentTest = true
+          
+          // Get all user memberships to find their registered teams/clubs
+          const userMemberships = await prisma.membership.findMany({
+            where: {
+              userId: session.user.id,
+            },
+            include: {
+              club: {
+                select: {
+                  id: true,
+                },
+              },
+              team: {
+                select: {
+                  id: true,
+                },
+              },
+            },
+          })
+
+          // Get team IDs and club IDs from memberships
+          const teamIds = userMemberships
+            .map((m) => m.teamId)
+            .filter((id): id is string => id !== null)
+          const clubIds = userMemberships.map((m) => m.clubId)
+
+          // Check if user is registered for this tournament
+          const registration = await prisma.tournamentRegistration.findFirst({
+            where: {
+              tournamentId: esTest.tournament.id,
+              status: 'CONFIRMED',
+              OR: [
+                { teamId: { in: teamIds } },
+                { clubId: { in: clubIds } },
+              ],
+            },
+          })
+
+          if (!registration) {
+            return NextResponse.json({ error: 'Not registered for this tournament' }, { status: 403 })
+          }
+
+          // Find the membership that matches this registration
+          membership = registration.teamId
+            ? userMemberships.find(
+                (m) => m.clubId === registration.clubId && m.teamId === registration.teamId
+              )
+            : userMemberships.find((m) => m.clubId === registration.clubId)
+
+          if (!membership) {
+            return NextResponse.json({ error: 'Membership not found' }, { status: 403 })
+          }
+
+          // For ESTest, check event assignment if test is event-specific
+          if (esTest.eventId) {
+            const userEventAssignments = await prisma.rosterAssignment.findMany({
+              where: {
+                membershipId: membership.id,
+                eventId: esTest.eventId,
+                ...(registration.teamId
+                  ? { teamId: registration.teamId }
+                  : {
+                      team: {
+                        clubId: registration.clubId,
+                      },
+                    }),
+              },
+            })
+
+            if (userEventAssignments.length === 0) {
+              return NextResponse.json({ error: 'Not assigned to this event' }, { status: 403 })
+            }
+          }
+
+          // Check if ESTest is available
+          const esTestAvailability = isTestAvailable({
+            status: esTest.status,
+            startAt: esTest.startAt,
+            endAt: esTest.endAt,
+            allowLateUntil: esTest.allowLateUntil,
+          })
+          if (!esTestAvailability.available) {
+            return NextResponse.json(
+              { error: esTestAvailability.reason },
+              { status: 403 }
+            )
+          }
+
+          // Check for existing in-progress or not-started ESTest attempt
+          let attempt = await prisma.eSTestAttempt.findFirst({
+            where: {
+              membershipId: membership.id,
+              testId: testId,
+              status: {
+                in: ['NOT_STARTED', 'IN_PROGRESS'],
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          })
+
+          if (attempt) {
+            // Resume existing attempt
+            return NextResponse.json({ attempt })
+          }
+
+          // Create new ESTest attempt
+          const ipAddress = getClientIp(req.headers)
+          const userAgent = req.headers.get('user-agent')
+
+          attempt = await prisma.eSTestAttempt.create({
+            data: {
+              testId: testId,
+              membershipId: membership.id,
+              status: 'IN_PROGRESS',
+              startedAt: new Date(),
+              clientFingerprintHash: fingerprint || null,
+              ipAtStart: ipAddress,
+              userAgentAtStart: userAgent,
+            },
+          })
+
+          return NextResponse.json({ attempt }, { status: 201 })
+        }
+
+        // Test not found - log for debugging
+        console.error(`Test not found: testId=${testId}, tournamentTest=${!!tournamentTest}`)
+        return NextResponse.json({ error: 'Test not found' }, { status: 404 })
+      }
+
+      membership = await getUserMembership(session.user.id, test.clubId)
+      if (!membership) {
+        return NextResponse.json({ error: 'Not a team member' }, { status: 403 })
+      }
+
+      // Check if user is admin (admins bypass password)
+      isAdminUser = await isAdmin(session.user.id, test.clubId)
     }
 
-    const membership = await getUserMembership(session.user.id, test.clubId)
-    if (!membership) {
-      return NextResponse.json({ error: 'Not a team member' }, { status: 403 })
+    // Ensure we have a test and membership before proceeding
+    if (!test || !membership) {
+      return NextResponse.json({ error: 'Test or membership not found' }, { status: 404 })
     }
-
-    // Check if user is admin (admins bypass password)
-    const isAdminUser = await isAdmin(session.user.id, test.clubId)
 
     // Verify test password if required (non-admins only)
     if (!isAdminUser && test.testPasswordHash) {
@@ -67,33 +330,14 @@ export async function POST(
       )
     }
 
-    // Check assignment (admins bypass this check)
-    if (!isAdminUser) {
-      // Get user's event assignments from roster for event-based test access
-      const userEventAssignments = await prisma.rosterAssignment.findMany({
-        where: {
-          membershipId: membership.id,
-          team: {
-            clubId: test.clubId,
-          },
-        },
-        select: {
-          eventId: true,
-        },
-      })
-      const userEventIds = userEventAssignments.map(ra => ra.eventId)
-
-      // Check assignment - user can access if any condition matches
+    // Check assignment (admins bypass this check, tournament tests bypass this check)
+    if (!isAdminUser && !isTournamentTest) {
       const hasAccess = test.assignments.some(
         (a) =>
-          // CLUB scope - everyone gets access
           a.assignedScope === 'CLUB' ||
-          // Team-based - user's team matches assignment's team
           (a.teamId && membership.teamId && a.teamId === membership.teamId) ||
-          // PERSONAL scope - directly assigned to this user
           a.targetMembershipId === membership.id ||
-          // Event-based assignments - user must have the event in their roster
-          (a.eventId && userEventIds.includes(a.eventId))
+          (a.eventId && membership.rosterAssignments?.some((ra: any) => ra.eventId === a.eventId))
       )
 
       if (!hasAccess) {
@@ -107,8 +351,8 @@ export async function POST(
     // Check for existing in-progress or not-started attempt
     let attempt = await prisma.testAttempt.findFirst({
       where: {
-          membershipId: membership.id,
-          testId: params.testId,
+        membershipId: membership.id,
+        testId: testId,
         status: {
           in: ['NOT_STARTED', 'IN_PROGRESS'],
         },
@@ -126,7 +370,7 @@ export async function POST(
       const completedAttempts = await prisma.testAttempt.count({
         where: {
           membershipId: membership.id,
-          testId: params.testId,
+          testId: testId,
           status: {
             in: ['SUBMITTED', 'GRADED'],
           },
@@ -150,7 +394,7 @@ export async function POST(
 
     attempt = await prisma.testAttempt.create({
       data: {
-        testId: params.testId,
+        testId: testId,
         membershipId: membership.id,
         status: 'IN_PROGRESS',
         startedAt: new Date(),

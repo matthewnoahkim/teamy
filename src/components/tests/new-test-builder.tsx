@@ -361,7 +361,6 @@ export function NewTestBuilder({
   const [publishFormData, setPublishFormData] = useState({
     startAt: '',
     endAt: '',
-    allowLateUntil: '',
     testPassword: '',
     testPasswordConfirm: '',
     releaseScoresAt: '',
@@ -1364,12 +1363,12 @@ export function NewTestBuilder({
       return
     }
 
-    // Validate startAt/endAt if provided (now supported for ES tests too)
-    if (publishFormData.startAt || publishFormData.endAt) {
+    // Skip startAt/endAt validation for ES tests (ESTest doesn't support these fields)
+    if (!esMode) {
       if (!publishFormData.startAt || !publishFormData.endAt) {
         toast({
           title: 'Error',
-          description: 'Both start and end times are required if time restrictions are set',
+          description: 'Start and end times are required',
           variant: 'destructive',
         })
         return
@@ -1420,13 +1419,8 @@ export function NewTestBuilder({
     setPublishing(true)
     try {
       // For ES mode (ESTest), use the PUT endpoint to update status to PUBLISHED
+      // ESTest doesn't support startAt, endAt, testPassword, etc.
       if (esMode) {
-        const startAtISO = publishFormData.startAt ? new Date(publishFormData.startAt).toISOString() : undefined
-        const endAtISO = publishFormData.endAt ? new Date(publishFormData.endAt).toISOString() : undefined
-        const allowLateUntilISO = publishFormData.allowLateUntil && publishFormData.allowLateUntil.trim()
-          ? new Date(publishFormData.allowLateUntil).toISOString()
-          : undefined
-
         const response = await fetch('/api/es/tests', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1434,9 +1428,6 @@ export function NewTestBuilder({
             testId,
             status: 'PUBLISHED',
             durationMinutes: details.durationMinutes,
-            startAt: startAtISO,
-            endAt: endAtISO,
-            allowLateUntil: allowLateUntilISO,
           }),
         })
 
@@ -1876,35 +1867,25 @@ export function NewTestBuilder({
 
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="startAt">Start Date/Time {!esMode && '*'}</Label>
+              <Label htmlFor="startAt">Start Date/Time *</Label>
               <Input
                 id="startAt"
                 type="datetime-local"
                 value={publishFormData.startAt}
                 onChange={(e) => setPublishFormData((prev) => ({ ...prev, startAt: e.target.value }))}
-                required={!esMode}
+                required
               />
-              {esMode && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Optional: Set when the test becomes available
-                </p>
-              )}
             </div>
 
             <div>
-              <Label htmlFor="endAt">End Date/Time {!esMode && '*'}</Label>
+              <Label htmlFor="endAt">End Date/Time *</Label>
               <Input
                 id="endAt"
                 type="datetime-local"
                 value={publishFormData.endAt}
                 onChange={(e) => setPublishFormData((prev) => ({ ...prev, endAt: e.target.value }))}
-                required={!esMode}
+                required
               />
-              {esMode && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Optional: Set when the test closes (both start and end must be set together)
-                </p>
-              )}
             </div>
 
             <div>

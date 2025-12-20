@@ -1052,6 +1052,14 @@ export function TDTournamentManageClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
+  // Fetch registrations when teams tab is activated
+  useEffect(() => {
+    if (activeTab === 'teams') {
+      fetchRegistrations()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
   // Delete test handlers
   const handleDeleteTestClick = (test: { id: string; name: string }) => {
     setTestToDelete(test)

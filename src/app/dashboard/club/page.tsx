@@ -14,11 +14,29 @@ export default async function DashboardClubPage() {
   const memberships = await prisma.membership.findMany({
     where: { userId: session.user.id },
     include: {
-      club: true,
-      team: true,
+      club: {
+        select: {
+          id: true,
+          name: true,
+          division: true,
+        },
+      },
+      team: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
       rosterAssignments: {
         include: {
-          event: true,
+          event: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              division: true,
+            },
+          },
         },
       },
     },

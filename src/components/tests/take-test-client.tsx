@@ -405,6 +405,11 @@ export function TakeTestClient({
   // Check if there are unanswered questions
   const getUnansweredQuestions = () => {
     return test.questions.filter((question: any) => {
+      // TEXT_BLOCK questions are stored as SHORT_TEXT with 0 points - they don't require answers
+      const isTextBlock = question.type === 'SHORT_TEXT' && Number(question.points) === 0
+      if (isTextBlock) {
+        return false
+      }
       const answer = answers[question.id]
       if (!answer) return true
       
@@ -704,42 +709,50 @@ export function TakeTestClient({
             {test.questions.length === 0 ? (
               <p className="text-muted-foreground">No questions available.</p>
             ) : (
-              test.questions.map((question: any, index: number) => (
+              test.questions.map((question: any, index: number) => {
+                // TEXT_BLOCK questions are stored as SHORT_TEXT with 0 points
+                const isTextBlock = question.type === 'SHORT_TEXT' && Number(question.points) === 0
+                
+                return (
                 <div key={question.id} className={`space-y-3 p-4 border rounded-lg ${markedForReview.has(question.id) ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/10' : ''}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">Question {index + 1}</span>
-                      <span className="text-sm text-muted-foreground">
-                        ({question.points} points)
-                      </span>
-                      {markedForReview.has(question.id) && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 font-medium">
-                          Marked for Review
+                  {!isTextBlock && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Question {index + 1}</span>
+                        <span className="text-sm text-muted-foreground">
+                          ({question.points} points)
                         </span>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleMarkForReview(question.id, !markedForReview.has(question.id))}
-                      className={`flex items-center gap-2 h-8 ${
-                        markedForReview.has(question.id)
-                          ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <Flag
-                        className={`h-4 w-4 ${
-                          markedForReview.has(question.id) ? 'fill-current' : ''
+                        {markedForReview.has(question.id) && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 font-medium">
+                            Marked for Review
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleMarkForReview(question.id, !markedForReview.has(question.id))}
+                        className={`flex items-center gap-2 h-8 ${
+                          markedForReview.has(question.id)
+                            ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300'
+                            : 'text-muted-foreground hover:text-foreground'
                         }`}
-                      />
-                      <span className="text-sm">
-                        {markedForReview.has(question.id) ? 'Marked for review' : 'Mark for review'}
-                      </span>
-                    </Button>
-                  </div>
-                  {question.type === 'SHORT_TEXT' && (() => {
+                      >
+                        <Flag
+                          className={`h-4 w-4 ${
+                            markedForReview.has(question.id) ? 'fill-current' : ''
+                          }`}
+                        />
+                        <span className="text-sm">
+                          {markedForReview.has(question.id) ? 'Marked for review' : 'Mark for review'}
+                        </span>
+                      </Button>
+                    </div>
+                  )}
+                  {isTextBlock ? (
+                    <QuestionPrompt promptMd={question.promptMd} />
+                  ) : question.type === 'SHORT_TEXT' && (() => {
                     // Check if this is a fill-in-the-blank question (contains blank markers: [blank] or [blank1], [blank2], etc.)
                     const promptText = question.promptMd || ''
                     const hasBlanks = /\[blank\d*\]/.test(promptText)
@@ -866,9 +879,9 @@ export function TakeTestClient({
                     )
                   })()}
                   
-                  {question.type !== 'SHORT_TEXT' && <QuestionPrompt promptMd={question.promptMd} />}
+                  {question.type !== 'SHORT_TEXT' && !isTextBlock && <QuestionPrompt promptMd={question.promptMd} />}
                   
-                  {question.type === 'MCQ_SINGLE' && (
+                  {!isTextBlock && question.type === 'MCQ_SINGLE' && (
                     <RadioGroup 
                       value={answers[question.id]?.selectedOptionIds?.[0] || ''} 
                       onValueChange={(value) => handleAnswerChange(question.id, {
@@ -890,7 +903,7 @@ export function TakeTestClient({
                     </RadioGroup>
                   )}
 
-                  {question.type === 'MCQ_MULTI' && (
+                  {!isTextBlock && question.type === 'MCQ_MULTI' && (
                     <div className="space-y-2">
                       {question.options.map((option: any) => (
                         <div
@@ -918,7 +931,7 @@ export function TakeTestClient({
                     </div>
                   )}
 
-                  {question.type === 'NUMERIC' && (
+                  {!isTextBlock && question.type === 'NUMERIC' && (
                     <Input
                       type="number"
                       step="any"
@@ -930,7 +943,7 @@ export function TakeTestClient({
                     />
                   )}
 
-                  {question.type === 'LONG_TEXT' && (
+                  {!isTextBlock && question.type === 'LONG_TEXT' && (
                     <Textarea
                       className="min-h-[150px]"
                       placeholder="Enter your answer"
@@ -941,7 +954,7 @@ export function TakeTestClient({
                     />
                   )}
                 </div>
-              ))
+              )})
             )}
           </div>
           </CardContent>

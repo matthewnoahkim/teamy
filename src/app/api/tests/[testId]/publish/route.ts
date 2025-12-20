@@ -18,7 +18,7 @@ const publishSchema = z.object({
   scoreReleaseMode: z.enum(['NONE', 'SCORE_ONLY', 'SCORE_WITH_WRONG', 'FULL_TEST']).optional(),
   requireFullscreen: z.boolean().optional(),
   assignmentMode: z.enum(['CLUB', 'TEAM', 'EVENT']).optional(),
-  selectedTeams: z.array(z.string()).optional(),
+  selectedSubteams: z.array(z.string()).optional(),
   selectedEventId: z.string().optional(),
   addToCalendar: z.boolean().optional(),
 })
@@ -46,7 +46,7 @@ export async function POST(
         questions: true,
         assignments: {
           include: {
-            team: true,
+            subteam: true,
             event: true,
           },
         },
@@ -58,7 +58,7 @@ export async function POST(
     }
 
     // Check if user is an admin
-    const isAdminUser = await isAdmin(session.user.id, test.clubId)
+    const isAdminUser = await isAdmin(session.user.id, test.teamId)
     if (!isAdminUser) {
       return NextResponse.json(
         { error: 'Only admins can publish tests' },
@@ -91,7 +91,7 @@ export async function POST(
     const testPasswordPlaintext = validatedData.testPassword || null
 
     // Get membership for audit
-    const membership = await getUserMembership(session.user.id, test.clubId)
+    const membership = await getUserMembership(session.user.id, test.teamId)
     if (!membership) {
       return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
     }
@@ -117,23 +117,6 @@ export async function POST(
 
     // Handle assignments if provided
     if (validatedData.assignmentMode) {
-      // Validate that required data is provided for each mode
-      if (validatedData.assignmentMode === 'TEAM') {
-        if (!validatedData.selectedTeams || validatedData.selectedTeams.length === 0) {
-          return NextResponse.json(
-            { error: 'At least one team must be selected when assigning to specific teams' },
-            { status: 400 }
-          )
-        }
-      } else if (validatedData.assignmentMode === 'EVENT') {
-        if (!validatedData.selectedEventId) {
-          return NextResponse.json(
-            { error: 'An event must be selected when assigning to specific event' },
-            { status: 400 }
-          )
-        }
-      }
-
       // First, delete existing assignments
       await prisma.testAssignment.deleteMany({
         where: { testId },
@@ -147,25 +130,39 @@ export async function POST(
             assignedScope: 'CLUB',
           },
         })
-      } else if (validatedData.assignmentMode === 'TEAM') {
-        // Create TEAM assignments for each selected team
+      } else if (validatedData.assignmentMode === 'TEAM' && validatedData.selectedSubteams) {
         await prisma.testAssignment.createMany({
-          data: validatedData.selectedTeams!.map(teamId => ({
+          data: validatedData.selectedSubteams.map(subteamId => ({
             testId,
             assignedScope: 'TEAM' as const,
-            teamId,
+            subteamId,
           })),
         })
-      } else if (validatedData.assignmentMode === 'EVENT') {
-        // Create a single assignment with eventId for dynamic event-based filtering
-        // This allows users added to the event after test publish to still see the test
-        await prisma.testAssignment.create({
-          data: {
-            testId,
-            assignedScope: 'TEAM' as const, // TEAM scope with eventId means "all members assigned to this event"
+      } else if (validatedData.assignmentMode === 'EVENT' && validatedData.selectedEventId) {
+        // Find all members assigned to this event via roster assignments
+        const rosterAssignments = await prisma.rosterAssignment.findMany({
+          where: {
             eventId: validatedData.selectedEventId,
+            subteam: {
+              teamId: test.teamId,
+            },
+          },
+          select: {
+            membershipId: true,
           },
         })
+
+        const uniqueMembershipIds = [...new Set(rosterAssignments.map(ra => ra.membershipId))]
+
+        if (uniqueMembershipIds.length > 0) {
+          await prisma.testAssignment.createMany({
+            data: uniqueMembershipIds.map(membershipId => ({
+              testId,
+              assignedScope: 'PERSONAL' as const,
+              targetMembershipId: membershipId,
+            })),
+          })
+        }
       }
     }
 
@@ -195,17 +192,17 @@ export async function POST(
       if (finalAssignments.length > 0) {
         // Determine calendar event scope and target users
         const hasClubAssignment = finalAssignments.some(a => a.assignedScope === 'CLUB')
-        const teamAssignments = finalAssignments.filter(a => a.assignedScope === 'TEAM' && a.teamId)
+        const teamAssignments = finalAssignments.filter(a => a.assignedScope === 'TEAM' && a.subteamId)
         const personalAssignments = finalAssignments.filter(a => a.assignedScope === 'PERSONAL' && a.targetMembershipId)
         const eventAssignments = finalAssignments.filter(a => a.eventId)
 
         if (hasClubAssignment) {
-          // Entire club - create one CLUB scope event
+          // Entire club - create one TEAM scope event
           const calendarEvent = await prisma.calendarEvent.create({
             data: {
-              clubId: test.clubId,
+              teamId: test.teamId,
               creatorId: membership.id,
-              scope: 'CLUB',
+              scope: 'TEAM',
               title: test.name,
               description: test.description || `Test: ${test.name}`,
               startUTC: startAt,
@@ -218,15 +215,15 @@ export async function POST(
           })
           calendarEventIds.push(calendarEvent.id)
         } else if (teamAssignments.length > 0) {
-          // Specific teams - create one TEAM scope event per team
+          // Specific teams - create one SUBTEAM event per team
           const createdEvents = await Promise.all(
             teamAssignments.map(async (assignment) => {
-              if (!assignment.teamId) return null
+              if (!assignment.subteamId) return null
               return await prisma.calendarEvent.create({
                 data: {
-                  clubId: test.clubId,
+                  teamId: test.teamId,
                   creatorId: membership.id,
-                  scope: 'TEAM',
+                  scope: 'SUBTEAM',
                   title: test.name,
                   description: test.description || `Test: ${test.name}`,
                   startUTC: startAt,
@@ -234,7 +231,7 @@ export async function POST(
                   color: '#8b5cf6',
                   rsvpEnabled: false,
                   important: true,
-                  teamId: assignment.teamId,
+                  subteamId: assignment.subteamId,
                   testId: testId,
                 },
               })
@@ -246,7 +243,7 @@ export async function POST(
           const uniqueEventIds = [...new Set(eventAssignments.map(a => a.eventId).filter(Boolean) as string[])]
           const calendarEvent = await prisma.calendarEvent.create({
             data: {
-              clubId: test.clubId,
+              teamId: test.teamId,
               creatorId: membership.id,
               scope: 'TEAM',
               title: test.name,
@@ -279,7 +276,7 @@ export async function POST(
               if (!assignment.targetMembershipId) return null
               return await prisma.calendarEvent.create({
                 data: {
-                  clubId: test.clubId,
+                  teamId: test.teamId,
                   creatorId: membership.id,
                   scope: 'PERSONAL',
                   title: test.name,
