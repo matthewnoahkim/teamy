@@ -1,7 +1,4 @@
 import { PublicPageLayout } from '@/components/public-page-layout'
-<<<<<<< HEAD
-import { ScrollDrivenFeatures } from '@/components/scroll-driven-features'
-=======
 import { ScrollAnimate } from '@/components/scroll-animate'
 import { 
   Users, Calendar, ClipboardCheck, DollarSign, FileText, Trophy,
@@ -9,51 +6,9 @@ import {
   ArrowLeft, Shield, Bell, Zap
 } from 'lucide-react'
 import Link from 'next/link'
->>>>>>> 3f7e3302f92caca1bd3ab36b1278c9d58a7a2126
 
-const heroFeatures = [
+const features = [
   {
-<<<<<<< HEAD
-    icon: 'MessageSquare' as const,
-    title: 'Communication',
-    description: 'Keep your team connected with announcements, threaded replies, reactions, and email notifications. Share updates with specific roles or the entire team.',
-  },
-  {
-    icon: 'Calendar' as const,
-    title: 'Planning',
-    description: 'Schedule practices, meetings, and competitions with ease. RSVP tracking, recurring events, and calendar integration keep everyone organized.',
-  },
-  {
-    icon: 'ClipboardCheck' as const,
-    title: 'Rosters',
-    description: 'Assign students to Science Olympiad events with AI assistance. Automatic conflict detection and capacity limits ensure optimal team composition.',
-  },
-  {
-    icon: 'FileText' as const,
-    title: 'Tests',
-    description: 'Create and grade tests with multiple question types. AI-powered grading, proctoring tools, built-in calculator, and customizable score release.',
-  },
-  {
-    icon: 'BarChart3' as const,
-    title: 'Analytics',
-    description: 'Track team performance with detailed statistics and insights. Monitor attendance, test scores, and event participation at a glance.',
-  },
-  {
-    icon: 'FolderKanban' as const,
-    title: 'Organization',
-    description: 'Manage clubs, teams, and members with powerful admin tools. Photo albums, file sharing, and customizable dashboard widgets.',
-  },
-  {
-    icon: 'DollarSign' as const,
-    title: 'Finance',
-    description: 'Track event budgets and expenses effortlessly. Purchase request approval system with automatic budget enforcement and reporting.',
-  },
-  {
-    icon: 'Wrench' as const,
-    title: 'Tools',
-    description: 'Forms, to-do lists, attendance tracking, and more. Everything you need to run your Science Olympiad team efficiently in one place.',
-  },
-=======
     category: 'Core',
     items: [
       {
@@ -204,17 +159,11 @@ const heroFeatures = [
       }
     ]
   }
->>>>>>> 3f7e3302f92caca1bd3ab36b1278c9d58a7a2126
 ]
 
 export default function FeaturesPage() {
   return (
     <PublicPageLayout>
-<<<<<<< HEAD
-      <div className="py-12 px-4 sm:px-6">
-        {/* Scroll-driven feature showcase with header and footer */}
-        <ScrollDrivenFeatures features={heroFeatures} />
-=======
       <div className="py-16 px-4 sm:px-6 relative">
         {/* Background gradient orbs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -308,7 +257,6 @@ export default function FeaturesPage() {
             </div>
           </ScrollAnimate>
         </div>
->>>>>>> 3f7e3302f92caca1bd3ab36b1278c9d58a7a2126
       </div>
     </PublicPageLayout>
   )

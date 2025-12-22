@@ -1,12 +1,10 @@
-import { getServerSession } from 'next/auth'
+import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ArrowRight, Sparkles, Users, Trophy, Calendar, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
 import { HomeNav } from '@/components/home-nav'
 import { ScrollAnimate } from '@/components/scroll-animate'
-import { AnimatedGradient } from '@/components/animated-gradient'
-import { FeatureCard } from '@/components/feature-card'
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions)
@@ -42,7 +40,11 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground relative overflow-hidden">
       {/* Animated background gradient */}
-      <AnimatedGradient />
+      <div className="fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-teamy-primary/5 via-background to-purple-500/5" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-teamy-primary/10 rounded-full blur-3xl animate-pulse-slow" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse-slow animation-delay-2000" />
+      </div>
       
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary/95 dark:bg-slate-900/95 backdrop-blur-lg shadow-nav">
@@ -120,14 +122,23 @@ export default async function HomePage() {
           <ScrollAnimate animation="fade-scale" delay={400} duration={800}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-12 px-4">
               {features.map((feature, index) => (
-                <FeatureCard
-                  key={feature.title}
-                  icon={feature.icon}
-                  title={feature.title}
-                  description={feature.description}
-                  color={feature.color}
-                  delay={index * 100}
-                />
+                <div key={feature.title} className="group relative h-full">
+                  <div className={`absolute -inset-[1px] bg-gradient-to-br ${feature.color} rounded-2xl opacity-0 group-hover:opacity-100 blur-sm transition-all duration-500`} />
+                  <div className="relative h-full p-6 rounded-2xl bg-card/80 backdrop-blur-sm border border-border shadow-card hover:shadow-card-hover transition-all duration-500 hover:scale-[1.02]">
+                    <div className="relative w-12 h-12 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-500">
+                      <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-10 rounded-xl`} />
+                      <div className="relative w-full h-full flex items-center justify-center">
+                        <feature.icon className="h-6 w-6 text-teamy-primary" />
+                      </div>
+                    </div>
+                    <h3 className="font-heading text-lg font-semibold mb-2 text-foreground">
+                      {feature.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {feature.description}
+                    </p>
+                  </div>
+                </div>
               ))}
             </div>
           </ScrollAnimate>
