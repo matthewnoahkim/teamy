@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { sessionId, refresh } = body
 
-    let subscription
+    let subscription: Stripe.Subscription
     let subscriptionType = 'pro'
 
     if (refresh) {
@@ -212,11 +212,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Only set subscriptionEndsAt if current_period_end exists and is valid
-    if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
-      updateData.subscriptionEndsAt = new Date(subscription.current_period_end * 1000)
+    const currentPeriodEnd = (subscription as any).current_period_end
+    if (currentPeriodEnd && typeof currentPeriodEnd === 'number') {
+      updateData.subscriptionEndsAt = new Date(currentPeriodEnd * 1000)
       console.log(`Setting subscriptionEndsAt to: ${updateData.subscriptionEndsAt.toISOString()}`)
     } else {
-      console.warn(`Subscription ${subscription.id} has invalid current_period_end:`, subscription.current_period_end)
+      console.warn(`Subscription ${subscription.id} has invalid current_period_end:`, currentPeriodEnd)
     }
 
     // Update user subscription status

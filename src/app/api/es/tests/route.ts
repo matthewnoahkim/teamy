@@ -405,7 +405,7 @@ export async function POST(request: NextRequest) {
           allowLateUntil: allowLateUntil ? new Date(allowLateUntil) : null,
           allowCalculator: allowCalculator ?? false,
           allowNoteSheet: allowNoteSheet ?? false,
-          calculatorType: allowCalculator && calculatorType ? calculatorType : null,
+          calculatorType: allowCalculator && calculatorType ? calculatorType as 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' : null,
           noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null,
           questions: questions && questions.length > 0
             ? {
@@ -679,7 +679,7 @@ export async function PUT(request: NextRequest) {
           ...(allowLateUntil !== undefined && { allowLateUntil: allowLateUntil ? new Date(allowLateUntil) : null }),
           ...(allowCalculator !== undefined && { allowCalculator }),
           ...(allowNoteSheet !== undefined && { allowNoteSheet }),
-          ...(calculatorType !== undefined && { calculatorType: allowCalculator && calculatorType ? calculatorType : null }),
+          ...(calculatorType !== undefined && { calculatorType: allowCalculator && calculatorType ? calculatorType as 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' : null }),
           ...(noteSheetInstructions !== undefined && { noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null }),
         },
       })

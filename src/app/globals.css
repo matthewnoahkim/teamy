@@ -130,66 +130,6 @@
   .teamy-hero-bg-light {
     background: linear-gradient(180deg, #0056C7 0%, #1A6FEA 100%);
   }
-  
-  /* Subtle blue tint for light mode sections */
-  .teamy-surface-blue {
-    background: rgba(0, 86, 199, 0.03);
-  }
-  
-  /* Glow effects - USE SPARINGLY */
-  .teamy-glow-primary {
-    box-shadow: 0 0 20px rgba(111, 214, 255, 0.4);
-  }
-  
-  .teamy-glow-strong {
-    box-shadow: 0 0 30px rgba(111, 214, 255, 0.6);
-  }
-  
-  /* Card styles */
-  .teamy-card {
-    @apply bg-card rounded-2xl border border-border shadow-lg;
-  }
-  
-  .teamy-card-hover:hover {
-    @apply shadow-xl border-primary/20;
-    transform: translateY(-2px);
-  }
-  
-  /* Glass effect for hero/marketing sections */
-  .teamy-glass {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-  }
-  
-  .teamy-glass-dark {
-    background: rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-  
-  /* Button styles */
-  .teamy-btn-primary {
-    @apply bg-white text-[#0056C7] font-semibold rounded-full;
-    box-shadow: 0 0 18px rgba(111, 214, 255, 0.5);
-    transition: all 200ms ease;
-  }
-  
-  .teamy-btn-primary:hover {
-    box-shadow: 0 0 25px rgba(111, 214, 255, 0.7);
-    transform: scale(1.03);
-  }
-  
-  .teamy-btn-secondary {
-    @apply bg-transparent text-white font-semibold rounded-full;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    transition: all 200ms ease;
-  }
-  
-  .teamy-btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.8);
-  }
 
   /* App shell backgrounds */
   .app-shell-light {
@@ -326,20 +266,56 @@
 
   /* Floating animation */
   @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
+    0%, 100% { 
+      transform: translateY(0px) translateX(0px); 
+    }
+    50% { 
+      transform: translateY(-20px) translateX(10px); 
+    }
   }
   
   .animate-float {
-    animation: float 6s ease-in-out infinite;
+    animation: float 8s ease-in-out infinite;
   }
 
-  /* Gradient text */
-  .gradient-text {
-    background: linear-gradient(135deg, #0056C7 0%, #6FD6FF 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  .animate-float-delayed {
+    animation: float 10s ease-in-out infinite;
+    animation-delay: 2s;
+  }
+
+  /* Pulse slow for gradient orbs */
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 0.4;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(1.05);
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow-delayed {
+    animation: pulse-slow 8s ease-in-out infinite;
+    animation-delay: 3s;
+  }
+
+  /* Animated gradient for text */
+  @keyframes gradient {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .animate-gradient {
+    animation: gradient 6s ease infinite;
   }
 
   /* Scroll animations */
@@ -420,36 +396,5 @@
       rgba(255, 255, 255, 0.05) 50%,
       rgba(255, 255, 255, 0) 100%
     );
-  }
-
-  /* Gradient animation */
-  @keyframes gradient {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-  }
-
-  .animate-gradient {
-    animation: gradient 3s ease infinite;
-  }
-
-  /* Pulse slow animation */
-  @keyframes pulse-slow {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-
-  .animate-pulse-slow {
-    animation: pulse-slow 3s ease-in-out infinite;
-  }
-
-  /* Float animation */
-  @keyframes float {
-    0%, 100% { transform: translateY(0px) translateX(0px); }
-    33% { transform: translateY(-10px) translateX(5px); }
-    66% { transform: translateY(5px) translateX(-5px); }
-  }
-
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
   }
 }
