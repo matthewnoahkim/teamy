@@ -10,7 +10,6 @@ import {
   Lightbulb,
   Trophy,
   ArrowRight,
-  ArrowLeft,
   ExternalLink,
 } from 'lucide-react'
 
@@ -23,15 +22,9 @@ export default function AboutPage() {
   return (
     <PublicPageLayout>
       <div className="container mx-auto px-4 sm:px-6 py-12 max-w-4xl">
-        {/* Back link */}
-        <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8">
-          <ArrowLeft className="h-4 w-4" />
-          <span className="text-sm font-medium">Back to home</span>
-        </Link>
-
         {/* Hero Section */}
-        <div className="text-center mb-16">
-          <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground mb-6">
+        <div className="text-center mb-12">
+          <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
             About Teamy
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">

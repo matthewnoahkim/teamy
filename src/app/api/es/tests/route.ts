@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { CalculatorType } from '@prisma/client'
 
 // Helper to check if user is a tournament director for a tournament
 async function isTournamentDirector(userId: string, userEmail: string, tournamentId: string): Promise<boolean> {
@@ -347,7 +348,7 @@ export async function POST(request: NextRequest) {
       allowLateUntil?: string
       allowCalculator?: boolean
       allowNoteSheet?: boolean
-      calculatorType?: string
+      calculatorType?: CalculatorType
       noteSheetInstructions?: string
       questions?: Array<{
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
@@ -534,7 +535,7 @@ export async function PUT(request: NextRequest) {
       allowLateUntil?: string
       allowCalculator?: boolean
       allowNoteSheet?: boolean
-      calculatorType?: string
+      calculatorType?: CalculatorType
       noteSheetInstructions?: string
       questions?: Array<{
         id?: string

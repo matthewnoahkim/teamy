@@ -6,9 +6,10 @@ import { authOptions } from '@/lib/auth'
 
 interface PublicPageLayoutProps {
   children: React.ReactNode
+  hideFooter?: boolean
 }
 
-export async function PublicPageLayout({ children }: PublicPageLayoutProps) {
+export async function PublicPageLayout({ children, hideFooter = false }: PublicPageLayoutProps) {
   const session = await getServerSession(authOptions)
   const isLoggedIn = !!session?.user
 
@@ -44,17 +45,19 @@ export async function PublicPageLayout({ children }: PublicPageLayoutProps) {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card py-4">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-center md:text-left">
-            <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
-              <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-              <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+      {!hideFooter && (
+        <footer className="border-t border-border bg-card py-4">
+          <div className="container mx-auto px-4 sm:px-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-center md:text-left">
+              <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
+                <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+                <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   )
 }

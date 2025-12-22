@@ -1,17 +1,10 @@
 import { PublicPageLayout } from '@/components/public-page-layout'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 
 export default function PrivacyPolicyPage() {
   return (
     <PublicPageLayout>
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-12">
-        {/* Back link */}
-        <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8">
-          <ArrowLeft className="h-4 w-4" />
-          <span className="text-sm font-medium">Back to home</span>
-        </Link>
-
         <div className="prose prose-slate dark:prose-invert max-w-none bg-card border border-border rounded-2xl p-8 md:p-12 shadow-card">
           <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
           <p className="text-muted-foreground mb-8">Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>

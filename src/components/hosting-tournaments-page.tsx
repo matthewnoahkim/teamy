@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Trophy, Plus, Loader2, CheckCircle2, ArrowLeft, Search, Monitor, User, Mail, ExternalLink, MapPin } from 'lucide-react'
+import { Trophy, Plus, Loader2, CheckCircle2, Search, Monitor, User, Mail, ExternalLink, MapPin } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,8 +10,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Logo } from '@/components/logo'
-import { HomeNav } from '@/components/home-nav'
 import { useToast } from '@/components/ui/use-toast'
 import { formatDivision } from '@/lib/utils'
 import Link from 'next/link'
@@ -301,51 +299,19 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 overflow-x-auto">
-          <Logo size="md" href="/" variant="light" />
-          <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">
-            <HomeNav 
-              variant="light" 
-              mobileButton={
-                <Link href={isLoggedIn ? "/dashboard" : "/login"}>
-                  <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
-                    {isLoggedIn ? "Dashboard" : "Sign In"}
-                  </button>
-                </Link>
-              }
-            />
-            <Link href={isLoggedIn ? "/dashboard" : "/login"} className="hidden md:block">
-              <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm">
-                {isLoggedIn ? "Dashboard" : "Sign In"}
-              </button>
-            </Link>
-          </div>
+    <div className="py-12 px-4 sm:px-6">
+      <div className="max-w-6xl mx-auto space-y-12">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
+            Host Tournaments
+          </h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Host your Science Olympiad tournament on teamy. Our platform streamlines every aspect of tournament management all in one place.
+          </p>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <section className="flex-1 px-4 sm:px-6 py-8 sm:py-12 bg-slate-50 dark:bg-slate-900 grid-pattern overflow-x-hidden">
-        <div className="max-w-6xl mx-auto space-y-8 sm:space-y-12">
-          {/* Back link */}
-          <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm font-medium">Back to home</span>
-          </Link>
-
-          {/* Header */}
-          <div className="text-center space-y-3 sm:space-y-4">
-            <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground px-4">
-              Host Tournaments
-            </h1>
-            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
-              Host your Science Olympiad tournament on teamy. Our platform streamlines every aspect of tournament management all in one place.
-            </p>
-          </div>
-
-          {/* Demo Video Coming Soon */}
+        {/* Demo Video Coming Soon */}
           <Card className="border-2 border-teamy-primary/20">
             <CardContent className="p-8 text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teamy-primary/10 text-teamy-primary font-semibold">
@@ -783,31 +749,16 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
             )}
           </div>
 
-          {/* Questions Link */}
-          <div className="mt-8 text-center">
-            <p className="text-muted-foreground">
-              Have questions about hosting a tournament?{' '}
-              <Link href="/contact" className="text-teamy-primary hover:underline font-semibold">
-                Click here to contact us
-              </Link>
-            </p>
-          </div>
-
+        {/* Questions Link */}
+        <div className="mt-8 text-center">
+          <p className="text-muted-foreground">
+            Have questions about hosting a tournament?{' '}
+            <Link href="/contact" className="text-teamy-primary hover:underline font-semibold">
+              Click here to contact us
+            </Link>
+          </p>
         </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border bg-card py-4">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-center md:text-left">
-            <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
-              <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-              <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-            </div>
-            <p className="text-xs sm:text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      </div>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { PublicPageLayout } from '@/components/public-page-layout'
-import { ArrowLeft, Check, Zap } from 'lucide-react'
+import { Check, Zap } from 'lucide-react'
 import Link from 'next/link'
 
 const plans = [
@@ -54,17 +54,11 @@ const boostTiers = [
 export default function PricingPage() {
   return (
     <PublicPageLayout>
-      <div className="py-16 px-4 sm:px-6">
+      <div className="py-12 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
-          {/* Back link */}
-          <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm font-medium">Back to home</span>
-          </Link>
-
           {/* Header */}
-          <div className="text-center mb-16">
-            <h1 className="font-heading text-4xl md:text-5xl font-bold text-foreground mb-6">
+          <div className="text-center mb-12">
+            <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
               Pricing
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
