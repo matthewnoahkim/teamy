@@ -22,6 +22,7 @@ import { Calendar, MapPin, Trophy, FileText, ChevronRight, LogOut, Pencil, Chevr
 import { formatDivision } from '@/lib/utils'
 import Link from 'next/link'
 import { format } from 'date-fns'
+import { isTestAvailable } from '@/lib/test-availability'
 
 interface Tournament {
   tournament: {
@@ -212,7 +213,8 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
   }
 
   const formatTestTimeRange = (startAt: string | null | undefined, endAt: string | null | undefined, allowLateUntil: string | null | undefined) => {
-    if (!startAt || !endAt) {
+    // Check if dates exist and are not empty strings
+    if (!startAt || !endAt || startAt.trim() === '' || endAt.trim() === '') {
       return null
     }
     try {
@@ -223,6 +225,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
       
       // Check if dates are valid
       if (isNaN(startDate.getTime()) || isNaN(deadlineDate.getTime())) {
+        console.warn('Invalid dates in formatTestTimeRange:', { startAt, endAt, allowLateUntil })
         return null
       }
       
@@ -235,9 +238,29 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
       }
       // Different days, show full date/time for both
       return `${formatDateTime(startAt)} - ${formatDateTime(allowLateUntil || endAt)}`
-    } catch {
+    } catch (error) {
+      console.error('Error formatting test time range:', error, { startAt, endAt, allowLateUntil })
       return null
     }
+  }
+
+  const checkTestAvailability = (test: {
+    startAt: string | null
+    endAt: string | null
+    allowLateUntil: string | null
+  }) => {
+    // Convert string dates to Date objects for isTestAvailable
+    const startAt = test.startAt ? new Date(test.startAt) : null
+    const endAt = test.endAt ? new Date(test.endAt) : null
+    const allowLateUntil = test.allowLateUntil ? new Date(test.allowLateUntil) : null
+
+    // Use the isTestAvailable function - tests are always PUBLISHED when shown in this portal
+    return isTestAvailable({
+      status: 'PUBLISHED',
+      startAt,
+      endAt,
+      allowLateUntil,
+    })
   }
 
   const handleTakeTest = (testId: string, clubId: string, isESTest?: boolean) => {
@@ -398,9 +421,17 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {eventData.tests.length > 0 ? (
+                        {eventData.tests.filter((test) => {
+                          // Filter out tests that are outside their availability window
+                          const availability = checkTestAvailability(test)
+                          return availability.available
+                        }).length > 0 ? (
                           <div className="space-y-3">
-                            {eventData.tests.map((test) => (
+                            {eventData.tests.filter((test) => {
+                              // Filter out tests that are outside their availability window
+                              const availability = checkTestAvailability(test)
+                              return availability.available
+                            }).map((test) => (
                               <Card key={test.id} className="bg-slate-50 dark:bg-slate-800 hover:shadow-lg transition-shadow">
                                 <CardContent className="p-6">
                                   <div className="space-y-4">
@@ -502,10 +533,25 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                           <div className="flex-1">
                                             <div className="text-xs text-muted-foreground mb-1">Availability</div>
                                             <div className="text-sm font-semibold">
-                                              {test.startAt && test.endAt 
-                                                ? (formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil) || 
-                                                   `${formatDateTime(test.startAt)} - ${formatDateTime(test.endAt)}`)
-                                                : <span className="text-teamy-primary">Always available</span>}
+                                              {(() => {
+                                                // Check if dates exist and are valid
+                                                const hasStartAt = test.startAt && test.startAt.trim && test.startAt.trim() !== ''
+                                                const hasEndAt = test.endAt && test.endAt.trim && test.endAt.trim() !== ''
+                                                
+                                                if (hasStartAt && hasEndAt) {
+                                                  const formatted = formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil)
+                                                  if (formatted) {
+                                                    return formatted
+                                                  }
+                                                  // Fallback if formatTestTimeRange returns null
+                                                  try {
+                                                    return `${formatDateTime(test.startAt)} - ${formatDateTime(test.endAt)}`
+                                                  } catch {
+                                                    return <span className="text-muted-foreground">Invalid date range</span>
+                                                  }
+                                                }
+                                                return <span className="text-teamy-primary">Always available</span>
+                                              })()}
                                             </div>
                                           </div>
                                         </div>
@@ -556,15 +602,26 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                         )}
                                       </div>
                                       
-                                      <Button
-                                        onClick={() => handleTakeTest(test.id, test.clubId)}
-                                        size="lg"
-                                        className="bg-teamy-primary hover:bg-teamy-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 gap-2 group"
-                                      >
-                                        <Play className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-                                        Take Test
-                                        <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                                      </Button>
+                                      {(() => {
+                                        const availability = checkTestAvailability(test)
+                                        return (
+                                          <div className="flex flex-col items-end gap-2">
+                                            {!availability.available && availability.reason && (
+                                              <span className="text-xs text-muted-foreground">{availability.reason}</span>
+                                            )}
+                                            <Button
+                                              onClick={() => handleTakeTest(test.id, test.clubId)}
+                                              size="lg"
+                                              disabled={!availability.available}
+                                              className="bg-teamy-primary hover:bg-teamy-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                              <Play className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                                              Take Test
+                                              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                                            </Button>
+                                          </div>
+                                        )
+                                      })()}
                                     </div>
                                   </div>
                                 </CardContent>
@@ -581,11 +638,19 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
               )}
 
               {/* General tests (not assigned to a specific event) */}
-              {selectedTournamentData.generalTests.length > 0 && (
+              {selectedTournamentData.generalTests.filter((test) => {
+                // Filter out tests that are outside their availability window
+                const availability = checkTestAvailability(test)
+                return availability.available
+              }).length > 0 && (
                 <div className="space-y-4">
                   <h2 className="text-2xl font-semibold">General Tests</h2>
                   <div className="space-y-3">
-                    {selectedTournamentData.generalTests.map((test) => (
+                    {selectedTournamentData.generalTests.filter((test) => {
+                      // Filter out tests that are outside their availability window
+                      const availability = checkTestAvailability(test)
+                      return availability.available
+                    }).map((test) => (
                       <Card key={test.id} className="bg-slate-50 dark:bg-slate-800 hover:shadow-lg transition-shadow">
                         <CardContent className="p-6">
                           <div className="space-y-4">
@@ -687,10 +752,25 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                   <div className="flex-1">
                                     <div className="text-xs text-muted-foreground mb-1">Availability</div>
                                     <div className="text-sm font-semibold">
-                                      {test.startAt && test.endAt 
-                                        ? (formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil) || 
-                                           `${formatDateTime(test.startAt)} - ${formatDateTime(test.endAt)}`)
-                                        : <span className="text-teamy-primary">Always available</span>}
+                                      {(() => {
+                                        // Check if dates exist and are valid
+                                        const hasStartAt = test.startAt && test.startAt.trim && test.startAt.trim() !== ''
+                                        const hasEndAt = test.endAt && test.endAt.trim && test.endAt.trim() !== ''
+                                        
+                                        if (hasStartAt && hasEndAt) {
+                                          const formatted = formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil)
+                                          if (formatted) {
+                                            return formatted
+                                          }
+                                          // Fallback if formatTestTimeRange returns null
+                                          try {
+                                            return `${formatDateTime(test.startAt)} - ${formatDateTime(test.endAt)}`
+                                          } catch {
+                                            return <span className="text-muted-foreground">Invalid date range</span>
+                                          }
+                                        }
+                                        return <span className="text-teamy-primary">Always available</span>
+                                      })()}
                                     </div>
                                   </div>
                                 </div>
@@ -741,15 +821,26 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                 )}
                               </div>
                               
-                              <Button
-                                onClick={() => handleTakeTest(test.id, test.clubId)}
-                                size="lg"
-                                className="bg-teamy-primary hover:bg-teamy-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 gap-2 group"
-                              >
-                                <Play className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-                                Take Test
-                                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                              </Button>
+                              {(() => {
+                                const availability = checkTestAvailability(test)
+                                return (
+                                  <div className="flex flex-col items-end gap-2">
+                                    {!availability.available && availability.reason && (
+                                      <span className="text-xs text-muted-foreground">{availability.reason}</span>
+                                    )}
+                                    <Button
+                                      onClick={() => handleTakeTest(test.id, test.clubId)}
+                                      size="lg"
+                                      disabled={!availability.available}
+                                      className="bg-teamy-primary hover:bg-teamy-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <Play className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                                      Take Test
+                                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                                    </Button>
+                                  </div>
+                                )
+                              })()}
                             </div>
                           </div>
                         </CardContent>

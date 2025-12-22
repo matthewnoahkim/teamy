@@ -46,7 +46,7 @@ async function isTournamentDirector(userId: string, userEmail: string, tournamen
 // Get audit logs for all tests in a tournament
 export async function GET(
   req: NextRequest,
-  { params }: { params: { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> | { tournamentId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -54,8 +54,12 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Resolve params if it's a Promise (Next.js 15 compatibility)
+    const resolvedParams = params instanceof Promise ? await params : params
+    const tournamentId = resolvedParams.tournamentId
+
     // Check if user is tournament director
-    const isTD = await isTournamentDirector(session.user.id, session.user.email, params.tournamentId)
+    const isTD = await isTournamentDirector(session.user.id, session.user.email, tournamentId)
     if (!isTD) {
       return NextResponse.json({ error: 'Only tournament directors can view audit logs' }, { status: 403 })
     }
@@ -63,7 +67,7 @@ export async function GET(
     // Get all ESTest IDs for this tournament
     const esTests = await prisma.eSTest.findMany({
       where: {
-        tournamentId: params.tournamentId,
+        tournamentId: tournamentId,
       },
       select: {
         id: true,
@@ -75,7 +79,7 @@ export async function GET(
     // Get all clubs registered for this tournament
     const registrations = await prisma.tournamentRegistration.findMany({
       where: {
-        tournamentId: params.tournamentId,
+        tournamentId: tournamentId,
       },
       select: {
         clubId: true,
@@ -102,7 +106,7 @@ export async function GET(
     // Also get test IDs from TournamentTest (currently linked tests)
     const tournamentTests = await prisma.tournamentTest.findMany({
       where: {
-        tournamentId: params.tournamentId,
+        tournamentId: tournamentId,
       },
       select: {
         testId: true,
@@ -199,7 +203,7 @@ export async function GET(
             // Tests that still exist
             {
               test: {
-                tournamentId: params.tournamentId,
+                tournamentId: tournamentId,
               },
             },
             // Deleted tests - filter by tournamentId stored in details
@@ -246,12 +250,12 @@ export async function GET(
     const esTestAuditsRaw = allESTestAuditsRaw.filter(audit => {
       if (audit.test) {
         // Test still exists - check tournament
-        return audit.test.tournamentId === params.tournamentId
+        return audit.test.tournamentId === tournamentId
       } else if (audit.testId === null) {
         // Test was deleted - check tournamentId in details
         const details = audit.details as any
         if (details?.tournamentId && typeof details.tournamentId === 'string') {
-          return details.tournamentId === params.tournamentId
+          return details.tournamentId === tournamentId
         }
         return false
       }

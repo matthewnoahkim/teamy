@@ -288,20 +288,11 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    // Filter out requests where the tournament exists but is not published
-    // Only show requests that either:
-    // 1. Don't have a tournament yet (shouldn't happen for APPROVED, but just in case)
-    // 2. Have a tournament that is published
-    const filteredRequests = requests.filter(request => {
-      if (!request.tournament) {
-        // If no tournament exists, don't show it (approved requests should have tournaments)
-        return false
-      }
-      // Only show if tournament is published
-      return request.tournament.published === true
-    })
-
-    return NextResponse.json({ requests: filteredRequests })
+    // Return all requests - dev panel users should see all requests regardless of
+    // whether they have tournaments or whether those tournaments are published
+    // This allows developers to see and manage pending requests, approved requests,
+    // and rejected requests
+    return NextResponse.json({ requests })
   } catch (error) {
     console.error('Error fetching tournament hosting requests:', error)
     return NextResponse.json(

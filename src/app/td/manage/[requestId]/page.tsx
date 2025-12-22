@@ -66,7 +66,7 @@ export default async function TournamentManageByRequestPage({ params }: Props) {
       division = 'C'
     }
 
-    // Create the tournament
+    // Create the tournament and add director as admin
     tournament = await prisma.tournament.create({
       data: {
         name: request.tournamentName,
@@ -83,6 +83,22 @@ export default async function TournamentManageByRequestPage({ params }: Props) {
         createdById: session.user.id,
         hostingRequestId: requestId,
       },
+    })
+
+    // Ensure the director (current user) is added as a tournament admin
+    // This ensures they can see the tournament in the dev panel
+    await prisma.tournamentAdmin.upsert({
+      where: {
+        tournamentId_userId: {
+          tournamentId: tournament.id,
+          userId: session.user.id,
+        },
+      },
+      create: {
+        tournamentId: tournament.id,
+        userId: session.user.id,
+      },
+      update: {},
     })
   }
 

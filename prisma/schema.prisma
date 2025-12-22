@@ -13,9 +13,9 @@ model User {
   name                    String?
   image                   String?
   emailVerified           DateTime?
-  preferences             Json?                    // User-level preferences including background settings
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
+  preferences             Json?
   accounts                Account[]
   activityLogs            ActivityLog[]
   apiLogs                 ApiLog[]
@@ -102,12 +102,12 @@ model Club {
   homePageWidgets           HomePageWidget[]
   memberships               Membership[]
   purchaseRequests          PurchaseRequest[]
+  resources                 Resource[]
+  resourceRequests          ResourceRequest[]        @relation("ResourceRequests")
   teams                     Team[]
   tests                     Test[]
   todos                     Todo[]
   tournamentRegistrations   TournamentRegistration[] @relation("TournamentRegistrations")
-  resources                Resource[]
-  resourceRequests         ResourceRequest[]        @relation("ResourceRequests")
 
   @@index([createdById])
 }
@@ -126,16 +126,16 @@ model Membership {
   attendanceCheckIns  AttendanceCheckIn[]
   attendeeEvents      CalendarEvent[]     @relation("AttendeeEvents")
   calendarEvents      CalendarEvent[]     @relation("CreatorEvents")
+  esTestAttempts      ESTestAttempt[]
   preferences         MemberPreferences?
   club                Club                @relation(fields: [clubId], references: [id], onDelete: Cascade)
   team                Team?               @relation(fields: [teamId], references: [id])
   user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   noteSheets          NoteSheet[]
   reviewedNoteSheets  NoteSheet[]         @relation("NoteSheetReviewer")
+  resourceRequests    ResourceRequest[]
   rosterAssignments   RosterAssignment[]
   todos               Todo[]
-  resourceRequests    ResourceRequest[]
-  esTestAttempts     ESTestAttempt[]
 
   @@unique([userId, clubId])
   @@index([clubId])
@@ -798,7 +798,7 @@ model TestAudit {
   action            TestAuditAction
   details           Json?
   createdAt         DateTime        @default(now())
-  test              Test?           @relation(fields: [testId], references: [id], onDelete: SetNull)
+  test              Test?           @relation(fields: [testId], references: [id])
 
   @@index([testId])
   @@index([actorMembershipId])
@@ -1034,17 +1034,17 @@ model MemberPreferences {
 }
 
 model StudyNote {
-  id           String          @id @default(cuid())
+  id           String        @id @default(cuid())
   clubId       String
   membershipId String
-  eventSlug    String          // e.g., "anatomy", "chemistry-lab"
+  eventSlug    String
   title        String
-  content      String          @db.Text // Rich text HTML content
-  noteType     StudyNoteType   // NOTE_SHEET or BINDER
-  sheetCount   Int             @default(1) // Number of note sheets (1, 2, or 4 for note sheets)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  
+  content      String
+  noteType     StudyNoteType
+  sheetCount   Int           @default(1)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
   @@unique([clubId, membershipId, eventSlug])
   @@index([clubId])
   @@index([membershipId])
@@ -1084,7 +1084,6 @@ model Tournament {
   paymentInstructions     String?
   isOnline                Boolean                   @default(false)
   approved                Boolean                   @default(false)
-  published               Boolean                   @default(false)
   rejectionReason         String?
   hostingRequestId        String?                   @unique
   pageContent             String?
@@ -1094,13 +1093,14 @@ model Tournament {
   earlyBirdDiscount       Float?
   eligibilityRequirements String?
   eventsRun               String?
-  trialEvents             String?
   feeStructure            String                    @default("flat")
   lateFee                 Float?
   lateFeeStartDate        DateTime?
   otherDiscounts          String?
   registrationEndDate     DateTime?
   registrationStartDate   DateTime?
+  published               Boolean                   @default(false)
+  trialEvents             String?
   esTests                 ESTest[]
   createdBy               User                      @relation("TournamentCreator", fields: [createdById], references: [id], onDelete: Cascade)
   hostingRequest          TournamentHostingRequest? @relation("TournamentFromRequest", fields: [hostingRequestId], references: [id])
@@ -1226,25 +1226,25 @@ model BlogPost {
 }
 
 model TournamentStaff {
-  id                 String                      @id @default(cuid())
-  tournamentId       String
-  email              String
-  name               String?
-  role               StaffRole
-  status             StaffInviteStatus           @default(PENDING)
-  inviteToken        String                      @unique
-  invitedAt          DateTime                    @default(now())
-  acceptedAt         DateTime?
-  userId             String?
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
-  tests              ESTest[]                    @relation("ESTestOwner")
-  testsCreated       ESTest[]                    @relation("ESTestCreator")
-  testsAudited       ESTestAudit[]                @relation("ESTestAuditActor")
-  events             EventSupervisorAssignment[]
-  trialEvents        String?                      // JSON array of trial event names assigned to this staff member
-  tournament         Tournament                  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  user               User?                       @relation("TournamentStaffUser", fields: [userId], references: [id])
+  id           String                      @id @default(cuid())
+  tournamentId String
+  email        String
+  name         String?
+  role         StaffRole
+  status       StaffInviteStatus           @default(PENDING)
+  inviteToken  String                      @unique
+  invitedAt    DateTime                    @default(now())
+  acceptedAt   DateTime?
+  userId       String?
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+  trialEvents  String?
+  testsCreated ESTest[]                    @relation("ESTestCreator")
+  tests        ESTest[]                    @relation("ESTestOwner")
+  testsAudited ESTestAudit[]               @relation("ESTestAuditActor")
+  events       EventSupervisorAssignment[]
+  tournament   Tournament                  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user         User?                       @relation("TournamentStaffUser", fields: [userId], references: [id])
 
   @@unique([tournamentId, email])
   @@index([tournamentId])
@@ -1282,29 +1282,33 @@ model TournamentTimeline {
 }
 
 model ESTest {
-  id               String               @id @default(cuid())
-  staffId          String               // Current owner/maintainer (can be changed for collaboration)
-  createdByStaffId String               // Original creator (never changes)
-  tournamentId     String
-  eventId          String?
-  name             String
-  description      String?
-  instructions     String?
-  content          String?
-  status           TestStatus           @default(DRAFT)
-  durationMinutes  Int                  @default(60)
-  startAt          DateTime?
-  endAt            DateTime?
-  allowLateUntil   DateTime?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  event            Event?               @relation(fields: [eventId], references: [id])
-  staff            TournamentStaff      @relation("ESTestOwner", fields: [staffId], references: [id], onDelete: Cascade)
-  createdBy        TournamentStaff      @relation("ESTestCreator", fields: [createdByStaffId], references: [id], onDelete: Cascade)
-  tournament       Tournament           @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  questions        ESTestQuestion[]
-  audits           ESTestAudit[]
-  attempts         ESTestAttempt[]
+  id                    String           @id @default(cuid())
+  staffId               String
+  tournamentId          String
+  eventId               String?
+  name                  String
+  description           String?
+  instructions          String?
+  content               String?
+  status                TestStatus       @default(DRAFT)
+  durationMinutes       Int              @default(60)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  createdByStaffId      String
+  allowLateUntil        DateTime?
+  endAt                 DateTime?
+  startAt               DateTime?
+  allowCalculator       Boolean          @default(false)
+  allowNoteSheet        Boolean          @default(false)
+  calculatorType        CalculatorType?
+  noteSheetInstructions String?
+  createdBy             TournamentStaff  @relation("ESTestCreator", fields: [createdByStaffId], references: [id], onDelete: Cascade)
+  event                 Event?           @relation(fields: [eventId], references: [id])
+  staff                 TournamentStaff  @relation("ESTestOwner", fields: [staffId], references: [id], onDelete: Cascade)
+  tournament            Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  attempts              ESTestAttempt[]
+  audits                ESTestAudit[]
+  questions             ESTestQuestion[]
 
   @@index([staffId])
   @@index([createdByStaffId])
@@ -1325,9 +1329,9 @@ model ESTestQuestion {
   numericTolerance Decimal?               @db.Decimal(8, 3)
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
+  answers          ESTestAttemptAnswer[]
   test             ESTest                 @relation(fields: [testId], references: [id], onDelete: Cascade)
   options          ESTestQuestionOption[]
-  answers          ESTestAttemptAnswer[]
 
   @@index([testId])
 }
@@ -1345,14 +1349,14 @@ model ESTestQuestionOption {
 }
 
 model ESTestAudit {
-  id                String          @id @default(cuid())
-  testId            String?
-  actorStaffId      String
-  action            TestAuditAction
-  details           Json?
-  createdAt         DateTime        @default(now())
-  test              ESTest?         @relation(fields: [testId], references: [id], onDelete: SetNull)
-  actorStaff        TournamentStaff @relation("ESTestAuditActor", fields: [actorStaffId], references: [id], onDelete: Cascade)
+  id           String          @id @default(cuid())
+  testId       String?
+  actorStaffId String
+  action       TestAuditAction
+  details      Json?
+  createdAt    DateTime        @default(now())
+  actorStaff   TournamentStaff @relation("ESTestAuditActor", fields: [actorStaffId], references: [id], onDelete: Cascade)
+  test         ESTest?         @relation(fields: [testId], references: [id])
 
   @@index([testId])
   @@index([actorStaffId])
@@ -1376,8 +1380,8 @@ model ESTestAttempt {
   updatedAt             DateTime              @updatedAt
   tabSwitchCount        Int                   @default(0)
   timeOffPageSeconds    Int                   @default(0)
+  membership            Membership            @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   test                  ESTest                @relation(fields: [testId], references: [id], onDelete: Cascade)
-  membership            Membership             @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   answers               ESTestAttemptAnswer[]
 
   @@index([testId])
@@ -1387,24 +1391,65 @@ model ESTestAttempt {
 }
 
 model ESTestAttemptAnswer {
-  id                String                @id @default(cuid())
+  id                String         @id @default(cuid())
   attemptId         String
   questionId        String
   answerText        String?
   selectedOptionIds Json?
-  numericAnswer     Decimal?              @db.Decimal(16, 6)
-  pointsAwarded     Decimal?              @db.Decimal(5, 2)
+  numericAnswer     Decimal?       @db.Decimal(16, 6)
+  pointsAwarded     Decimal?       @db.Decimal(5, 2)
   gradedAt          DateTime?
   graderNote        String?
-  markedForReview   Boolean               @default(false)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  attempt           ESTestAttempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question          ESTestQuestion         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  markedForReview   Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  attempt           ESTestAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question          ESTestQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([attemptId, questionId])
   @@index([attemptId])
   @@index([questionId])
+}
+
+model Resource {
+  id        String        @id @default(cuid())
+  name      String
+  tag       String
+  url       String?
+  category  String
+  scope     ResourceScope @default(CLUB)
+  clubId    String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  club      Club?         @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@index([category])
+  @@index([clubId])
+  @@index([scope])
+}
+
+model ResourceRequest {
+  id              String                @id @default(cuid())
+  name            String
+  tag             String
+  url             String?
+  category        String
+  scope           ResourceScope         @default(PUBLIC)
+  clubId          String
+  requestedById   String
+  status          ResourceRequestStatus @default(PENDING)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  club            Club                  @relation("ResourceRequests", fields: [clubId], references: [id], onDelete: Cascade)
+  requestedBy     Membership            @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([clubId])
+  @@index([requestedById])
+  @@index([createdAt])
 }
 
 enum Division {
@@ -1629,47 +1674,6 @@ enum StaffInviteStatus {
 enum StudyNoteType {
   NOTE_SHEET
   BINDER
-}
-
-model Resource {
-  id          String   @id @default(cuid())
-  name        String
-  tag         String
-  url         String?
-  category    String   // Event slug or 'general'
-  scope       ResourceScope @default(CLUB)
-  clubId      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  club        Club?    @relation(fields: [clubId], references: [id], onDelete: Cascade)
-
-  @@index([category])
-  @@index([clubId])
-  @@index([scope])
-}
-
-model ResourceRequest {
-  id          String                @id @default(cuid())
-  name        String
-  tag         String
-  url         String?
-  category    String                // Event slug or 'general'
-  scope       ResourceScope         @default(PUBLIC)
-  clubId      String
-  requestedById String
-  status      ResourceRequestStatus @default(PENDING)
-  reviewedById String?
-  reviewedAt  DateTime?
-  rejectionReason String?
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-  club        Club                  @relation("ResourceRequests", fields: [clubId], references: [id], onDelete: Cascade)
-  requestedBy Membership            @relation(fields: [requestedById], references: [id], onDelete: Cascade)
-
-  @@index([status])
-  @@index([clubId])
-  @@index([requestedById])
-  @@index([createdAt])
 }
 
 enum ResourceScope {

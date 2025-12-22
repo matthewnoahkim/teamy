@@ -1028,6 +1028,17 @@ export function NewTestBuilder({
           const existingQuestionIds = new Set(test.questions.map(q => q.id))
           
           // Build questions array for ES API
+          // Include startAt/endAt if they exist in publishFormData (when publishing) or test data (when updating)
+          const startAtISO = andPublish && publishFormData.startAt 
+            ? new Date(publishFormData.startAt).toISOString() 
+            : (test.startAt ? new Date(test.startAt).toISOString() : undefined)
+          const endAtISO = andPublish && publishFormData.endAt 
+            ? new Date(publishFormData.endAt).toISOString() 
+            : (test.endAt ? new Date(test.endAt).toISOString() : undefined)
+          const allowLateUntilISO = andPublish && publishFormData.allowLateUntil && publishFormData.allowLateUntil.trim()
+            ? new Date(publishFormData.allowLateUntil).toISOString()
+            : (test.allowLateUntil ? new Date(test.allowLateUntil).toISOString() : undefined)
+
           updatePayload = {
             testId: test.id,
             name: payload.name,
@@ -1036,6 +1047,13 @@ export function NewTestBuilder({
             durationMinutes: payload.durationMinutes,
             status: andPublish ? 'PUBLISHED' : test.status,
             eventId: initialEventId || undefined,
+            startAt: startAtISO,
+            endAt: endAtISO,
+            allowLateUntil: allowLateUntilISO,
+            allowCalculator: payload.allowCalculator,
+            calculatorType: payload.allowCalculator ? payload.calculatorType : undefined,
+            allowNoteSheet: payload.allowNoteSheet,
+            noteSheetInstructions: payload.allowNoteSheet ? payload.noteSheetInstructions : undefined,
             questions: questions.map((question, index) => {
               // For fill-in-the-blank, store blankAnswers and blankPoints in explanation field as JSON
               let explanationValue: string | undefined = undefined
@@ -1259,6 +1277,10 @@ export function NewTestBuilder({
             description: payload.description,
             instructions: payload.instructions,
             durationMinutes: payload.durationMinutes,
+            allowCalculator: payload.allowCalculator,
+            calculatorType: payload.allowCalculator ? payload.calculatorType : undefined,
+            allowNoteSheet: payload.allowNoteSheet,
+            noteSheetInstructions: payload.allowNoteSheet ? payload.noteSheetInstructions : undefined,
             questions: payload.questions.map((q: any) => {
               const questionPayload: any = {
                 type: q.type,
@@ -1363,7 +1385,7 @@ export function NewTestBuilder({
       return
     }
 
-    // Skip startAt/endAt validation for ES tests (ESTest doesn't support these fields)
+    // ESTest supports startAt/endAt, but validation is optional
     if (!esMode) {
       if (!publishFormData.startAt || !publishFormData.endAt) {
         toast({
@@ -1419,8 +1441,13 @@ export function NewTestBuilder({
     setPublishing(true)
     try {
       // For ES mode (ESTest), use the PUT endpoint to update status to PUBLISHED
-      // ESTest doesn't support startAt, endAt, testPassword, etc.
       if (esMode) {
+        const startAtISO = publishFormData.startAt ? new Date(publishFormData.startAt).toISOString() : undefined
+        const endAtISO = publishFormData.endAt ? new Date(publishFormData.endAt).toISOString() : undefined
+        const allowLateUntilISO = publishFormData.allowLateUntil && publishFormData.allowLateUntil.trim()
+          ? new Date(publishFormData.allowLateUntil).toISOString()
+          : undefined
+
         const response = await fetch('/api/es/tests', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1428,6 +1455,13 @@ export function NewTestBuilder({
             testId,
             status: 'PUBLISHED',
             durationMinutes: details.durationMinutes,
+            startAt: startAtISO,
+            endAt: endAtISO,
+            allowLateUntil: allowLateUntilISO,
+            allowCalculator: details.allowCalculator,
+            calculatorType: details.allowCalculator ? details.calculatorType : undefined,
+            allowNoteSheet: details.allowNoteSheet,
+            noteSheetInstructions: details.allowNoteSheet ? details.noteSheetInstructions : undefined,
           }),
         })
 

@@ -135,15 +135,22 @@ export async function GET(req: NextRequest) {
 
         // Get released tests for these events in this tournament
         // Include both regular Test records (via TournamentTest) and ESTest records
+        // IMPORTANT: If user has no event assignments, show all tests (eventId: null OR any eventId)
+        // This allows tests to be visible even if roster hasn't been set up yet
         const [tournamentTests, esTests] = await Promise.all([
           // Regular Test records linked via TournamentTest
           prisma.tournamentTest.findMany({
             where: {
               tournamentId: registration.tournamentId,
-              OR: [
-                { eventId: { in: eventIds } },
-                { eventId: null }, // Tests not assigned to a specific event
-              ],
+              OR: eventIds.length === 0
+                ? [
+                    // If no event assignments, show all tests (both event-specific and general)
+                    {},
+                  ]
+                : [
+                    { eventId: { in: eventIds } },
+                    { eventId: null }, // Tests not assigned to a specific event
+                  ],
             },
             include: {
               test: {
@@ -192,10 +199,15 @@ export async function GET(req: NextRequest) {
           prisma.eSTest.findMany({
             where: {
               tournamentId: registration.tournamentId,
-              OR: [
-                { eventId: { in: eventIds } },
-                { eventId: null }, // Tests not assigned to a specific event
-              ],
+              OR: eventIds.length === 0
+                ? [
+                    // If no event assignments, show all tests (both event-specific and general)
+                    {},
+                  ]
+                : [
+                    { eventId: { in: eventIds } },
+                    { eventId: null }, // Tests not assigned to a specific event
+                  ],
             },
             include: {
               event: {
@@ -203,6 +215,11 @@ export async function GET(req: NextRequest) {
                   id: true,
                   name: true,
                   slug: true,
+                },
+              },
+              questions: {
+                select: {
+                  id: true,
                 },
               },
             },
@@ -265,14 +282,14 @@ export async function GET(req: NextRequest) {
               endAt: et.endAt ? (typeof et.endAt === 'string' ? et.endAt : et.endAt.toISOString()) : null,
               allowLateUntil: et.allowLateUntil ? (typeof et.allowLateUntil === 'string' ? et.allowLateUntil : et.allowLateUntil.toISOString()) : null,
               requireFullscreen: false, // ESTest doesn't have this field
-              allowCalculator: false, // ESTest doesn't have this field
-              calculatorType: null, // ESTest doesn't have this field
-              allowNoteSheet: false, // ESTest doesn't have this field
-              noteSheetInstructions: null, // ESTest doesn't have this field
+              allowCalculator: et.allowCalculator ?? false,
+              calculatorType: et.calculatorType ?? null,
+              allowNoteSheet: et.allowNoteSheet ?? false,
+              noteSheetInstructions: et.noteSheetInstructions ?? null,
               maxAttempts: null, // ESTest doesn't have this field
               scoreReleaseMode: null, // ESTest doesn't have this field
               releaseScoresAt: null, // ESTest doesn't have this field
-              questionCount: 0, // ESTest doesn't track question count
+              questionCount: et.questions?.length ?? 0,
               clubId: registration.clubId, // Use registration's clubId as fallback
               club: registration.club,
             },
@@ -281,36 +298,97 @@ export async function GET(req: NextRequest) {
         ]
 
         // Group tests by event
-        const eventsWithTests = rosterAssignments.map((ra) => {
-          const eventTests = releasedTests.filter(
-            (tt) => tt.eventId === ra.event.id
-          )
-          return {
-            event: ra.event,
-            tests: eventTests.map((tt) => ({
-              id: tt.test.id,
-              name: tt.test.name,
-              description: tt.test.description,
-              instructions: tt.test.instructions,
-              durationMinutes: tt.test.durationMinutes,
-              startAt: tt.test.startAt,
-              endAt: tt.test.endAt,
-              allowLateUntil: tt.test.allowLateUntil,
-              requireFullscreen: tt.test.requireFullscreen,
-              allowCalculator: tt.test.allowCalculator,
-              calculatorType: tt.test.calculatorType,
-              allowNoteSheet: tt.test.allowNoteSheet,
-              noteSheetInstructions: tt.test.noteSheetInstructions,
-              maxAttempts: tt.test.maxAttempts,
-              scoreReleaseMode: tt.test.scoreReleaseMode,
-              releaseScoresAt: tt.test.releaseScoresAt,
-              questionCount: tt.test.questionCount,
-              clubId: tt.test.clubId,
-              club: tt.test.club,
-              isESTest: tt.isESTest,
-            })),
+        // If user has no roster assignments, show all event-specific tests grouped by their events
+        let eventsWithTests: Array<{ event: any; tests: any[] }> = []
+        
+        if (eventIds.length === 0) {
+          // No roster assignments - show all event-specific tests grouped by event
+          const allEventIds = [...new Set(releasedTests.map(tt => tt.eventId).filter((id): id is string => id !== null))]
+          
+          if (allEventIds.length > 0) {
+            // Get event details for all events that have tests
+            const eventsWithTestData = await prisma.event.findMany({
+              where: {
+                id: { in: allEventIds },
+                division: registration.tournament.division,
+              },
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                division: true,
+              },
+            })
+            
+            eventsWithTests = eventsWithTestData.map((event) => {
+              const eventTests = releasedTests.filter(
+                (tt) => tt.eventId === event.id
+              )
+              return {
+                event: {
+                  id: event.id,
+                  name: event.name,
+                  slug: event.slug,
+                  division: event.division,
+                },
+                tests: eventTests.map((tt) => ({
+                  id: tt.test.id,
+                  name: tt.test.name,
+                  description: tt.test.description,
+                  instructions: tt.test.instructions,
+                  durationMinutes: tt.test.durationMinutes,
+                  startAt: tt.test.startAt,
+                  endAt: tt.test.endAt,
+                  allowLateUntil: tt.test.allowLateUntil,
+                  requireFullscreen: tt.test.requireFullscreen,
+                  allowCalculator: tt.test.allowCalculator,
+                  calculatorType: tt.test.calculatorType,
+                  allowNoteSheet: tt.test.allowNoteSheet,
+                  noteSheetInstructions: tt.test.noteSheetInstructions,
+                  maxAttempts: tt.test.maxAttempts,
+                  scoreReleaseMode: tt.test.scoreReleaseMode,
+                  releaseScoresAt: tt.test.releaseScoresAt,
+                  questionCount: tt.test.questionCount,
+                  clubId: tt.test.clubId,
+                  club: tt.test.club,
+                  isESTest: tt.isESTest,
+                })),
+              }
+            })
           }
-        })
+        } else {
+          // User has roster assignments - only show tests for assigned events
+          eventsWithTests = rosterAssignments.map((ra) => {
+            const eventTests = releasedTests.filter(
+              (tt) => tt.eventId === ra.event.id
+            )
+            return {
+              event: ra.event,
+              tests: eventTests.map((tt) => ({
+                id: tt.test.id,
+                name: tt.test.name,
+                description: tt.test.description,
+                instructions: tt.test.instructions,
+                durationMinutes: tt.test.durationMinutes,
+                startAt: tt.test.startAt,
+                endAt: tt.test.endAt,
+                allowLateUntil: tt.test.allowLateUntil,
+                requireFullscreen: tt.test.requireFullscreen,
+                allowCalculator: tt.test.allowCalculator,
+                calculatorType: tt.test.calculatorType,
+                allowNoteSheet: tt.test.allowNoteSheet,
+                noteSheetInstructions: tt.test.noteSheetInstructions,
+                maxAttempts: tt.test.maxAttempts,
+                scoreReleaseMode: tt.test.scoreReleaseMode,
+                releaseScoresAt: tt.test.releaseScoresAt,
+                questionCount: tt.test.questionCount,
+                clubId: tt.test.clubId,
+                club: tt.test.club,
+                isESTest: tt.isESTest,
+              })),
+            }
+          })
+        }
 
         // Also include tests not assigned to a specific event
         const generalTests = releasedTests

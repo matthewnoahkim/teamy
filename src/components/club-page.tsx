@@ -41,7 +41,7 @@ const PaperworkTab = dynamic(() => import('@/components/tabs/paperwork-tab').the
 const TodoTab = dynamic(() => import('@/components/tabs/todo-tab').then(mod => ({ default: mod.TodoTab })), {
   loading: () => <PageLoading title="Loading to-do list" description="Fetching tasks and reminders..." variant="orbit" />
 })
-const StatsTab = dynamic(() => import('@/components/tabs/stats-tab').then(mod => ({ default: mod.StatsTab })), {
+const StatsTab = dynamic(() => import('@/components/tabs/stats-tab').then(mod => ({ default: mod.StatsTab })).catch(() => ({ default: () => <div>Failed to load stats tab</div> })), {
   loading: () => <PageLoading title="Loading stats" description="Fetching analytics and insights..." variant="orbit" />
 })
 const ToolsTab = dynamic(() => import('@/components/tabs/tools-tab').then(mod => ({ default: mod.ToolsTab })), {

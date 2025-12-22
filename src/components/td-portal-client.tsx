@@ -30,7 +30,6 @@ import {
   ChevronDown,
   Pencil,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { formatDivision } from '@/lib/utils'
@@ -70,7 +69,6 @@ interface TDPortalClientProps {
 }
 
 export function TDPortalClient({ user, requests }: TDPortalClientProps) {
-  const router = useRouter()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user.name ?? null)

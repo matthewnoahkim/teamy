@@ -4,6 +4,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 // PATCH - Update tournament hosting request status
+// This endpoint is used by dev panel users to approve/reject tournament hosting requests
+// Any authenticated user can update requests (dev panel access is controlled by the dev panel UI)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { requestId: string } }
@@ -81,6 +83,40 @@ export async function PATCH(
             createdById: session.user.id,
             hostingRequestId: requestId,
           },
+        })
+
+        // Find the director by email and add them as a tournament admin
+        // This allows them to see and manage the tournament in the dev panel
+        const director = await tx.user.findUnique({
+          where: {
+            email: currentRequest.directorEmail.toLowerCase(),
+          },
+        })
+
+        if (director) {
+          // Add director as tournament admin
+          await tx.tournamentAdmin.create({
+            data: {
+              tournamentId: tournament.id,
+              userId: director.id,
+            },
+          })
+        }
+
+        // Also add the approving user (dev panel user) as an admin if they're not already the creator
+        // (They're already the creator, but let's make sure they're also an admin for consistency)
+        await tx.tournamentAdmin.upsert({
+          where: {
+            tournamentId_userId: {
+              tournamentId: tournament.id,
+              userId: session.user.id,
+            },
+          },
+          create: {
+            tournamentId: tournament.id,
+            userId: session.user.id,
+          },
+          update: {},
         })
 
         // Update the request status

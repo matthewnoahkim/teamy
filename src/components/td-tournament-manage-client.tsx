@@ -975,9 +975,18 @@ export function TDTournamentManageClient({
         const data = await res.json()
         setEventsWithTests(data.events || [])
       } else {
+        // Try to get error message from response
+        let errorMessage = 'Failed to fetch events and tests'
+        try {
+          const errorData = await res.json()
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          // If response isn't JSON, use default message
+        }
+        console.error('Failed to fetch events and tests:', res.status, errorMessage)
         toast({
           title: 'Error',
-          description: 'Failed to fetch events and tests',
+          description: errorMessage,
           variant: 'destructive',
         })
       }
@@ -985,7 +994,7 @@ export function TDTournamentManageClient({
       console.error('Failed to fetch events with tests:', error)
       toast({
         title: 'Error',
-        description: 'Failed to fetch events and tests',
+        description: error instanceof Error ? error.message : 'Failed to fetch events and tests',
         variant: 'destructive',
       })
     } finally {

@@ -318,7 +318,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { staffId, tournamentId, eventId, name, description, instructions, durationMinutes, questions } = body as {
+    const { 
+      staffId, 
+      tournamentId, 
+      eventId, 
+      name, 
+      description, 
+      instructions, 
+      durationMinutes, 
+      startAt,
+      endAt,
+      allowLateUntil,
+      allowCalculator,
+      allowNoteSheet,
+      calculatorType,
+      noteSheetInstructions,
+      questions 
+    } = body as {
       staffId: string
       tournamentId: string
       eventId?: string
@@ -326,6 +342,13 @@ export async function POST(request: NextRequest) {
       description?: string
       instructions?: string
       durationMinutes?: number
+      startAt?: string
+      endAt?: string
+      allowLateUntil?: string
+      allowCalculator?: boolean
+      allowNoteSheet?: boolean
+      calculatorType?: string
+      noteSheetInstructions?: string
       questions?: Array<{
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
         promptMd: string
@@ -376,6 +399,13 @@ export async function POST(request: NextRequest) {
           description,
           instructions,
           durationMinutes: durationMinutes || 60,
+          startAt: startAt ? new Date(startAt) : null,
+          endAt: endAt ? new Date(endAt) : null,
+          allowLateUntil: allowLateUntil ? new Date(allowLateUntil) : null,
+          allowCalculator: allowCalculator ?? false,
+          allowNoteSheet: allowNoteSheet ?? false,
+          calculatorType: allowCalculator && calculatorType ? calculatorType : null,
+          noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null,
           questions: questions && questions.length > 0
             ? {
                 create: questions.map((q, index) => ({
@@ -475,7 +505,23 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { testId, name, description, instructions, durationMinutes, status, eventId, questions } = body as {
+    const { 
+      testId, 
+      name, 
+      description, 
+      instructions, 
+      durationMinutes, 
+      status, 
+      eventId, 
+      startAt,
+      endAt,
+      allowLateUntil,
+      allowCalculator,
+      allowNoteSheet,
+      calculatorType,
+      noteSheetInstructions,
+      questions 
+    } = body as {
       testId: string
       name?: string
       description?: string
@@ -483,6 +529,13 @@ export async function PUT(request: NextRequest) {
       durationMinutes?: number
       status?: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
       eventId?: string
+      startAt?: string
+      endAt?: string
+      allowLateUntil?: string
+      allowCalculator?: boolean
+      allowNoteSheet?: boolean
+      calculatorType?: string
+      noteSheetInstructions?: string
       questions?: Array<{
         id?: string
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
@@ -587,6 +640,25 @@ export async function PUT(request: NextRequest) {
     if (durationMinutes && durationMinutes !== existingTest.durationMinutes) changedFields.push('durationMinutes')
     if (status && status !== existingTest.status) changedFields.push('status')
     if (eventId !== undefined && eventId !== existingTest.eventId) changedFields.push('eventId')
+    if (startAt !== undefined) {
+      const newStartAt = startAt ? new Date(startAt) : null
+      const existingStartAt = existingTest.startAt
+      if (newStartAt?.getTime() !== existingStartAt?.getTime()) changedFields.push('startAt')
+    }
+    if (endAt !== undefined) {
+      const newEndAt = endAt ? new Date(endAt) : null
+      const existingEndAt = existingTest.endAt
+      if (newEndAt?.getTime() !== existingEndAt?.getTime()) changedFields.push('endAt')
+    }
+    if (allowLateUntil !== undefined) {
+      const newAllowLateUntil = allowLateUntil ? new Date(allowLateUntil) : null
+      const existingAllowLateUntil = existingTest.allowLateUntil
+      if (newAllowLateUntil?.getTime() !== existingAllowLateUntil?.getTime()) changedFields.push('allowLateUntil')
+    }
+    if (allowCalculator !== undefined && allowCalculator !== existingTest.allowCalculator) changedFields.push('allowCalculator')
+    if (allowNoteSheet !== undefined && allowNoteSheet !== existingTest.allowNoteSheet) changedFields.push('allowNoteSheet')
+    if (calculatorType !== undefined && calculatorType !== existingTest.calculatorType) changedFields.push('calculatorType')
+    if (noteSheetInstructions !== undefined && noteSheetInstructions !== existingTest.noteSheetInstructions) changedFields.push('noteSheetInstructions')
     if (questions) changedFields.push('questions')
 
     // Use a transaction to update test and questions
@@ -601,6 +673,13 @@ export async function PUT(request: NextRequest) {
           ...(durationMinutes && { durationMinutes }),
           ...(status && { status }),
           ...(eventId !== undefined && { eventId }),
+          ...(startAt !== undefined && { startAt: startAt ? new Date(startAt) : null }),
+          ...(endAt !== undefined && { endAt: endAt ? new Date(endAt) : null }),
+          ...(allowLateUntil !== undefined && { allowLateUntil: allowLateUntil ? new Date(allowLateUntil) : null }),
+          ...(allowCalculator !== undefined && { allowCalculator }),
+          ...(allowNoteSheet !== undefined && { allowNoteSheet }),
+          ...(calculatorType !== undefined && { calculatorType: allowCalculator && calculatorType ? calculatorType : null }),
+          ...(noteSheetInstructions !== undefined && { noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null }),
         },
       })
 
