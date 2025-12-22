@@ -545,6 +545,9 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                                   }
                                                   // Fallback if formatTestTimeRange returns null
                                                   try {
+                                                    if (!test.startAt || !test.endAt) {
+                                                      return <span className="text-muted-foreground">Invalid date range</span>
+                                                    }
                                                     const startFormatted = formatDateTime(test.startAt)
                                                     const endFormatted = formatDateTime(test.endAt)
                                                     if (startFormatted && endFormatted) {
