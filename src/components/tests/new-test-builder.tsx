@@ -1444,10 +1444,11 @@ export function NewTestBuilder({
     try {
       // For ES mode (ESTest), use the PUT endpoint to update status to PUBLISHED
       if (esMode) {
+        const publishFormDataWithDates = publishFormData as any
         const startAtISO = publishFormData.startAt ? new Date(publishFormData.startAt).toISOString() : undefined
         const endAtISO = publishFormData.endAt ? new Date(publishFormData.endAt).toISOString() : undefined
-        const allowLateUntilISO = publishFormData.allowLateUntil && publishFormData.allowLateUntil.trim()
-          ? new Date(publishFormData.allowLateUntil).toISOString()
+        const allowLateUntilISO = publishFormDataWithDates.allowLateUntil && publishFormDataWithDates.allowLateUntil.trim()
+          ? new Date(publishFormDataWithDates.allowLateUntil).toISOString()
           : undefined
 
         const response = await fetch('/api/es/tests', {

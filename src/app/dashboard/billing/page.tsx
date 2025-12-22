@@ -62,13 +62,14 @@ export default async function BillingPage() {
         const subscriptionType = subscription.metadata?.type || 'pro'
         
         // Update user subscription status
+        const currentPeriodEnd = (subscription as any).current_period_end
         await prisma.user.update({
           where: { id: session.user.id },
           data: {
             subscriptionStatus: subscription.status,
             subscriptionType: subscriptionType,
             stripeSubscriptionId: subscription.id,
-            subscriptionEndsAt: new Date(subscription.current_period_end * 1000),
+            subscriptionEndsAt: currentPeriodEnd ? new Date(currentPeriodEnd * 1000) : undefined,
           },
         })
 
