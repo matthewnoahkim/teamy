@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
               
               <p style="color: #374151; line-height: 1.6;">
                 If you have any questions in the meantime, feel free to reply to this email or contact us at 
-                <a href="mailto:support@teamy.site" style="color: #0056C7;">support@teamy.site</a>.
+                <a href="mailto:teamysite@gmail.com" style="color: #0056C7;">teamysite@gmail.com</a>.
               </p>
               
               <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;" />

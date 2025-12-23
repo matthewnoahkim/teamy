@@ -28,11 +28,11 @@ export default function ContactPage() {
             <p className="text-muted-foreground text-sm">Or reach out directly</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8">
               <a 
-                href="mailto:support@teamy.site" 
+                href="mailto:teamysite@gmail.com" 
                 className="inline-flex items-center gap-2 text-teamy-primary hover:underline font-semibold"
               >
                 <Mail className="h-4 w-4" />
-                support@teamy.site
+                teamysite@gmail.com
               </a>
               <a 
                 href="https://discord.gg/y44dB5jaDp" 

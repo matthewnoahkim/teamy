@@ -72,8 +72,8 @@ export default function TermsOfServicePage() {
             </ul>
             <p className="mt-4">
               If you encounter inappropriate or illegal content, please report it immediately at{' '}
-              <a href="mailto:support@teamy.site" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
-                support@teamy.site
+              <a href="mailto:teamysite@gmail.com" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
+                teamysite@gmail.com
               </a>.
             </p>
 
@@ -129,7 +129,7 @@ export default function TermsOfServicePage() {
               If you have any questions about these Terms of Service, please contact us at:
             </p>
             <p className="mt-4">
-              <strong>Email:</strong> support@teamy.site
+              <strong>Email:</strong> teamysite@gmail.com
             </p>
           </section>
         </div>
