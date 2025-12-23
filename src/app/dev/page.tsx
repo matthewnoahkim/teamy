@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, BookOpen } from 'lucide-react'
+import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, BookOpen, Megaphone } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,15 +24,17 @@ import { TournamentRequests } from '@/components/dev/tournament-requests'
 import { EmailManager } from '@/components/dev/email-manager'
 import { AnalyticsDashboard } from '@/components/dev/analytics-dashboard'
 import { ResourceRequests } from '@/components/dev/resource-requests'
+import { BannerManager } from '@/components/dev/banner-manager'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 
-type Section = 'blog' | 'security' | 'tournaments' | 'email' | 'analytics' | 'payments' | 'resources'
+type Section = 'blog' | 'security' | 'tournaments' | 'email' | 'analytics' | 'payments' | 'resources' | 'banner'
 
 const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'banner', label: 'Site Banner', icon: Megaphone },
   { id: 'email', label: 'Email', icon: Mail },
   { id: 'blog', label: 'Blog', icon: FileText },
   { id: 'tournaments', label: 'Tournaments', icon: Trophy },
@@ -45,7 +47,7 @@ export default function DevPage() {
   const [activeSection, setActiveSection] = useState<Section>(() => {
     if (typeof window !== 'undefined') {
       const savedSection = localStorage.getItem('dev-panel-active-section') as Section
-      if (savedSection && ['blog', 'security', 'tournaments', 'email', 'analytics', 'payments', 'resources'].includes(savedSection)) {
+      if (savedSection && ['blog', 'security', 'tournaments', 'email', 'analytics', 'payments', 'resources', 'banner'].includes(savedSection)) {
         return savedSection
       }
     }
@@ -389,6 +391,8 @@ export default function DevPage() {
           </div>
 
           {activeSection === 'analytics' && <AnalyticsDashboard />}
+
+          {activeSection === 'banner' && <BannerManager />}
 
           {activeSection === 'email' && <EmailManager />}
 

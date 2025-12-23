@@ -1072,6 +1072,16 @@ model AIRosterGeneration {
   @@index([createdAt])
 }
 
+model SiteSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
 model Tournament {
   id                      String                    @id @default(cuid())
   name                    String
