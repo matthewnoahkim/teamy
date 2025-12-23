@@ -11,7 +11,7 @@ export default function GrantsPage() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
-              Teamy Grants
+              Grants
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               All of our profit will be donated back to Science Olympiad teams through grants.

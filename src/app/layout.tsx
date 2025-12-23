@@ -5,7 +5,6 @@ import { Toaster } from '@/components/ui/toaster'
 import { FaviconLoader } from '@/components/favicon-loader'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
-import { DiscordBanner } from '@/components/discord-banner'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -232,7 +231,6 @@ export default async function RootLayout({
         />
         <FaviconLoader />
         <Providers>
-          <DiscordBanner />
           {children}
           <Toaster />
           <SpeedInsights />

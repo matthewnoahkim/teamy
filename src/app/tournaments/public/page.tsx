@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function PublicTournamentsRedirect() {
-  redirect('/tournaments')
+  redirect('/tournament-listings')
 }

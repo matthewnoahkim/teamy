@@ -11,7 +11,7 @@ export default function ContactPage() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
-              Contact Us
+              Contact
             </h1>
             <p className="text-xl text-muted-foreground max-w-xl mx-auto">
               Have a question, suggestion, or need help? We&apos;d love to hear from you.

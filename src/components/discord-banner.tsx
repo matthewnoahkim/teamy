@@ -5,10 +5,9 @@ import { X } from 'lucide-react'
 import Link from 'next/link'
 
 export function DiscordBanner() {
-  const [dismissed, setDismissed] = useState(true) // Start hidden to avoid flash
+  const [dismissed, setDismissed] = useState(true)
   
   useEffect(() => {
-    // Check if banner was previously dismissed
     const isDismissed = localStorage.getItem('discord-banner-dismissed')
     if (!isDismissed) {
       setDismissed(false)
