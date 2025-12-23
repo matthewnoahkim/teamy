@@ -38,10 +38,10 @@ Each question MUST match:
 
 {
   "id": "string",                                // e.g. "1", "CS1-1"
-  "type": "free_response" | "multiple_choice" | "select_all",
+  "type": "free_response" | "multiple_choice" | "select_all" | "true_false" | "fill_blank" | "text_block",
   "prompt": "string",
   "context": "string | null",
-  "choices": [                                   // empty for pure FRQs
+  "choices": [                                   // empty for pure FRQs, text_block, fill_blank
     { "label": "A", "text": "string", "correct": true }
   ],
   "points": number | null,
@@ -106,42 +106,109 @@ Assign an id for such questions by:
   - using a synthetic id like "Q1", "Q2", "Q3" in the order they appear
     in this chunk.
 
-D. IMPLICIT SHORT FRQs (NO CHOICES)
-A [CONTEXT]/[TEXT] line should be treated as a short FRQ question if:
+D. IMPLICIT SHORT FRQs / FILL IN THE BLANK (NO CHOICES)
+A [CONTEXT]/[TEXT] line should be treated as a question if:
   - it ends with "?" OR clearly reads as a prompt, AND
   - it contains an explicit point value in parentheses at the end,
     e.g. "(1)", "(2)", "(1.5)", "(3, all or nothing)",
   - AND it is NOT followed by [CHOICE] lines.
 
-For these, create a free_response question.
+For these, check for fill-in-the-blank markers FIRST:
+  - If the prompt OR context contains blank markers ([blank], [blank1], _____, etc.) → type = "fill_blank".
+  - Otherwise → type = "free_response".
+  
+IMPORTANT: Even if a line does NOT end with "?", if it contains blank markers and has points, it should be treated as a fill_blank question.
+
+E. TEXT BLOCKS (DISPLAY-ONLY)
+A [CONTEXT]/[TEXT] line should be treated as a text_block if:
+  - it does NOT end with "?" AND does NOT read as a question prompt,
+  - it has 0 points (explicitly marked as "(0)" or no points specified),
+  - AND it is NOT followed by [CHOICE] lines.
+
+Text blocks are informational content (instructions, context, etc.) that should be displayed but not answered.
 
 ==============================================================
 2. QUESTION TYPE (NEVER TURN MCQs INTO FRQs)
 ==============================================================
 
+CRITICAL: Before determining type, ALWAYS check the prompt text (and context if present) for blank markers.
+If blank markers are found (_____, [blank], etc.) and there are no choices, it MUST be fill_blank.
+
 Determine type in this exact priority order:
 
-1) If the question text or nearby instructions contain phrases like:
-   - "Select all that apply"
-   - "Select all"
-   - "Choose all that apply"
-   - "Select multiple"
+1) TEXT BLOCK (Display-only content)
+   - If a [CONTEXT]/[TEXT] line:
+     - does NOT end with "?" AND does NOT read as a question prompt,
+     - AND has 0 points (explicitly marked as "(0)" or no points),
+     - AND is NOT followed by [CHOICE] lines,
+   then:
+   → type = "text_block".
+   - Text blocks are informational only (instructions, context, etc.)
+   - They have 0 points and no choices.
+
+2) FILL IN THE BLANK (CHECK THIS BEFORE FREE_RESPONSE)
+   - If the question prompt OR context contains ANY blank markers:
+     - "[blank]", "[blank1]", "[blank2]", "[blank3]", etc., OR
+     - "_____", "______", "_______" (3+ underscores), OR
+     - "(blank)", "(blank1)", "(blank2)", etc., OR
+     - "____" (4+ underscores in a row), OR
+     - "___" (3+ underscores), OR
+     - Any pattern with underscores that clearly indicates a blank space,
+   - AND it does NOT have choices,
+   - AND it is NOT a text block,
+   - AND it does NOT have [SUBQ] markers (not multi-part),
+   then:
+   → type = "fill_blank".
+   - Fill in the blank questions have no choices.
+   - Points should be assigned if specified.
+   - IMPORTANT: Check for blank markers in BOTH the prompt text AND any context text.
+   - Common patterns: "The _____ is used for...", "Fill in: [blank1]", "Complete: _____"
+
+3) TRUE OR FALSE
+   - If the question has EXACTLY 2 choices, AND:
+     - The choices are "True" and "False" (or variations like "T/F", "True/False"),
+     - OR the question text explicitly asks "True or False", "T or F", etc.,
+   then:
+   → type = "true_false".
+   - True/False questions always have exactly 2 choices: True and False.
+
+4) SELECT ALL THAT APPLY
+   - If the question text or nearby instructions contain phrases like:
+     - "Select all that apply"
+     - "Select all"
+     - "Choose all that apply"
+     - "Select multiple"
+   - AND the question has choices,
    then:
    → type = "select_all".
 
-2) Else, if the question has ANY choices (explicit [CHOICE]/[CHOICE_CORRECT]
-   or implicit option-like lines as described in 1C):
+5) MULTIPLE CHOICE
+   - If the question has ANY choices (explicit [CHOICE]/[CHOICE_CORRECT]
+     or implicit option-like lines as described in 1C):
+     - AND it's not true_false (doesn't have exactly 2 True/False choices),
+     - AND it's not select_all,
+   then:
    → type = "multiple_choice".
 
-3) Else, if the question has one or more [SUBQ]:
+6) MULTI-PART FREE RESPONSE
+   - If the question has one or more [SUBQ]:
    → type = "free_response" with frqParts.
+   - NOTE: If a question has [SUBQ] markers, it CANNOT be fill_blank.
 
-4) Otherwise:
+7) FREE RESPONSE
+   - Otherwise (only if none of the above apply):
    → type = "free_response".
+   - FINAL CHECK: Before assigning free_response, verify one more time that:
+     * The prompt does NOT contain blank markers (_____, [blank], etc.)
+     * If blank markers ARE present, go back and assign type = "fill_blank" instead.
 
 IMPORTANT:
-- If a question has ANY choices, it MUST NOT be free_response.
+- If a question has ANY choices, it MUST NOT be free_response, fill_blank, or text_block.
 - You MUST NOT create frqParts for a question that has choices.
+- Text blocks have 0 points and are display-only.
+- Fill in the blank questions have no choices but may have points.
+- CRITICAL: Always check for blank markers (_____, [blank], etc.) in the prompt text BEFORE classifying as free_response.
+- If blank markers are present and there are no choices, it MUST be fill_blank, not free_response.
 
 ==============================================================
 3. MULTI-PART FRQs (frqParts) — ONLY FROM [SUBQ]
@@ -151,7 +218,7 @@ A question is multi-part IF AND ONLY IF:
 - It has one or more [SUBQ] markers.
 
 Rules:
-- The [Q] text is the main prompt.
+- The [Q] text is the main prompt and any related sentences of context that directly precede it.
 - Each [SUBQ] becomes one entry in frqParts:
   - label: the letter part only ("a", "b", "c").
   - prompt: text after the numbering.
@@ -231,7 +298,9 @@ PROMPT:
 - For [Q]: remove numeric prefix ("1.", "2)") and use the rest as the prompt.
 - For [SUBQ]: remove "1a.", "2b)" and use the rest as frqPart.prompt.
 - For implicit questions: strip trailing point value "(n)" or "(n, all or nothing)"
-  but keep the wording.
+   but keep the wording.
+- IMPORTANT: When extracting the prompt, preserve any blank markers (_____, [blank], etc.)
+   as they are critical for identifying fill_blank questions.
 
 ==============================================================
 7. POINTS
@@ -253,16 +322,28 @@ Before outputting JSON:
 1) Count:
    - All [Q] markers.
    - PLUS all implicit questions detected by:
-       - "question? + choices" (MCQ/select-all), and
-       - "question? with (n)" and no choices (short FRQs).
+       - "question? + choices" (MCQ/select-all/true_false), and
+       - "question? with (n)" and no choices (short FRQs/fill_blank).
+       - Text blocks (display-only content with 0 points).
 2) Ensure you have AT LEAST that many main questions in "questions".
 3) If the chunk has **zero [SUBQ] markers**, verify that:
    - Every question has frqParts = [].
 4) For each question with choices:
-   - Confirm type is NOT "free_response".
-5) Ensure:
+   - Confirm type is NOT "free_response", "fill_blank", or "text_block".
+5) For true_false questions:
+   - Must have exactly 2 choices (True and False).
+6) For fill_blank questions:
+   - Must have NO choices.
+   - Prompt OR context MUST contain blank markers ([blank], [blank1], _____, etc.).
+   - If blank markers are present, it MUST be fill_blank, NOT free_response.
+   - Verify you checked for blank markers before assigning free_response type.
+7) For text_block questions:
+   - Must have 0 points.
+   - Must have NO choices.
+   - Should NOT end with "?" unless it's clearly instructional.
+8) Ensure:
    - Every question has a non-empty prompt.
-   - Every multiple-choice/select-all question has >= 2 choices.
+   - Every multiple-choice/select-all/true_false question has >= 2 choices.
 
 If anything is inconsistent, FIX YOUR JSON before responding.
 

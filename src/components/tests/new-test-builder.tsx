@@ -639,8 +639,35 @@ export function NewTestBuilder({
           let type: QuestionType
           let options: OptionDraft[]
           let frqParts: FRQPart[] | undefined
+          let blankAnswers: string[] | undefined = undefined
           
-          if (iq.type === 'free_response') {
+          if (iq.type === 'true_false') {
+            type = 'TRUE_FALSE'
+            // True/False questions should have exactly 2 options: True and False
+            if (iq.choices.length === 2) {
+              options = iq.choices.map((choice) => ({
+                id: nanoid(),
+                label: choice.text,
+                isCorrect: choice.correct,
+              }))
+            } else {
+              // Default True/False options if not provided
+              options = [
+                { id: nanoid(), label: 'True', isCorrect: iq.choices.find(c => c.text.toLowerCase().includes('true') || c.correct)?.correct ?? true },
+                { id: nanoid(), label: 'False', isCorrect: iq.choices.find(c => c.text.toLowerCase().includes('false') || !c.correct)?.correct ?? false },
+              ]
+            }
+          } else if (iq.type === 'fill_blank') {
+            type = 'FILL_BLANK'
+            options = []
+            // Extract blank answers if they exist in the prompt or need to be set
+            // The AI should identify blanks, but we'll initialize empty array
+            blankAnswers = []
+          } else if (iq.type === 'text_block') {
+            type = 'TEXT_BLOCK'
+            options = []
+            // Text blocks are display-only, 0 points
+          } else if (iq.type === 'free_response') {
             type = 'LONG_TEXT'
             options = []
             
@@ -679,10 +706,11 @@ export function NewTestBuilder({
             prompt: iq.prompt || '',
             context: iq.context || '',
             explanation: '',
-            points: iq.points || 1,
+            points: iq.type === 'text_block' ? 0 : (iq.points || 1),
             options,
-            shuffleOptions: true,
+            shuffleOptions: type !== 'TRUE_FALSE' && type !== 'TEXT_BLOCK' && type !== 'LONG_TEXT' && type !== 'FILL_BLANK',
             frqParts,
+            blankAnswers,
           }
         })
         

@@ -1,4 +1,4 @@
-export type ImportedQuestionType = "free_response" | "multiple_choice" | "select_all";
+export type ImportedQuestionType = "free_response" | "multiple_choice" | "select_all" | "true_false" | "fill_blank" | "text_block";
 
 export interface ImportedChoice {
   label: string;              // "A", "B", ...
