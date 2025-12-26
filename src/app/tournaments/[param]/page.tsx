@@ -78,6 +78,20 @@ export default async function TournamentPage({ params }: Props) {
     // Check if user is the tournament director
     const isDirector = session?.user?.email?.toLowerCase() === tournamentById.hostingRequest.directorEmail.toLowerCase()
 
+    // Check if user is a tournament admin
+    let isTournamentAdmin = false
+    if (session?.user?.id) {
+      const admin = await prisma.tournamentAdmin.findUnique({
+        where: {
+          tournamentId_userId: {
+            tournamentId: tournamentById.id,
+            userId: session.user.id,
+          },
+        },
+      })
+      isTournamentAdmin = !!admin || isDirector
+    }
+
     // Check if tournament is published (or user is director)
     if (!tournamentById.published && !isDirector) {
       notFound()
@@ -111,13 +125,138 @@ export default async function TournamentPage({ params }: Props) {
       trialEvents: tournamentById.trialEvents,
     }
 
+    // Load page content
+    let initialSections: Array<{ id: string; type: string; title: string; content: string }> | undefined = undefined
+    if (tournamentById.hostingRequest.pageContent) {
+      try {
+        initialSections = JSON.parse(tournamentById.hostingRequest.pageContent)
+      } catch (e) {
+        console.error('Error parsing page content:', e)
+      }
+    }
+
+    // Check if user is registered and if tests are available
+    let isRegistered = false
+    let hasAvailableTests = false
+    if (session?.user?.id) {
+      // Get user memberships
+      const memberships = await prisma.membership.findMany({
+        where: { userId: session.user.id },
+        select: { id: true, teamId: true, clubId: true },
+      })
+
+      const teamIds = memberships.map((m) => m.teamId).filter((id): id is string => id !== null)
+      const clubIds = memberships.map((m) => m.clubId)
+
+      // Check if user is registered
+      const registration = await prisma.tournamentRegistration.findFirst({
+        where: {
+          tournamentId: tournamentById.id,
+          status: 'CONFIRMED',
+          OR: [
+            { teamId: { in: teamIds } },
+            { clubId: { in: clubIds } },
+          ],
+        },
+      })
+
+      if (registration) {
+        isRegistered = true
+
+        // Check if there are tests available during the testing window
+        const now = new Date()
+        
+        // Get membership that matches registration
+        const matchingMembership = registration.teamId
+          ? memberships.find((m) => m.clubId === registration.clubId && m.teamId === registration.teamId)
+          : memberships.find((m) => m.clubId === registration.clubId)
+
+        if (matchingMembership) {
+          // Get event assignments
+          const rosterAssignments = await prisma.rosterAssignment.findMany({
+            where: {
+              membershipId: matchingMembership.id,
+            },
+            select: { eventId: true },
+          })
+          const eventIds = rosterAssignments.map((ra) => ra.eventId)
+
+          // Get published tests
+          const [tournamentTests, esTests] = await Promise.all([
+            prisma.tournamentTest.findMany({
+              where: {
+                tournamentId: tournamentById.id,
+                OR: eventIds.length === 0
+                  ? [{}]
+                  : [{ eventId: { in: eventIds } }, { eventId: null }],
+              },
+              include: {
+                test: {
+                  select: {
+                    status: true,
+                    startAt: true,
+                    endAt: true,
+                    allowLateUntil: true,
+                    durationMinutes: true,
+                  },
+                },
+              },
+            }),
+            prisma.eSTest.findMany({
+              where: {
+                tournamentId: tournamentById.id,
+                status: 'PUBLISHED',
+                OR: eventIds.length === 0
+                  ? [{}]
+                  : [{ eventId: { in: eventIds } }, { eventId: null }],
+              },
+              select: {
+                startAt: true,
+                endAt: true,
+                allowLateUntil: true,
+                durationMinutes: true,
+              },
+            }),
+          ])
+
+          // Check if any tests are currently available
+          const allTests = [
+            ...tournamentTests.filter((tt) => tt.test.status === 'PUBLISHED').map((tt) => ({
+              startAt: tt.test.startAt,
+              endAt: tt.test.endAt,
+              allowLateUntil: tt.test.allowLateUntil,
+              durationMinutes: tt.test.durationMinutes,
+            })),
+            ...esTests,
+          ]
+
+          hasAvailableTests = allTests.some((test) => {
+            if (!test.startAt) return false
+            const startAt = test.startAt instanceof Date ? test.startAt : new Date(test.startAt)
+            const endAt = test.endAt ? (test.endAt instanceof Date ? test.endAt : new Date(test.endAt)) : null
+            const allowLateUntil = test.allowLateUntil
+              ? test.allowLateUntil instanceof Date
+                ? test.allowLateUntil
+                : new Date(test.allowLateUntil)
+              : null
+            const effectiveEnd = allowLateUntil || endAt || new Date(startAt.getTime() + (test.durationMinutes || 60) * 60000)
+            return now >= startAt && now <= effectiveEnd
+          })
+        }
+      }
+    }
+
     return (
       <TournamentPageClient 
         hostingRequest={tournamentById.hostingRequest}
         tournament={serializedTournament}
         isDirector={isDirector}
+        isTournamentAdmin={isTournamentAdmin}
         user={session?.user}
         userClubs={userClubs}
+        initialSections={initialSections}
+        isRegistered={isRegistered}
+        hasAvailableTests={hasAvailableTests}
       />
     )
   }
@@ -147,6 +286,20 @@ export default async function TournamentPage({ params }: Props) {
 
   // Check if user is the tournament director (they can see unpublished)
   const isDirector = session?.user?.email?.toLowerCase() === hostingRequest.directorEmail.toLowerCase()
+
+  // Check if user is a tournament admin
+  let isTournamentAdmin = false
+  if (session?.user?.id && hostingRequest.tournament) {
+    const admin = await prisma.tournamentAdmin.findUnique({
+      where: {
+        tournamentId_userId: {
+          tournamentId: hostingRequest.tournament.id,
+          userId: session.user.id,
+        },
+      },
+    })
+    isTournamentAdmin = !!admin || isDirector
+  }
 
   // Check if tournament is published (or user is director)
   if (!hostingRequest.tournament?.published && !isDirector) {
@@ -218,13 +371,138 @@ export default async function TournamentPage({ params }: Props) {
     trialEvents: hostingRequest.tournament.trialEvents,
   } : null
 
+  // Load page content
+  let initialSections: Array<{ id: string; type: string; title: string; content: string }> | undefined = undefined
+  if (hostingRequest.pageContent) {
+    try {
+      initialSections = JSON.parse(hostingRequest.pageContent)
+    } catch (e) {
+      console.error('Error parsing page content:', e)
+    }
+  }
+
+  // Check if user is registered and if tests are available
+  let isRegistered = false
+  let hasAvailableTests = false
+  if (session?.user?.id && hostingRequest.tournament) {
+    // Get user memberships
+    const memberships = await prisma.membership.findMany({
+      where: { userId: session.user.id },
+      select: { id: true, teamId: true, clubId: true },
+    })
+
+    const teamIds = memberships.map((m) => m.teamId).filter((id): id is string => id !== null)
+    const clubIds = memberships.map((m) => m.clubId)
+
+    // Check if user is registered
+    const registration = await prisma.tournamentRegistration.findFirst({
+      where: {
+        tournamentId: hostingRequest.tournament.id,
+        status: 'CONFIRMED',
+        OR: [
+          { teamId: { in: teamIds } },
+          { clubId: { in: clubIds } },
+        ],
+      },
+    })
+
+    if (registration) {
+      isRegistered = true
+
+      // Check if there are tests available during the testing window
+      const now = new Date()
+      
+      // Get membership that matches registration
+      const matchingMembership = registration.teamId
+        ? memberships.find((m) => m.clubId === registration.clubId && m.teamId === registration.teamId)
+        : memberships.find((m) => m.clubId === registration.clubId)
+
+      if (matchingMembership) {
+        // Get event assignments
+        const rosterAssignments = await prisma.rosterAssignment.findMany({
+          where: {
+            membershipId: matchingMembership.id,
+          },
+          select: { eventId: true },
+        })
+        const eventIds = rosterAssignments.map((ra) => ra.eventId)
+
+        // Get published tests
+        const [tournamentTests, esTests] = await Promise.all([
+          prisma.tournamentTest.findMany({
+            where: {
+              tournamentId: hostingRequest.tournament.id,
+              OR: eventIds.length === 0
+                ? [{}]
+                : [{ eventId: { in: eventIds } }, { eventId: null }],
+            },
+            include: {
+              test: {
+                select: {
+                  status: true,
+                  startAt: true,
+                  endAt: true,
+                  allowLateUntil: true,
+                  durationMinutes: true,
+                },
+              },
+            },
+          }),
+          prisma.eSTest.findMany({
+            where: {
+              tournamentId: hostingRequest.tournament.id,
+              status: 'PUBLISHED',
+              OR: eventIds.length === 0
+                ? [{}]
+                : [{ eventId: { in: eventIds } }, { eventId: null }],
+            },
+            select: {
+              startAt: true,
+              endAt: true,
+              allowLateUntil: true,
+              durationMinutes: true,
+            },
+          }),
+        ])
+
+        // Check if any tests are currently available
+        const allTests = [
+          ...tournamentTests.filter((tt) => tt.test.status === 'PUBLISHED').map((tt) => ({
+            startAt: tt.test.startAt,
+            endAt: tt.test.endAt,
+            allowLateUntil: tt.test.allowLateUntil,
+            durationMinutes: tt.test.durationMinutes,
+          })),
+          ...esTests,
+        ]
+
+        hasAvailableTests = allTests.some((test) => {
+          if (!test.startAt) return false
+          const startAt = test.startAt instanceof Date ? test.startAt : new Date(test.startAt)
+          const endAt = test.endAt ? (test.endAt instanceof Date ? test.endAt : new Date(test.endAt)) : null
+          const allowLateUntil = test.allowLateUntil
+            ? test.allowLateUntil instanceof Date
+              ? test.allowLateUntil
+              : new Date(test.allowLateUntil)
+            : null
+          const effectiveEnd = allowLateUntil || endAt || new Date(startAt.getTime() + (test.durationMinutes || 60) * 60000)
+          return now >= startAt && now <= effectiveEnd
+        })
+      }
+    }
+  }
+
   return (
     <TournamentPageClient 
       hostingRequest={hostingRequest}
       tournament={serializedTournament}
       isDirector={isDirector}
+      isTournamentAdmin={isTournamentAdmin}
       user={session?.user}
       userClubs={userClubs}
+      initialSections={initialSections}
+      isRegistered={isRegistered}
+      hasAvailableTests={hasAvailableTests}
     />
   )
 }

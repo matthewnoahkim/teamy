@@ -70,11 +70,12 @@ export async function GET(
       return NextResponse.json({ error: 'Only tournament directors can view tests' }, { status: 403 })
     }
 
-    // Get tournament info to get division
+    // Get tournament info to get division and eventsRun
     const tournament = await prisma.tournament.findUnique({
       where: { id: tournamentId },
       select: { 
         division: true,
+        eventsRun: true,
         hostingRequest: {
           select: {
             division: true,
@@ -99,23 +100,31 @@ export async function GET(
     // Fetch all ES tests for this tournament
     // Use select instead of include to avoid fetching columns that don't exist in the database
     // (allowCalculator, allowNoteSheet, calculatorType, noteSheetInstructions may not exist yet)
-    const allTests = await prisma.eSTest.findMany({
-      where: {
-        tournamentId: tournamentId,
-      },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        instructions: true,
-        durationMinutes: true,
-        status: true,
-        eventId: true,
-        startAt: true,
-        endAt: true,
-        allowLateUntil: true,
-        updatedAt: true,
-        createdAt: true,
+    let allTests
+    try {
+      allTests = await prisma.eSTest.findMany({
+        where: {
+          tournamentId: tournamentId,
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          instructions: true,
+          durationMinutes: true,
+          status: true,
+          eventId: true,
+          startAt: true,
+          endAt: true,
+          allowLateUntil: true,
+          allowCalculator: true,
+          calculatorType: true,
+          allowNoteSheet: true,
+          noteSheetInstructions: true,
+          autoApproveNoteSheet: true,
+          requireOneSitting: true,
+          updatedAt: true,
+          createdAt: true,
         event: {
           select: {
             id: true,
@@ -145,12 +154,17 @@ export async function GET(
             explanation: true,
             points: true,
             order: true,
+            shuffleOptions: true,
+            numericTolerance: true,
             options: {
               select: {
                 id: true,
                 label: true,
                 isCorrect: true,
                 order: true,
+              },
+              orderBy: {
+                order: 'asc',
               },
             },
           },
@@ -159,6 +173,91 @@ export async function GET(
       },
       orderBy: { updatedAt: 'desc' },
     })
+    } catch (error: any) {
+      // If requireOneSitting column doesn't exist, try without it
+      // P2022 is PrismaClientValidationError for unknown fields
+      if (error?.code === 'P2022' || error?.message?.includes('requireOneSitting') || error?.message?.includes('Unknown field')) {
+        console.warn('requireOneSitting column not found, fetching without it. Error:', error?.message || error)
+        allTests = await prisma.eSTest.findMany({
+          where: {
+            tournamentId: tournamentId,
+          },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            instructions: true,
+            durationMinutes: true,
+            status: true,
+            eventId: true,
+            startAt: true,
+            endAt: true,
+            allowLateUntil: true,
+            allowCalculator: true,
+            calculatorType: true,
+            allowNoteSheet: true,
+            noteSheetInstructions: true,
+            autoApproveNoteSheet: true,
+            // requireOneSitting: true, // Column doesn't exist yet
+            updatedAt: true,
+            createdAt: true,
+            event: {
+              select: {
+                id: true,
+                name: true,
+                division: true,
+              },
+            },
+            staff: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            questions: {
+              select: {
+                id: true,
+                type: true,
+                promptMd: true,
+                explanation: true,
+                points: true,
+                order: true,
+                shuffleOptions: true,
+                numericTolerance: true,
+                options: {
+                  select: {
+                    id: true,
+                    label: true,
+                    isCorrect: true,
+                    order: true,
+                  },
+                  orderBy: {
+                    order: 'asc',
+                  },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+        })
+      } else {
+        // Re-throw if it's a different error
+        console.error('Error fetching tests:', error)
+        return NextResponse.json(
+          { error: error?.message || 'Failed to fetch tests' },
+          { status: 500 }
+        )
+      }
+    }
 
     // Organize tests by event
     const testsByEvent = new Map<string, typeof allTests>()
@@ -175,18 +274,36 @@ export async function GET(
       testsByEvent.get(test.eventId)!.push(test)
     }
 
+    // Parse eventsRun to get list of event IDs being run in this tournament
+    let eventsRunIds: string[] = []
+    if (tournament.eventsRun && tournament.eventsRun.trim()) {
+      try {
+        const parsed = JSON.parse(tournament.eventsRun)
+        eventsRunIds = Array.isArray(parsed) ? parsed : []
+      } catch (e) {
+        console.error('Error parsing eventsRun:', e)
+      }
+    }
+
     // Get all events for this division - handle B&C tournaments
+    // Only fetch events that are being run in this tournament
     let events
     if (displayDivision === 'B&C' || (typeof displayDivision === 'string' && displayDivision.includes('B') && displayDivision.includes('C'))) {
       // For B&C tournaments, fetch both B and C events
       const [bEvents, cEvents] = await Promise.all([
         prisma.event.findMany({
-          where: { division: 'B' },
+          where: { 
+            division: 'B',
+            ...(eventsRunIds.length > 0 && { id: { in: eventsRunIds } }),
+          },
           select: { id: true, name: true, division: true },
           orderBy: { name: 'asc' },
         }),
         prisma.event.findMany({
-          where: { division: 'C' },
+          where: { 
+            division: 'C',
+            ...(eventsRunIds.length > 0 && { id: { in: eventsRunIds } }),
+          },
           select: { id: true, name: true, division: true },
           orderBy: { name: 'asc' },
         }),
@@ -200,6 +317,7 @@ export async function GET(
       events = await prisma.event.findMany({
         where: {
           division: division as 'B' | 'C',
+          ...(eventsRunIds.length > 0 && { id: { in: eventsRunIds } }),
         },
         select: {
           id: true,
@@ -243,6 +361,9 @@ export async function GET(
         } : undefined,
         updatedAt: test.updatedAt.toISOString(),
         createdAt: test.createdAt.toISOString(),
+        allowNoteSheet: test.allowNoteSheet ?? false,
+        autoApproveNoteSheet: test.autoApproveNoteSheet ?? true,
+        requireOneSitting: (test as any).requireOneSitting ?? true, // Default to true if column doesn't exist
         questions: test.questions.map(q => ({
           id: q.id,
           type: q.type,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trophy, Plus, Loader2, CheckCircle2, Search, Monitor, User, Mail, ExternalLink, MapPin } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -49,6 +49,12 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
   const [dialogOpen, setDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [slugChecking, setSlugChecking] = useState(false)
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
+  const [slugError, setSlugError] = useState<string>('')
+  const slugCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [emailError, setEmailError] = useState<string>('')
+  const [phoneError, setPhoneError] = useState<string>('')
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loadingTournaments, setLoadingTournaments] = useState(false)
   const [search, setSearch] = useState('')
@@ -68,6 +74,69 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
     otherNotes: '',
   })
 
+  // Check slug availability
+  const checkSlugAvailability = async (slug: string) => {
+    if (!slug || slug.trim() === '') {
+      setSlugAvailable(null)
+      setSlugError('')
+      return
+    }
+
+    setSlugChecking(true)
+    try {
+      const response = await fetch(`/api/tournaments/check-slug?slug=${encodeURIComponent(slug.trim())}`)
+      const data = await response.json()
+      
+      if (response.ok) {
+        setSlugAvailable(data.available)
+        setSlugError(data.available ? '' : data.message || 'This slug is already taken')
+      } else {
+        setSlugAvailable(false)
+        setSlugError(data.error || 'Failed to check slug availability')
+      }
+    } catch (error) {
+      console.error('Error checking slug:', error)
+      setSlugAvailable(false)
+      setSlugError('Failed to check slug availability')
+    } finally {
+      setSlugChecking(false)
+    }
+  }
+
+  // Handle slug input change with debouncing
+  const handleSlugChange = (value: string) => {
+    const normalizedSlug = value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+    setFormData({ ...formData, preferredSlug: normalizedSlug })
+    
+    // Clear previous timeout
+    if (slugCheckTimeoutRef.current) {
+      clearTimeout(slugCheckTimeoutRef.current)
+    }
+    
+    // Reset availability state
+    setSlugAvailable(null)
+    setSlugError('')
+    
+    // Debounce the slug check
+    if (normalizedSlug.trim()) {
+      slugCheckTimeoutRef.current = setTimeout(() => {
+        checkSlugAvailability(normalizedSlug)
+      }, 500) // Wait 500ms after user stops typing
+    } else {
+      setSlugAvailable(null)
+      setSlugError('')
+    }
+  }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (slugCheckTimeoutRef.current) {
+        clearTimeout(slugCheckTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -80,6 +149,43 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
         variant: 'destructive',
       })
       return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.directorEmail)) {
+      setEmailError('Please enter a valid email address')
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (!emailRegex.test(formData.confirmEmail)) {
+      setEmailError('Please enter a valid email address')
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    // Validate phone number format if provided
+    if (formData.directorPhone && formData.directorPhone.trim()) {
+      // Allow various phone number formats: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890, +1 123 456 7890, etc.
+      const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}[-\s\.]?[0-9]{1,9}$/
+      const digitsOnly = formData.directorPhone.replace(/\D/g, '')
+      if (digitsOnly.length < 10 || digitsOnly.length > 15 || !phoneRegex.test(formData.directorPhone)) {
+        setPhoneError('Please enter a valid phone number (e.g., (555) 123-4567 or 555-123-4567)')
+        toast({
+          title: 'Invalid Phone Number',
+          description: 'Please enter a valid phone number.',
+          variant: 'destructive',
+        })
+        return
+      }
     }
 
     // Validate emails match
@@ -99,6 +205,47 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
         variant: 'destructive',
       })
       return
+    }
+
+    // Validate slug if provided
+    if (formData.preferredSlug && formData.preferredSlug.trim()) {
+      // If we haven't checked yet or it's checking, wait for the check
+      if (slugChecking) {
+        toast({
+          title: 'Please Wait',
+          description: 'Checking slug availability...',
+          variant: 'default',
+        })
+        return
+      }
+      
+      // If slug is not available, prevent submission
+      if (slugAvailable === false) {
+        toast({
+          title: 'Slug Not Available',
+          description: slugError || 'This slug is already taken. Please choose a different one.',
+          variant: 'destructive',
+        })
+        return
+      }
+      
+      // If we haven't checked yet, check now
+      if (slugAvailable === null) {
+        await checkSlugAvailability(formData.preferredSlug)
+        // After checking, if not available, prevent submission
+        const response = await fetch(`/api/tournaments/check-slug?slug=${encodeURIComponent(formData.preferredSlug.trim())}`)
+        const data = await response.json()
+        if (!data.available) {
+          setSlugAvailable(false)
+          setSlugError(data.message || 'This slug is already taken')
+          toast({
+            title: 'Slug Not Available',
+            description: data.message || 'This slug is already taken. Please choose a different one.',
+            variant: 'destructive',
+          })
+          return
+        }
+      }
     }
 
     setSubmitting(true)
@@ -148,6 +295,14 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
       otherNotes: '',
     })
     setSubmitted(false)
+    setSlugAvailable(null)
+    setSlugError('')
+    setSlugChecking(false)
+    setEmailError('')
+    setPhoneError('')
+    if (slugCheckTimeoutRef.current) {
+      clearTimeout(slugCheckTimeoutRef.current)
+    }
   }
 
   // Load tournaments on mount
@@ -512,17 +667,40 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
                             <Label htmlFor="preferredSlug">Preferred Website Slug</Label>
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-muted-foreground">teamy.site/tournaments/</span>
-                              <Input
-                                id="preferredSlug"
-                                value={formData.preferredSlug}
-                                onChange={(e) => setFormData({ ...formData, preferredSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
-                                placeholder="hylas"
-                                className="flex-1"
-                              />
+                              <div className="flex-1 relative">
+                                <Input
+                                  id="preferredSlug"
+                                  value={formData.preferredSlug}
+                                  onChange={(e) => handleSlugChange(e.target.value)}
+                                  placeholder="hylas"
+                                  className={slugAvailable === false ? 'border-destructive' : slugAvailable === true ? 'border-green-500' : ''}
+                                />
+                                {slugChecking && (
+                                  <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                                )}
+                                {!slugChecking && slugAvailable === true && formData.preferredSlug.trim() && (
+                                  <CheckCircle2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-500" />
+                                )}
+                                {!slugChecking && slugAvailable === false && (
+                                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-destructive text-sm">✕</span>
+                                )}
+                              </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Letters, numbers, and hyphens only. Leave blank for auto-generated.
-                            </p>
+                            {slugError && (
+                              <p className="text-xs text-destructive">
+                                {slugError}
+                              </p>
+                            )}
+                            {!slugError && slugAvailable === true && formData.preferredSlug.trim() && (
+                              <p className="text-xs text-green-600 dark:text-green-400">
+                                This slug is available
+                              </p>
+                            )}
+                            {!slugError && slugAvailable === null && (
+                              <p className="text-xs text-muted-foreground">
+                                Letters, numbers, and hyphens only. Leave blank for auto-generated.
+                              </p>
+                            )}
                           </div>
 
                           {/* Director Info */}
@@ -546,10 +724,30 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
                                     id="directorEmail"
                                     type="email"
                                     value={formData.directorEmail}
-                                    onChange={(e) => setFormData({ ...formData, directorEmail: e.target.value })}
+                                    onChange={(e) => {
+                                      const email = e.target.value
+                                      setFormData({ ...formData, directorEmail: email })
+                                      // Validate email format
+                                      if (email.trim()) {
+                                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                                        if (!emailRegex.test(email)) {
+                                          setEmailError('Please enter a valid email address')
+                                        } else if (formData.confirmEmail && email !== formData.confirmEmail) {
+                                          setEmailError('Email addresses do not match')
+                                        } else {
+                                          setEmailError('')
+                                        }
+                                      } else {
+                                        setEmailError('')
+                                      }
+                                    }}
                                     placeholder="director@school.edu"
                                     required
+                                    className={emailError ? 'border-destructive' : ''}
                                   />
+                                  {emailError && (
+                                    <p className="text-xs text-destructive">{emailError}</p>
+                                  )}
                                 </div>
                                 <div className="space-y-2">
                                   <Label htmlFor="confirmEmail">Confirm Email *</Label>
@@ -557,10 +755,30 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
                                     id="confirmEmail"
                                     type="email"
                                     value={formData.confirmEmail}
-                                    onChange={(e) => setFormData({ ...formData, confirmEmail: e.target.value })}
+                                    onChange={(e) => {
+                                      const email = e.target.value
+                                      setFormData({ ...formData, confirmEmail: email })
+                                      // Validate email format
+                                      if (email.trim()) {
+                                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                                        if (!emailRegex.test(email)) {
+                                          setEmailError('Please enter a valid email address')
+                                        } else if (email !== formData.directorEmail) {
+                                          setEmailError('Email addresses do not match')
+                                        } else {
+                                          setEmailError('')
+                                        }
+                                      } else {
+                                        setEmailError('')
+                                      }
+                                    }}
                                     placeholder="director@school.edu"
                                     required
+                                    className={emailError ? 'border-destructive' : ''}
                                   />
+                                  {emailError && (
+                                    <p className="text-xs text-destructive">{emailError}</p>
+                                  )}
                                 </div>
                                 <div className="space-y-2">
                                   <Label htmlFor="directorPhone">Phone Number</Label>
@@ -568,9 +786,28 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
                                     id="directorPhone"
                                     type="tel"
                                     value={formData.directorPhone}
-                                    onChange={(e) => setFormData({ ...formData, directorPhone: e.target.value })}
+                                    onChange={(e) => {
+                                      const phone = e.target.value
+                                      setFormData({ ...formData, directorPhone: phone })
+                                      // Validate phone number format if provided
+                                      if (phone.trim()) {
+                                        const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}[-\s\.]?[0-9]{1,9}$/
+                                        const digitsOnly = phone.replace(/\D/g, '')
+                                        if (digitsOnly.length < 10 || digitsOnly.length > 15 || !phoneRegex.test(phone)) {
+                                          setPhoneError('Please enter a valid phone number (e.g., (555) 123-4567 or 555-123-4567)')
+                                        } else {
+                                          setPhoneError('')
+                                        }
+                                      } else {
+                                        setPhoneError('')
+                                      }
+                                    }}
                                     placeholder="(555) 123-4567"
+                                    className={phoneError ? 'border-destructive' : ''}
                                   />
+                                  {phoneError && (
+                                    <p className="text-xs text-destructive">{phoneError}</p>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -590,11 +827,11 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
 
                           {/* Submit Button */}
                           <div className="flex gap-4 pt-4">
-                            <Button
-                              type="submit"
-                              disabled={submitting}
-                              className="flex-1"
-                            >
+                          <Button
+                            type="submit"
+                            disabled={submitting || (formData.preferredSlug.trim() && slugAvailable === false) || slugChecking || !!emailError || !!phoneError}
+                            className="flex-1"
+                          >
                               {submitting ? (
                                 <>
                                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

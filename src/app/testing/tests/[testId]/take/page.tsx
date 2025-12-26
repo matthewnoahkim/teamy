@@ -181,10 +181,11 @@ export default async function TournamentTakeTestPage({
         endAt: esTest.endAt,
         allowLateUntil: esTest.allowLateUntil,
         requireFullscreen: false, // ESTest doesn't have this
-        allowCalculator: false, // ESTest doesn't have this
-        calculatorType: null,
-        allowNoteSheet: false, // ESTest doesn't have this
-        noteSheetInstructions: null,
+        allowCalculator: esTest.allowCalculator ?? false,
+        calculatorType: esTest.calculatorType,
+        allowNoteSheet: esTest.allowNoteSheet ?? false,
+        noteSheetInstructions: esTest.noteSheetInstructions,
+        requireOneSitting: esTest.requireOneSitting ?? true,
         testPasswordHash: null, // ESTest doesn't have password
         maxAttempts: null, // ESTest doesn't have max attempts
         scoreReleaseMode: 'FULL_TEST', // Default for ESTest

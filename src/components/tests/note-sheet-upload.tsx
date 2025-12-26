@@ -41,27 +41,37 @@ export function NoteSheetUpload({
   const [uploading, setUploading] = useState(false)
   const [instructions, setInstructions] = useState<string | null>(initialInstructions || null)
   const [isDragging, setIsDragging] = useState(false)
+  const [autoApproveNoteSheet, setAutoApproveNoteSheet] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (open) {
-      // Use initial instructions if provided, otherwise fetch
-      if (initialInstructions !== undefined) {
-        setInstructions(initialInstructions)
-      } else {
-        // Fetch test to get instructions
-        fetch(`/api/tests/${testId}`)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.test) {
-              setInstructions(data.test.noteSheetInstructions)
+      // Fetch test to get instructions and autoApproveNoteSheet setting
+      fetch(`/api/tests/${testId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.test) {
+            setInstructions(data.test.noteSheetInstructions || initialInstructions || null)
+            setAutoApproveNoteSheet(data.test.autoApproveNoteSheet ?? true)
+          } else {
+            // Fallback to initial instructions if provided
+            if (initialInstructions !== undefined) {
+              setInstructions(initialInstructions)
             }
-          })
-          .catch(() => {})
-      }
+            // Default to true if we can't determine
+            setAutoApproveNoteSheet(true)
+          }
+        })
+        .catch(() => {
+          // Fallback to initial instructions if fetch fails
+          if (initialInstructions !== undefined) {
+            setInstructions(initialInstructions)
+          }
+        })
     } else {
       // Reset when dialog closes
       setFile(null)
       setIsDragging(false)
+      setAutoApproveNoteSheet(null)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -270,7 +280,11 @@ export function NoteSheetUpload({
             Cancel
           </Button>
           <Button onClick={handleUpload} disabled={!file || uploading}>
-            {uploading ? 'Uploading...' : 'Submit for Review'}
+            {uploading 
+              ? 'Uploading...' 
+              : autoApproveNoteSheet === false 
+                ? 'Submit for Review' 
+                : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

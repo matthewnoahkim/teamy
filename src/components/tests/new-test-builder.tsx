@@ -368,6 +368,7 @@ export function NewTestBuilder({
     scoreReleaseMode: (test?.scoreReleaseMode || 'FULL_TEST') as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',
     requireFullscreen: test?.requireFullscreen ?? true,
   })
+  const [dateTimeErrors, setDateTimeErrors] = useState<{ startAt?: string; endAt?: string }>({})
 
   const isEditMode = !!test
 
@@ -401,6 +402,8 @@ export function NewTestBuilder({
     calculatorType: test?.calculatorType || null,
     allowNoteSheet: test?.allowNoteSheet || false,
     noteSheetInstructions: test?.noteSheetInstructions || '',
+    autoApproveNoteSheet: test?.autoApproveNoteSheet ?? true,
+    requireOneSitting: (test as any)?.requireOneSitting ?? true,
   })
 
   const [questions, setQuestions] = useState<QuestionDraft[]>(() => {
@@ -987,6 +990,7 @@ export function NewTestBuilder({
       calculatorType: details.allowCalculator ? details.calculatorType : null,
       allowNoteSheet: details.allowNoteSheet,
       noteSheetInstructions: details.allowNoteSheet ? details.noteSheetInstructions.trim() || undefined : undefined,
+      autoApproveNoteSheet: details.allowNoteSheet ? (details.autoApproveNoteSheet ?? true) : undefined,
       assignments,
       questions: questions.map((question, index) => {
         // Map frontend types to backend types
@@ -1084,6 +1088,8 @@ export function NewTestBuilder({
             calculatorType: payload.allowCalculator ? payload.calculatorType : undefined,
             allowNoteSheet: payload.allowNoteSheet,
             noteSheetInstructions: payload.allowNoteSheet ? payload.noteSheetInstructions : undefined,
+            autoApproveNoteSheet: payload.allowNoteSheet ? (payload.autoApproveNoteSheet ?? true) : undefined,
+            requireOneSitting: payload.requireOneSitting ?? true,
             questions: questions.map((question, index) => {
               // For fill-in-the-blank, store blankAnswers and blankPoints in explanation field as JSON
               let explanationValue: string | undefined = undefined
@@ -1311,6 +1317,8 @@ export function NewTestBuilder({
             calculatorType: payload.allowCalculator ? payload.calculatorType : undefined,
             allowNoteSheet: payload.allowNoteSheet,
             noteSheetInstructions: payload.allowNoteSheet ? payload.noteSheetInstructions : undefined,
+            autoApproveNoteSheet: payload.allowNoteSheet ? (payload.autoApproveNoteSheet ?? true) : undefined,
+            requireOneSitting: payload.requireOneSitting ?? true,
             questions: payload.questions.map((q: any) => {
               const questionPayload: any = {
                 type: q.type,
@@ -1415,23 +1423,25 @@ export function NewTestBuilder({
       return
     }
 
-    // ESTest supports startAt/endAt, but validation is optional
-    if (!esMode) {
-      if (!publishFormData.startAt || !publishFormData.endAt) {
-        toast({
-          title: 'Error',
-          description: 'Start and end times are required',
-          variant: 'destructive',
-        })
-        return
-      }
-
+    // Validate start/end times for both regular tests and ES tests
+    if (publishFormData.startAt && publishFormData.endAt) {
       const start = new Date(publishFormData.startAt)
       const end = new Date(publishFormData.endAt)
       if (end <= start) {
         toast({
           title: 'Error',
-          description: 'End time must be after start time',
+          description: 'End date/time must be after start date/time',
+          variant: 'destructive',
+        })
+        setDateTimeErrors({ endAt: 'End date/time must be after start date/time' })
+        return
+      }
+    } else if (!esMode) {
+      // For regular tests, start and end times are required
+      if (!publishFormData.startAt || !publishFormData.endAt) {
+        toast({
+          title: 'Error',
+          description: 'Start and end times are required',
           variant: 'destructive',
         })
         return
@@ -1493,6 +1503,8 @@ export function NewTestBuilder({
             calculatorType: details.allowCalculator ? details.calculatorType : undefined,
             allowNoteSheet: details.allowNoteSheet,
             noteSheetInstructions: details.allowNoteSheet ? details.noteSheetInstructions : undefined,
+            autoApproveNoteSheet: details.allowNoteSheet ? (details.autoApproveNoteSheet ?? true) : undefined,
+            requireOneSitting: details.requireOneSitting ?? true,
           }),
         })
 
@@ -1742,6 +1754,31 @@ export function NewTestBuilder({
                 <p className="text-xs text-muted-foreground mt-1">
                   Time allowed to complete the test (1-720 minutes)
                 </p>
+                {/* Require One Sitting - Only for ES tests (tournament tests) */}
+                {(esMode || tournamentId) && (
+                  <>
+                    <div className="flex items-center gap-2 mt-4">
+                      <Checkbox
+                        id="require-one-sitting"
+                        checked={details.requireOneSitting}
+                        onCheckedChange={(checked) =>
+                          setDetails((prev) => ({
+                            ...prev,
+                            requireOneSitting: checked as boolean,
+                          }))
+                        }
+                      />
+                      <Label htmlFor="require-one-sitting" className="cursor-pointer font-normal">
+                        Require test to be completed in one sitting
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 ml-6">
+                      {details.requireOneSitting
+                        ? 'Students must complete the test in one session. The "Save & Exit" button will be hidden.'
+                        : 'Students can save their progress and return to complete the test later.'}
+                    </p>
+                  </>
+                )}
               </div>
 
               <div className="space-y-3 pt-4 border-t">
@@ -1820,24 +1857,46 @@ export function NewTestBuilder({
                 </div>
 
                 {details.allowNoteSheet && (
-                  <div>
-                    <Label htmlFor="note-sheet-instructions">Note Sheet Instructions</Label>
-                    <textarea
-                      id="note-sheet-instructions"
-                      className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm mt-2"
-                      value={details.noteSheetInstructions}
-                      onChange={(e) =>
-                        setDetails((prev) => ({
-                          ...prev,
-                          noteSheetInstructions: e.target.value,
-                        }))
-                      }
-                      placeholder="Provide instructions for students about note sheet requirements, size limits, content guidelines, etc."
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      These instructions will be shown to students when they create or upload their note sheet
+                  <>
+                    <div>
+                      <Label htmlFor="note-sheet-instructions">Note Sheet Instructions</Label>
+                      <textarea
+                        id="note-sheet-instructions"
+                        className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm mt-2"
+                        value={details.noteSheetInstructions}
+                        onChange={(e) =>
+                          setDetails((prev) => ({
+                            ...prev,
+                            noteSheetInstructions: e.target.value,
+                          }))
+                        }
+                        placeholder="Provide instructions for students about note sheet requirements, size limits, content guidelines, etc."
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        These instructions will be shown to students when they create or upload their note sheet
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <Checkbox
+                        id="auto-approve-note-sheet"
+                        checked={details.autoApproveNoteSheet}
+                        onCheckedChange={(checked) =>
+                          setDetails((prev) => ({
+                            ...prev,
+                            autoApproveNoteSheet: checked as boolean,
+                          }))
+                        }
+                      />
+                      <Label htmlFor="auto-approve-note-sheet" className="cursor-pointer font-normal">
+                        Automatically approve note sheets
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 ml-6">
+                      {details.autoApproveNoteSheet 
+                        ? 'Note sheets will be automatically accepted. Tournament admins can still review and reject them if needed.'
+                        : 'All note sheets must be approved by tournament admins before students can take the test.'}
                     </p>
-                  </div>
+                  </>
                 )}
               </div>
             </CardContent>
@@ -1937,9 +1996,27 @@ export function NewTestBuilder({
                 id="startAt"
                 type="datetime-local"
                 value={publishFormData.startAt}
-                onChange={(e) => setPublishFormData((prev) => ({ ...prev, startAt: e.target.value }))}
+                onChange={(e) => {
+                  const newStartAt = e.target.value
+                  setPublishFormData((prev) => ({ ...prev, startAt: newStartAt }))
+                  // Validate immediately
+                  if (newStartAt && publishFormData.endAt) {
+                    const start = new Date(newStartAt)
+                    const end = new Date(publishFormData.endAt)
+                    if (end <= start) {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
+                    } else {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                    }
+                  } else {
+                    setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                  }
+                }}
                 required
               />
+              {dateTimeErrors.startAt && (
+                <p className="text-sm text-destructive mt-1">{dateTimeErrors.startAt}</p>
+              )}
             </div>
 
             <div>
@@ -1948,9 +2025,28 @@ export function NewTestBuilder({
                 id="endAt"
                 type="datetime-local"
                 value={publishFormData.endAt}
-                onChange={(e) => setPublishFormData((prev) => ({ ...prev, endAt: e.target.value }))}
+                onChange={(e) => {
+                  const newEndAt = e.target.value
+                  setPublishFormData((prev) => ({ ...prev, endAt: newEndAt }))
+                  // Validate immediately
+                  if (publishFormData.startAt && newEndAt) {
+                    const start = new Date(publishFormData.startAt)
+                    const end = new Date(newEndAt)
+                    if (end <= start) {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
+                    } else {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                    }
+                  } else {
+                    setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                  }
+                }}
                 required
+                min={publishFormData.startAt || undefined}
               />
+              {dateTimeErrors.endAt && (
+                <p className="text-sm text-destructive mt-1">{dateTimeErrors.endAt}</p>
+              )}
             </div>
 
             <div>
@@ -2156,7 +2252,7 @@ export function NewTestBuilder({
                   setCalendarModalOpen(true)
                 }
               }}
-              disabled={publishing}
+              disabled={publishing || !!dateTimeErrors.startAt || !!dateTimeErrors.endAt}
             >
               {publishing ? 'Publishing...' : 'Publish'}
             </Button>

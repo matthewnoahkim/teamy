@@ -32,6 +32,8 @@ import {
   Tag,
   FileText,
   CheckCircle2,
+  ClipboardCheck,
+  Settings,
 } from 'lucide-react'
 import Link from 'next/link'
 import { format, isBefore, isAfter } from 'date-fns'
@@ -98,25 +100,40 @@ interface TournamentPageClientProps {
   hostingRequest: TournamentHostingRequest
   tournament: Tournament | null
   isDirector: boolean
+  isTournamentAdmin?: boolean
   user?: {
     id: string
     name?: string | null
     email: string
   }
   userClubs?: UserClub[]
+  initialSections?: Section[]
+  isRegistered?: boolean
+  hasAvailableTests?: boolean
 }
 
-export function TournamentPageClient({ hostingRequest, tournament, isDirector, user, userClubs = [] }: TournamentPageClientProps) {
+export function TournamentPageClient({ 
+  hostingRequest, 
+  tournament, 
+  isDirector, 
+  isTournamentAdmin = false, 
+  user, 
+  userClubs = [],
+  initialSections,
+  isRegistered: initialIsRegistered = false,
+  hasAvailableTests: initialHasAvailableTests = false,
+}: TournamentPageClientProps) {
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
-  const [sections, setSections] = useState<Section[]>([
+  const defaultSections: Section[] = [
     {
       id: '1',
       type: 'header',
       title: 'About',
       content: `Welcome to ${hostingRequest.tournamentName}! This is a ${hostingRequest.tournamentLevel} Science Olympiad tournament for Division ${formatDivision(hostingRequest.division)}.`
     }
-  ])
+  ]
+  const [sections, setSections] = useState<Section[]>(initialSections || defaultSections)
   const [saving, setSaving] = useState(false)
   
   // Registration state
@@ -129,23 +146,9 @@ export function TournamentPageClient({ hostingRequest, tournament, isDirector, u
   const [eventsNotRun, setEventsNotRun] = useState<Array<{ id: string; name: string; division: string }>>([])
   const [eventsNotRunLoading, setEventsNotRunLoading] = useState(true)
 
-  // Load saved page content
-  useEffect(() => {
-    const loadPageContent = async () => {
-      try {
-        const response = await fetch(`/api/tournament-pages/${hostingRequest.id}`)
-        if (response.ok) {
-          const data = await response.json()
-          if (data.pageContent) {
-            setSections(JSON.parse(data.pageContent))
-          }
-        }
-      } catch (error) {
-        console.error('Error loading page content:', error)
-      }
-    }
-    loadPageContent()
-  }, [hostingRequest.id])
+  // Check if user is registered and tests are available (use initial values from server)
+  const [isRegistered, setIsRegistered] = useState(initialIsRegistered)
+  const [hasAvailableTests, setHasAvailableTests] = useState(initialHasAvailableTests)
 
   // Fetch events and calculate which are not being run
   useEffect(() => {
@@ -441,7 +444,7 @@ export function TournamentPageClient({ hostingRequest, tournament, isDirector, u
             </div>
           )}
           
-          {/* Register Button */}
+          {/* Action Buttons */}
           {tournament && (
             <div className="mt-6 flex flex-wrap gap-3 justify-center">
               <Link href={`/tournaments/${tournament.slug || tournament.id}/register`}>
@@ -450,6 +453,22 @@ export function TournamentPageClient({ hostingRequest, tournament, isDirector, u
                   {canRegister ? 'Register Now' : 'View Registration'}
                 </Button>
               </Link>
+              {isRegistered && hasAvailableTests && (
+                <Link href={`/testing?tournamentId=${tournament.id}`}>
+                  <Button size="lg" className="gap-2">
+                    <ClipboardCheck className="h-5 w-5" />
+                    Take Tests
+                  </Button>
+                </Link>
+              )}
+              {isTournamentAdmin && (
+                <Link href={`/td/manage/${hostingRequest.id}`}>
+                  <Button size="lg" className="gap-2">
+                    <Settings className="h-5 w-5" />
+                    Manage Tournament
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
 
@@ -519,11 +538,11 @@ export function TournamentPageClient({ hostingRequest, tournament, isDirector, u
                     </div>
                   </div>
 
-                  {/* Events Not Being Run */}
+                  {/* Events Not Offered */}
                   <div className="flex items-start gap-3">
                     <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div className="flex-1">
-                      <p className="font-medium">Events Not Being Run</p>
+                      <p className="font-medium">Events Not Offered</p>
                       <div className="mt-2">
                         {eventsNotRunLoading ? (
                           <p className="text-sm text-muted-foreground">Loading...</p>

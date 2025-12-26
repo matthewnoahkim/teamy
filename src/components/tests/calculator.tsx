@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { X, Minimize2, Calculator as CalcIcon, GripVertical } from 'lucide-react'
+import { X, Minimize2, Calculator as CalcIcon, GripVertical, Maximize2 } from 'lucide-react'
 
 type CalculatorType = 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING'
 
@@ -50,6 +50,27 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
   const [desmosLoaded, setDesmosLoaded] = useState(false)
   const [desmosInitialized, setDesmosInitialized] = useState(false)
   const savedDesmosStateRef = useRef<any>(null)
+  const [desmosLoadStartTime, setDesmosLoadStartTime] = useState<number | null>(null)
+  const [showScientificFallback, setShowScientificFallback] = useState(false)
+  const [calculatorSize, setCalculatorSize] = useState<{ width: number; height: number }>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`calculator-size-${type}`)
+      if (saved) {
+        try {
+          return JSON.parse(saved)
+        } catch {
+          // Fallback to defaults
+        }
+      }
+    }
+    return {
+      width: type === 'GRAPHING' ? 900 : 400,
+      height: type === 'GRAPHING' ? 650 : 500,
+    }
+  })
+  const [isResizing, setIsResizing] = useState(false)
+  const [resizeDirection, setResizeDirection] = useState<'se' | 'sw' | 'ne' | 'nw' | 'e' | 'w' | 'n' | 's' | null>(null)
+  const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
   
   // Helper function to calculate centered position
   const getCenteredPosition = (): Position => {
@@ -58,8 +79,8 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
     }
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight
-    const elementWidth = type === 'GRAPHING' ? 900 : 400
-    const elementHeight = type === 'GRAPHING' ? 650 : 500
+    const elementWidth = calculatorSize.width
+    const elementHeight = calculatorSize.height
     
     const centeredX = (viewportWidth - elementWidth) / 2
     const centeredY = (viewportHeight - elementHeight) / 2
@@ -76,6 +97,126 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
   const calculatorRef = useRef<HTMLDivElement>(null)
   const hasInitializedRef = useRef(false)
   const [isPositioned, setIsPositioned] = useState(false)
+  
+  // Handle resize mouse down
+  const handleResizeMouseDown = (e: React.MouseEvent<HTMLDivElement>, direction: 'se' | 'sw' | 'ne' | 'nw' | 'e' | 'w' | 'n' | 's') => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (calculatorRef.current) {
+      const rect = calculatorRef.current.getBoundingClientRect()
+      resizeStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        width: rect.width,
+        height: rect.height,
+      }
+      setResizeDirection(direction)
+      setIsResizing(true)
+    }
+  }
+  
+  // Handle resize mouse move
+  useEffect(() => {
+    if (!isResizing || !resizeStartRef.current || !resizeDirection) return
+    
+    // Prevent text selection during resize
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = `${resizeDirection}-resize`
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const deltaX = e.clientX - resizeStartRef.current!.x
+      const deltaY = e.clientY - resizeStartRef.current!.y
+      
+      let newWidth = resizeStartRef.current.width
+      let newHeight = resizeStartRef.current.height
+      let newX = position.x
+      let newY = position.y
+      
+      const minWidth = type === 'GRAPHING' ? 600 : 300
+      const minHeight = type === 'GRAPHING' ? 400 : 300
+      const maxWidth = window.innerWidth - 20
+      const maxHeight = window.innerHeight - 20
+      
+      // Handle different resize directions
+      if (resizeDirection.includes('e')) {
+        newWidth = Math.max(minWidth, Math.min(maxWidth, resizeStartRef.current.width + deltaX))
+      }
+      if (resizeDirection.includes('w')) {
+        const oldWidth = resizeStartRef.current.width
+        newWidth = Math.max(minWidth, Math.min(maxWidth, resizeStartRef.current.width - deltaX))
+        const widthChange = oldWidth - newWidth
+        newX = Math.max(0, position.x + widthChange)
+      }
+      if (resizeDirection.includes('s')) {
+        newHeight = Math.max(minHeight, Math.min(maxHeight, resizeStartRef.current.height + deltaY))
+      }
+      if (resizeDirection.includes('n')) {
+        const oldHeight = resizeStartRef.current.height
+        newHeight = Math.max(minHeight, Math.min(maxHeight, resizeStartRef.current.height - deltaY))
+        const heightChange = oldHeight - newHeight
+        newY = Math.max(0, position.y + heightChange)
+      }
+      
+      // Ensure calculator stays within viewport
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      if (newX + newWidth > viewportWidth) {
+        newWidth = Math.max(minWidth, viewportWidth - newX)
+      }
+      if (newY + newHeight > viewportHeight) {
+        newHeight = Math.max(minHeight, viewportHeight - newY)
+      }
+      if (newX < 0) {
+        newWidth = Math.max(minWidth, newWidth + newX)
+        newX = 0
+      }
+      if (newY < 0) {
+        newHeight = Math.max(minHeight, newHeight + newY)
+        newY = 0
+      }
+      
+      setCalculatorSize({ width: newWidth, height: newHeight })
+      setPosition({ x: newX, y: newY })
+    }
+    
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      setResizeDirection(null)
+      resizeStartRef.current = null
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+    }
+    
+    document.addEventListener('mousemove', handleMouseMove, { passive: false, capture: true })
+    document.addEventListener('mouseup', handleMouseUp, { capture: true })
+    window.addEventListener('mouseup', handleMouseUp, { capture: true })
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove, { capture: true })
+      document.removeEventListener('mouseup', handleMouseUp, { capture: true })
+      window.removeEventListener('mouseup', handleMouseUp, { capture: true })
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+    }
+  }, [isResizing, resizeDirection, position, type])
+  
+  // Save calculator size to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`calculator-size-${type}`, JSON.stringify(calculatorSize))
+    }
+  }, [calculatorSize, type])
+
+  // Reset size when type changes
+  useEffect(() => {
+    setCalculatorSize({
+      width: type === 'GRAPHING' ? 900 : 400,
+      height: type === 'GRAPHING' ? 650 : 500,
+    })
+  }, [type])
 
   // Center calculator on screen when first opened
   useEffect(() => {
@@ -102,8 +243,8 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight
       
       // Try to get actual element dimensions, fallback to estimated
-      let elementWidth = type === 'GRAPHING' ? 900 : 400
-      let elementHeight = type === 'GRAPHING' ? 650 : 500
+      let elementWidth = calculatorSize.width
+      let elementHeight = calculatorSize.height
       
       if (calculatorRef.current) {
         const rect = calculatorRef.current.getBoundingClientRect()
@@ -144,9 +285,12 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
   const isDraggingRef = useRef(false)
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent dragging if clicking on buttons
+    // Prevent dragging if clicking on buttons or resize handles
     const target = e.target as HTMLElement
-    if (target.closest('button')) return
+    if (target.closest('button') || target.closest('[class*="resize"]')) return
+    
+    // Don't start dragging if we're resizing
+    if (isResizing) return
     
     e.preventDefault()
     e.stopPropagation()
@@ -260,41 +404,85 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
   // Load Desmos API script for graphing calculator (only once)
   useEffect(() => {
     if (type === 'GRAPHING') {
+      setDesmosLoadStartTime(Date.now())
+      setShowScientificFallback(false)
+      
       // Check if Desmos is already loaded
       if (window.Desmos) {
         setDesmosLoaded(true)
+        setDesmosLoadStartTime(null)
         return
       }
 
       // Check if script is already being loaded
       const existingScript = document.querySelector(`script[src*="desmos.com/api"]`)
       if (existingScript) {
-        // Script exists, wait for it to load
+        // Script exists, wait for it to load with timeout
+        const startTime = Date.now()
+        // Check immediately first
+        if (window.Desmos) {
+          setDesmosLoaded(true)
+          setDesmosLoadStartTime(null)
+          return
+        }
+        
+        // Then check periodically with longer interval (200ms instead of 100ms for better performance)
+        let fallbackShown = false
         const checkDesmos = setInterval(() => {
           if (window.Desmos) {
             setDesmosLoaded(true)
+            setDesmosLoadStartTime(null)
+            setShowScientificFallback(false) // Clear fallback when Desmos loads
             clearInterval(checkDesmos)
+          } else if (!fallbackShown && Date.now() - startTime > 5000) {
+            // 5 second timeout - show fallback option (but continue waiting for Desmos)
+            setShowScientificFallback(true)
+            fallbackShown = true
+            // Don't clear interval - continue checking for Desmos even after showing fallback
           }
-        }, 100)
+        }, 200) // Increased from 100ms to reduce CPU usage
         return () => clearInterval(checkDesmos)
       }
 
       // Load the script
       if (!DESMOS_API_KEY) {
         console.error('Desmos API key is not configured. Please set NEXT_PUBLIC_DESMOS_API_KEY in your .env.local file.')
+        setShowScientificFallback(true)
         return
       }
 
+      const startTime = Date.now()
       const script = document.createElement('script')
+      // Use the latest API version and add cache-busting only if needed
       script.src = `https://www.desmos.com/api/v1.8/calculator.js?apiKey=${DESMOS_API_KEY}`
       script.async = true
+      // Don't use defer with async - they conflict. async is better for external scripts
+      script.crossOrigin = 'anonymous' // Add CORS for better loading
       script.onload = () => {
         setDesmosLoaded(true)
+        setDesmosLoadStartTime(null)
+        setShowScientificFallback(false)
       }
       script.onerror = () => {
         console.error('Failed to load Desmos API')
+        setShowScientificFallback(true)
+        setDesmosLoadStartTime(null)
       }
-      document.body.appendChild(script)
+      
+      // Set timeout to show fallback after 5 seconds
+      const timeoutId = setTimeout(() => {
+        if (!window.Desmos) {
+          console.warn('Desmos loading timeout - showing scientific calculator fallback')
+          setShowScientificFallback(true)
+        }
+      }, 5000)
+      
+      // Append to head for better loading performance
+      document.head.appendChild(script)
+      
+      return () => {
+        clearTimeout(timeoutId)
+      }
     } else {
       // Cleanup when switching away from graphing calculator type
       if (desmosCalculatorRef.current) {
@@ -305,6 +493,8 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
         }
         desmosCalculatorRef.current = null
       }
+      setDesmosLoadStartTime(null)
+      setShowScientificFallback(false)
     }
   }, [type])
 
@@ -323,11 +513,11 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
     }
   }, [type, open, isMinimized])
 
-  // Initialize Desmos calculator when container is ready
+  // Initialize Desmos calculator when container is ready (optimized)
   useEffect(() => {
     if (type === 'GRAPHING' && open && !isMinimized && desmosLoaded) {
-      // Wait for container to be available
-      const checkContainer = setInterval(() => {
+      // Optimized: Check immediately first, then use a longer interval if needed
+      const initializeDesmos = () => {
         if (desmosContainerRef.current && window.Desmos) {
           // Destroy existing calculator if it exists (for reinitialization)
           if (desmosCalculatorRef.current) {
@@ -347,20 +537,18 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
             desmosContainerRef.current.innerHTML = ''
           }
 
-          // Initialize after clearing - use requestAnimationFrame for better timing
-          requestAnimationFrame(() => {
-            setTimeout(() => {
-              if (desmosContainerRef.current && window.Desmos && !desmosCalculatorRef.current) {
-                try {
-                  desmosCalculatorRef.current = window.Desmos.GraphingCalculator(desmosContainerRef.current, {
-                    keypad: true,
-                    expressions: true,
-                    settingsMenu: true,
-                    zoomButtons: true,
-                    expressionsTopbar: true,
-                    lockViewport: false,
-                  })
-                  
+          // Initialize immediately - no need for setTimeout if container is ready
+          if (desmosContainerRef.current && window.Desmos && !desmosCalculatorRef.current) {
+            try {
+              desmosCalculatorRef.current = window.Desmos.GraphingCalculator(desmosContainerRef.current, {
+                keypad: true,
+                expressions: true,
+                settingsMenu: true,
+                zoomButtons: true,
+                expressionsTopbar: true,
+                lockViewport: false,
+              })
+              
                   // Restore saved state if available
                   if (savedDesmosStateRef.current) {
                     try {
@@ -369,18 +557,31 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
                       console.error('Error restoring Desmos state:', error)
                     }
                   }
-                  // Mark as initialized to hide loading indicator
+                  // Mark as initialized to hide loading indicator and switch from scientific calculator
                   setDesmosInitialized(true)
-                } catch (error) {
-                  console.error('Failed to initialize Desmos calculator:', error)
-                }
-              }
-            }, 100)
-          })
-          
+                  setShowScientificFallback(false) // Automatically switch to Desmos when ready
+                  return true // Successfully initialized
+            } catch (error) {
+              console.error('Failed to initialize Desmos calculator:', error)
+            }
+          }
+          return true // Container ready, initialization attempted
+        }
+        return false // Not ready yet
+      }
+
+      // Try immediately first
+      if (initializeDesmos()) {
+        return // Already initialized or attempted
+      }
+
+      // If not ready, check with longer interval (500ms instead of 200ms for much better performance)
+      // Most of the time, the container will be ready immediately, so this is just a fallback
+      const checkContainer = setInterval(() => {
+        if (initializeDesmos()) {
           clearInterval(checkContainer)
         }
-      }, 50)
+      }, 500) // Increased to 500ms to significantly reduce CPU usage
 
       return () => {
         clearInterval(checkContainer)
@@ -989,22 +1190,57 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
   )
 
 
+
   const renderGraphing = () => {
+    const loadingTime = desmosLoadStartTime ? (Date.now() - desmosLoadStartTime) / 1000 : 0
+    const isLoading = !desmosLoaded || !desmosInitialized
+    
+    // If showing fallback, show scientific calculator content
+    // Desmos will automatically appear when it finishes loading
+    if (showScientificFallback && isLoading) {
+      return (
+        <div className="space-y-4">
+          <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
+            <div className="flex items-start gap-3">
+              <CalcIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
+                  Desmos Calculator Loading
+                </p>
+                <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                  Desmos is taking longer than expected ({loadingTime.toFixed(1)}s). Use the scientific calculator below while it continues loading. The graphing calculator will appear automatically when ready.
+                </p>
+              </div>
+            </div>
+          </div>
+          {/* Show scientific calculator as fallback */}
+          {renderScientific()}
+        </div>
+      )
+    }
+    
     return (
-      <div className="bg-muted rounded-md border relative w-full" style={{ height: '600px', minHeight: '600px' }}>
+      <div className="bg-muted rounded-md border relative w-full" style={{ height: `${calculatorSize.height - 100}px`, minHeight: '400px' }}>
         <div 
           key={open ? 'desmos-open' : 'desmos-closed'}
           ref={desmosContainerRef}
           className="w-full h-full"
-          style={{ minHeight: '600px', width: '100%' }}
+          style={{ minHeight: '400px', width: '100%' }}
         />
-        {(!desmosLoaded || !desmosInitialized) && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <div className="text-center space-y-2 bg-background/90 rounded-lg p-4 border">
+        {isLoading && !showScientificFallback && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-auto z-10 bg-background/95">
+            <div className="text-center space-y-4 bg-background rounded-lg p-6 border shadow-lg max-w-md">
               <CalcIcon className="h-8 w-8 mx-auto text-muted-foreground animate-pulse" />
-              <p className="text-sm text-muted-foreground">
-                Loading Desmos calculator...
-              </p>
+              <div>
+                <p className="text-sm font-medium mb-2">
+                  Loading Desmos calculator...
+                </p>
+                {loadingTime > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {loadingTime.toFixed(1)}s elapsed
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1059,10 +1295,12 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
           style={{
             left: `${position.x}px`,
             top: `${position.y}px`,
-            width: type === 'GRAPHING' ? '900px' : '400px',
+            width: `${calculatorSize.width}px`,
+            height: `${calculatorSize.height}px`,
             maxWidth: '90vw',
             maxHeight: '90vh',
-            transition: isDragging ? 'none' : isPositioned ? 'opacity 0.2s ease, box-shadow 0.2s ease' : 'none',
+            transition: (isDragging || isResizing) ? 'none' : isPositioned ? 'opacity 0.2s ease, box-shadow 0.2s ease' : 'none',
+            resize: 'none', // Prevent browser default resize
           }}
         >
           <Card className={`border-2 shadow-xl ${isDragging ? 'ring-2 ring-primary/50' : ''}`}>
@@ -1102,7 +1340,7 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
               </div>
             </CardHeader>
             
-            <CardContent className={`overflow-y-auto ${type === 'GRAPHING' ? 'max-h-[calc(90vh-80px)]' : 'max-h-[calc(90vh-80px)]'}`}>
+            <CardContent className={`overflow-y-auto`} style={{ height: `calc(${calculatorSize.height}px - 80px)`, maxHeight: 'calc(90vh - 80px)' }}>
               <div className={type === 'GRAPHING' ? '' : 'space-y-4'}>
                 {/* Display - only show for non-graphing calculators */}
                 {type !== 'GRAPHING' && (
@@ -1133,6 +1371,23 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
               </div>
             </CardContent>
           </Card>
+          
+          {/* Resize handle - bottom-right corner only for simplicity */}
+          {!isMinimized && (
+            <div
+              className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize z-50 group"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                handleResizeMouseDown(e, 'se')
+              }}
+              style={{ 
+                cursor: 'se-resize',
+                background: 'linear-gradient(to top left, transparent 0%, transparent 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1) 100%)'
+              }}
+              title="Drag to resize"
+            />
+          )}
         </div>
       )}
     </>

@@ -38,6 +38,7 @@ export function EditTestSchedule({
       : '',
     endAt: currentEndAt ? new Date(currentEndAt).toISOString().slice(0, 16) : '',
   })
+  const [dateTimeErrors, setDateTimeErrors] = useState<{ startAt?: string; endAt?: string }>({})
 
   const handleUpdate = async () => {
     if (!formData.startAt || !formData.endAt) {
@@ -127,9 +128,27 @@ export function EditTestSchedule({
                 id="editStartAt"
                 type="datetime-local"
                 value={formData.startAt}
-                onChange={(e) => setFormData((prev) => ({ ...prev, startAt: e.target.value }))}
+                onChange={(e) => {
+                  const newStartAt = e.target.value
+                  setFormData((prev) => ({ ...prev, startAt: newStartAt }))
+                  // Validate immediately
+                  if (newStartAt && formData.endAt) {
+                    const start = new Date(newStartAt)
+                    const end = new Date(formData.endAt)
+                    if (end <= start) {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
+                    } else {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                    }
+                  } else {
+                    setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                  }
+                }}
                 required
               />
+              {dateTimeErrors.startAt && (
+                <p className="text-sm text-destructive mt-1">{dateTimeErrors.startAt}</p>
+              )}
             </div>
 
             <div>
@@ -138,9 +157,28 @@ export function EditTestSchedule({
                 id="editEndAt"
                 type="datetime-local"
                 value={formData.endAt}
-                onChange={(e) => setFormData((prev) => ({ ...prev, endAt: e.target.value }))}
+                onChange={(e) => {
+                  const newEndAt = e.target.value
+                  setFormData((prev) => ({ ...prev, endAt: newEndAt }))
+                  // Validate immediately
+                  if (formData.startAt && newEndAt) {
+                    const start = new Date(formData.startAt)
+                    const end = new Date(newEndAt)
+                    if (end <= start) {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
+                    } else {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                    }
+                  } else {
+                    setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                  }
+                }}
                 required
+                min={formData.startAt || undefined}
               />
+              {dateTimeErrors.endAt && (
+                <p className="text-sm text-destructive mt-1">{dateTimeErrors.endAt}</p>
+              )}
             </div>
           </div>
 
@@ -162,7 +200,10 @@ export function EditTestSchedule({
             >
               Cancel
             </Button>
-            <Button onClick={handleUpdate} disabled={updating}>
+            <Button 
+              onClick={handleUpdate} 
+              disabled={updating || !!dateTimeErrors.startAt || !!dateTimeErrors.endAt}
+            >
               {updating ? 'Updating...' : 'Update Schedule'}
             </Button>
           </DialogFooter>

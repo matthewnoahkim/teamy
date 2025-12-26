@@ -21,6 +21,7 @@ const updateTestSchema = z.object({
   calculatorType: z.enum(['FOUR_FUNCTION', 'SCIENTIFIC', 'GRAPHING']).optional().nullable(),
   allowNoteSheet: z.boolean().optional(),
   noteSheetInstructions: z.string().optional().nullable(),
+  autoApproveNoteSheet: z.boolean().optional(),
   releaseScoresAt: z.string().datetime().optional().nullable(),
   maxAttempts: z.number().int().min(1).optional().nullable(),
   scoreReleaseMode: z.enum(['NONE', 'SCORE_ONLY', 'SCORE_WITH_WRONG', 'FULL_TEST']).optional(),
@@ -37,7 +38,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const test = await prisma.test.findUnique({
+    // First try to find as regular Test
+    let test = await prisma.test.findUnique({
       where: { id: params.testId },
       include: {
         sections: {
@@ -68,6 +70,62 @@ export async function GET(
         },
       },
     })
+
+    // If not found, try to find as ESTest
+    let esTest = null
+    if (!test) {
+      esTest = await prisma.eSTest.findUnique({
+        where: { id: params.testId },
+        include: {
+          tournament: {
+            select: {
+              id: true,
+            },
+          },
+          event: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      })
+
+      if (esTest) {
+        // Convert ESTest to Test-like format for compatibility
+        // Note: ESTest doesn't support note sheets in the database yet
+        return NextResponse.json({
+          test: {
+            id: esTest.id,
+            name: esTest.name,
+            description: esTest.description,
+            instructions: esTest.instructions,
+            status: esTest.status,
+            durationMinutes: esTest.durationMinutes,
+            startAt: esTest.startAt,
+            endAt: esTest.endAt,
+            allowLateUntil: esTest.allowLateUntil,
+            requireFullscreen: false,
+            allowCalculator: esTest.allowCalculator ?? false,
+            calculatorType: esTest.calculatorType,
+            allowNoteSheet: esTest.allowNoteSheet ?? false,
+            noteSheetInstructions: esTest.noteSheetInstructions,
+            autoApproveNoteSheet: esTest.autoApproveNoteSheet ?? true,
+            testPasswordHash: null,
+            maxAttempts: null,
+            scoreReleaseMode: 'FULL_TEST',
+            clubId: null,
+            sections: [],
+            questions: [],
+            assignments: [],
+            _count: {
+              attempts: 0,
+            },
+          },
+          userAttempts: null,
+          completedAttempts: null,
+        })
+      }
+    }
 
     if (!test) {
       return NextResponse.json({ error: 'Test not found' }, { status: 404 })
@@ -246,6 +304,8 @@ export async function PATCH(
       updateData.allowNoteSheet = validatedData.allowNoteSheet
     if (validatedData.noteSheetInstructions !== undefined)
       updateData.noteSheetInstructions = validatedData.noteSheetInstructions
+    if (validatedData.autoApproveNoteSheet !== undefined)
+      updateData.autoApproveNoteSheet = validatedData.autoApproveNoteSheet
     if (validatedData.releaseScoresAt !== undefined)
       updateData.releaseScoresAt = validatedData.releaseScoresAt
         ? new Date(validatedData.releaseScoresAt)

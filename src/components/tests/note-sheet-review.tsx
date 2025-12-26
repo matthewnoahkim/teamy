@@ -40,6 +40,14 @@ interface NoteSheet {
       name: string | null
       email: string
     }
+    team?: {
+      id: string
+      name: string
+    } | null
+    club?: {
+      id: string
+      name: string
+    } | null
   }
   reviewer?: {
     user: {
@@ -72,9 +80,14 @@ export function NoteSheetReview({
   const fetchNoteSheets = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/tests/${testId}/note-sheets?admin=true`)
+      // Try TD portal endpoint first (for tournament tests), fallback to regular endpoint
+      let response = await fetch(`/api/td/tests/${testId}/note-sheets`)
       if (!response.ok) {
-        throw new Error('Failed to fetch note sheets')
+        // Fallback to regular endpoint for club tests
+        response = await fetch(`/api/tests/${testId}/note-sheets?admin=true`)
+        if (!response.ok) {
+          throw new Error('Failed to fetch note sheets')
+        }
       }
       const data = await response.json()
       setNoteSheets(data.noteSheets || [])
@@ -94,8 +107,9 @@ export function NoteSheetReview({
 
     setReviewingId(noteSheetId)
     try {
-      const response = await fetch(
-        `/api/tests/${testId}/note-sheets/${noteSheetId}/review`,
+      // Try TD portal endpoint first (for tournament tests), fallback to regular endpoint
+      let response = await fetch(
+        `/api/td/tests/${testId}/note-sheets/${noteSheetId}/review`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -105,6 +119,21 @@ export function NoteSheetReview({
           }),
         }
       )
+      
+      // If TD endpoint fails, try regular endpoint
+      if (!response.ok) {
+        response = await fetch(
+          `/api/tests/${testId}/note-sheets/${noteSheetId}/review`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: reviewStatus,
+              rejectionReason: reviewStatus === 'REJECTED' ? rejectionReason : undefined,
+            }),
+          }
+        )
+      }
 
       if (!response.ok) {
         const data = await response.json()
@@ -174,7 +203,17 @@ export function NoteSheetReview({
                           <User className="h-4 w-4" />
                           {noteSheet.membership.user.name || noteSheet.membership.user.email}
                         </CardTitle>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
+                          {noteSheet.membership.team && (
+                            <div className="flex items-center gap-1">
+                              <span>Team: <strong>{noteSheet.membership.team.name}</strong></span>
+                            </div>
+                          )}
+                          {noteSheet.membership.club && (
+                            <div className="flex items-center gap-1">
+                              <span>Club: <strong>{noteSheet.membership.club.name}</strong></span>
+                            </div>
+                          )}
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             Submitted {new Date(noteSheet.createdAt).toLocaleDateString()}

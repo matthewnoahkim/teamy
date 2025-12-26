@@ -18,11 +18,13 @@ import {
 import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { PageLoading } from '@/components/ui/loading-spinner'
-import { Calendar, MapPin, Trophy, FileText, ChevronRight, LogOut, Pencil, ChevronDown, Clock, HelpCircle, ListChecks, AlertCircle, Calculator, FileCheck, Play, ArrowRight } from 'lucide-react'
+import { Calendar, MapPin, Trophy, FileText, ChevronRight, LogOut, Pencil, ChevronDown, Clock, HelpCircle, ListChecks, AlertCircle, Calculator, FileCheck, Play, ArrowRight, Upload, CheckCircle2, XCircle } from 'lucide-react'
 import { formatDivision } from '@/lib/utils'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import { isTestAvailable } from '@/lib/test-availability'
+import { NoteSheetUpload } from '@/components/tests/note-sheet-upload'
 
 interface Tournament {
   tournament: {
@@ -116,20 +118,37 @@ const STORAGE_KEY = 'testing-portal-selected-tournament'
 
 export function TestingPortalClient({ user }: TestingPortalClientProps) {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTournament, setSelectedTournament] = useState<string | null>(null)
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
+  // Track note sheet status for each test: Map<testId, { status: string | null, hasNoteSheet: boolean }>
+  const [noteSheetStatuses, setNoteSheetStatuses] = useState<Map<string, { status: string | null, hasNoteSheet: boolean }>>(new Map())
+  const [noteSheetUploadOpen, setNoteSheetUploadOpen] = useState<string | null>(null)
 
   // Load tournaments
   useEffect(() => {
     loadTournaments()
   }, [])
 
-  // Restore selected tournament from localStorage after tournaments are loaded (only once)
+  // Restore selected tournament from URL query param or localStorage after tournaments are loaded (only once)
   useEffect(() => {
     if (!loading && tournaments.length > 0 && selectedTournament === null) {
+      // First check URL query parameter
+      const tournamentIdFromUrl = searchParams.get('tournamentId')
+      if (tournamentIdFromUrl) {
+        // Verify the tournament exists in the list
+        const tournamentExists = tournaments.some(t => t.tournament.id === tournamentIdFromUrl)
+        if (tournamentExists) {
+          setSelectedTournament(tournamentIdFromUrl)
+          localStorage.setItem(STORAGE_KEY, tournamentIdFromUrl)
+          return
+        }
+      }
+      
+      // Fallback to localStorage
       const savedTournamentId = localStorage.getItem(STORAGE_KEY)
       if (savedTournamentId) {
         // Verify the tournament still exists in the list
@@ -143,7 +162,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, tournaments])
+  }, [loading, tournaments, searchParams])
 
   // Save selected tournament to localStorage whenever user changes selection
   const handleSetSelectedTournament = (tournamentId: string | null) => {
@@ -163,6 +182,9 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
       
       const data = await response.json()
       setTournaments(data.tournaments || [])
+      
+      // Load note sheet statuses for all tests that allow note sheets
+      await loadNoteSheetStatuses(data.tournaments || [])
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -171,6 +193,72 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadNoteSheetStatuses = async (tournaments: Tournament[]) => {
+    const statusMap = new Map<string, { status: string | null, hasNoteSheet: boolean }>()
+    
+    // Collect all test IDs that allow note sheets
+    const testIds: string[] = []
+    tournaments.forEach(tournament => {
+      tournament.events.forEach(event => {
+        event.tests.forEach(test => {
+          if (test.allowNoteSheet) {
+            testIds.push(test.id)
+          }
+        })
+      })
+      tournament.generalTests.forEach(test => {
+        if (test.allowNoteSheet) {
+          testIds.push(test.id)
+        }
+      })
+    })
+
+    // Fetch note sheet status for each test
+    const promises = testIds.map(async (testId) => {
+      try {
+        const response = await fetch(`/api/tests/${testId}/note-sheets`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.noteSheet) {
+            statusMap.set(testId, {
+              status: data.noteSheet.status,
+              hasNoteSheet: true,
+            })
+          } else {
+            statusMap.set(testId, {
+              status: null,
+              hasNoteSheet: false,
+            })
+          }
+        } else {
+          statusMap.set(testId, {
+            status: null,
+            hasNoteSheet: false,
+          })
+        }
+      } catch (error) {
+        // Silently fail for individual tests
+        statusMap.set(testId, {
+          status: null,
+          hasNoteSheet: false,
+        })
+      }
+    })
+
+    await Promise.all(promises)
+    setNoteSheetStatuses(statusMap)
+  }
+
+  const handleNoteSheetUploadSuccess = () => {
+    // Reload note sheet statuses after successful upload
+    if (selectedTournament) {
+      const tournament = tournaments.find(t => t.tournament.id === selectedTournament)
+      if (tournament) {
+        loadNoteSheetStatuses([tournament])
+      }
     }
   }
 
@@ -579,6 +667,92 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                       </div>
                                     )}
 
+                                    {/* Note Sheet Status and Upload */}
+                                    {test.allowNoteSheet && (() => {
+                                      const noteSheetStatus = noteSheetStatuses.get(test.id)
+                                      const isAccepted = noteSheetStatus?.status === 'ACCEPTED'
+                                      return (
+                                        <div className={`${isAccepted ? 'bg-green-500/20 dark:bg-green-600/20' : 'bg-amber-50 dark:bg-amber-950/20'} rounded-md p-4 border ${isAccepted ? 'border-green-500 dark:border-green-600' : 'border-amber-200 dark:border-amber-800'}`}>
+                                          <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-start gap-3 flex-1">
+                                              <FileText className={`h-5 w-5 ${isAccepted ? 'text-black dark:text-white' : 'text-amber-600 dark:text-amber-400'} flex-shrink-0 mt-0.5`} />
+                                              <div className="flex-1">
+                                                {(() => {
+                                                  if (!noteSheetStatus || !noteSheetStatus.hasNoteSheet) {
+                                                    return (
+                                                      <>
+                                                        <div className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                                                          You haven't uploaded a note sheet yet
+                                                        </div>
+                                                        <div className="text-sm text-amber-800 dark:text-amber-200">
+                                                          Upload one before the test starts.
+                                                        </div>
+                                                      </>
+                                                    )
+                                                  } else if (noteSheetStatus.status === 'ACCEPTED') {
+                                                    return (
+                                                      <>
+                                                        <div className="text-sm font-semibold text-black dark:text-white mb-1">
+                                                          Note Sheet Accepted
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-sm text-black dark:text-white">
+                                                          <CheckCircle2 className="h-4 w-4" />
+                                                          <span>Your note sheet has been accepted</span>
+                                                        </div>
+                                                      </>
+                                                    )
+                                                  } else if (noteSheetStatus.status === 'PENDING') {
+                                                    return (
+                                                      <>
+                                                        <div className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                                                          Note Sheet Pending Review
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
+                                                          <Clock className="h-4 w-4" />
+                                                          <span>Your note sheet is pending review</span>
+                                                        </div>
+                                                      </>
+                                                    )
+                                                  } else if (noteSheetStatus.status === 'REJECTED') {
+                                                    return (
+                                                      <>
+                                                        <div className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
+                                                          Note Sheet Rejected
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                                                          <XCircle className="h-4 w-4" />
+                                                          <span>Your note sheet was rejected. Please upload a new one.</span>
+                                                        </div>
+                                                      </>
+                                                    )
+                                                  }
+                                                  return null
+                                                })()}
+                                              </div>
+                                            </div>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setNoteSheetUploadOpen(test.id)}
+                                              className="flex-shrink-0"
+                                            >
+                                              {noteSheetStatuses.get(test.id)?.hasNoteSheet ? (
+                                                <>
+                                                  <Upload className="h-4 w-4 mr-2" />
+                                                  Modify
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Upload className="h-4 w-4 mr-2" />
+                                                  Upload
+                                                </>
+                                              )}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      )
+                                    })()}
+
                                     {/* Instructions if available */}
                                     {test.instructions && (
                                       <div className="bg-slate-100 dark:bg-slate-900/50 rounded-md p-3 border border-slate-200 dark:border-slate-700">
@@ -806,6 +980,92 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                               </div>
                             )}
 
+                            {/* Note Sheet Status and Upload */}
+                            {test.allowNoteSheet && (() => {
+                              const noteSheetStatus = noteSheetStatuses.get(test.id)
+                              const isAccepted = noteSheetStatus?.status === 'ACCEPTED'
+                              return (
+                                <div className={`${isAccepted ? 'bg-green-500/20 dark:bg-green-600/20' : 'bg-amber-50 dark:bg-amber-950/20'} rounded-md p-4 border ${isAccepted ? 'border-green-500 dark:border-green-600' : 'border-amber-200 dark:border-amber-800'}`}>
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="flex items-start gap-3 flex-1">
+                                      <FileText className={`h-5 w-5 ${isAccepted ? 'text-black dark:text-white' : 'text-amber-600 dark:text-amber-400'} flex-shrink-0 mt-0.5`} />
+                                      <div className="flex-1">
+                                        {(() => {
+                                          if (!noteSheetStatus || !noteSheetStatus.hasNoteSheet) {
+                                            return (
+                                              <>
+                                                <div className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                                                  You haven't uploaded a note sheet yet
+                                                </div>
+                                                <div className="text-sm text-amber-800 dark:text-amber-200">
+                                                  Upload one before the test starts.
+                                                </div>
+                                              </>
+                                            )
+                                          } else if (noteSheetStatus.status === 'ACCEPTED') {
+                                            return (
+                                              <>
+                                                <div className="text-sm font-semibold text-black dark:text-white mb-1">
+                                                  Note Sheet Accepted
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm text-black dark:text-white">
+                                                  <CheckCircle2 className="h-4 w-4" />
+                                                  <span>Your note sheet has been accepted</span>
+                                                </div>
+                                              </>
+                                            )
+                                          } else if (noteSheetStatus.status === 'PENDING') {
+                                            return (
+                                              <>
+                                                <div className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                                                  Note Sheet Pending Review
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
+                                                  <Clock className="h-4 w-4" />
+                                                  <span>Your note sheet is pending review</span>
+                                                </div>
+                                              </>
+                                            )
+                                          } else if (noteSheetStatus.status === 'REJECTED') {
+                                            return (
+                                              <>
+                                                <div className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
+                                                  Note Sheet Rejected
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                                                  <XCircle className="h-4 w-4" />
+                                                  <span>Your note sheet was rejected. Please upload a new one.</span>
+                                                </div>
+                                              </>
+                                            )
+                                          }
+                                          return null
+                                        })()}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setNoteSheetUploadOpen(test.id)}
+                                      className="flex-shrink-0"
+                                    >
+                                      {noteSheetStatuses.get(test.id)?.hasNoteSheet ? (
+                                        <>
+                                          <Upload className="h-4 w-4 mr-2" />
+                                          Modify
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Upload className="h-4 w-4 mr-2" />
+                                          Upload
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
+                              )
+                            })()}
+
                             {/* Instructions if available */}
                             {test.instructions && (
                               <div className="bg-slate-100 dark:bg-slate-900/50 rounded-md p-3 border border-slate-200 dark:border-slate-700">
@@ -981,6 +1241,31 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
           setEditUsernameOpen(false)
         }}
       />
+
+      {/* Note Sheet Upload Dialog */}
+      {noteSheetUploadOpen && (
+        <NoteSheetUpload
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              setNoteSheetUploadOpen(null)
+            }
+          }}
+          testId={noteSheetUploadOpen}
+          onSuccess={handleNoteSheetUploadSuccess}
+          instructions={(() => {
+            // Find the test to get its note sheet instructions
+            if (!selectedTournamentData) return undefined
+            for (const event of selectedTournamentData.events) {
+              const test = event.tests.find(t => t.id === noteSheetUploadOpen)
+              if (test) return test.noteSheetInstructions || undefined
+            }
+            const test = selectedTournamentData.generalTests.find(t => t.id === noteSheetUploadOpen)
+            if (test) return test.noteSheetInstructions || undefined
+            return undefined
+          })()}
+        />
+      )}
     </div>
   )
 }

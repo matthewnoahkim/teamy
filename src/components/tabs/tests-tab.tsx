@@ -664,14 +664,14 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
                   )}
                   
                   {noteSheet.status === 'ACCEPTED' && (
-                    <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <div className="p-3 bg-green-500 dark:bg-green-600 border border-green-600 dark:border-green-700 rounded-lg">
                       <div className="flex items-start gap-2">
-                        <FileText className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                        <FileText className="h-5 w-5 text-black dark:text-white flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                          <p className="text-sm font-medium text-black dark:text-white">
                             Note Sheet Accepted
                           </p>
-                          <p className="text-xs text-green-800 dark:text-green-200 mt-1">
+                          <p className="text-xs text-black/80 dark:text-white/80 mt-1">
                             Your note sheet has been approved and will be available during the test.
                           </p>
                         </div>

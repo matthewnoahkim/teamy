@@ -49,6 +49,7 @@ export function PublishTestButton({
     scoreReleaseMode: 'FULL_TEST' as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',
     requireFullscreen: true,
   })
+  const [dateTimeErrors, setDateTimeErrors] = useState<{ startAt?: string; endAt?: string }>({})
 
   const handlePublish = async () => {
     if (questionCount === 0) {
@@ -205,9 +206,27 @@ export function PublishTestButton({
                 id="startAt"
                 type="datetime-local"
                 value={formData.startAt}
-                onChange={(e) => setFormData((prev) => ({ ...prev, startAt: e.target.value }))}
+                onChange={(e) => {
+                  const newStartAt = e.target.value
+                  setFormData((prev) => ({ ...prev, startAt: newStartAt }))
+                  // Validate immediately
+                  if (newStartAt && formData.endAt) {
+                    const start = new Date(newStartAt)
+                    const end = new Date(formData.endAt)
+                    if (end <= start) {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
+                    } else {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                    }
+                  } else {
+                    setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                  }
+                }}
                 required
               />
+              {dateTimeErrors.startAt && (
+                <p className="text-sm text-destructive mt-1">{dateTimeErrors.startAt}</p>
+              )}
             </div>
 
             <div>
@@ -216,9 +235,28 @@ export function PublishTestButton({
                 id="endAt"
                 type="datetime-local"
                 value={formData.endAt}
-                onChange={(e) => setFormData((prev) => ({ ...prev, endAt: e.target.value }))}
+                onChange={(e) => {
+                  const newEndAt = e.target.value
+                  setFormData((prev) => ({ ...prev, endAt: newEndAt }))
+                  // Validate immediately
+                  if (formData.startAt && newEndAt) {
+                    const start = new Date(formData.startAt)
+                    const end = new Date(newEndAt)
+                    if (end <= start) {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
+                    } else {
+                      setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                    }
+                  } else {
+                    setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                  }
+                }}
                 required
+                min={formData.startAt || undefined}
               />
+              {dateTimeErrors.endAt && (
+                <p className="text-sm text-destructive mt-1">{dateTimeErrors.endAt}</p>
+              )}
             </div>
 
             <div>
@@ -332,6 +370,20 @@ export function PublishTestButton({
             </Button>
             <Button
               onClick={() => {
+                // Validate before proceeding
+                if (formData.startAt && formData.endAt) {
+                  const start = new Date(formData.startAt)
+                  const end = new Date(formData.endAt)
+                  if (end <= start) {
+                    toast({
+                      title: 'Error',
+                      description: 'End date/time must be after start date/time',
+                      variant: 'destructive',
+                    })
+                    setDateTimeErrors({ endAt: 'End date/time must be after start date/time' })
+                    return
+                  }
+                }
                 setOpen(false)
                 setCalendarModalOpen(true)
               }}

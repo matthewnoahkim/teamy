@@ -130,6 +130,12 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
     location: '',
   })
   const [saving, setSaving] = useState(false)
+  const [dateTimeErrors, setDateTimeErrors] = useState<{
+    startDate?: string
+    endDate?: string
+    startTime?: string
+    endTime?: string
+  }>({})
   
   // Sync activeTab with URL param when it changes (e.g., browser back/forward)
   useEffect(() => {
@@ -547,17 +553,34 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
       return
     }
 
-    // Validate date range
-    const startDateObj = new Date(editFormData.startDate)
-    const endDateObj = new Date(editFormData.endDate)
-    if (endDateObj < startDateObj) {
+    // Validate that end date/time is after start date/time
+    const startDateTime = new Date(`${editFormData.startDate}T${editFormData.startTime}`)
+    const endDateTime = new Date(`${editFormData.endDate}T${editFormData.endTime}`)
+    if (endDateTime <= startDateTime) {
       toast({
         title: 'Error',
-        description: 'End date must be on or after start date',
+        description: 'End date/time must be after start date/time',
         variant: 'destructive',
       })
+      setDateTimeErrors({ endDate: 'End date/time must be after start date/time', endTime: 'End date/time must be after start date/time' })
       return
     }
+
+    // Validate date/time range
+    const startDateTime = new Date(`${editFormData.startDate}T${editFormData.startTime}`)
+    const endDateTime = new Date(`${editFormData.endDate}T${editFormData.endTime}`)
+    if (endDateTime <= startDateTime) {
+      toast({
+        title: 'Error',
+        description: 'End date/time must be after start date/time',
+        variant: 'destructive',
+      })
+      setDateTimeErrors({ endDate: 'End date/time must be after start date/time', endTime: 'End date/time must be after start date/time' })
+      return
+    }
+    
+    // Clear errors if validation passes
+    setDateTimeErrors({})
 
     try {
       setSaving(true)
@@ -977,7 +1000,19 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
               </CardHeader>
               <CardContent>
                 {isEditing ? (
-                  <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleSaveDetails(); }}>
+                  <form className="space-y-6" onSubmit={(e) => { 
+                    e.preventDefault()
+                    // Check for date/time errors before submitting
+                    if (Object.values(dateTimeErrors).some(err => err !== undefined)) {
+                      toast({
+                        title: 'Validation Error',
+                        description: 'Please fix the date/time errors before saving',
+                        variant: 'destructive',
+                      })
+                      return
+                    }
+                    handleSaveDetails()
+                  }}>
                     <div className="space-y-2">
                       <Label htmlFor="edit-name">Tournament Name *</Label>
                       <Input
@@ -1070,9 +1105,27 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
                           id="edit-startDate"
                           type="date"
                           value={editFormData.startDate}
-                          onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
+                          onChange={(e) => {
+                            const newStartDate = e.target.value
+                            setEditFormData({ ...editFormData, startDate: newStartDate })
+                            // Validate immediately
+                            if (newStartDate && editFormData.endDate && editFormData.startTime && editFormData.endTime) {
+                              const startDateTime = new Date(`${newStartDate}T${editFormData.startTime}`)
+                              const endDateTime = new Date(`${editFormData.endDate}T${editFormData.endTime}`)
+                              if (endDateTime <= startDateTime) {
+                                setDateTimeErrors(prev => ({ ...prev, endDate: 'End date/time must be after start date/time', endTime: 'End date/time must be after start date/time' }))
+                              } else {
+                                setDateTimeErrors(prev => ({ ...prev, endDate: undefined, endTime: undefined }))
+                              }
+                            } else {
+                              setDateTimeErrors(prev => ({ ...prev, endDate: undefined, endTime: undefined }))
+                            }
+                          }}
                           required
                         />
+                        {dateTimeErrors.startDate && (
+                          <p className="text-sm text-destructive mt-1">{dateTimeErrors.startDate}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -1081,10 +1134,28 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
                           id="edit-endDate"
                           type="date"
                           value={editFormData.endDate}
-                          onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
-                          min={editFormData.startDate}
+                          min={editFormData.startDate || undefined}
+                          onChange={(e) => {
+                            const newEndDate = e.target.value
+                            setEditFormData({ ...editFormData, endDate: newEndDate })
+                            // Validate immediately
+                            if (editFormData.startDate && newEndDate && editFormData.startTime && editFormData.endTime) {
+                              const startDateTime = new Date(`${editFormData.startDate}T${editFormData.startTime}`)
+                              const endDateTime = new Date(`${newEndDate}T${editFormData.endTime}`)
+                              if (endDateTime <= startDateTime) {
+                                setDateTimeErrors(prev => ({ ...prev, endDate: 'End date/time must be after start date/time', endTime: 'End date/time must be after start date/time' }))
+                              } else {
+                                setDateTimeErrors(prev => ({ ...prev, endDate: undefined, endTime: undefined }))
+                              }
+                            } else {
+                              setDateTimeErrors(prev => ({ ...prev, endDate: undefined, endTime: undefined }))
+                            }
+                          }}
                           required
                         />
+                        {dateTimeErrors.endDate && (
+                          <p className="text-sm text-destructive mt-1">{dateTimeErrors.endDate}</p>
+                        )}
                       </div>
                     </div>
 
@@ -1095,9 +1166,27 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
                           id="edit-startTime"
                           type="time"
                           value={editFormData.startTime}
-                          onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })}
+                          onChange={(e) => {
+                            const newStartTime = e.target.value
+                            setEditFormData({ ...editFormData, startTime: newStartTime })
+                            // Validate immediately
+                            if (editFormData.startDate && editFormData.endDate && newStartTime && editFormData.endTime) {
+                              const startDateTime = new Date(`${editFormData.startDate}T${newStartTime}`)
+                              const endDateTime = new Date(`${editFormData.endDate}T${editFormData.endTime}`)
+                              if (endDateTime <= startDateTime) {
+                                setDateTimeErrors(prev => ({ ...prev, endTime: 'End date/time must be after start date/time' }))
+                              } else {
+                                setDateTimeErrors(prev => ({ ...prev, endTime: undefined }))
+                              }
+                            } else {
+                              setDateTimeErrors(prev => ({ ...prev, endTime: undefined }))
+                            }
+                          }}
                           required
                         />
+                        {dateTimeErrors.startTime && (
+                          <p className="text-sm text-destructive mt-1">{dateTimeErrors.startTime}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -1106,9 +1195,27 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
                           id="edit-endTime"
                           type="time"
                           value={editFormData.endTime}
-                          onChange={(e) => setEditFormData({ ...editFormData, endTime: e.target.value })}
+                          onChange={(e) => {
+                            const newEndTime = e.target.value
+                            setEditFormData({ ...editFormData, endTime: newEndTime })
+                            // Validate immediately
+                            if (editFormData.startDate && editFormData.endDate && editFormData.startTime && newEndTime) {
+                              const startDateTime = new Date(`${editFormData.startDate}T${editFormData.startTime}`)
+                              const endDateTime = new Date(`${editFormData.endDate}T${newEndTime}`)
+                              if (endDateTime <= startDateTime) {
+                                setDateTimeErrors(prev => ({ ...prev, endTime: 'End date/time must be after start date/time' }))
+                              } else {
+                                setDateTimeErrors(prev => ({ ...prev, endTime: undefined }))
+                              }
+                            } else {
+                              setDateTimeErrors(prev => ({ ...prev, endTime: undefined }))
+                            }
+                          }}
                           required
                         />
+                        {dateTimeErrors.endTime && (
+                          <p className="text-sm text-destructive mt-1">{dateTimeErrors.endTime}</p>
+                        )}
                       </div>
                     </div>
                   </form>

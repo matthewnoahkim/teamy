@@ -50,6 +50,7 @@ import {
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { formatDivision } from '@/lib/utils'
+import { NoteSheetReview } from '@/components/tests/note-sheet-review'
 
 interface StaffMember {
   id: string
@@ -294,6 +295,16 @@ export function TDTournamentManageClient({
   // Settings edit state
   const [isEditingSettings, setIsEditingSettings] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsFormErrors, setSettingsFormErrors] = useState<{
+    startDate?: string
+    endDate?: string
+    startTime?: string
+    endTime?: string
+    registrationStartDate?: string
+    registrationEndDate?: string
+    earlyBirdDeadline?: string
+    lateFeeStartDate?: string
+  }>({})
   const [settingsForm, setSettingsForm] = useState({
     startDate: tournament.startDate?.split('T')[0] || '',
     endDate: tournament.endDate?.split('T')[0] || '',
@@ -343,6 +354,8 @@ export function TDTournamentManageClient({
       createdBy?: { id: string; name: string | null; email: string }
       updatedAt: string
       createdAt: string
+      allowNoteSheet: boolean
+      autoApproveNoteSheet: boolean
       questions: Array<{
         id: string
         type: string
@@ -354,6 +367,7 @@ export function TDTournamentManageClient({
       }>
     }>
   }>>([])
+  const [noteSheetReviewOpen, setNoteSheetReviewOpen] = useState<string | null>(null)
   const [loadingEvents, setLoadingEvents] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [eventFilter, setEventFilter] = useState<string>('all')
@@ -848,6 +862,62 @@ export function TDTournamentManageClient({
   }
 
   const handleSaveSettings = async () => {
+    // Validate all date/time fields before saving
+    const errors: typeof settingsFormErrors = {}
+    
+    // Validate tournament start/end date and time
+    if (settingsForm.startDate && settingsForm.endDate) {
+      const startDateTime = settingsForm.startDate && settingsForm.startTime
+        ? new Date(`${settingsForm.startDate}T${settingsForm.startTime}`)
+        : new Date(settingsForm.startDate)
+      const endDateTime = settingsForm.endDate && settingsForm.endTime
+        ? new Date(`${settingsForm.endDate}T${settingsForm.endTime}`)
+        : new Date(settingsForm.endDate)
+      if (endDateTime <= startDateTime) {
+        errors.endDate = 'End date/time must be after start date/time'
+        errors.endTime = 'End date/time must be after start date/time'
+      }
+    }
+    
+    // Validate registration dates
+    if (settingsForm.registrationStartDate && settingsForm.registrationEndDate) {
+      const regStart = new Date(settingsForm.registrationStartDate)
+      const regEnd = new Date(settingsForm.registrationEndDate)
+      if (regEnd <= regStart) {
+        errors.registrationEndDate = 'Registration end date must be after start date'
+      }
+    }
+    
+    // Validate early bird deadline (should be before registration end date if both exist)
+    if (settingsForm.earlyBirdDeadline && settingsForm.registrationEndDate) {
+      const earlyBird = new Date(settingsForm.earlyBirdDeadline)
+      const regEnd = new Date(settingsForm.registrationEndDate)
+      if (earlyBird >= regEnd) {
+        errors.earlyBirdDeadline = 'Early bird deadline must be before registration end date'
+      }
+    }
+    
+    // Validate late fee start date (should be after registration start date if both exist)
+    if (settingsForm.lateFeeStartDate && settingsForm.registrationStartDate) {
+      const lateFeeStart = new Date(settingsForm.lateFeeStartDate)
+      const regStart = new Date(settingsForm.registrationStartDate)
+      if (lateFeeStart <= regStart) {
+        errors.lateFeeStartDate = 'Late fee start date must be after registration start date'
+      }
+    }
+    
+    // If there are errors, show them and prevent saving
+    if (Object.values(errors).some(err => err !== undefined)) {
+      setSettingsFormErrors(errors)
+      toast({
+        title: 'Validation Error',
+        description: 'Please fix the date/time errors before saving',
+        variant: 'destructive',
+      })
+      setSavingSettings(false)
+      return
+    }
+    
     setSavingSettings(true)
     try {
       const res = await fetch(`/api/tournaments/${tournament.id}/settings`, {
@@ -884,6 +954,7 @@ export function TDTournamentManageClient({
           description: 'Tournament settings have been updated.',
         })
         setIsEditingSettings(false)
+        setSettingsFormErrors({}) // Clear errors on success
         router.refresh()
       } else {
         const data = await res.json()
@@ -2173,6 +2244,16 @@ export function TDTournamentManageClient({
                                       </div>
                                     </div>
                                     <div className="flex gap-2">
+                                      {test.allowNoteSheet && (
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm"
+                                          onClick={() => setNoteSheetReviewOpen(test.id)}
+                                        >
+                                          <FileText className="h-4 w-4 mr-1" />
+                                          Note Sheets
+                                        </Button>
+                                      )}
                                       <Link href={`/td/tests/${test.id}`}>
                                         <Button variant="outline" size="sm">
                                           <Edit className="h-4 w-4 mr-1" />
@@ -2714,7 +2795,10 @@ export function TDTournamentManageClient({
                       <Button variant="outline" onClick={() => setIsEditingSettings(false)}>
                         Cancel
                       </Button>
-                      <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                      <Button 
+                        onClick={handleSaveSettings} 
+                        disabled={savingSettings || Object.values(settingsFormErrors).some(err => err !== undefined)}
+                      >
                         {savingSettings ? 'Saving...' : 'Save Changes'}
                       </Button>
                     </div>
@@ -2729,11 +2813,35 @@ export function TDTournamentManageClient({
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Start Date</Label>
                       {isEditingSettings ? (
-                        <Input
-                          type="date"
-                          value={settingsForm.startDate}
-                          onChange={e => setSettingsForm(prev => ({ ...prev, startDate: e.target.value }))}
-                        />
+                        <>
+                          <Input
+                            type="date"
+                            value={settingsForm.startDate}
+                            onChange={e => {
+                              const newStartDate = e.target.value
+                              setSettingsForm(prev => ({ ...prev, startDate: newStartDate }))
+                              // Validate immediately
+                              if (newStartDate && settingsForm.endDate) {
+                                const startDateTime = newStartDate && settingsForm.startTime 
+                                  ? new Date(`${newStartDate}T${settingsForm.startTime}`)
+                                  : new Date(newStartDate)
+                                const endDateTime = settingsForm.endDate && settingsForm.endTime
+                                  ? new Date(`${settingsForm.endDate}T${settingsForm.endTime}`)
+                                  : new Date(settingsForm.endDate)
+                                if (endDateTime <= startDateTime) {
+                                  setSettingsFormErrors(prev => ({ ...prev, endDate: 'End date/time must be after start date/time' }))
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, endDate: undefined }))
+                                }
+                              } else {
+                                setSettingsFormErrors(prev => ({ ...prev, endDate: undefined }))
+                              }
+                            }}
+                          />
+                          {settingsFormErrors.startDate && (
+                            <p className="text-sm text-destructive mt-1">{settingsFormErrors.startDate}</p>
+                          )}
+                        </>
                       ) : (
                         <p className="text-base font-semibold py-1.5">{tournament.startDate ? format(new Date(tournament.startDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                       )}
@@ -2741,11 +2849,35 @@ export function TDTournamentManageClient({
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Start Time</Label>
                       {isEditingSettings ? (
-                        <Input
-                          type="time"
-                          value={settingsForm.startTime}
-                          onChange={e => setSettingsForm(prev => ({ ...prev, startTime: e.target.value }))}
-                        />
+                        <>
+                          <Input
+                            type="time"
+                            value={settingsForm.startTime}
+                            onChange={e => {
+                              const newStartTime = e.target.value
+                              setSettingsForm(prev => ({ ...prev, startTime: newStartTime }))
+                              // Validate immediately
+                              if (settingsForm.startDate && settingsForm.endDate) {
+                                const startDateTime = settingsForm.startDate && newStartTime
+                                  ? new Date(`${settingsForm.startDate}T${newStartTime}`)
+                                  : new Date(settingsForm.startDate)
+                                const endDateTime = settingsForm.endDate && settingsForm.endTime
+                                  ? new Date(`${settingsForm.endDate}T${settingsForm.endTime}`)
+                                  : new Date(settingsForm.endDate)
+                                if (endDateTime <= startDateTime) {
+                                  setSettingsFormErrors(prev => ({ ...prev, endTime: 'End date/time must be after start date/time' }))
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, endTime: undefined }))
+                                }
+                              } else {
+                                setSettingsFormErrors(prev => ({ ...prev, endTime: undefined }))
+                              }
+                            }}
+                          />
+                          {settingsFormErrors.startTime && (
+                            <p className="text-sm text-destructive mt-1">{settingsFormErrors.startTime}</p>
+                          )}
+                        </>
                       ) : (
                         <p className="text-base font-semibold py-1.5">{tournament.startTime ? format(new Date(tournament.startTime), 'h:mm a') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                       )}
@@ -2753,11 +2885,36 @@ export function TDTournamentManageClient({
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">End Date</Label>
                       {isEditingSettings ? (
-                        <Input
-                          type="date"
-                          value={settingsForm.endDate}
-                          onChange={e => setSettingsForm(prev => ({ ...prev, endDate: e.target.value }))}
-                        />
+                        <>
+                          <Input
+                            type="date"
+                            value={settingsForm.endDate}
+                            min={settingsForm.startDate || undefined}
+                            onChange={e => {
+                              const newEndDate = e.target.value
+                              setSettingsForm(prev => ({ ...prev, endDate: newEndDate }))
+                              // Validate immediately
+                              if (settingsForm.startDate && newEndDate) {
+                                const startDateTime = settingsForm.startDate && settingsForm.startTime
+                                  ? new Date(`${settingsForm.startDate}T${settingsForm.startTime}`)
+                                  : new Date(settingsForm.startDate)
+                                const endDateTime = newEndDate && settingsForm.endTime
+                                  ? new Date(`${newEndDate}T${settingsForm.endTime}`)
+                                  : new Date(newEndDate)
+                                if (endDateTime <= startDateTime) {
+                                  setSettingsFormErrors(prev => ({ ...prev, endDate: 'End date/time must be after start date/time' }))
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, endDate: undefined, endTime: undefined }))
+                                }
+                              } else {
+                                setSettingsFormErrors(prev => ({ ...prev, endDate: undefined }))
+                              }
+                            }}
+                          />
+                          {settingsFormErrors.endDate && (
+                            <p className="text-sm text-destructive mt-1">{settingsFormErrors.endDate}</p>
+                          )}
+                        </>
                       ) : (
                         <p className="text-base font-semibold py-1.5">{tournament.endDate ? format(new Date(tournament.endDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                       )}
@@ -2765,11 +2922,35 @@ export function TDTournamentManageClient({
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">End Time</Label>
                       {isEditingSettings ? (
-                        <Input
-                          type="time"
-                          value={settingsForm.endTime}
-                          onChange={e => setSettingsForm(prev => ({ ...prev, endTime: e.target.value }))}
-                        />
+                        <>
+                          <Input
+                            type="time"
+                            value={settingsForm.endTime}
+                            onChange={e => {
+                              const newEndTime = e.target.value
+                              setSettingsForm(prev => ({ ...prev, endTime: newEndTime }))
+                              // Validate immediately
+                              if (settingsForm.startDate && settingsForm.endDate) {
+                                const startDateTime = settingsForm.startDate && settingsForm.startTime
+                                  ? new Date(`${settingsForm.startDate}T${settingsForm.startTime}`)
+                                  : new Date(settingsForm.startDate)
+                                const endDateTime = settingsForm.endDate && newEndTime
+                                  ? new Date(`${settingsForm.endDate}T${newEndTime}`)
+                                  : new Date(settingsForm.endDate)
+                                if (endDateTime <= startDateTime) {
+                                  setSettingsFormErrors(prev => ({ ...prev, endTime: 'End date/time must be after start date/time' }))
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, endTime: undefined }))
+                                }
+                              } else {
+                                setSettingsFormErrors(prev => ({ ...prev, endTime: undefined }))
+                              }
+                            }}
+                          />
+                          {settingsFormErrors.endTime && (
+                            <p className="text-sm text-destructive mt-1">{settingsFormErrors.endTime}</p>
+                          )}
+                        </>
                       ) : (
                         <p className="text-base font-semibold py-1.5">{tournament.endTime ? format(new Date(tournament.endTime), 'h:mm a') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                       )}
@@ -3056,11 +3237,41 @@ export function TDTournamentManageClient({
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Registration Opens</Label>
                       {isEditingSettings ? (
-                        <Input
-                          type="date"
-                          value={settingsForm.registrationStartDate}
-                          onChange={e => setSettingsForm(prev => ({ ...prev, registrationStartDate: e.target.value }))}
-                        />
+                        <>
+                          <Input
+                            type="date"
+                            value={settingsForm.registrationStartDate}
+                            onChange={e => {
+                              const newRegStart = e.target.value
+                              setSettingsForm(prev => ({ ...prev, registrationStartDate: newRegStart }))
+                              // Validate immediately
+                              if (newRegStart && settingsForm.registrationEndDate) {
+                                const regStart = new Date(newRegStart)
+                                const regEnd = new Date(settingsForm.registrationEndDate)
+                                if (regEnd <= regStart) {
+                                  setSettingsFormErrors(prev => ({ ...prev, registrationEndDate: 'Registration end date must be after start date' }))
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, registrationEndDate: undefined }))
+                                }
+                              } else {
+                                setSettingsFormErrors(prev => ({ ...prev, registrationEndDate: undefined }))
+                              }
+                              // Also validate late fee start date
+                              if (newRegStart && settingsForm.lateFeeStartDate) {
+                                const regStart = new Date(newRegStart)
+                                const lateFeeStart = new Date(settingsForm.lateFeeStartDate)
+                                if (lateFeeStart <= regStart) {
+                                  setSettingsFormErrors(prev => ({ ...prev, lateFeeStartDate: 'Late fee start date must be after registration start date' }))
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, lateFeeStartDate: undefined }))
+                                }
+                              }
+                            }}
+                          />
+                          {settingsFormErrors.registrationStartDate && (
+                            <p className="text-sm text-destructive mt-1">{settingsFormErrors.registrationStartDate}</p>
+                          )}
+                        </>
                       ) : (
                         <p className="text-base font-semibold py-1.5">{tournament.registrationStartDate ? format(new Date(tournament.registrationStartDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                       )}
@@ -3068,11 +3279,42 @@ export function TDTournamentManageClient({
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Registration Closes</Label>
                       {isEditingSettings ? (
-                        <Input
-                          type="date"
-                          value={settingsForm.registrationEndDate}
-                          onChange={e => setSettingsForm(prev => ({ ...prev, registrationEndDate: e.target.value }))}
-                        />
+                        <>
+                          <Input
+                            type="date"
+                            value={settingsForm.registrationEndDate}
+                            min={settingsForm.registrationStartDate || undefined}
+                            onChange={e => {
+                              const newRegEnd = e.target.value
+                              setSettingsForm(prev => ({ ...prev, registrationEndDate: newRegEnd }))
+                              // Validate immediately
+                              if (settingsForm.registrationStartDate && newRegEnd) {
+                                const regStart = new Date(settingsForm.registrationStartDate)
+                                const regEnd = new Date(newRegEnd)
+                                if (regEnd <= regStart) {
+                                  setSettingsFormErrors(prev => ({ ...prev, registrationEndDate: 'Registration end date must be after start date' }))
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, registrationEndDate: undefined }))
+                                }
+                              } else {
+                                setSettingsFormErrors(prev => ({ ...prev, registrationEndDate: undefined }))
+                              }
+                              // Also validate early bird deadline
+                              if (newRegEnd && settingsForm.earlyBirdDeadline) {
+                                const regEnd = new Date(newRegEnd)
+                                const earlyBird = new Date(settingsForm.earlyBirdDeadline)
+                                if (earlyBird >= regEnd) {
+                                  setSettingsFormErrors(prev => ({ ...prev, earlyBirdDeadline: 'Early bird deadline must be before registration end date' }))
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, earlyBirdDeadline: undefined }))
+                                }
+                              }
+                            }}
+                          />
+                          {settingsFormErrors.registrationEndDate && (
+                            <p className="text-sm text-destructive mt-1">{settingsFormErrors.registrationEndDate}</p>
+                          )}
+                        </>
                       ) : (
                         <p className="text-base font-semibold py-1.5">{tournament.registrationEndDate ? format(new Date(tournament.registrationEndDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                       )}
@@ -3104,11 +3346,32 @@ export function TDTournamentManageClient({
                       <div className="space-y-2">
                         <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Early Bird Deadline</Label>
                         {isEditingSettings ? (
-                          <Input
-                            type="date"
-                            value={settingsForm.earlyBirdDeadline}
-                            onChange={e => setSettingsForm(prev => ({ ...prev, earlyBirdDeadline: e.target.value }))}
-                          />
+                          <>
+                            <Input
+                              type="date"
+                              value={settingsForm.earlyBirdDeadline}
+                              max={settingsForm.registrationEndDate || undefined}
+                              onChange={e => {
+                                const newEarlyBird = e.target.value
+                                setSettingsForm(prev => ({ ...prev, earlyBirdDeadline: newEarlyBird }))
+                                // Validate immediately
+                                if (newEarlyBird && settingsForm.registrationEndDate) {
+                                  const earlyBird = new Date(newEarlyBird)
+                                  const regEnd = new Date(settingsForm.registrationEndDate)
+                                  if (earlyBird >= regEnd) {
+                                    setSettingsFormErrors(prev => ({ ...prev, earlyBirdDeadline: 'Early bird deadline must be before registration end date' }))
+                                  } else {
+                                    setSettingsFormErrors(prev => ({ ...prev, earlyBirdDeadline: undefined }))
+                                  }
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, earlyBirdDeadline: undefined }))
+                                }
+                              }}
+                            />
+                            {settingsFormErrors.earlyBirdDeadline && (
+                              <p className="text-sm text-destructive mt-1">{settingsFormErrors.earlyBirdDeadline}</p>
+                            )}
+                          </>
                         ) : (
                           <p className="text-base font-semibold py-1.5">{tournament.earlyBirdDeadline ? format(new Date(tournament.earlyBirdDeadline), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                         )}
@@ -3135,11 +3398,32 @@ export function TDTournamentManageClient({
                       <div className="space-y-2">
                         <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Late Fee Starts On</Label>
                         {isEditingSettings ? (
-                          <Input
-                            type="date"
-                            value={settingsForm.lateFeeStartDate}
-                            onChange={e => setSettingsForm(prev => ({ ...prev, lateFeeStartDate: e.target.value }))}
-                          />
+                          <>
+                            <Input
+                              type="date"
+                              value={settingsForm.lateFeeStartDate}
+                              min={settingsForm.registrationStartDate || undefined}
+                              onChange={e => {
+                                const newLateFeeStart = e.target.value
+                                setSettingsForm(prev => ({ ...prev, lateFeeStartDate: newLateFeeStart }))
+                                // Validate immediately
+                                if (settingsForm.registrationStartDate && newLateFeeStart) {
+                                  const regStart = new Date(settingsForm.registrationStartDate)
+                                  const lateFeeStart = new Date(newLateFeeStart)
+                                  if (lateFeeStart <= regStart) {
+                                    setSettingsFormErrors(prev => ({ ...prev, lateFeeStartDate: 'Late fee start date must be after registration start date' }))
+                                  } else {
+                                    setSettingsFormErrors(prev => ({ ...prev, lateFeeStartDate: undefined }))
+                                  }
+                                } else {
+                                  setSettingsFormErrors(prev => ({ ...prev, lateFeeStartDate: undefined }))
+                                }
+                              }}
+                            />
+                            {settingsFormErrors.lateFeeStartDate && (
+                              <p className="text-sm text-destructive mt-1">{settingsFormErrors.lateFeeStartDate}</p>
+                            )}
+                          </>
                         ) : (
                           <p className="text-base font-semibold py-1.5">{tournament.lateFeeStartDate ? format(new Date(tournament.lateFeeStartDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                         )}
@@ -3279,6 +3563,22 @@ export function TDTournamentManageClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Note Sheet Review Dialog */}
+      {noteSheetReviewOpen && (
+        <NoteSheetReview
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              setNoteSheetReviewOpen(null)
+            }
+          }}
+          testId={noteSheetReviewOpen}
+          testName={eventsWithTests
+            .flatMap(e => e.tests)
+            .find(t => t.id === noteSheetReviewOpen)?.name || 'Test'}
+        />
+      )}
     </div>
   )
 }

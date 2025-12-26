@@ -219,18 +219,36 @@ export default async function TournamentManageByRequestPage({ params }: Props) {
     },
   })
 
+  // Parse eventsRun to get list of event IDs being run in this tournament
+  let eventsRunIds: string[] = []
+  if (tournament.eventsRun && tournament.eventsRun.trim()) {
+    try {
+      const parsed = JSON.parse(tournament.eventsRun)
+      eventsRunIds = Array.isArray(parsed) ? parsed : []
+    } catch (e) {
+      console.error('Error parsing eventsRun:', e)
+    }
+  }
+
   // Fetch events for this division - handle B&C tournaments
+  // Only fetch events that are being run in this tournament
   let events
   if (displayDivision === 'B&C' || (typeof displayDivision === 'string' && displayDivision.includes('B') && displayDivision.includes('C'))) {
     // For B&C tournaments, fetch both B and C events
     const [bEvents, cEvents] = await Promise.all([
       prisma.event.findMany({
-        where: { division: 'B' },
+        where: { 
+          division: 'B',
+          ...(eventsRunIds.length > 0 && { id: { in: eventsRunIds } }),
+        },
         select: { id: true, name: true, division: true },
         orderBy: { name: 'asc' },
       }),
       prisma.event.findMany({
-        where: { division: 'C' },
+        where: { 
+          division: 'C',
+          ...(eventsRunIds.length > 0 && { id: { in: eventsRunIds } }),
+        },
         select: { id: true, name: true, division: true },
         orderBy: { name: 'asc' },
       }),
@@ -242,6 +260,7 @@ export default async function TournamentManageByRequestPage({ params }: Props) {
     events = await prisma.event.findMany({
       where: {
         division: tournament.division,
+        ...(eventsRunIds.length > 0 && { id: { in: eventsRunIds } }),
       },
       select: {
         id: true,

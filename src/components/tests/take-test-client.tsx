@@ -979,15 +979,17 @@ export function TakeTestClient({
               )}
             </div>
             <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowSaveExitDialog(true)
-                }}
-                disabled={submitting}
-              >
-                Save & Exit
-              </Button>
+              {!(test as any).requireOneSitting && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowSaveExitDialog(true)
+                  }}
+                  disabled={submitting}
+                >
+                  Save & Exit
+                </Button>
+              )}
               <Button
                 onClick={() => {
                   setShowSubmitDialog(true)

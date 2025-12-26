@@ -334,6 +334,8 @@ export async function POST(request: NextRequest) {
       allowNoteSheet,
       calculatorType,
       noteSheetInstructions,
+      autoApproveNoteSheet,
+      requireOneSitting,
       questions 
     } = body as {
       staffId: string
@@ -350,6 +352,7 @@ export async function POST(request: NextRequest) {
       allowNoteSheet?: boolean
       calculatorType?: CalculatorType
       noteSheetInstructions?: string
+      autoApproveNoteSheet?: boolean
       questions?: Array<{
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
         promptMd: string
@@ -390,23 +393,30 @@ export async function POST(request: NextRequest) {
     
     // Create the test with questions and audit log in a transaction
     const test = await prisma.$transaction(async (tx) => {
+      // Base data without requireOneSitting
+      const baseData: any = {
+        staffId,
+        createdByStaffId: staffId, // Track original creator
+        tournamentId,
+        eventId: eventId || null, // Ensure we store null if not provided
+        name,
+        description,
+        instructions,
+        durationMinutes: durationMinutes || 60,
+        startAt: startAt ? new Date(startAt) : null,
+        endAt: endAt ? new Date(endAt) : null,
+        allowLateUntil: allowLateUntil ? new Date(allowLateUntil) : null,
+        allowCalculator: allowCalculator ?? false,
+        allowNoteSheet: allowNoteSheet ?? false,
+        calculatorType: allowCalculator && calculatorType ? calculatorType as 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' : null,
+        noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null,
+        autoApproveNoteSheet: allowNoteSheet ? (autoApproveNoteSheet ?? true) : true,
+      }
+      
       const createdTest = await tx.eSTest.create({
         data: {
-          staffId,
-          createdByStaffId: staffId, // Track original creator
-          tournamentId,
-          eventId: eventId || null, // Ensure we store null if not provided
-          name,
-          description,
-          instructions,
-          durationMinutes: durationMinutes || 60,
-          startAt: startAt ? new Date(startAt) : null,
-          endAt: endAt ? new Date(endAt) : null,
-          allowLateUntil: allowLateUntil ? new Date(allowLateUntil) : null,
-          allowCalculator: allowCalculator ?? false,
-          allowNoteSheet: allowNoteSheet ?? false,
-          calculatorType: allowCalculator && calculatorType ? calculatorType as 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' : null,
-          noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null,
+          ...baseData,
+          requireOneSitting: requireOneSitting ?? true,
           questions: questions && questions.length > 0
             ? {
                 create: questions.map((q, index) => ({
@@ -521,6 +531,8 @@ export async function PUT(request: NextRequest) {
       allowNoteSheet,
       calculatorType,
       noteSheetInstructions,
+      autoApproveNoteSheet,
+      requireOneSitting,
       questions 
     } = body as {
       testId: string
@@ -537,6 +549,8 @@ export async function PUT(request: NextRequest) {
       allowNoteSheet?: boolean
       calculatorType?: CalculatorType
       noteSheetInstructions?: string
+      autoApproveNoteSheet?: boolean
+      requireOneSitting?: boolean
       questions?: Array<{
         id?: string
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
@@ -660,6 +674,8 @@ export async function PUT(request: NextRequest) {
     if (allowNoteSheet !== undefined && allowNoteSheet !== existingTest.allowNoteSheet) changedFields.push('allowNoteSheet')
     if (calculatorType !== undefined && calculatorType !== existingTest.calculatorType) changedFields.push('calculatorType')
     if (noteSheetInstructions !== undefined && noteSheetInstructions !== existingTest.noteSheetInstructions) changedFields.push('noteSheetInstructions')
+    if (autoApproveNoteSheet !== undefined && autoApproveNoteSheet !== existingTest.autoApproveNoteSheet) changedFields.push('autoApproveNoteSheet')
+    if (requireOneSitting !== undefined && requireOneSitting !== existingTest.requireOneSitting) changedFields.push('requireOneSitting')
     if (questions) changedFields.push('questions')
 
     // Use a transaction to update test and questions
@@ -681,6 +697,9 @@ export async function PUT(request: NextRequest) {
           ...(allowNoteSheet !== undefined && { allowNoteSheet }),
           ...(calculatorType !== undefined && { calculatorType: allowCalculator && calculatorType ? calculatorType as 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' : null }),
           ...(noteSheetInstructions !== undefined && { noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null }),
+          ...(autoApproveNoteSheet !== undefined && { autoApproveNoteSheet: allowNoteSheet ? (autoApproveNoteSheet ?? true) : true }),
+          // Only include requireOneSitting if provided (will be skipped if column doesn't exist)
+          ...(requireOneSitting !== undefined ? { requireOneSitting } : {}),
         },
       })
 

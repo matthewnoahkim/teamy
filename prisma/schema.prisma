@@ -573,6 +573,7 @@ model Test {
   calculatorType         CalculatorType?
   allowNoteSheet         Boolean               @default(false)
   noteSheetInstructions  String?
+  autoApproveNoteSheet   Boolean               @default(true)
   createdByMembershipId  String
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
@@ -594,7 +595,8 @@ model Test {
 
 model NoteSheet {
   id              String          @id @default(cuid())
-  testId          String
+  testId          String? // Nullable to support ESTest
+  esTestId        String? // Support for ESTest note sheets
   membershipId    String
   type            NoteSheetType
   content         String?
@@ -610,10 +612,13 @@ model NoteSheet {
   updatedAt       DateTime        @updatedAt
   membership      Membership      @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   reviewer        Membership?     @relation("NoteSheetReviewer", fields: [reviewedById], references: [id])
-  test            Test            @relation(fields: [testId], references: [id], onDelete: Cascade)
+  test            Test?           @relation(fields: [testId], references: [id], onDelete: Cascade)
+  esTest          ESTest?         @relation(fields: [esTestId], references: [id], onDelete: Cascade)
 
   @@unique([testId, membershipId])
+  @@unique([esTestId, membershipId])
   @@index([testId])
+  @@index([esTestId])
   @@index([membershipId])
   @@index([status])
   @@index([reviewedById])
@@ -1317,6 +1322,8 @@ model ESTest {
   allowNoteSheet        Boolean          @default(false)
   calculatorType        CalculatorType?
   noteSheetInstructions String?
+  autoApproveNoteSheet  Boolean          @default(true)
+  requireOneSitting     Boolean          @default(true)
   createdBy             TournamentStaff  @relation("ESTestCreator", fields: [createdByStaffId], references: [id], onDelete: Cascade)
   event                 Event?           @relation(fields: [eventId], references: [id])
   staff                 TournamentStaff  @relation("ESTestOwner", fields: [staffId], references: [id], onDelete: Cascade)
@@ -1324,6 +1331,7 @@ model ESTest {
   attempts              ESTestAttempt[]
   audits                ESTestAudit[]
   questions             ESTestQuestion[]
+  noteSheets            NoteSheet[]
 
   @@index([staffId])
   @@index([createdByStaffId])
