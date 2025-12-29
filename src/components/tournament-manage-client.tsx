@@ -565,19 +565,6 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
       setDateTimeErrors({ endDate: 'End date/time must be after start date/time', endTime: 'End date/time must be after start date/time' })
       return
     }
-
-    // Validate date/time range
-    const startDateTime = new Date(`${editFormData.startDate}T${editFormData.startTime}`)
-    const endDateTime = new Date(`${editFormData.endDate}T${editFormData.endTime}`)
-    if (endDateTime <= startDateTime) {
-      toast({
-        title: 'Error',
-        description: 'End date/time must be after start date/time',
-        variant: 'destructive',
-      })
-      setDateTimeErrors({ endDate: 'End date/time must be after start date/time', endTime: 'End date/time must be after start date/time' })
-      return
-    }
     
     // Clear errors if validation passes
     setDateTimeErrors({})

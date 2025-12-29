@@ -37,17 +37,30 @@ const boostTiers = [
   {
     tier: 'Tier 1',
     boosts: '0 boosts',
-    features: ['60 max members', '50MB storage/month'],
+    features: ['50 max members', '5 GB storage'],
   },
   {
     tier: 'Tier 2',
-    boosts: '5 boosts',
-    features: ['Unlimited members', '100MB storage/month'],
+    boosts: '10 boosts',
+    features: [
+      '100 max members', 
+      '10 GB storage',
+      'Admin access to Teamy testing portal',
+      'Customizable widgets'
+    ],
   },
   {
     tier: 'Tier 3',
-    boosts: '10 boosts',
-    features: ['Unlimited members', 'Unlimited storage'],
+    boosts: '25 boosts',
+    features: [
+      'Unlimited members', 
+      '15 GB storage',
+      'Admin access to Teamy testing portal',
+      'Customizable widgets',
+      '2% discount on designated tournaments',
+      '7-day point-in-time data recovery',
+      'Dedicated priority support'
+    ],
   },
 ]
 
@@ -153,9 +166,12 @@ export default function PricingPage() {
                   >
                     <div className="text-sm text-muted-foreground mb-1">{tier.boosts}</div>
                     <h3 className="font-heading text-lg font-bold mb-3 text-foreground">{tier.tier}</h3>
-                    <ul className="space-y-1 text-sm text-muted-foreground">
+                    <ul className="space-y-2 text-sm text-left">
                       {tier.features.map((feature) => (
-                        <li key={feature}>{feature}</li>
+                        <li key={feature} className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-teamy-primary flex-shrink-0 mt-0.5" />
+                          <span className="text-foreground">{feature}</span>
+                        </li>
                       ))}
                     </ul>
                   </div>
