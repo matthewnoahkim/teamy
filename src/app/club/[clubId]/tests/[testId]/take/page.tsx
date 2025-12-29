@@ -310,6 +310,7 @@ export default async function TakeTestPage({
       membership={membership}
       existingAttempt={existingAttempt}
       isAdmin={isAdminUser}
+      tournamentId={tournamentTest?.tournament.id}
     />
   )
 }

@@ -406,7 +406,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
       <AppHeader user={user} />
       <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <Button onClick={() => router.push('/dashboard/tournaments')} variant="ghost" className="mb-6">
+        <Button onClick={() => router.push('/dashboard/tournaments')} variant="ghost" className="mb-6 transition-colors hover:bg-muted/50">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Tournaments
         </Button>
@@ -579,7 +579,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                     <p className="text-sm text-muted-foreground">
                       You don&apos;t have admin access to any {formatDivision(tournament.division)} division teams. Only team admins can register teams for tournaments.
                     </p>
-                    <Button variant="outline" onClick={() => router.push('/dashboard')}>
+                    <Button variant="outline" onClick={() => router.push('/dashboard')} className="transition-colors hover:bg-muted/50">
                       Go to Dashboard
                     </Button>
                   </div>

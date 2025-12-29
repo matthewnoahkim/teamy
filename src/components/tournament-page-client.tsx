@@ -366,9 +366,9 @@ export function TournamentPageClient({
             {isDirector && !isEditing && (
               <Button 
                 onClick={() => setIsEditing(true)}
-                variant="secondary"
+                variant="ghost"
                 size="sm"
-                className="gap-2"
+                className="gap-2 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
               >
                 <Edit className="h-4 w-4" />
                 Edit Page
@@ -379,7 +379,7 @@ export function TournamentPageClient({
                 <Button 
                   onClick={handleSave}
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                   disabled={saving}
                 >
                   <Save className="h-4 w-4" />
@@ -389,7 +389,7 @@ export function TournamentPageClient({
                   onClick={() => setIsEditing(false)}
                   variant="outline"
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 text-white/80 hover:text-white hover:bg-white/10 border-white/20 hover:border-white/40 transition-colors"
                 >
                   <X className="h-4 w-4" />
                   Cancel
@@ -398,13 +398,13 @@ export function TournamentPageClient({
             )}
             {user ? (
               <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/10 transition-colors">
                   Dashboard
                 </Button>
               </Link>
             ) : (
               <Link href={`/login?callbackUrl=${encodeURIComponent(`/tournaments/${hostingRequest.preferredSlug || tournament?.slug || tournament?.id || hostingRequest.id}`)}`}>
-                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/10 transition-colors">
                   Sign In
                 </Button>
               </Link>

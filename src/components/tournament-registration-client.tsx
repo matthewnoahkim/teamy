@@ -225,13 +225,13 @@ export function TournamentRegistrationClient({
             <ThemeToggle variant="header" />
             {user ? (
               <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/10 transition-colors">
                   Dashboard
                 </Button>
               </Link>
             ) : (
               <Link href={`/login?callbackUrl=${encodeURIComponent(`/tournaments/${tournamentSlug}/register`)}`}>
-                <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/10 transition-colors">
                   Sign In
                 </Button>
               </Link>
@@ -244,7 +244,7 @@ export function TournamentRegistrationClient({
         {/* Back link */}
         <Link 
           href={`/tournaments/${tournamentSlug}`}
-          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Tournament
@@ -607,7 +607,7 @@ export function TournamentRegistrationClient({
                       You need to be a club admin to register teams.
                     </p>
                     <Link href="/dashboard">
-                      <Button variant="outline" size="sm" className="gap-2">
+                      <Button variant="outline" size="sm" className="gap-2 transition-colors hover:bg-muted/50">
                         <Building className="h-4 w-4" />
                         Go to Dashboard
                       </Button>

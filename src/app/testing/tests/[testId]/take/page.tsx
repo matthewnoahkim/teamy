@@ -475,6 +475,8 @@ export default async function TournamentTakeTestPage({
       membership={membership}
       existingAttempt={existingAttempt}
       isAdmin={false} // Tournament tests don't have admin bypass
+      tournamentId={tournamentId}
+      testingPortal={true}
     />
   )
 }

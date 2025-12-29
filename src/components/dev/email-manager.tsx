@@ -35,11 +35,13 @@ import {
 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface FilteredUser {
   id: string
   email: string
   name: string | null
+  image: string | null
   createdAt: string
   isClubAdmin: boolean
   isTournamentDirector: boolean
@@ -285,10 +287,16 @@ export function EmailManager() {
           <div className="mt-6 p-4 bg-muted rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">
-                  {loading ? 'Loading...' : `${filterStats?.matchingUsers || 0} users match your filters`}
-                </span>
+                {loading ? (
+                  <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                ) : (
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                )}
+                {!loading && (
+                  <span className="font-medium">
+                    {`${filterStats?.matchingUsers || 0} users match your filters`}
+                  </span>
+                )}
                 {filterStats && (
                   <span className="text-muted-foreground">
                     (out of {filterStats.totalUsers} total)
@@ -314,8 +322,16 @@ export function EmailManager() {
                 {filterStats.users.slice(0, 50).map((user) => (
                   <div key={user.id} className="flex items-center justify-between p-2 border rounded-lg text-sm">
                     <div className="flex items-center gap-3">
-                      <span className="font-medium">{user.name || 'No name'}</span>
-                      <span className="text-muted-foreground">{user.email}</span>
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src={user.image || ''} />
+                        <AvatarFallback className="text-xs">
+                          {user.name?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-medium">{user.name || 'No name'}</span>
+                        <span className="text-muted-foreground text-xs truncate">{user.email}</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {user.isClubAdmin && <Badge variant="outline" className="text-xs">Admin</Badge>}

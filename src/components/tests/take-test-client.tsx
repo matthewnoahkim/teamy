@@ -30,6 +30,8 @@ interface TakeTestClientProps {
   membership: any
   existingAttempt: any
   isAdmin: boolean
+  tournamentId?: string
+  testingPortal?: boolean
 }
 
 
@@ -38,6 +40,8 @@ export function TakeTestClient({
   membership,
   existingAttempt,
   isAdmin,
+  tournamentId,
+  testingPortal,
 }: TakeTestClientProps) {
   const { toast } = useToast()
   const router = useRouter()
@@ -477,9 +481,15 @@ export function TakeTestClient({
       }
 
       // Use window.location for full page navigation to ensure tab parameter is preserved
-      // Extract clubId from membership or current URL path
-      const clubId = membership?.clubId || window.location.pathname.split('/')[2]
-      window.location.href = `/club/${clubId}?tab=tests`
+      if (testingPortal) {
+        window.location.href = '/testing'
+      } else if (tournamentId) {
+        window.location.href = `/tournaments/${tournamentId}/tests`
+      } else {
+        // Extract clubId from membership or current URL path
+        const clubId = membership?.clubId || window.location.pathname.split('/')[2]
+        window.location.href = `/club/${clubId}?tab=tests`
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -492,7 +502,7 @@ export function TakeTestClient({
         document.documentElement.requestFullscreen().catch(() => {})
       }
     }
-  }, [attempt, test.id, membership.clubId, test.requireFullscreen, toast, router, answers, saveAnswer])
+  }, [attempt, test.id, membership.clubId, test.requireFullscreen, toast, router, answers, saveAnswer, tournamentId, testingPortal])
 
   // Countdown timer
   useEffect(() => {
@@ -563,11 +573,19 @@ export function TakeTestClient({
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>{test.name}</CardTitle>
-              {clubId && (
+              {(clubId || tournamentId || testingPortal) && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => router.push(`/club/${clubId}?tab=tests`)}
+                  onClick={() => {
+                    if (testingPortal) {
+                      router.push('/testing')
+                    } else if (tournamentId) {
+                      router.push(`/tournaments/${tournamentId}/tests`)
+                    } else if (clubId) {
+                      router.push(`/club/${clubId}?tab=tests`)
+                    }
+                  }}
                   className="gap-2"
                 >
                   <ArrowLeft className="h-4 w-4" />

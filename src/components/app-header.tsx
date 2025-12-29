@@ -94,38 +94,28 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
                     const from = isOnTournamentsPage ? 'tournaments' : 'clubs'
                     router.push(`/dashboard/customization?from=${from}`)
                   }}
-                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
+                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
                     pathname === '/dashboard/customization'
-                      ? 'text-white font-semibold'
-                      : 'text-white/80 hover:text-white'
+                      ? 'bg-white/20 text-white font-semibold'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  <span className="relative flex items-center gap-1.5">
-                    <Settings className="h-3.5 w-3.5" />
-                    <span>Customization</span>
-                    {pathname === '/dashboard/customization' && (
-                      <span className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-white" />
-                    )}
-                  </span>
+                  <Settings className="h-3.5 w-3.5" />
+                  <span>Customization</span>
                 </button>
                 <button
                   onClick={() => {
                     const from = isOnTournamentsPage ? 'tournaments' : 'clubs'
                     router.push(`/dashboard/billing?from=${from}`)
                   }}
-                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
+                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
                     pathname === '/dashboard/billing'
-                      ? 'text-white font-semibold'
-                      : 'text-white/80 hover:text-white'
+                      ? 'bg-white/20 text-white font-semibold'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  <span className="relative flex items-center gap-1.5">
-                    <CreditCard className="h-3.5 w-3.5" />
-                    <span>Billing</span>
-                    {pathname === '/dashboard/billing' && (
-                      <span className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-white" />
-                    )}
-                  </span>
+                  <CreditCard className="h-3.5 w-3.5" />
+                  <span>Billing</span>
                 </button>
               </>
             )}
