@@ -402,7 +402,7 @@ export function NewTestBuilder({
     calculatorType: test?.calculatorType || null,
     allowNoteSheet: test?.allowNoteSheet || false,
     noteSheetInstructions: test?.noteSheetInstructions || '',
-    autoApproveNoteSheet: test?.autoApproveNoteSheet ?? true,
+    autoApproveNoteSheet: (test as any)?.autoApproveNoteSheet ?? true,
     requireOneSitting: (test as any)?.requireOneSitting ?? true,
   })
 
