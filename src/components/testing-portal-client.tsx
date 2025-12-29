@@ -686,7 +686,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                                     return (
                                                       <>
                                                         <div className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
-                                                          You haven't uploaded a note sheet yet
+                                                          You haven&apos;t uploaded a note sheet yet
                                                         </div>
                                                         <div className="text-sm text-amber-800 dark:text-amber-200">
                                                           Upload one before the test starts.
@@ -1011,7 +1011,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                             return (
                                               <>
                                                 <div className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
-                                                  You haven't uploaded a note sheet yet
+                                                  You haven&apos;t uploaded a note sheet yet
                                                 </div>
                                                 <div className="text-sm text-amber-800 dark:text-amber-200">
                                                   Upload one before the test starts.
