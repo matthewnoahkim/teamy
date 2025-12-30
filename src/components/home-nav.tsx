@@ -109,23 +109,17 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                 key={item.label}
                 href={item.href}
                 className={cn(
-                  "text-sm font-semibold transition-colors relative",
+                  "text-sm font-semibold transition-all duration-200 rounded-xl px-4 py-2",
                   isLight 
                     ? active
-                      ? "text-white"
-                      : "text-white/80 hover:text-white"
+                      ? "text-white bg-white/20 backdrop-blur-sm shadow-lg"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
                     : active
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "text-foreground bg-background shadow-lg backdrop-blur-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 )}
               >
                 {item.label}
-                {active && (
-                  <span className={cn(
-                    "absolute -bottom-1 left-0 right-0 h-0.5 rounded-full",
-                    isLight ? "bg-white" : "bg-teamy-primary dark:bg-teamy-accent"
-                  )} />
-                )}
               </Link>
             )
           } else {
@@ -153,24 +147,18 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                     buttonRefs.current[item.label] = el
                   }}
                   className={cn(
-                    "text-sm font-semibold transition-colors flex items-center gap-1 relative",
+                    "text-sm font-semibold transition-all duration-200 flex items-center gap-1 rounded-xl px-4 py-2",
                     isLight 
                       ? hasActive
-                        ? "text-white"
-                        : "text-white/80 hover:text-white"
+                        ? "text-white bg-white/20 backdrop-blur-sm shadow-lg"
+                        : "text-white/80 hover:text-white hover:bg-white/10"
                       : hasActive
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "text-foreground bg-background shadow-lg backdrop-blur-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
                   {item.label}
                   <ChevronDown className="h-4 w-4" />
-                  {hasActive && (
-                    <span className={cn(
-                      "absolute -bottom-1 left-0 right-0 h-0.5 rounded-full",
-                      isLight ? "bg-white" : "bg-teamy-primary dark:bg-teamy-accent"
-                    )} />
-                  )}
                 </button>
               </div>
             )

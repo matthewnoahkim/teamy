@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Trophy, Plus, Loader2, CheckCircle2 } from 'lucide-react'
+import { Trophy, Plus, Loader2, CheckCircle2, LogIn } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,8 +18,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { SignInButton } from '@/components/signin-button'
+import { useSession } from 'next-auth/react'
 
-export function HostTournamentContent() {
+interface HostTournamentContentProps {
+  isAuthenticated: boolean
+}
+
+export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated }: HostTournamentContentProps) {
+  const { status } = useSession()
+  // Use client-side session check if available, otherwise fall back to server-side prop during loading
+  const isAuthenticated = status === 'authenticated' || (status === 'loading' ? initialIsAuthenticated : false)
   const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -109,6 +118,16 @@ export function HostTournamentContent() {
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please sign in to submit a tournament hosting request.',
+        variant: 'destructive',
+      })
+      return
+    }
     
     // Validate required fields
     if (!formData.tournamentName || !formData.tournamentLevel || !formData.division || 
@@ -390,6 +409,30 @@ export function HostTournamentContent() {
                       >
                         Close
                       </Button>
+                    </div>
+                  ) : !isAuthenticated ? (
+                    <div className="py-12 text-center space-y-6">
+                      <div className="flex justify-center">
+                        <div className="rounded-full bg-teamy-primary/10 p-4">
+                          <LogIn className="h-12 w-12 text-teamy-primary" />
+                        </div>
+                      </div>
+                      <DialogHeader>
+                        <DialogTitle className="text-2xl">Sign In Required</DialogTitle>
+                        <DialogDescription className="text-base pt-2">
+                          Please sign in to continue with your tournament hosting request.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="pt-4 space-y-4">
+                        <SignInButton callbackUrl="/host-tournament" />
+                        <Button
+                          variant="outline"
+                          onClick={() => setDialogOpen(false)}
+                          className="w-full"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <>
