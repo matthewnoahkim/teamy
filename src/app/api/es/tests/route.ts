@@ -293,7 +293,7 @@ export async function GET(request: NextRequest) {
         },
       })
       for (const audit of createAudits) {
-        if (audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
+        if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
           const eventName = (audit.details as any).eventName
           if (eventName && typeof eventName === 'string') {
             testEventNameMap.set(audit.testId, eventName)
