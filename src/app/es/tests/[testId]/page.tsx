@@ -60,6 +60,11 @@ export default async function ESEditTestPage({ params }: Props) {
     notFound()
   }
 
+  // Prevent editing published tests
+  if (esTest.status === 'PUBLISHED') {
+    redirect('/es')
+  }
+
   // Verify user has access (assigned to the same event - collaborative access)
   // OR user is a tournament director for this tournament
   // Check ALL staff memberships to find one where user is assigned to the event

@@ -2290,12 +2290,14 @@ export function TDTournamentManageClient({
                                           Note Sheets
                                         </Button>
                                       )}
-                                      <Link href={`/td/tests/${test.id}`}>
-                                        <Button variant="outline" size="sm">
-                                          <Edit className="h-4 w-4 mr-1" />
-                                          Edit
-                                        </Button>
-                                      </Link>
+                                      {test.status !== 'PUBLISHED' && (
+                                        <Link href={`/td/tests/${test.id}`}>
+                                          <Button variant="outline" size="sm">
+                                            <Edit className="h-4 w-4 mr-1" />
+                                            Edit
+                                          </Button>
+                                        </Link>
+                                      )}
                                       <Button 
                                         variant="outline" 
                                         size="sm"

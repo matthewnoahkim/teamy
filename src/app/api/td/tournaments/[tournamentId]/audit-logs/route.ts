@@ -96,7 +96,7 @@ export async function GET(
 
     const esTestIds = esTests.map(t => t.id)
 
-    // Get all clubs registered for this tournament
+    // Get all clubs registered for this tournament (needed for filtering deleted tests)
     const registrations = await prisma.tournamentRegistration.findMany({
       where: {
         tournamentId: tournamentId,
@@ -108,22 +108,7 @@ export async function GET(
 
     const clubIds = registrations.map(r => r.clubId)
 
-    // Get all Test IDs that belong to clubs registered for this tournament
-    // This includes tests that may have been deleted (we'll handle that separately)
-    const allTestsInTournament = await prisma.test.findMany({
-      where: {
-        clubId: {
-          in: clubIds,
-        },
-      },
-      select: {
-        id: true,
-      },
-    })
-
-    const testIds = allTestsInTournament.map(t => t.id)
-
-    // Also get test IDs from TournamentTest (currently linked tests)
+    // Get test IDs from TournamentTest - only tests actually linked to this tournament
     const tournamentTests = await prisma.tournamentTest.findMany({
       where: {
         tournamentId: tournamentId,
@@ -134,7 +119,7 @@ export async function GET(
     })
 
     const linkedTestIds = tournamentTests.map(tt => tt.testId)
-    const allTestIds = [...new Set([...testIds, ...linkedTestIds])]
+    const allTestIds = linkedTestIds
 
     // Fetch audit logs for regular Test models
     // Query all audit logs - includes logs for deleted tests (testId will be null after migration)
@@ -174,21 +159,29 @@ export async function GET(
       take: 1000, // Limit to most recent 1000 audit logs for performance
     })
 
-    // Filter audit logs to only include those from clubs registered in this tournament
-    // For deleted tests, check the clubId stored in details
+    // Filter audit logs to only include tests linked to this tournament
+    // For existing tests, check if testId is in linkedTestIds
+    // For deleted tests, check tournamentIds stored in the audit log details
     const testAudits = allTestAudits.filter(audit => {
       if (audit.test) {
-        // Test still exists - check if club is registered
-        return clubIds.includes(audit.test.clubId)
+        // Test still exists - check if it's linked to this tournament
+        return linkedTestIds.includes(audit.test.id)
       } else if (audit.testId === null) {
-        // Test was deleted - check clubId in details
+        // Test was deleted and testId is null - check tournamentIds in details
         const details = audit.details as any
-        if (details?.clubId && typeof details.clubId === 'string') {
-          return clubIds.includes(details.clubId)
+        if (details?.tournamentIds && Array.isArray(details.tournamentIds)) {
+          return details.tournamentIds.includes(tournamentId)
         }
         return false
+      } else {
+        // Test was deleted but testId is still in audit log - check tournamentIds in details
+        const details = audit.details as any
+        if (details?.tournamentIds && Array.isArray(details.tournamentIds)) {
+          return details.tournamentIds.includes(tournamentId)
+        }
+        // Fallback: check if testId was in linkedTestIds (for older audit logs without tournamentIds)
+        return linkedTestIds.includes(audit.testId)
       }
-      return false
     })
 
     // Fetch membership and user info for each audit log

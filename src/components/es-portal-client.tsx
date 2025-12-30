@@ -613,9 +613,10 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
                                         .map((eventAssignment) => {
                                           const isTrialEvent = eventAssignment.event.id === null
                                           const eventKey = eventAssignment.event.id || `trial-${eventAssignment.event.name}`
+                                          const showDivision = membership.tournament.division === 'B&C'
                                           return (
                                             <SelectItem key={eventKey} value={eventKey}>
-                                              {eventAssignment.event.name} {isTrialEvent && '(Trial)'} (Div {eventAssignment.event.division})
+                                              {eventAssignment.event.name} {isTrialEvent && '(Trial)'} {showDivision && `(Div ${eventAssignment.event.division})`}
                                             </SelectItem>
                                           )
                                         })}
@@ -668,9 +669,11 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
                                                   Trial
                                                 </Badge>
                                               )}
-                                              <Badge variant="outline" className="text-xs">
-                                                Div {eventAssignment.event.division}
-                                              </Badge>
+                                              {membership.tournament.division === 'B&C' && (
+                                                <Badge variant="outline" className="text-xs">
+                                                  Div {eventAssignment.event.division}
+                                                </Badge>
+                                              )}
                                             </div>
                                             <p className="text-sm text-muted-foreground">
                                               {filteredTests.length} test{filteredTests.length !== 1 ? 's' : ''}
@@ -755,12 +758,14 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
                                                   </div>
                                                 </div>
                                                 <div className="flex gap-2">
-                                                  <Link href={`/es/tests/${test.id}`}>
-                                                    <Button variant="outline" size="sm">
-                                                      <Edit className="h-4 w-4 mr-1" />
-                                                      Edit
-                                                    </Button>
-                                                  </Link>
+                                                  {test.status !== 'PUBLISHED' && (
+                                                    <Link href={`/es/tests/${test.id}`}>
+                                                      <Button variant="outline" size="sm">
+                                                        <Edit className="h-4 w-4 mr-1" />
+                                                        Edit
+                                                      </Button>
+                                                    </Link>
+                                                  )}
                                                   <Button 
                                                     variant="outline" 
                                                     size="sm"

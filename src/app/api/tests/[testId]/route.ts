@@ -379,8 +379,20 @@ export async function DELETE(
       return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
     }
 
+    // Get tournament IDs this test is linked to (before deletion)
+    const tournamentTests = await prisma.tournamentTest.findMany({
+      where: {
+        testId: test.id,
+      },
+      select: {
+        tournamentId: true,
+      },
+    })
+
+    const tournamentIds = tournamentTests.map(tt => tt.tournamentId)
+
     // Create audit log before deletion with all necessary info
-    // Store clubId so we can still query it after test is deleted
+    // Store clubId and tournamentIds so we can still query it after test is deleted
     await prisma.testAudit.create({
       data: {
         testId: test.id,
@@ -389,6 +401,7 @@ export async function DELETE(
         details: { 
           testName: test.name,
           clubId: test.clubId, // Store clubId for querying after deletion
+          tournamentIds: tournamentIds, // Store tournamentIds for filtering in audit logs
         },
       },
     })

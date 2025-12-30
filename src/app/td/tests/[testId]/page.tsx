@@ -119,6 +119,11 @@ export default async function TDEditTestPage({ params }: Props) {
     notFound()
   }
 
+  // Prevent editing published tests
+  if (esTest.status === 'PUBLISHED') {
+    redirect('/td')
+  }
+
   // Verify user is a tournament director for this tournament
   const isTD = await isTournamentDirector(session.user.id, session.user.email, esTest.tournamentId)
   

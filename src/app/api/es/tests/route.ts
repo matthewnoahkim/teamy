@@ -841,6 +841,14 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Test not found' }, { status: 404 })
     }
 
+    // Prevent editing published tests
+    if (existingTest.status === 'PUBLISHED') {
+      return NextResponse.json(
+        { error: 'Cannot edit published tests' },
+        { status: 403 }
+      )
+    }
+
     // Verify the user has access to this test (check ALL staff memberships to see if any has access to this event)
     const userStaffMemberships = await prisma.tournamentStaff.findMany({
       where: {
