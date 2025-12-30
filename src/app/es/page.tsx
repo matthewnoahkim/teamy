@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { ESPortalClient } from '@/components/es-portal-client'
 import { ESLoginClient } from '@/components/es-login-client'
 import { Suspense } from 'react'
+import { Division } from '@prisma/client'
 
 interface ESPortalPageProps {
   searchParams: Promise<{ token?: string; tournament?: string }>
@@ -250,7 +251,7 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
   const tdEventIds = new Set<string>()
   for (const [tournamentId, division] of tournamentDivisions.entries()) {
     // Fetch events matching the division (handle "B&C" as both B and C)
-    const divisionsToFetch = division === 'B&C' ? ['B', 'C'] : [division]
+    const divisionsToFetch: Division[] = division === 'B&C' ? [Division.B, Division.C] : [division as Division]
     const events = await prisma.event.findMany({
       where: {
         division: { in: divisionsToFetch },
@@ -437,7 +438,7 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
   // For TDs, get all events for their tournament's division
   const allEventsForTDs = new Map<string, Array<{ id: string; name: string; division: 'B' | 'C' }>>()
   for (const [tournamentId, division] of tournamentDivisions.entries()) {
-    const divisionsToFetch = division === 'B&C' ? ['B', 'C'] : [division]
+    const divisionsToFetch: Division[] = division === 'B&C' ? [Division.B, Division.C] : [division as Division]
     const events = await prisma.event.findMany({
       where: {
         division: { in: divisionsToFetch },

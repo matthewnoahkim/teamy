@@ -34,6 +34,7 @@ const navItems: NavItem[] = [
     label: 'Connect',
     items: [
       { label: 'About', href: '/about' },
+      { label: 'Partnerships', href: '/partnerships' },
       { label: 'Help Center', href: '/help' },
       { label: 'Contact', href: '/contact' },
     ],
