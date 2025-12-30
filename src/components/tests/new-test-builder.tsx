@@ -55,6 +55,7 @@ import { DuplicateTestButton } from '@/components/tests/duplicate-test-button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { QuestionPrompt } from '@/components/tests/question-prompt'
 import { ImportedQuestion, ImportedQuestionType } from '@/lib/import-types'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 type QuestionType = 'MCQ_SINGLE' | 'MCQ_MULTI' | 'LONG_TEXT' | 'FILL_BLANK' | 'TEXT_BLOCK' | 'TRUE_FALSE'
 
@@ -1651,44 +1652,94 @@ export function NewTestBuilder({
             lockdown before sharing with students.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (isInTDPortal && tournamentId) {
-                router.push(`/td/tournament/${tournamentId}`)
-              } else if (esMode && tournamentId) {
-                router.push(`/es?tournament=${tournamentId}`)
-              } else if (esMode) {
-                router.push('/es')
-              } else if (clubId) {
-                router.push(`/club/${clubId}?tab=tests`)
-              } else {
-                router.back()
-              }
-            }}
-            disabled={saving}
-          >
-            Cancel
-          </Button>
-          {isEditMode && test && clubId && (
-            <DuplicateTestButton
-              testId={test.id}
-              testName={test.name}
-              clubId={clubId}
-            />
-          )}
-          <Button onClick={() => handleSave(false)} disabled={saving || draftValidation.errors.length > 0} variant="outline">
-            {saving ? 'Saving…' : isEditMode ? 'Save Changes' : 'Save as Draft'}
-          </Button>
-          <Button 
-            onClick={() => handleSave(true)} 
-            disabled={saving || publishValidation.errors.length > 0}
-          >
-            <Send className="h-4 w-4 mr-2" />
-            {saving ? 'Saving…' : 'Save & Publish'}
-          </Button>
-        </div>
+        <TooltipProvider delayDuration={200}>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (isInTDPortal && tournamentId) {
+                  router.push(`/td/tournament/${tournamentId}`)
+                } else if (esMode && tournamentId) {
+                  router.push(`/es?tournament=${tournamentId}`)
+                } else if (esMode) {
+                  router.push('/es')
+                } else if (clubId) {
+                  router.push(`/club/${clubId}?tab=tests`)
+                } else {
+                  router.back()
+                }
+              }}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            {isEditMode && test && clubId && (
+              <DuplicateTestButton
+                testId={test.id}
+                testName={test.name}
+                clubId={clubId}
+              />
+            )}
+            {!saving && draftValidation.errors.length > 0 ? (
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <div className="inline-block cursor-not-allowed">
+                    <Button onClick={() => handleSave(false)} disabled={true} variant="outline">
+                      {isEditMode ? 'Save Changes' : 'Save as Draft'}
+                    </Button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-sm">
+                  <div className="space-y-1">
+                    <p className="font-semibold">Requirements to save:</p>
+                    <ul className="list-disc list-inside text-xs space-y-0.5">
+                      {draftValidation.errors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button onClick={() => handleSave(false)} disabled={saving} variant="outline">
+                {saving ? 'Saving…' : isEditMode ? 'Save Changes' : 'Save as Draft'}
+              </Button>
+            )}
+            {!saving && publishValidation.errors.length > 0 ? (
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <div className="inline-block cursor-not-allowed">
+                    <Button 
+                      onClick={() => handleSave(true)} 
+                      disabled={true}
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Save & Publish
+                    </Button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-sm">
+                  <div className="space-y-1">
+                    <p className="font-semibold">Requirements to publish:</p>
+                    <ul className="list-disc list-inside text-xs space-y-0.5">
+                      {publishValidation.errors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button 
+                onClick={() => handleSave(true)} 
+                disabled={saving}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {saving ? 'Saving…' : 'Save & Publish'}
+              </Button>
+            )}
+          </div>
+        </TooltipProvider>
       </div>
 
       <div className="space-y-6">
