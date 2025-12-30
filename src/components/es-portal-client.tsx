@@ -99,7 +99,7 @@ interface StaffMembership {
   }
   events: Array<{
     event: {
-      id: string
+      id: string | null
       name: string
       division: 'B' | 'C'
     }
