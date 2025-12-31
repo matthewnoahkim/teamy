@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, BookOpen, Megaphone } from 'lucide-react'
+import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, BookOpen, Megaphone, Tag } from 'lucide-react'
 import { SignInButton } from '@/components/signin-button'
 import {
   DropdownMenu,
@@ -26,12 +26,13 @@ import { EmailManager } from '@/components/dev/email-manager'
 import { AnalyticsDashboard } from '@/components/dev/analytics-dashboard'
 import { ResourceRequests } from '@/components/dev/resource-requests'
 import { BannerManager } from '@/components/dev/banner-manager'
+import { PromoCodeManager } from '@/components/dev/promo-code-manager'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 
-type Section = 'blog' | 'security' | 'tournaments' | 'email' | 'analytics' | 'payments' | 'resources' | 'banner'
+type Section = 'blog' | 'security' | 'tournaments' | 'email' | 'analytics' | 'payments' | 'resources' | 'banner' | 'promo'
 
 const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -40,6 +41,7 @@ const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: 'blog', label: 'Blog', icon: FileText },
   { id: 'tournaments', label: 'Tournaments', icon: Trophy },
   { id: 'resources', label: 'Resources', icon: BookOpen },
+  { id: 'promo', label: 'Promo Codes', icon: Tag },
   { id: 'security', label: 'Security', icon: Shield },
   { id: 'payments', label: 'Payments', icon: CreditCard },
 ]
@@ -48,7 +50,7 @@ export default function DevPage() {
   const [activeSection, setActiveSection] = useState<Section>(() => {
     if (typeof window !== 'undefined') {
       const savedSection = localStorage.getItem('dev-panel-active-section') as Section
-      if (savedSection && ['blog', 'security', 'tournaments', 'email', 'analytics', 'payments', 'resources', 'banner'].includes(savedSection)) {
+      if (savedSection && ['blog', 'security', 'tournaments', 'email', 'analytics', 'payments', 'resources', 'banner', 'promo'].includes(savedSection)) {
         return savedSection
       }
     }
@@ -277,6 +279,8 @@ export default function DevPage() {
           {activeSection === 'tournaments' && <TournamentRequests />}
           
           {activeSection === 'resources' && <ResourceRequests />}
+          
+          {activeSection === 'promo' && <PromoCodeManager />}
           
           {activeSection === 'payments' && (
             <div className="p-8 rounded-xl bg-card border">

@@ -40,6 +40,7 @@ model User {
   tournamentAdmins        TournamentAdmin[]        @relation("TournamentAdmins")
   tournamentRegistrations TournamentRegistration[] @relation("TournamentRegistrationsBy")
   tournamentStaff         TournamentStaff[]        @relation("TournamentStaffUser")
+  promoCodeRedemptions    PromoCodeRedemption[]    @relation("PromoCodeRedemptions")
 }
 
 model Account {
@@ -1475,6 +1476,40 @@ model ResourceRequest {
   @@index([createdAt])
 }
 
+model PromoCode {
+  id              String                @id @default(cuid())
+  code            String                @unique
+  effectType      PromoEffectType
+  effectDuration  Int // Duration in weeks for PRO or months for CLUB_BOOST
+  activatesAt     DateTime? // When the promo code becomes active
+  expiresAt       DateTime? // When the promo code expires
+  maxRedemptions  Int? // Maximum number of total redemptions (null = unlimited)
+  currentRedemptions Int @default(0) // Current number of redemptions
+  createdById     String? // Dev who created it
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  redemptions     PromoCodeRedemption[]
+
+  @@index([code])
+  @@index([effectType])
+  @@index([expiresAt])
+}
+
+model PromoCodeRedemption {
+  id          String    @id @default(cuid())
+  promoCodeId String
+  userId      String
+  redeemedAt  DateTime  @default(now())
+  expiresAt   DateTime // When this redemption's benefits expire
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  user        User      @relation("PromoCodeRedemptions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([promoCodeId, userId]) // Each user can only redeem a promo code once
+  @@index([userId])
+  @@index([promoCodeId])
+  @@index([expiresAt])
+}
+
 enum Division {
   B
   C
@@ -1545,6 +1580,11 @@ enum AttemptStatus {
   IN_PROGRESS
   SUBMITTED
   GRADED
+}
+
+enum PromoEffectType {
+  PRO_SUBSCRIPTION
+  CLUB_BOOST
   INVALIDATED
 }
 

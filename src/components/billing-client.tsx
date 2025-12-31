@@ -6,7 +6,8 @@ import { AppHeader } from '@/components/app-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, Zap, Crown, CreditCard, ArrowLeft, Loader2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Check, Zap, Crown, CreditCard, ArrowLeft, Loader2, Tag } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/components/ui/use-toast'
 
@@ -76,6 +77,8 @@ export function BillingClient({ user, clubs, subscriptionStatus, subscriptionTyp
   const router = useRouter()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
+  const [promoCode, setPromoCode] = useState('')
+  const [isRedeemingPromo, setIsRedeemingPromo] = useState(false)
   
   // Determine back destination based on where user came from
   const from = searchParams.get('from')
@@ -184,6 +187,54 @@ export function BillingClient({ user, clubs, subscriptionStatus, subscriptionTyp
     }
   }
   
+  const handleRedeemPromoCode = async () => {
+    if (!promoCode.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a promo code',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsRedeemingPromo(true)
+    try {
+      const response = await fetch('/api/promo/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: promoCode.trim() }),
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to redeem promo code')
+      }
+      
+      toast({
+        title: 'Success!',
+        description: data.message || 'Promo code redeemed successfully',
+      })
+      
+      // Reset promo code input
+      setPromoCode('')
+      
+      // Refresh the page to show updated subscription status
+      router.refresh()
+    } catch (error) {
+      console.error('Promo redemption error:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to redeem promo code',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsRedeemingPromo(false)
+    }
+  }
+  
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
       <AppHeader user={user} />
@@ -200,6 +251,48 @@ export function BillingClient({ user, clubs, subscriptionStatus, subscriptionTyp
           <h1 className="font-heading text-3xl font-bold text-foreground">Billing & Subscriptions</h1>
           <p className="text-muted-foreground mt-2">Manage your Pro subscription and club boosts</p>
         </div>
+
+        {/* Promo Code */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5" />
+              Have a Promo Code?
+            </CardTitle>
+            <CardDescription>
+              Redeem a promo code to get Pro subscription time or club boosts
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              <Input
+                placeholder="Enter promo code"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRedeemPromoCode()
+                  }
+                }}
+                className="max-w-md"
+                disabled={isRedeemingPromo}
+              />
+              <Button 
+                onClick={handleRedeemPromoCode} 
+                disabled={isRedeemingPromo || !promoCode.trim()}
+              >
+                {isRedeemingPromo ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Redeeming...
+                  </>
+                ) : (
+                  'Redeem'
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Current Plan */}
         <Card className={`mb-8 ${isPro ? 'border-teamy-primary/50 bg-teamy-primary/5' : ''}`}>
