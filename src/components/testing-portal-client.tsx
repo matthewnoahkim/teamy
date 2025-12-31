@@ -79,6 +79,39 @@ interface Tournament {
       }
     }>
   }>
+  trialEvents: Array<{
+    event: {
+      id: null
+      name: string
+      slug: null
+      division: string
+      isTrial: true
+    }
+    tests: Array<{
+      id: string
+      name: string
+      description: string | null
+      instructions: string | null
+      durationMinutes: number
+      startAt: string | null
+      endAt: string | null
+      allowLateUntil: string | null
+      requireFullscreen: boolean
+      allowCalculator: boolean
+      calculatorType: string | null
+      allowNoteSheet: boolean
+      noteSheetInstructions: string | null
+      maxAttempts: number | null
+      scoreReleaseMode: string | null
+      releaseScoresAt: string | null
+      questionCount: number
+      clubId: string
+      club: {
+        id: string
+        name: string
+      }
+    }>
+  }>
   generalTests: Array<{
     id: string
     name: string
@@ -203,6 +236,13 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
     const testIds: string[] = []
     tournaments.forEach(tournament => {
       tournament.events.forEach(event => {
+        event.tests.forEach(test => {
+          if (test.allowNoteSheet) {
+            testIds.push(test.id)
+          }
+        })
+      })
+      tournament.trialEvents?.forEach(event => {
         event.tests.forEach(test => {
           if (test.allowNoteSheet) {
             testIds.push(test.id)
@@ -835,6 +875,341 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                 </div>
               )}
 
+              {/* Trial Events */}
+              {selectedTournamentData.trialEvents && selectedTournamentData.trialEvents.length > 0 && (
+                <div className="space-y-4">
+                  {selectedTournamentData.trialEvents.map((eventData) => (
+                    <Card key={`trial-${eventData.event.name}`}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Trophy className="h-5 w-5" />
+                          {eventData.event.name}
+                          <Badge variant="outline" className="ml-2 px-3 py-1 rounded-md text-xs font-semibold bg-purple-500/10 border-purple-500/30 text-purple-700 dark:text-purple-400">Trial</Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {eventData.tests.filter((test) => {
+                          // Filter out tests that are outside their availability window
+                          const availability = checkTestAvailability(test)
+                          return availability.available
+                        }).length > 0 ? (
+                          <div className="space-y-3">
+                            {eventData.tests.filter((test) => {
+                              // Filter out tests that are outside their availability window
+                              const availability = checkTestAvailability(test)
+                              return availability.available
+                            }).map((test) => (
+                              <Card key={test.id} className="bg-slate-50 dark:bg-slate-800 hover:shadow-lg transition-shadow">
+                                <CardContent className="p-6">
+                                  <div className="space-y-4">
+                                    {/* Header */}
+                                    <div>
+                                      <h3 className="text-lg font-semibold mb-1">{test.name}</h3>
+                                      {test.description && (
+                                        <p className="text-sm text-muted-foreground">{test.description}</p>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Test Details - Theme Aligned */}
+                                    <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                        {/* Duration */}
+                                        <div className="flex items-center gap-3">
+                                          <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                            <Clock className="h-4 w-4 text-teamy-primary" />
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Duration</div>
+                                            <div className="text-sm font-semibold">{test.durationMinutes} min</div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Questions */}
+                                        {test.questionCount > 0 && (
+                                          <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                              <ListChecks className="h-4 w-4 text-teamy-primary" />
+                                            </div>
+                                            <div>
+                                              <div className="text-xs text-muted-foreground">Questions</div>
+                                              <div className="text-sm font-semibold">{test.questionCount}</div>
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Calculator */}
+                                        <div className="flex items-center gap-3">
+                                          <div className={`p-2 rounded-lg ${test.allowCalculator ? 'bg-teamy-accent/20' : 'bg-muted'}`}>
+                                            <Calculator className={`h-4 w-4 ${test.allowCalculator ? 'text-teamy-accent-dark' : 'text-muted-foreground'}`} />
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Calculator</div>
+                                            <div className="text-sm font-semibold">
+                                              {test.allowCalculator ? (
+                                                <span className="text-teamy-primary">
+                                                  {test.calculatorType 
+                                                    ? (test.calculatorType === 'FOUR_FUNCTION' ? 'Four Function' : 
+                                                       test.calculatorType === 'SCIENTIFIC' ? 'Scientific' : 
+                                                       'Graphing')
+                                                    : 'Allowed'}
+                                                </span>
+                                              ) : (
+                                                <span className="text-muted-foreground">Not Allowed</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Note Sheet */}
+                                        <div className="flex items-center gap-3">
+                                          <div className={`p-2 rounded-lg ${test.allowNoteSheet ? 'bg-teamy-accent/20' : 'bg-muted'}`}>
+                                            <FileCheck className={`h-4 w-4 ${test.allowNoteSheet ? 'text-teamy-accent-dark' : 'text-muted-foreground'}`} />
+                                          </div>
+                                          <div>
+                                            <div className="text-xs text-muted-foreground">Note Sheet</div>
+                                            <div className="text-sm font-semibold">
+                                              {test.allowNoteSheet ? (
+                                                <span className="text-teamy-primary">Allowed</span>
+                                              ) : (
+                                                <span className="text-muted-foreground">Not Allowed</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Max Attempts */}
+                                        {test.maxAttempts && (
+                                          <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                              <AlertCircle className="h-4 w-4 text-teamy-primary" />
+                                            </div>
+                                            <div>
+                                              <div className="text-xs text-muted-foreground">Max Attempts</div>
+                                              <div className="text-sm font-semibold">{test.maxAttempts}</div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Availability */}
+                                      <div className="mt-4 pt-4 border-t border-border">
+                                        <div className="flex items-center gap-3">
+                                          <div className="p-2 bg-teamy-primary/10 rounded-lg">
+                                            <Calendar className="h-4 w-4 text-teamy-primary" />
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-xs text-muted-foreground mb-1">Availability</div>
+                                            <div className="text-sm font-semibold">
+                                              {(() => {
+                                                // Check if dates exist and are valid
+                                                const hasStartAt = test.startAt && test.startAt.trim && test.startAt.trim() !== ''
+                                                const hasEndAt = test.endAt && test.endAt.trim && test.endAt.trim() !== ''
+                                                
+                                                if (hasStartAt && hasEndAt) {
+                                                  const formatted = formatTestTimeRange(test.startAt, test.endAt, test.allowLateUntil)
+                                                  if (formatted) {
+                                                    return formatted
+                                                  }
+                                                  // Fallback if formatTestTimeRange returns null
+                                                  try {
+                                                    if (!test.startAt || !test.endAt) {
+                                                      return <span className="text-muted-foreground">Invalid date range</span>
+                                                    }
+                                                    const startFormatted = formatDateTime(test.startAt)
+                                                    const endFormatted = formatDateTime(test.endAt)
+                                                    if (startFormatted && endFormatted) {
+                                                      return `${startFormatted} - ${endFormatted}`
+                                                    }
+                                                    return <span className="text-muted-foreground">Invalid date range</span>
+                                                  } catch {
+                                                    return <span className="text-muted-foreground">Invalid date range</span>
+                                                  }
+                                                }
+                                                return <span className="text-teamy-primary">Always available</span>
+                                              })()}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Note sheet instructions if available */}
+                                    {test.allowNoteSheet && test.noteSheetInstructions && (
+                                      <div className="bg-blue-50 dark:bg-blue-950/20 rounded-md p-3 border border-blue-200 dark:border-blue-800">
+                                        <div className="flex items-start gap-2">
+                                          <FileCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                          <div>
+                                            <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Note Sheet Guidelines</div>
+                                            <p className="text-sm text-blue-900 dark:text-blue-100">{test.noteSheetInstructions}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Note Sheet Status and Upload */}
+                                    {test.allowNoteSheet && (() => {
+                                      const noteSheetStatus = noteSheetStatuses.get(test.id)
+                                      const isAccepted = noteSheetStatus?.status === 'ACCEPTED'
+                                      return (
+                                        <div className={`${isAccepted ? 'bg-green-500/20 dark:bg-green-600/20' : 'bg-amber-50 dark:bg-amber-950/20'} rounded-md p-4 border ${isAccepted ? 'border-green-500 dark:border-green-600' : 'border-amber-200 dark:border-amber-800'}`}>
+                                          <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-start gap-3 flex-1">
+                                              <FileText className={`h-5 w-5 ${isAccepted ? 'text-black dark:text-white' : 'text-amber-600 dark:text-amber-400'} flex-shrink-0 mt-0.5`} />
+                                              <div className="flex-1">
+                                                {(() => {
+                                                  if (!noteSheetStatus || !noteSheetStatus.hasNoteSheet) {
+                                                    return (
+                                                      <>
+                                                        <div className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                                                          You haven&apos;t uploaded a note sheet yet
+                                                        </div>
+                                                        <div className="text-sm text-amber-800 dark:text-amber-200">
+                                                          Upload one before the test starts.
+                                                        </div>
+                                                      </>
+                                                    )
+                                                  } else if (noteSheetStatus.status === 'ACCEPTED') {
+                                                    return (
+                                                      <>
+                                                        <div className="text-sm font-semibold text-black dark:text-white mb-1">
+                                                          Note Sheet Accepted
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-sm text-black dark:text-white">
+                                                          <CheckCircle2 className="h-4 w-4" />
+                                                          <span>Your note sheet has been accepted</span>
+                                                        </div>
+                                                      </>
+                                                    )
+                                                  } else if (noteSheetStatus.status === 'PENDING') {
+                                                    return (
+                                                      <>
+                                                        <div className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                                                          Note Sheet Pending Review
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
+                                                          <Clock className="h-4 w-4" />
+                                                          <span>Your note sheet is pending review</span>
+                                                        </div>
+                                                      </>
+                                                    )
+                                                  } else if (noteSheetStatus.status === 'REJECTED') {
+                                                    return (
+                                                      <>
+                                                        <div className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
+                                                          Note Sheet Rejected
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                          <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                                                            <XCircle className="h-4 w-4" />
+                                                            <span>Your note sheet was rejected. Please upload a new one.</span>
+                                                          </div>
+                                                          {noteSheetStatus.rejectionReason && noteSheetStatus.rejectionReason.trim() && (
+                                                            <div className="mt-2 p-3 bg-white dark:bg-red-950/40 rounded border-2 border-red-300 dark:border-red-700">
+                                                              <p className="text-xs font-semibold text-red-900 dark:text-red-100 mb-1.5 uppercase tracking-wide">
+                                                                Admin Comments:
+                                                              </p>
+                                                              <p className="text-sm text-red-900 dark:text-red-100 whitespace-pre-wrap leading-relaxed">
+                                                                {noteSheetStatus.rejectionReason}
+                                                              </p>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      </>
+                                                    )
+                                                  }
+                                                  return null
+                                                })()}
+                                              </div>
+                                            </div>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setNoteSheetUploadOpen(test.id)}
+                                              className="flex-shrink-0"
+                                            >
+                                              {noteSheetStatuses.get(test.id)?.hasNoteSheet ? (
+                                                <>
+                                                  <Upload className="h-4 w-4 mr-2" />
+                                                  Modify
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Upload className="h-4 w-4 mr-2" />
+                                                  Upload
+                                                </>
+                                              )}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      )
+                                    })()}
+
+                                    {/* Instructions if available */}
+                                    {test.instructions && (
+                                      <div className="bg-slate-100 dark:bg-slate-900/50 rounded-md p-3 border border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-start gap-2">
+                                          <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                          <div>
+                                            <div className="text-xs font-semibold text-muted-foreground mb-1">Instructions</div>
+                                            <p className="text-sm whitespace-pre-wrap">{test.instructions}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Badges and Action Button */}
+                                    <div className="flex items-center justify-between gap-4 pt-2">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {test.requireFullscreen && (
+                                          <Badge variant="outline" className="text-xs">
+                                            Fullscreen Required
+                                          </Badge>
+                                        )}
+                                        {test.scoreReleaseMode && (
+                                          <Badge variant="outline" className="text-xs">
+                                            {test.scoreReleaseMode === 'FULL_TEST' ? 'Full Review' :
+                                             test.scoreReleaseMode === 'SCORE_WITH_WRONG' ? 'Score + Wrong' :
+                                             test.scoreReleaseMode === 'SCORE_ONLY' ? 'Score Only' :
+                                             'No Review'}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      
+                                      {(() => {
+                                        const availability = checkTestAvailability(test)
+                                        return (
+                                          <div className="flex flex-col items-end gap-2">
+                                            {!availability.available && availability.reason && (
+                                              <span className="text-xs text-muted-foreground">{availability.reason}</span>
+                                            )}
+                                            <Button
+                                              onClick={() => handleTakeTest(test.id, test.clubId)}
+                                              size="lg"
+                                              disabled={!availability.available}
+                                              className="bg-teamy-primary hover:bg-teamy-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                              <Play className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                                              Take Test
+                                              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                                            </Button>
+                                          </div>
+                                        )
+                                      })()}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No tests released for this trial event yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
               {/* General tests (not assigned to a specific event) */}
               {selectedTournamentData.generalTests.filter((test) => {
                 // Filter out tests that are outside their availability window
@@ -1154,7 +1529,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                 </div>
               )}
 
-              {selectedTournamentData.events.length === 0 && selectedTournamentData.generalTests.length === 0 && (
+              {selectedTournamentData.events.length === 0 && (!selectedTournamentData.trialEvents || selectedTournamentData.trialEvents.length === 0) && selectedTournamentData.generalTests.length === 0 && (
                 <Card>
                   <CardContent className="py-12 text-center">
                     <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -1196,8 +1571,8 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                   const totalTests = tournament.events.reduce(
                     (sum, e) => sum + e.tests.length,
                     0
-                  ) + tournament.generalTests.length
-                  const totalEvents = tournament.events.length
+                  ) + (tournament.trialEvents?.reduce((sum, e) => sum + e.tests.length, 0) || 0) + tournament.generalTests.length
+                  const totalEvents = tournament.events.length + (tournament.trialEvents?.length || 0)
 
                   return (
                     <Card
@@ -1285,6 +1660,10 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
             // Find the test to get its note sheet instructions
             if (!selectedTournamentData) return undefined
             for (const event of selectedTournamentData.events) {
+              const test = event.tests.find(t => t.id === noteSheetUploadOpen)
+              if (test) return test.noteSheetInstructions || undefined
+            }
+            for (const event of selectedTournamentData.trialEvents || []) {
               const test = event.tests.find(t => t.id === noteSheetUploadOpen)
               if (test) return test.noteSheetInstructions || undefined
             }

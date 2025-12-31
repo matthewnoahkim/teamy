@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
             endDate: true,
             location: true,
             slug: true,
+            trialEvents: true,
           },
         },
         team: {
@@ -297,6 +298,78 @@ export async function GET(req: NextRequest) {
           })),
         ]
 
+        // Get trial events from tournament
+        let trialEvents: Array<{ name: string; division: string }> = []
+        if (registration.tournament.trialEvents) {
+          try {
+            const parsed = JSON.parse(registration.tournament.trialEvents)
+            if (Array.isArray(parsed)) {
+              // Normalize format: handle both old format (string[]) and new format ({ name, division }[])
+              trialEvents = parsed.map((e: any) => 
+                typeof e === 'string' 
+                  ? { name: e, division: registration.tournament.division } 
+                  : { name: e.name, division: e.division || registration.tournament.division }
+              )
+            }
+          } catch (e) {
+            console.error('Error parsing trial events:', e)
+          }
+        }
+        const trialEventNames = trialEvents.map(e => e.name)
+
+        // Fetch eventNames from audit logs for tests with null eventId (trial events)
+        const testsWithNullEventId = releasedTests.filter(tt => !tt.eventId)
+        const testEventNameMap = new Map<string, string>()
+        
+        if (testsWithNullEventId.length > 0) {
+          const estestIds = testsWithNullEventId.filter(tt => tt.isESTest).map(tt => tt.test.id)
+          const regularTestIds = testsWithNullEventId.filter(tt => !tt.isESTest).map(tt => tt.test.id)
+
+          // Fetch ESTestAudit for ESTest records
+          if (estestIds.length > 0) {
+            const esCreateAudits = await prisma.eSTestAudit.findMany({
+              where: {
+                testId: { in: estestIds },
+                action: 'CREATE',
+              },
+              select: {
+                testId: true,
+                details: true,
+              },
+            })
+            for (const audit of esCreateAudits) {
+              if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
+                const eventName = (audit.details as any).eventName
+                if (eventName && typeof eventName === 'string') {
+                  testEventNameMap.set(audit.testId, eventName)
+                }
+              }
+            }
+          }
+
+          // Fetch TestAudit for regular Test records
+          if (regularTestIds.length > 0) {
+            const testCreateAudits = await prisma.testAudit.findMany({
+              where: {
+                testId: { in: regularTestIds },
+                action: 'CREATE',
+              },
+              select: {
+                testId: true,
+                details: true,
+              },
+            })
+            for (const audit of testCreateAudits) {
+              if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
+                const eventName = (audit.details as any).eventName
+                if (eventName && typeof eventName === 'string') {
+                  testEventNameMap.set(audit.testId, eventName)
+                }
+              }
+            }
+          }
+        }
+
         // Group tests by event
         // If user has no roster assignments, show all event-specific tests grouped by their events
         let eventsWithTests: Array<{ event: any; tests: any[] }> = []
@@ -390,31 +463,83 @@ export async function GET(req: NextRequest) {
           })
         }
 
-        // Also include tests not assigned to a specific event
-        const generalTests = releasedTests
-          .filter((tt) => !tt.eventId)
-          .map((tt) => ({
-            id: tt.test.id,
-            name: tt.test.name,
-            description: tt.test.description,
-            instructions: tt.test.instructions,
-            durationMinutes: tt.test.durationMinutes,
-            startAt: tt.test.startAt,
-            endAt: tt.test.endAt,
-            allowLateUntil: tt.test.allowLateUntil,
-            requireFullscreen: tt.test.requireFullscreen,
-            allowCalculator: tt.test.allowCalculator,
-            calculatorType: tt.test.calculatorType,
-            allowNoteSheet: tt.test.allowNoteSheet,
-            noteSheetInstructions: tt.test.noteSheetInstructions,
-            maxAttempts: tt.test.maxAttempts,
-            scoreReleaseMode: tt.test.scoreReleaseMode,
-            releaseScoresAt: tt.test.releaseScoresAt,
-            questionCount: tt.test.questionCount,
-            clubId: tt.test.clubId,
-            club: tt.test.club,
-            isESTest: tt.isESTest,
-          }))
+        // Separate tests with null eventId into trial events and true general tests
+        const testsWithNullEventId_ = releasedTests.filter((tt) => !tt.eventId)
+        
+        // Group trial event tests by event name
+        const trialEventTestsByEvent = new Map<string, any[]>()
+        const generalTests: any[] = []
+
+        for (const tt of testsWithNullEventId_) {
+          const eventName = testEventNameMap.get(tt.test.id)
+          if (eventName && trialEventNames.includes(eventName)) {
+            // This is a trial event test
+            if (!trialEventTestsByEvent.has(eventName)) {
+              trialEventTestsByEvent.set(eventName, [])
+            }
+            trialEventTestsByEvent.get(eventName)!.push({
+              id: tt.test.id,
+              name: tt.test.name,
+              description: tt.test.description,
+              instructions: tt.test.instructions,
+              durationMinutes: tt.test.durationMinutes,
+              startAt: tt.test.startAt,
+              endAt: tt.test.endAt,
+              allowLateUntil: tt.test.allowLateUntil,
+              requireFullscreen: tt.test.requireFullscreen,
+              allowCalculator: tt.test.allowCalculator,
+              calculatorType: tt.test.calculatorType,
+              allowNoteSheet: tt.test.allowNoteSheet,
+              noteSheetInstructions: tt.test.noteSheetInstructions,
+              maxAttempts: tt.test.maxAttempts,
+              scoreReleaseMode: tt.test.scoreReleaseMode,
+              releaseScoresAt: tt.test.releaseScoresAt,
+              questionCount: tt.test.questionCount,
+              clubId: tt.test.clubId,
+              club: tt.test.club,
+              isESTest: tt.isESTest,
+            })
+          } else {
+            // True general test (not a trial event)
+            generalTests.push({
+              id: tt.test.id,
+              name: tt.test.name,
+              description: tt.test.description,
+              instructions: tt.test.instructions,
+              durationMinutes: tt.test.durationMinutes,
+              startAt: tt.test.startAt,
+              endAt: tt.test.endAt,
+              allowLateUntil: tt.test.allowLateUntil,
+              requireFullscreen: tt.test.requireFullscreen,
+              allowCalculator: tt.test.allowCalculator,
+              calculatorType: tt.test.calculatorType,
+              allowNoteSheet: tt.test.allowNoteSheet,
+              noteSheetInstructions: tt.test.noteSheetInstructions,
+              maxAttempts: tt.test.maxAttempts,
+              scoreReleaseMode: tt.test.scoreReleaseMode,
+              releaseScoresAt: tt.test.releaseScoresAt,
+              questionCount: tt.test.questionCount,
+              clubId: tt.test.clubId,
+              club: tt.test.club,
+              isESTest: tt.isESTest,
+            })
+          }
+        }
+
+        // Convert trial event tests map to array format
+        const trialEventsWithTests = Array.from(trialEventTestsByEvent.entries()).map(([eventName, tests]) => {
+          const trialEvent = trialEvents.find(te => te.name === eventName)
+          return {
+            event: {
+              id: null, // Trial events don't have an Event ID
+              name: eventName,
+              slug: null,
+              division: trialEvent?.division || registration.tournament.division,
+              isTrial: true,
+            },
+            tests,
+          }
+        })
 
         return {
           tournament: registration.tournament,
@@ -424,7 +549,8 @@ export async function GET(req: NextRequest) {
             club: registration.club,
           },
           events: eventsWithTests,
-          generalTests, // Tests not assigned to a specific event
+          trialEvents: trialEventsWithTests, // Trial event tests grouped by event
+          generalTests, // True general tests (not assigned to any event, including trial events)
         }
       })
     )
