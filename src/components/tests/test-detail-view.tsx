@@ -105,7 +105,12 @@ export function TestDetailView({ clubId, test }: TestDetailViewProps) {
           </Link>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-semibold tracking-tight">{test.name}</h1>
-            <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+            <Badge 
+              variant={statusConfig.variant}
+              className={test.status === 'PUBLISHED' ? 'bg-green-600 hover:bg-green-700 text-white border-transparent' : ''}
+            >
+              {statusConfig.label}
+            </Badge>
             {test.requireFullscreen && (
               <Badge variant="outline" className="gap-1">
                 <Lock className="h-3 w-3" />

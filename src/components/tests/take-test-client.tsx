@@ -45,6 +45,12 @@ export function TakeTestClient({
 }: TakeTestClientProps) {
   const { toast } = useToast()
   const router = useRouter()
+  
+  // Helper function: Check if fullscreen is required
+  // Handles both boolean true and string 'true' values, and ensures proper type checking
+  const requiresFullscreen = () => {
+    return test?.requireFullscreen === true || test?.requireFullscreen === 'true'
+  }
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [attempt, setAttempt] = useState<any>(existingAttempt)
@@ -60,6 +66,7 @@ export function TakeTestClient({
   const trackingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const fullscreenEnforcementIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isExitingRef = useRef(false) // Track when we're intentionally exiting (Save & Exit)
   const [needsFullscreenPrompt, setNeedsFullscreenPrompt] = useState(false) // Track if we need user interaction to enter fullscreen
   const [showSaveExitDialog, setShowSaveExitDialog] = useState(false)
@@ -115,6 +122,7 @@ export function TakeTestClient({
   }, [started, attempt, existingAttempt])
 
   // Enter fullscreen when starting or resuming a test
+  // For tournament tests accessed via testing portal, ALWAYS enforce fullscreen
   // This runs when:
   // 1. Component mounts with an existing attempt (resume) - needs user interaction
   // 2. User starts a new test (started becomes true) - can request immediately
@@ -122,7 +130,13 @@ export function TakeTestClient({
     // Reset exit flag when starting/resuming (component mount or started changes)
     isExitingRef.current = false
     
-    if (started && test.requireFullscreen && attempt) {
+    // For tournament tests via testing portal, ALWAYS require fullscreen regardless of test.requireFullscreen
+    // For club tests, check the test.requireFullscreen flag
+    const requiresFullscreen = testingPortal 
+      ? true // Tournament tests via testing portal always require fullscreen
+      : (test?.requireFullscreen === true || test?.requireFullscreen === 'true')
+    
+    if (started && requiresFullscreen && attempt) {
       // If we're resuming (existingAttempt was passed), we need user interaction
       // Browsers block fullscreen requests that aren't in response to user gestures
       if (existingAttempt && !document.fullscreenElement) {
@@ -140,7 +154,7 @@ export function TakeTestClient({
     } else {
       setNeedsFullscreenPrompt(false)
     }
-  }, [started, test.requireFullscreen, attempt, existingAttempt, toast])
+  }, [started, test?.requireFullscreen, attempt, existingAttempt, toast, test?.id, testingPortal, tournamentId])
 
   // Handler for user-initiated fullscreen entry (required for resume)
   const handleEnterFullscreen = async () => {
@@ -214,10 +228,13 @@ export function TakeTestClient({
         return
       }
       
-      // If user manually exited fullscreen while test is active, show the prompt
-      if (test.requireFullscreen && started && attempt && !document.fullscreenElement) {
-        // User manually exited fullscreen (e.g., pressed Escape) - show prompt
-        setNeedsFullscreenPrompt(true)
+      // If user manually exited fullscreen while test is active, force re-entry
+      if (requiresFullscreen() && started && attempt && !document.fullscreenElement) {
+        // Try to automatically re-enter fullscreen
+        document.documentElement.requestFullscreen().catch(() => {
+          // If automatic re-entry fails, show prompt requiring user interaction
+          setNeedsFullscreenPrompt(true)
+        })
       } else if (document.fullscreenElement && needsFullscreenPrompt) {
         // Fullscreen was entered - hide the prompt
         setNeedsFullscreenPrompt(false)
@@ -247,6 +264,25 @@ export function TakeTestClient({
           }
         }
       }, 10000) // Update every 10 seconds
+
+      // Add aggressive fullscreen enforcement if fullscreen is required
+      if (requiresFullscreen()) {
+        fullscreenEnforcementIntervalRef.current = setInterval(() => {
+          // Don't enforce if we're intentionally exiting (Save & Exit)
+          if (isExitingRef.current) {
+            return
+          }
+          
+          // If fullscreen is required but not active, try to re-enter
+          if (started && attempt && !document.fullscreenElement) {
+            // Try to request fullscreen - browsers may block this, but we try anyway
+            document.documentElement.requestFullscreen().catch(() => {
+              // If automatic re-entry fails, show prompt requiring user interaction
+              setNeedsFullscreenPrompt(true)
+            })
+          }
+        }, 1000) // Check every second for aggressive enforcement
+      }
     }
 
     return () => {
@@ -256,6 +292,9 @@ export function TakeTestClient({
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
       if (trackingIntervalRef.current) {
         clearInterval(trackingIntervalRef.current)
+      }
+      if (fullscreenEnforcementIntervalRef.current) {
+        clearInterval(fullscreenEnforcementIntervalRef.current)
       }
     }
   }, [started, attempt, tabSwitchCount, timeOffPageSeconds, test.id, test.requireFullscreen, offPageStartTime, toast])
@@ -305,7 +344,7 @@ export function TakeTestClient({
       setStarted(true)
 
       // Enter fullscreen if required
-      if (test.requireFullscreen) {
+      if (requiresFullscreen()) {
         try {
           await document.documentElement.requestFullscreen()
         } catch (error) {
@@ -498,7 +537,7 @@ export function TakeTestClient({
       })
       setSubmitting(false)
       // Restore fullscreen on error if required
-      if (test.requireFullscreen && !document.fullscreenElement) {
+      if (requiresFullscreen() && !document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {})
       }
     }
@@ -612,8 +651,8 @@ export function TakeTestClient({
                 <span>Maximum attempts: {test.maxAttempts}</span>
               </div>
             )}
-            {test.requireFullscreen && (
-              <div className="flex items-center gap-2 text-sm text-amber-600">
+            {requiresFullscreen() && (
+              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
                 <Lock className="h-4 w-4" />
                 <span>This test requires fullscreen mode</span>
               </div>
@@ -659,7 +698,7 @@ export function TakeTestClient({
   }
 
   // Show fullscreen prompt if needed (for resume)
-  if (needsFullscreenPrompt && started && test.requireFullscreen) {
+  if (needsFullscreenPrompt && started && requiresFullscreen()) {
     return (
       <div className="container mx-auto max-w-2xl py-8 px-4">
         <Card>
@@ -1028,7 +1067,7 @@ export function TakeTestClient({
         setShowSaveExitDialog(open)
         if (!open) {
           // User canceled - restore fullscreen if required
-          if (test.requireFullscreen && !document.fullscreenElement) {
+          if (requiresFullscreen() && !document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(() => {})
           }
         }
@@ -1103,7 +1142,7 @@ export function TakeTestClient({
         setShowSubmitDialog(open)
         if (!open) {
           // User canceled - restore fullscreen if required
-          if (test.requireFullscreen && !document.fullscreenElement) {
+          if (requiresFullscreen() && !document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(() => {})
           }
         }

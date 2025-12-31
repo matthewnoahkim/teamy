@@ -1183,7 +1183,7 @@ export function NewTestBuilder({
             } else {
               router.push('/es')
             }
-            router.refresh()
+            // Don't call router.refresh() after router.push() - navigation will fetch fresh data
           }
           return
         }
@@ -1296,7 +1296,7 @@ export function NewTestBuilder({
               router.push(`/club/${clubId}?tab=tests`)
             }
           }
-          router.refresh()
+          // Don't call router.refresh() after router.push() - navigation will fetch fresh data
         }
       } else {
         // Create new test - use appropriate API based on mode
@@ -1399,7 +1399,7 @@ export function NewTestBuilder({
           } else {
             router.push(`/club/${clubId}?tab=tests`)
           }
-          router.refresh()
+          // Don't call router.refresh() after router.push() - navigation will fetch fresh data
         }
       }
     } catch (error: any) {
@@ -1546,7 +1546,7 @@ export function NewTestBuilder({
         } else if (esMode) {
           router.push('/es')
         }
-        router.refresh()
+        // Don't call router.refresh() after router.push() - navigation will fetch fresh data
         return
       }
 
@@ -1625,7 +1625,7 @@ export function NewTestBuilder({
       } else if (clubId) {
         router.push(`/club/${clubId}?tab=tests`)
       }
-      router.refresh()
+      // Don't call router.refresh() after router.push() - navigation will fetch fresh data
     } catch (error: any) {
       toast({
         title: 'Error',
