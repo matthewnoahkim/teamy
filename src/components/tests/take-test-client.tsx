@@ -67,6 +67,7 @@ export function TakeTestClient({
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null) // Time remaining in seconds
   const pausedAtRef = useRef<number | null>(null) // Timestamp when user saved and exited
   const totalPausedSecondsRef = useRef<number>(0) // Total seconds paused (accumulated)
+  const attemptRef = useRef(attempt) // Keep ref to latest attempt for back button handler
 
   // Load existing answers
   useEffect(() => {
@@ -157,6 +158,10 @@ export function TakeTestClient({
     }
   }
 
+  // Keep attempt ref updated for back button handler
+  useEffect(() => {
+    attemptRef.current = attempt
+  }, [attempt])
 
   // Track page visibility and tab switching
   useEffect(() => {
@@ -563,6 +568,43 @@ export function TakeTestClient({
       }
     }
   }, [started, attempt, test.durationMinutes, timeOffPageSeconds, toast, handleSubmit])
+
+  // Handle browser back button - auto-submit test
+  useEffect(() => {
+    if (!started || !attempt || attempt.status !== 'IN_PROGRESS') {
+      return
+    }
+
+    // Push a dummy state to history so we can intercept back button
+    const testState = { testId: test.id, attemptId: attempt.id, fromTest: true }
+    window.history.pushState(testState, '', window.location.href)
+
+    const handlePopState = (event: PopStateEvent) => {
+      // When back button is pressed, push state back immediately to prevent navigation
+      // This happens synchronously before the browser navigates away
+      window.history.pushState(testState, '', window.location.href)
+      
+      // Auto-submit the test (only if test is still in progress and not already exiting)
+      const currentAttempt = attemptRef.current
+      if (!isExitingRef.current && currentAttempt && currentAttempt.status === 'IN_PROGRESS') {
+        isExitingRef.current = true
+        toast({
+          title: 'Test Auto-Submitted',
+          description: 'Your test has been submitted due to navigation attempt.',
+        })
+        handleSubmit().catch((error) => {
+          console.error('Failed to auto-submit test:', error)
+          isExitingRef.current = false
+        })
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [started, attempt, test.id, handleSubmit, toast])
 
   if (!started) {
     const clubId = membership?.clubId
