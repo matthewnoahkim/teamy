@@ -37,7 +37,6 @@ export default async function TakeTestPage({
       calculatorType: true,
       allowNoteSheet: true,
       noteSheetInstructions: true,
-      requireOneSitting: true,
       testPasswordHash: true,
       maxAttempts: true,
       scoreReleaseMode: true,

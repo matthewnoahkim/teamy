@@ -992,7 +992,6 @@ export function NewTestBuilder({
       allowNoteSheet: details.allowNoteSheet,
       noteSheetInstructions: details.allowNoteSheet ? details.noteSheetInstructions.trim() || undefined : undefined,
       autoApproveNoteSheet: details.allowNoteSheet ? (details.autoApproveNoteSheet ?? true) : undefined,
-      requireOneSitting: details.requireOneSitting,
       assignments,
       questions: questions.map((question, index) => {
         // Map frontend types to backend types
@@ -1150,8 +1149,6 @@ export function NewTestBuilder({
             calculatorType: payload.calculatorType,
             allowNoteSheet: payload.allowNoteSheet,
             noteSheetInstructions: payload.noteSheetInstructions,
-            autoApproveNoteSheet: payload.autoApproveNoteSheet,
-            requireOneSitting: payload.requireOneSitting,
           }
         }
 
@@ -1572,7 +1569,6 @@ export function NewTestBuilder({
           maxAttempts: publishFormData.maxAttempts ? parseInt(publishFormData.maxAttempts, 10) : null,
           scoreReleaseMode: publishFormData.scoreReleaseMode,
           requireFullscreen: publishFormData.requireFullscreen,
-          requireOneSitting: details.requireOneSitting,
           ...(!tournamentId && {
             assignmentMode,
             selectedTeams: assignmentMode === 'TEAM' ? selectedTeams : undefined,
@@ -1810,27 +1806,31 @@ export function NewTestBuilder({
                 <p className="text-xs text-muted-foreground mt-1">
                   Time allowed to complete the test (1-720 minutes)
                 </p>
-                {/* Require One Sitting */}
-                <div className="flex items-center gap-2 mt-4">
-                  <Checkbox
-                    id="require-one-sitting"
-                    checked={details.requireOneSitting}
-                    onCheckedChange={(checked) =>
-                      setDetails((prev) => ({
-                        ...prev,
-                        requireOneSitting: checked as boolean,
-                      }))
-                    }
-                  />
-                  <Label htmlFor="require-one-sitting" className="cursor-pointer font-normal">
-                    Require test to be completed in one sitting
-                  </Label>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 ml-6">
-                  {details.requireOneSitting
-                    ? 'Students must complete the test in one session. The "Save & Exit" button will be hidden.'
-                    : 'Students can save their progress and return to complete the test later.'}
-                </p>
+                {/* Require One Sitting - Only for ES tests (tournament tests) */}
+                {(esMode || tournamentId) && (
+                  <>
+                    <div className="flex items-center gap-2 mt-4">
+                      <Checkbox
+                        id="require-one-sitting"
+                        checked={details.requireOneSitting}
+                        onCheckedChange={(checked) =>
+                          setDetails((prev) => ({
+                            ...prev,
+                            requireOneSitting: checked as boolean,
+                          }))
+                        }
+                      />
+                      <Label htmlFor="require-one-sitting" className="cursor-pointer font-normal">
+                        Require test to be completed in one sitting
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 ml-6">
+                      {details.requireOneSitting
+                        ? 'Students must complete the test in one session. The "Save & Exit" button will be hidden.'
+                        : 'Students can save their progress and return to complete the test later.'}
+                    </p>
+                  </>
+                )}
               </div>
 
               <div className="space-y-3 pt-4 border-t">
