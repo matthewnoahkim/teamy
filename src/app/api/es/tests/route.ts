@@ -496,13 +496,13 @@ export async function GET(request: NextRequest) {
                 name: test.createdBy.name,
                 email: test.createdBy.email,
               } : undefined,
-              questions: test.questions.map(q => ({
+              questions: test.questions.map((q: any) => ({
                 id: q.id,
                 type: q.type,
                 promptMd: q.promptMd,
                 points: Number(q.points),
                 order: q.order,
-                options: q.options.map(o => ({
+                options: q.options.map((o: any) => ({
                   id: o.id,
                   label: o.label,
                   isCorrect: o.isCorrect,

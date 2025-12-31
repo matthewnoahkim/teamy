@@ -169,14 +169,14 @@ export default async function TDEditTestPage({ params }: Props) {
     noteSheetInstructions: null,
     status: esTest.status as 'DRAFT' | 'PUBLISHED' | 'CLOSED',
     assignments: [],
-    questions: esTest.questions.map(q => ({
+    questions: esTest.questions.map((q: any) => ({
       id: q.id,
       type: q.type,
       promptMd: q.promptMd,
       explanation: q.explanation,
       points: Number(q.points),
       shuffleOptions: q.shuffleOptions,
-      options: q.options.map(o => ({
+      options: q.options.map((o: any) => ({
         id: o.id,
         label: o.label,
         isCorrect: o.isCorrect,

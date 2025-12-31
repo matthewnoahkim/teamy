@@ -444,14 +444,14 @@ export async function GET(
         allowNoteSheet: test.allowNoteSheet ?? false,
         autoApproveNoteSheet: test.autoApproveNoteSheet ?? true,
         requireOneSitting: (test as any).requireOneSitting ?? true, // Default to true if column doesn't exist
-        questions: test.questions.map(q => ({
+        questions: test.questions.map((q: any) => ({
           id: q.id,
           type: q.type,
           promptMd: q.promptMd,
           explanation: q.explanation,
           points: Number(q.points),
           order: q.order,
-          options: q.options.map(o => ({
+          options: q.options.map((o: any) => ({
             id: o.id,
             label: o.label,
             isCorrect: o.isCorrect,
@@ -492,14 +492,14 @@ export async function GET(
         allowNoteSheet: test.allowNoteSheet ?? false,
         autoApproveNoteSheet: test.autoApproveNoteSheet ?? true,
         requireOneSitting: (test as any).requireOneSitting ?? true, // Default to true if column doesn't exist
-        questions: test.questions.map(q => ({
+        questions: test.questions.map((q: any) => ({
           id: q.id,
           type: q.type,
           promptMd: q.promptMd,
           explanation: q.explanation,
           points: Number(q.points),
           order: q.order,
-          options: q.options.map(o => ({
+          options: q.options.map((o: any) => ({
             id: o.id,
             label: o.label,
             isCorrect: o.isCorrect,
