@@ -54,6 +54,7 @@ export default async function TournamentTakeTestPage({
           calculatorType: true,
           allowNoteSheet: true,
           noteSheetInstructions: true,
+          requireOneSitting: true,
           testPasswordHash: true,
           maxAttempts: true,
           scoreReleaseMode: true,

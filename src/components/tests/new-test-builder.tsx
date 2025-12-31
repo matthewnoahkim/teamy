@@ -992,6 +992,7 @@ export function NewTestBuilder({
       allowNoteSheet: details.allowNoteSheet,
       noteSheetInstructions: details.allowNoteSheet ? details.noteSheetInstructions.trim() || undefined : undefined,
       autoApproveNoteSheet: details.allowNoteSheet ? (details.autoApproveNoteSheet ?? true) : undefined,
+      requireOneSitting: details.requireOneSitting ?? true,
       assignments,
       questions: questions.map((question, index) => {
         // Map frontend types to backend types
@@ -1806,8 +1807,8 @@ export function NewTestBuilder({
                 <p className="text-xs text-muted-foreground mt-1">
                   Time allowed to complete the test (1-720 minutes)
                 </p>
-                {/* Require One Sitting - Only for ES tests (tournament tests) */}
-                {(esMode || tournamentId) && (
+                {/* Require One Sitting - For both club tests and ES tests (tournament tests) */}
+                {(clubId || esMode || tournamentId) && (
                   <>
                     <div className="flex items-center gap-2 mt-4">
                       <Checkbox

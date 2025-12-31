@@ -997,7 +997,7 @@ export function TakeTestClient({
               )}
             </div>
             <div className="flex items-center gap-3">
-              {!(test as any).requireOneSitting && (
+              {((test as any).requireOneSitting === false) && (
                 <Button
                   variant="outline"
                   onClick={() => {
