@@ -496,13 +496,13 @@ export async function GET(request: NextRequest) {
                 name: test.createdBy.name,
                 email: test.createdBy.email,
               } : undefined,
-              questions: test.questions.map((q: any) => ({
+              questions: test.questions.map(q => ({
                 id: q.id,
                 type: q.type,
                 promptMd: q.promptMd,
                 points: Number(q.points),
                 order: q.order,
-                options: q.options.map((o: any) => ({
+                options: q.options.map(o => ({
                   id: o.id,
                   label: o.label,
                   isCorrect: o.isCorrect,
@@ -608,24 +608,6 @@ export async function POST(request: NextRequest) {
 
     console.log('Creating ES test:', { staffId, tournamentId, eventId, name })
     
-    // Get event name BEFORE the transaction to avoid transaction timeout issues
-    let finalEventName: string | null = null
-    if (eventId) {
-      try {
-        const event = await prisma.event.findUnique({
-          where: { id: eventId },
-          select: { name: true },
-        })
-        finalEventName = event?.name || null
-      } catch (error) {
-        console.warn('Failed to fetch event name before transaction:', error)
-        // Continue without event name - it's not critical for test creation
-      }
-    } else if (eventName) {
-      // For trial events, use the provided eventName
-      finalEventName = eventName
-    }
-    
     // Create the test with questions and audit log in a transaction
     const test = await prisma.$transaction(async (tx) => {
       // Base data without requireOneSitting
@@ -664,7 +646,7 @@ export async function POST(request: NextRequest) {
                   numericTolerance: q.numericTolerance,
                   options: q.options && q.options.length > 0
                     ? {
-                        create: q.options.map((opt: any, optIndex: number) => ({
+                        create: q.options.map((opt, optIndex) => ({
                           label: opt.label,
                           isCorrect: opt.isCorrect,
                           order: opt.order ?? optIndex,
@@ -676,6 +658,19 @@ export async function POST(request: NextRequest) {
             : undefined,
         },
       })
+
+      // Get event name - either from the event relation or from the provided eventName (for trial events)
+      let finalEventName: string | null = null
+      if (eventId) {
+        const event = await tx.event.findUnique({
+          where: { id: eventId },
+          select: { name: true },
+        })
+        finalEventName = event?.name || null
+      } else if (eventName) {
+        // For trial events, use the provided eventName
+        finalEventName = eventName
+      }
 
       // Create audit log for test creation
       await tx.eSTestAudit.create({
@@ -936,51 +931,6 @@ export async function PUT(request: NextRequest) {
     if (requireOneSitting !== undefined && requireOneSitting !== existingTest.requireOneSitting) changedFields.push('requireOneSitting')
     if (questions) changedFields.push('questions')
 
-    // Get event name BEFORE the transaction to avoid transaction timeout issues
-    let finalEventName: string | null = null
-    if (eventId !== undefined) {
-      // If eventId is being changed, fetch the new event name
-      const newEventId = eventId || null
-      if (newEventId) {
-        try {
-          const event = await prisma.event.findUnique({
-            where: { id: newEventId },
-            select: { name: true },
-          })
-          finalEventName = event?.name || null
-        } catch (error) {
-          console.warn('Failed to fetch event name before transaction:', error)
-          // Continue without event name - it's not critical for test update
-        }
-      } else {
-        // eventId is being set to null
-        finalEventName = null
-      }
-    } else {
-      // eventId not changed, use existing event name
-      finalEventName = existingTest.event?.name || null
-      
-      // If eventId is null (trial event), try to get eventName from the CREATE audit log
-      if (!finalEventName && !existingTest.eventId) {
-        try {
-          const createAudit = await prisma.eSTestAudit.findFirst({
-            where: {
-              testId: testId,
-              action: 'CREATE',
-            },
-            orderBy: {
-              createdAt: 'desc',
-            },
-          })
-          if (createAudit && createAudit.details && typeof createAudit.details === 'object' && 'eventName' in createAudit.details) {
-            finalEventName = (createAudit.details as any).eventName || null
-          }
-        } catch (error) {
-          console.warn('Failed to fetch event name from audit log:', error)
-        }
-      }
-    }
-
     // Use a transaction to update test and questions
     const updatedTest = await prisma.$transaction(async (tx) => {
       // Update the test
@@ -1006,8 +956,41 @@ export async function PUT(request: NextRequest) {
         },
       })
 
-      // Get event name - fetch BEFORE transaction to avoid timeout issues
-      // We'll get it outside the transaction and use it here
+      // Get event name - either from the updated event relation or from existing test
+      let finalEventName: string | null = null
+      if (eventId !== undefined) {
+        // If eventId is being changed, fetch the new event name
+        const newEventId = eventId || null
+        if (newEventId) {
+          const event = await tx.event.findUnique({
+            where: { id: newEventId },
+            select: { name: true },
+          })
+          finalEventName = event?.name || null
+        } else {
+          // eventId is being set to null
+          finalEventName = null
+        }
+      } else {
+        // eventId not changed, use existing event name
+        finalEventName = existingTest.event?.name || null
+        
+        // If eventId is null (trial event), try to get eventName from the CREATE audit log
+        if (!finalEventName && !existingTest.eventId) {
+          const createAudit = await tx.eSTestAudit.findFirst({
+            where: {
+              testId: testId,
+              action: 'CREATE',
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          })
+          if (createAudit && createAudit.details && typeof createAudit.details === 'object' && 'eventName' in createAudit.details) {
+            finalEventName = (createAudit.details as any).eventName || null
+          }
+        }
+      }
 
       // Create audit log for the update
       if (changedFields.length > 0) {
@@ -1037,7 +1020,7 @@ export async function PUT(request: NextRequest) {
         })
 
         // Upsert questions
-        for (const q of questions as any[]) {
+        for (const q of questions) {
           if (q.id) {
             // Update existing question
             await tx.eSTestQuestion.update({
@@ -1055,7 +1038,7 @@ export async function PUT(request: NextRequest) {
 
             // Handle options
             if (q.options) {
-              const newOptionIds = q.options.filter((o: any) => o.id).map((o: any) => o.id!)
+              const newOptionIds = q.options.filter(o => o.id).map(o => o.id!)
               await tx.eSTestQuestionOption.deleteMany({
                 where: {
                   questionId: q.id,
@@ -1099,7 +1082,7 @@ export async function PUT(request: NextRequest) {
                 numericTolerance: q.numericTolerance,
                 options: q.options && q.options.length > 0
                   ? {
-                      create: q.options.map((opt: any, optIndex: number) => ({
+                      create: q.options.map((opt, optIndex) => ({
                         label: opt.label,
                         isCorrect: opt.isCorrect,
                         order: opt.order ?? optIndex,
