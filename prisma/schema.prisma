@@ -574,6 +574,7 @@ model Test {
   allowNoteSheet         Boolean               @default(false)
   noteSheetInstructions  String?
   autoApproveNoteSheet   Boolean               @default(true)
+  requireOneSitting      Boolean               @default(true)
   createdByMembershipId  String
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt

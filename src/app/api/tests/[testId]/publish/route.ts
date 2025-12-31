@@ -17,6 +17,7 @@ const publishSchema = z.object({
   maxAttempts: z.number().min(1).optional().nullable(),
   scoreReleaseMode: z.enum(['NONE', 'SCORE_ONLY', 'SCORE_WITH_WRONG', 'FULL_TEST']).optional(),
   requireFullscreen: z.boolean().optional(),
+  requireOneSitting: z.boolean().optional(),
   assignmentMode: z.enum(['CLUB', 'TEAM', 'EVENT']).optional(),
   selectedTeams: z.array(z.string()).optional(),
   selectedEventId: z.string().optional(),
@@ -112,6 +113,7 @@ export async function POST(
         ...(validatedData.durationMinutes && { durationMinutes: validatedData.durationMinutes }),
         ...(validatedData.maxAttempts !== undefined && { maxAttempts: validatedData.maxAttempts }),
         ...(validatedData.requireFullscreen !== undefined && { requireFullscreen: validatedData.requireFullscreen }),
+        ...(validatedData.requireOneSitting !== undefined && { requireOneSitting: validatedData.requireOneSitting }),
       },
     })
 

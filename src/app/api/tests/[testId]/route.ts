@@ -22,6 +22,7 @@ const updateTestSchema = z.object({
   allowNoteSheet: z.boolean().optional(),
   noteSheetInstructions: z.string().optional().nullable(),
   autoApproveNoteSheet: z.boolean().optional(),
+  requireOneSitting: z.boolean().optional(),
   releaseScoresAt: z.string().datetime().optional().nullable(),
   maxAttempts: z.number().int().min(1).optional().nullable(),
   scoreReleaseMode: z.enum(['NONE', 'SCORE_ONLY', 'SCORE_WITH_WRONG', 'FULL_TEST']).optional(),
@@ -306,6 +307,8 @@ export async function PATCH(
       updateData.noteSheetInstructions = validatedData.noteSheetInstructions
     if (validatedData.autoApproveNoteSheet !== undefined)
       updateData.autoApproveNoteSheet = validatedData.autoApproveNoteSheet
+    if (validatedData.requireOneSitting !== undefined)
+      updateData.requireOneSitting = validatedData.requireOneSitting
     if (validatedData.releaseScoresAt !== undefined)
       updateData.releaseScoresAt = validatedData.releaseScoresAt
         ? new Date(validatedData.releaseScoresAt)

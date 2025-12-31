@@ -100,6 +100,7 @@ export default async function TeamTestDetailPage({
       calculatorType: true,
       allowNoteSheet: true,
       noteSheetInstructions: true,
+      requireOneSitting: true,
       releaseScoresAt: true,
       testPasswordHash: true,
       testPasswordPlaintext: true,
@@ -193,6 +194,7 @@ export default async function TeamTestDetailPage({
       calculatorType: test.calculatorType,
       allowNoteSheet: test.allowNoteSheet,
       noteSheetInstructions: test.noteSheetInstructions,
+      requireOneSitting: (test as any).requireOneSitting ?? true,
       status: test.status,
       assignments: test.assignments,
       questions: test.questions.map(q => ({
