@@ -322,117 +322,149 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
     }
   }
 
-  // Combine ES assigned events and TD all events
-  const allUserEventIds = new Set([...userEventIds, ...tdEventIds])
-  const eventIdsArray = Array.from(allUserEventIds)
+  // Build event ID sets per tournament (NOT combined across tournaments)
+  // This prevents tests from leaking between tournaments
+  const eventIdsByTournament = new Map<string, Set<string>>()
   
-  // Fetch tests - include both regular events and trial events (eventId: null)
-  const allTests = await prisma.eSTest.findMany({
-    where: {
-      tournamentId: { in: tournamentIds },
-      OR: [
-        // Tests with real eventIds
-        ...(eventIdsArray.length > 0 ? [{ eventId: { in: eventIdsArray } }] : []),
-        // Tests with null eventId (trial events)
-        { eventId: null },
-      ],
-    },
-    include: {
-      event: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      staff: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      createdBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      questions: {
-        include: {
-          options: true,
-        },
-        orderBy: { order: 'asc' },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  // Fetch eventNames from CREATE audit logs for tests with null eventId (trial events)
-  const testsWithNullEventId = allTests.filter(t => !t.eventId)
-  const testEventNameMap = new Map<string, string>()
-  if (testsWithNullEventId.length > 0) {
-    const testIds = testsWithNullEventId.map(t => t.id)
-    const createAudits = await prisma.eSTestAudit.findMany({
-      where: {
-        testId: { in: testIds },
-        action: 'CREATE',
-      },
-      select: {
-        testId: true,
-        details: true,
-      },
-    })
-    for (const audit of createAudits) {
-      if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
-        const eventName = (audit.details as any).eventName
-        if (eventName && typeof eventName === 'string') {
-          testEventNameMap.set(audit.testId, eventName)
-        }
+  // For ES members, map their assigned events per tournament
+  staffMemberships.forEach(membership => {
+    if (membership.role !== 'TOURNAMENT_DIRECTOR') {
+      const tournamentId = membership.tournament.id
+      if (!eventIdsByTournament.has(tournamentId)) {
+        eventIdsByTournament.set(tournamentId, new Set())
       }
+      membership.events.forEach(e => {
+        eventIdsByTournament.get(tournamentId)!.add(e.event.id)
+      })
     }
+  })
+  
+  // For TDs, fetch all events for their tournament's division
+  for (const [tournamentId, division] of tournamentDivisions.entries()) {
+    if (!eventIdsByTournament.has(tournamentId)) {
+      eventIdsByTournament.set(tournamentId, new Set())
+    }
+    const divisionsToFetch: Division[] = division === 'B&C' ? [Division.B, Division.C] : [division as Division]
+    const events = await prisma.event.findMany({
+      where: {
+        division: { in: divisionsToFetch },
+      },
+      select: { id: true },
+    })
+    events.forEach(e => eventIdsByTournament.get(tournamentId)!.add(e.id))
   }
 
-  // Organize tests by tournament and event
-  // For regular events, use eventId as key
-  // For trial events, use "trial-{eventName}" as key
-  const testsByTournament = new Map<string, Map<string, typeof allTests>>()
+  // CRITICAL FIX: Query and organize tests PER TOURNAMENT separately
+  // Never mix tests from different tournaments together
+  const testsByTournament = new Map<string, Map<string, any[]>>()
+  const testEventNameMap = new Map<string, string>()
   
-  for (const test of allTests) {
-    if (!testsByTournament.has(test.tournamentId)) {
-      testsByTournament.set(test.tournamentId, new Map())
-    }
-    const testsByEvent = testsByTournament.get(test.tournamentId)!
+  // Process each tournament completely independently
+  for (const tournamentId of tournamentIds) {
+    // Query ONLY tests for this tournament
+    const tournamentTests = await prisma.eSTest.findMany({
+      where: {
+        tournamentId: tournamentId, // EXPLICIT: Only this tournament
+      },
+      include: {
+        event: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        staff: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        questions: {
+          include: {
+            options: true,
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
     
-    let eventKey: string
-    if (test.eventId) {
-      // Regular event - use eventId as key
-      eventKey = test.eventId
-    } else {
-      // Trial event - use eventName from audit log
-      const eventName = testEventNameMap.get(test.id)
-      if (eventName) {
-        // Check if user has access to this trial event
-        const userAccess = userTrialEventAccess.get(test.tournamentId)
-        const tournamentTrialEvents = tournamentTrialEventNamesByTournament.get(test.tournamentId) || []
-        const trialEventNames = tournamentTrialEvents.map(te => te.name)
-        
-        if (userAccess && userAccess.has(eventName) && trialEventNames.includes(eventName)) {
-          eventKey = `trial-${eventName}`
-        } else {
-          // Skip if user doesn't have access or event doesn't exist in tournament config
-          continue
+    // Fetch eventNames from CREATE audit logs for trial events in THIS tournament only
+    const testsWithNullEventId = tournamentTests.filter(t => !t.eventId)
+    if (testsWithNullEventId.length > 0) {
+      const testIds = testsWithNullEventId.map(t => t.id)
+      const createAudits = await prisma.eSTestAudit.findMany({
+        where: {
+          testId: { in: testIds },
+          action: 'CREATE',
+        },
+        select: {
+          testId: true,
+          details: true,
+        },
+      })
+      for (const audit of createAudits) {
+        if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
+          const eventName = (audit.details as any).eventName
+          if (eventName && typeof eventName === 'string') {
+            testEventNameMap.set(audit.testId, eventName)
+          }
         }
-      } else {
-        // No eventName found in audit log - skip
-        continue
       }
     }
     
-    if (!testsByEvent.has(eventKey)) {
-      testsByEvent.set(eventKey, [])
+    // Initialize tournament's test map
+    testsByTournament.set(tournamentId, new Map())
+    const testsByEvent = testsByTournament.get(tournamentId)!
+    
+    // Get allowed event IDs for THIS tournament only
+    const allowedEventIds = eventIdsByTournament.get(tournamentId) || new Set<string>()
+    const tournamentTrialEvents = tournamentTrialEventNamesByTournament.get(tournamentId) || []
+    const trialEventNames = tournamentTrialEvents.map(te => te.name)
+    const userAccess = userTrialEventAccess.get(tournamentId) || new Set<string>()
+    
+    // Organize tests for THIS tournament only
+    for (const test of tournamentTests) {
+      // VERIFY: Test belongs to this tournament (should always be true, but double-check)
+      if (test.tournamentId !== tournamentId) {
+        console.error(`CRITICAL ERROR: Test ${test.id} has tournamentId ${test.tournamentId} but we're organizing it for ${tournamentId}`)
+        continue
+      }
+      
+      let eventKey: string | null = null
+      
+      if (test.eventId) {
+        // Regular event - only include if user has access to this event in THIS tournament
+        if (allowedEventIds.has(test.eventId)) {
+          eventKey = test.eventId
+        } else {
+          continue // Skip - user doesn't have access
+        }
+      } else {
+        // Trial event - use eventName from audit log
+        const eventName = testEventNameMap.get(test.id)
+        if (eventName && userAccess.has(eventName) && trialEventNames.includes(eventName)) {
+          eventKey = `trial-${eventName}`
+        } else {
+          continue // Skip - no access or invalid trial event
+        }
+      }
+      
+      if (eventKey) {
+        if (!testsByEvent.has(eventKey)) {
+          testsByEvent.set(eventKey, [])
+        }
+        testsByEvent.get(eventKey)!.push(test)
+      }
     }
-    testsByEvent.get(eventKey)!.push(test)
   }
 
   // For TDs, get all events for their tournament's division
@@ -538,14 +570,21 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
         slug: membership.tournament.slug,
       },
       events: [...eventsToShow].sort((a, b) => a.event.name.localeCompare(b.event.name)).map(e => {
-        // Look for tests for this event across ALL tournaments the user has access to
+        // Only look for tests for this event in THIS tournament (matches TD portal behavior)
         // For regular events, use event.id; for trial events, use "trial-{eventName}"
         const eventKey = e.event.id ? e.event.id : `trial-${e.event.name}`
-        let eventTests: typeof allTests = []
-        for (const [tournamentId, eventMap] of testsByTournament.entries()) {
-          const testsForEventInTournament = eventMap.get(eventKey) || []
-          eventTests = [...eventTests, ...testsForEventInTournament]
-        }
+        const eventMap = testsByTournament.get(membership.tournament.id) || new Map()
+        const eventTests = eventMap.get(eventKey) || []
+        
+        // CRITICAL DEFENSIVE FILTER: Double-check that every test actually belongs to this tournament
+        // This catches any bugs in the organization logic
+        const filteredEventTests = eventTests.filter((test: any) => {
+          if (test.tournamentId !== membership.tournament.id) {
+            console.error(`CRITICAL ERROR: Test ${test.id} has tournamentId ${test.tournamentId} but is being shown for tournament ${membership.tournament.id}`)
+            return false
+          }
+          return true
+        })
         
         return {
           event: {
@@ -553,7 +592,7 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
             name: e.event.name,
             division: e.event.division,
           },
-          tests: eventTests.map(test => ({
+          tests: filteredEventTests.map((test: any) => ({
             id: test.id,
             name: test.name,
             status: test.status,
