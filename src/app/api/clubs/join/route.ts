@@ -50,6 +50,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Verify the user exists in the database
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User account not found. Please sign out and sign in again.', code: 'USER_NOT_FOUND' },
+        { status: 404 }
+      )
+    }
+
     // Check if user is already a member
     const existing = await prisma.membership.findUnique({
       where: {
@@ -108,6 +120,30 @@ export async function POST(req: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
     }
+    
+    // Handle Prisma foreign key constraint violations
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
+      const prismaError = error as { code: string; meta?: { field_name?: string } }
+      if (prismaError.meta?.field_name?.includes('userId')) {
+        return NextResponse.json(
+          { 
+            error: 'User account not found. Please sign out and sign in again.', 
+            code: 'USER_NOT_FOUND' 
+          },
+          { status: 404 }
+        )
+      }
+      if (prismaError.meta?.field_name?.includes('clubId')) {
+        return NextResponse.json(
+          { 
+            error: 'Club not found.', 
+            code: 'CLUB_NOT_FOUND' 
+          },
+          { status: 404 }
+        )
+      }
+    }
+    
     console.error('Join club error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

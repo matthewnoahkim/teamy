@@ -90,7 +90,7 @@ export function TestDetailWrapper({
           variant={activeView === 'attempts' ? 'default' : 'outline'}
           onClick={() => handleViewChange('attempts')}
         >
-          Attempts
+          Responses
         </Button>
       </div>
 

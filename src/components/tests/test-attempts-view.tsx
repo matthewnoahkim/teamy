@@ -395,7 +395,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Attempts ({attempts.length})
+                Responses ({attempts.length})
               </CardTitle>
               <CardDescription>
                 View all student attempts for {testName}
