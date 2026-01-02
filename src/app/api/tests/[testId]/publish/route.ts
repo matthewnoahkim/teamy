@@ -8,8 +8,8 @@ import { hashTestPassword } from '@/lib/test-security'
 import { z } from 'zod'
 
 const publishSchema = z.object({
-  startAt: z.string().datetime(),
-  endAt: z.string().datetime(),
+  startAt: z.string().datetime().optional().nullable(),
+  endAt: z.string().datetime().optional().nullable(),
   testPassword: z.string().min(6).optional(),
   releaseScoresAt: z.string().datetime().optional(),
   sendEmails: z.boolean().optional(),
@@ -74,12 +74,29 @@ export async function POST(
       )
     }
 
-    // Validate dates
-    const startAt = new Date(validatedData.startAt)
-    const endAt = new Date(validatedData.endAt)
-    if (endAt <= startAt) {
+    // Validate dates if provided
+    let startAt: Date | null = null
+    let endAt: Date | null = null
+    
+    if (validatedData.startAt) {
+      startAt = new Date(validatedData.startAt)
+    }
+    if (validatedData.endAt) {
+      endAt = new Date(validatedData.endAt)
+    }
+    
+    // If both dates are provided, validate they're in the correct order
+    if (startAt && endAt && endAt <= startAt) {
       return NextResponse.json(
         { error: 'End time must be after start time' },
+        { status: 400 }
+      )
+    }
+    
+    // If one date is provided, both should be provided
+    if ((startAt && !endAt) || (!startAt && endAt)) {
+      return NextResponse.json(
+        { error: 'Both start and end times must be provided together, or neither' },
         { status: 400 }
       )
     }
@@ -101,8 +118,8 @@ export async function POST(
       where: { id: testId },
       data: {
         status: 'PUBLISHED',
-        startAt,
-        endAt,
+        startAt: startAt || null,
+        endAt: endAt || null,
         testPasswordHash,
         testPasswordPlaintext,
         releaseScoresAt: validatedData.releaseScoresAt
@@ -179,9 +196,9 @@ export async function POST(
       },
     })
 
-    // Create calendar event if requested
+    // Create calendar event if requested (only if dates are provided)
     let calendarEventIds: string[] = []
-    if (validatedData.addToCalendar) {
+    if (validatedData.addToCalendar && startAt && endAt) {
       // Get the final assignments (either from the request or existing ones)
       const finalAssignments = validatedData.assignmentMode
         ? await prisma.testAssignment.findMany({

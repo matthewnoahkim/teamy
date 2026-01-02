@@ -359,9 +359,23 @@ export function NewTestBuilder({
   const [importStartTime, setImportStartTime] = useState<number | null>(null)
   const [estimatedTimeSeconds, setEstimatedTimeSeconds] = useState<number>(30)
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0)
+  // Helper to format date for datetime-local input (YYYY-MM-DDTHH:mm)
+  const formatDateTimeLocal = (date: Date | string | null | undefined): string => {
+    if (!date) return ''
+    const d = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(d.getTime())) return ''
+    // Get local date/time string in format YYYY-MM-DDTHH:mm
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const hours = String(d.getHours()).padStart(2, '0')
+    const minutes = String(d.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
+
   const [publishFormData, setPublishFormData] = useState({
-    startAt: '',
-    endAt: '',
+    startAt: test?.startAt ? formatDateTimeLocal(test.startAt) : '',
+    endAt: test?.endAt ? formatDateTimeLocal(test.endAt) : '',
     testPassword: '',
     testPasswordConfirm: '',
     releaseScoresAt: '',
@@ -369,6 +383,7 @@ export function NewTestBuilder({
     scoreReleaseMode: (test?.scoreReleaseMode || 'FULL_TEST') as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',
     requireFullscreen: test?.requireFullscreen !== undefined ? test.requireFullscreen : true,
   })
+  const [hasFixedWindow, setHasFixedWindow] = useState(test?.startAt !== null && test?.startAt !== undefined && test?.endAt !== null && test?.endAt !== undefined)
   const [dateTimeErrors, setDateTimeErrors] = useState<{ startAt?: string; endAt?: string }>({})
 
   const isEditMode = !!test
@@ -1428,8 +1443,16 @@ export function NewTestBuilder({
       return
     }
 
-    // Validate start/end times for both regular tests and ES tests
-    if (publishFormData.startAt && publishFormData.endAt) {
+    // Validate start/end times if fixed window is enabled
+    if (hasFixedWindow) {
+      if (!publishFormData.startAt || !publishFormData.endAt) {
+        toast({
+          title: 'Error',
+          description: 'Start and end times are required when test has a fixed window',
+          variant: 'destructive',
+        })
+        return
+      }
       const start = new Date(publishFormData.startAt)
       const end = new Date(publishFormData.endAt)
       if (end <= start) {
@@ -1439,16 +1462,6 @@ export function NewTestBuilder({
           variant: 'destructive',
         })
         setDateTimeErrors({ endAt: 'End date/time must be after start date/time' })
-        return
-      }
-    } else if (!esMode) {
-      // For regular tests, start and end times are required
-      if (!publishFormData.startAt || !publishFormData.endAt) {
-        toast({
-          title: 'Error',
-          description: 'Start and end times are required',
-          variant: 'destructive',
-        })
         return
       }
     }
@@ -1555,8 +1568,8 @@ export function NewTestBuilder({
       }
 
       // Regular test publish flow
-      const startAtISO = publishFormData.startAt ? new Date(publishFormData.startAt).toISOString() : undefined
-      const endAtISO = publishFormData.endAt ? new Date(publishFormData.endAt).toISOString() : undefined
+      const startAtISO = hasFixedWindow && publishFormData.startAt ? new Date(publishFormData.startAt).toISOString() : null
+      const endAtISO = hasFixedWindow && publishFormData.endAt ? new Date(publishFormData.endAt).toISOString() : null
       const releaseScoresAtISO = publishFormData.releaseScoresAt && publishFormData.releaseScoresAt.trim() 
         ? new Date(publishFormData.releaseScoresAt).toISOString() 
         : undefined
@@ -2045,163 +2058,9 @@ export function NewTestBuilder({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="startAt">Start Date/Time *</Label>
-              <Input
-                id="startAt"
-                type="datetime-local"
-                value={publishFormData.startAt}
-                onChange={(e) => {
-                  const newStartAt = e.target.value
-                  setPublishFormData((prev) => ({ ...prev, startAt: newStartAt }))
-                  // Validate immediately
-                  if (newStartAt && publishFormData.endAt) {
-                    const start = new Date(newStartAt)
-                    const end = new Date(publishFormData.endAt)
-                    if (end <= start) {
-                      setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
-                    } else {
-                      setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
-                    }
-                  } else {
-                    setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
-                  }
-                }}
-                required
-              />
-              {dateTimeErrors.startAt && (
-                <p className="text-sm text-destructive mt-1">{dateTimeErrors.startAt}</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="endAt">End Date/Time *</Label>
-              <Input
-                id="endAt"
-                type="datetime-local"
-                value={publishFormData.endAt}
-                onChange={(e) => {
-                  const newEndAt = e.target.value
-                  setPublishFormData((prev) => ({ ...prev, endAt: newEndAt }))
-                  // Validate immediately
-                  if (publishFormData.startAt && newEndAt) {
-                    const start = new Date(publishFormData.startAt)
-                    const end = new Date(newEndAt)
-                    if (end <= start) {
-                      setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
-                    } else {
-                      setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
-                    }
-                  } else {
-                    setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
-                  }
-                }}
-                required
-                min={publishFormData.startAt || undefined}
-              />
-              {dateTimeErrors.endAt && (
-                <p className="text-sm text-destructive mt-1">{dateTimeErrors.endAt}</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="testPassword">Test Password (optional)</Label>
-              <Input
-                id="testPassword"
-                type="password"
-                value={publishFormData.testPassword}
-                onChange={(e) => setPublishFormData((prev) => ({ ...prev, testPassword: e.target.value }))}
-                placeholder="Students need this to take the test"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                If set, students will need to enter this password to start the test.
-              </p>
-            </div>
-
-            {publishFormData.testPassword && (
-              <div>
-                <Label htmlFor="testPasswordConfirm">Confirm Password</Label>
-                <Input
-                  id="testPasswordConfirm"
-                  type="password"
-                  value={publishFormData.testPasswordConfirm}
-                  onChange={(e) => setPublishFormData((prev) => ({ ...prev, testPasswordConfirm: e.target.value }))}
-                  placeholder="Confirm password"
-                />
-              </div>
-            )}
-
-            <div>
-              <Label htmlFor="maxAttempts">Max attempts per user (optional)</Label>
-              <Input
-                id="maxAttempts"
-                type="number"
-                min="1"
-                value={publishFormData.maxAttempts}
-                onChange={(e) => setPublishFormData((prev) => ({ ...prev, maxAttempts: e.target.value }))}
-                placeholder="Unlimited if not set"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Leave blank for unlimited attempts
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="scoreReleaseMode">Score release mode</Label>
-              <Select
-                value={publishFormData.scoreReleaseMode}
-                onValueChange={(value) => setPublishFormData((prev) => ({ ...prev, scoreReleaseMode: value as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST' }))}
-              >
-                <SelectTrigger id="scoreReleaseMode">
-                  <SelectValue placeholder="Select release mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="FULL_TEST">Full test (answers, correctness, feedback)</SelectItem>
-                  <SelectItem value="SCORE_WITH_WRONG">Score + wrong questions</SelectItem>
-                  <SelectItem value="SCORE_ONLY">Score only</SelectItem>
-                  <SelectItem value="NONE">No scores released</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Controls what students see after submission
-              </p>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="require-fullscreen"
-                  checked={publishFormData.requireFullscreen}
-                  onCheckedChange={(checked) => {
-                    const value = checked === true
-                    setPublishFormData((prev) => ({ ...prev, requireFullscreen: value }))
-                  }}
-                />
-                <Label htmlFor="require-fullscreen" className="cursor-pointer text-sm font-medium">
-                  Require fullscreen lockdown
-                </Label>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 ml-6">
-                Lockdown is best-effort. Students will be prompted to stay in fullscreen mode.
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="releaseScoresAt">Release Scores (optional)</Label>
-              <Input
-                id="releaseScoresAt"
-                type="datetime-local"
-                value={publishFormData.releaseScoresAt}
-                onChange={(e) => setPublishFormData((prev) => ({ ...prev, releaseScoresAt: e.target.value }))}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                When to automatically release scores to students. Leave empty for manual release.
-              </p>
-            </div>
-
+          <div className="space-y-4 pt-2 pb-4">
             {!tournamentId && (
-              <div className="space-y-3 pt-4 border-t">
+              <div className="space-y-3">
                 <div>
                   <Label className="text-base font-semibold">Assignments</Label>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -2294,6 +2153,188 @@ export function NewTestBuilder({
             </div>
             )}
 
+            <div>
+              <Label htmlFor="testPassword">Test Password (optional)</Label>
+              <Input
+                id="testPassword"
+                type="password"
+                value={publishFormData.testPassword}
+                onChange={(e) => setPublishFormData((prev) => ({ ...prev, testPassword: e.target.value }))}
+                placeholder="Students need this to take the test"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                If set, students will need to enter this password to start the test.
+              </p>
+            </div>
+
+            {publishFormData.testPassword && (
+              <div>
+                <Label htmlFor="testPasswordConfirm">Confirm Password</Label>
+                <Input
+                  id="testPasswordConfirm"
+                  type="password"
+                  value={publishFormData.testPasswordConfirm}
+                  onChange={(e) => setPublishFormData((prev) => ({ ...prev, testPasswordConfirm: e.target.value }))}
+                  placeholder="Confirm password"
+                />
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="maxAttempts">Max attempts per user (optional)</Label>
+              <Input
+                id="maxAttempts"
+                type="number"
+                min="1"
+                value={publishFormData.maxAttempts}
+                onChange={(e) => setPublishFormData((prev) => ({ ...prev, maxAttempts: e.target.value }))}
+                placeholder="Unlimited if not set"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Leave blank for unlimited attempts
+              </p>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="hasFixedWindow"
+                  checked={hasFixedWindow}
+                  onCheckedChange={(checked) => {
+                    const isChecked = checked === true
+                    setHasFixedWindow(isChecked)
+                    if (!isChecked) {
+                      // Clear date fields when unchecking
+                      setPublishFormData((prev) => ({ ...prev, startAt: '', endAt: '' }))
+                      setDateTimeErrors({})
+                    }
+                  }}
+                />
+                <Label htmlFor="hasFixedWindow" className="cursor-pointer text-sm font-medium">
+                  Fixed Test Taking Window
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 ml-6">
+                If unchecked, the test will be available as long as attempts remain
+              </p>
+            </div>
+
+            {hasFixedWindow && (
+              <>
+                <div>
+                  <Label htmlFor="startAt">Start Date/Time *</Label>
+                  <Input
+                    id="startAt"
+                    type="datetime-local"
+                    value={publishFormData.startAt}
+                    onChange={(e) => {
+                      const newStartAt = e.target.value
+                      setPublishFormData((prev) => ({ ...prev, startAt: newStartAt }))
+                      // Validate immediately
+                      if (newStartAt && publishFormData.endAt) {
+                        const start = new Date(newStartAt)
+                        const end = new Date(publishFormData.endAt)
+                        if (end <= start) {
+                          setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
+                        } else {
+                          setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                        }
+                      } else {
+                        setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                      }
+                    }}
+                    required
+                  />
+                  {dateTimeErrors.startAt && (
+                    <p className="text-sm text-destructive mt-1">{dateTimeErrors.startAt}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="endAt">End Date/Time *</Label>
+                  <Input
+                    id="endAt"
+                    type="datetime-local"
+                    value={publishFormData.endAt}
+                    onChange={(e) => {
+                      const newEndAt = e.target.value
+                      setPublishFormData((prev) => ({ ...prev, endAt: newEndAt }))
+                      // Validate immediately
+                      if (publishFormData.startAt && newEndAt) {
+                        const start = new Date(publishFormData.startAt)
+                        const end = new Date(newEndAt)
+                        if (end <= start) {
+                          setDateTimeErrors((prev) => ({ ...prev, endAt: 'End date/time must be after start date/time' }))
+                        } else {
+                          setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                        }
+                      } else {
+                        setDateTimeErrors((prev) => ({ ...prev, endAt: undefined }))
+                      }
+                    }}
+                    required
+                    min={publishFormData.startAt || undefined}
+                  />
+                  {dateTimeErrors.endAt && (
+                    <p className="text-sm text-destructive mt-1">{dateTimeErrors.endAt}</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div>
+              <Label htmlFor="scoreReleaseMode">Score release mode</Label>
+              <Select
+                value={publishFormData.scoreReleaseMode}
+                onValueChange={(value) => setPublishFormData((prev) => ({ ...prev, scoreReleaseMode: value as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST' }))}
+              >
+                <SelectTrigger id="scoreReleaseMode">
+                  <SelectValue placeholder="Select release mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="FULL_TEST">Full test (answers, correctness, feedback)</SelectItem>
+                  <SelectItem value="SCORE_WITH_WRONG">Score + wrong questions</SelectItem>
+                  <SelectItem value="SCORE_ONLY">Score only</SelectItem>
+                  <SelectItem value="NONE">No scores released</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Controls what students see after submission
+              </p>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="require-fullscreen"
+                  checked={publishFormData.requireFullscreen}
+                  onCheckedChange={(checked) => {
+                    const value = checked === true
+                    setPublishFormData((prev) => ({ ...prev, requireFullscreen: value }))
+                  }}
+                />
+                <Label htmlFor="require-fullscreen" className="cursor-pointer text-sm font-medium">
+                  Require fullscreen lockdown
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 ml-6">
+                Lockdown is best-effort. Students will be prompted to stay in fullscreen mode.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="releaseScoresAt">Release Scores (optional)</Label>
+              <Input
+                id="releaseScoresAt"
+                type="datetime-local"
+                value={publishFormData.releaseScoresAt}
+                onChange={(e) => setPublishFormData((prev) => ({ ...prev, releaseScoresAt: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                When to automatically release scores to students. Leave empty for manual release.
+              </p>
+            </div>
+
           </div>
 
           <DialogFooter>
@@ -2311,7 +2352,7 @@ export function NewTestBuilder({
                   setCalendarModalOpen(true)
                 }
               }}
-              disabled={publishing || !!dateTimeErrors.startAt || !!dateTimeErrors.endAt}
+              disabled={publishing || (hasFixedWindow && (!!dateTimeErrors.startAt || !!dateTimeErrors.endAt))}
             >
               {publishing ? 'Publishing...' : 'Publish'}
             </Button>
