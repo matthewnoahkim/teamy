@@ -134,7 +134,9 @@ export async function PATCH(
       updateData.eventsRun = validatedData.eventsRun
     }
     if (validatedData.trialEvents !== undefined) {
-      updateData.trialEvents = validatedData.trialEvents
+      // Ensure trialEvents is always a string (even if empty array, send "[]")
+      // Only set to null if the value is explicitly null or empty string, not if it's "[]"
+      updateData.trialEvents = validatedData.trialEvents === null || validatedData.trialEvents === '' ? null : validatedData.trialEvents
     }
 
     const updatedTournament = await prisma.tournament.update({

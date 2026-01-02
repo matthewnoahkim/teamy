@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -342,6 +342,93 @@ export function TDTournamentManageClient({
   const [newDiscount, setNewDiscount] = useState({ condition: '', amount: '' })
   const [hoveredTestBadge, setHoveredTestBadge] = useState<string | null>(null)
 
+  // Events management dialog state
+  const [eventsDialogOpen, setEventsDialogOpen] = useState(false)
+  const [eventsDialogForm, setEventsDialogForm] = useState({
+    eventsRun: tournament.eventsRun ? JSON.parse(tournament.eventsRun) as string[] : [],
+    trialEvents: tournament.trialEvents ? (() => {
+      const parsed = JSON.parse(tournament.trialEvents)
+      const defaultDivision = tournament.division === 'C' ? 'C' : tournament.division === 'B' ? 'B' : 'C'
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        if (typeof parsed[0] === 'string') {
+          return parsed.map((name: string) => ({ name, division: defaultDivision }))
+        }
+        return parsed as Array<{ name: string; division: string }>
+      }
+      return [] as Array<{ name: string; division: string }>
+    })() : [],
+  })
+  const [newTrialEventDialog, setNewTrialEventDialog] = useState({ name: '', division: defaultTrialEventDivision })
+  const [savingEventsDialog, setSavingEventsDialog] = useState(false)
+
+  // Helper function to parse trial events
+  const parseTrialEvents = (trialEventsStr: string | null) => {
+    if (!trialEventsStr) return []
+    try {
+      const parsed = JSON.parse(trialEventsStr)
+      const defaultDivision = tournament.division === 'C' ? 'C' : tournament.division === 'B' ? 'B' : 'C'
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        if (typeof parsed[0] === 'string') {
+          return parsed.map((name: string) => ({ name, division: defaultDivision }))
+        }
+        return parsed as Array<{ name: string; division: string }>
+      }
+      return [] as Array<{ name: string; division: string }>
+    } catch (e) {
+      console.error('Error parsing trial events:', e)
+      return []
+    }
+  }
+
+  // Sync settingsForm when tournament data changes (e.g., after router.refresh())
+  useEffect(() => {
+    const parsedEventsRun = tournament.eventsRun ? (() => {
+      try {
+        return JSON.parse(tournament.eventsRun) as string[]
+      } catch (e) {
+        console.error('Error parsing eventsRun:', e)
+        return []
+      }
+    })() : []
+    const parsedTrialEvents = parseTrialEvents(tournament.trialEvents)
+    
+    setSettingsForm(prev => ({
+      ...prev,
+      eventsRun: parsedEventsRun,
+      trialEvents: parsedTrialEvents,
+    }))
+    
+    // Also sync eventsDialogForm if dialog is open to keep them in sync
+    if (eventsDialogOpen) {
+      setEventsDialogForm({
+        eventsRun: parsedEventsRun,
+        trialEvents: parsedTrialEvents,
+      })
+    }
+  }, [tournament.eventsRun, tournament.trialEvents, tournament.division, eventsDialogOpen])
+
+  // Sync events dialog form when dialog opens
+  // Note: The main sync happens in the settingsForm useEffect above to keep both forms in sync
+  useEffect(() => {
+    if (eventsDialogOpen) {
+      const parsedEventsRun = tournament.eventsRun ? (() => {
+        try {
+          return JSON.parse(tournament.eventsRun) as string[]
+        } catch (e) {
+          console.error('Error parsing eventsRun:', e)
+          return []
+        }
+      })() : []
+      const parsedTrialEvents = parseTrialEvents(tournament.trialEvents)
+      
+      setEventsDialogForm({
+        eventsRun: parsedEventsRun,
+        trialEvents: parsedTrialEvents,
+      })
+      setNewTrialEventDialog({ name: '', division: defaultTrialEventDivision })
+    }
+  }, [eventsDialogOpen, tournament.eventsRun, tournament.trialEvents, tournament.division, defaultTrialEventDivision])
+
   // Events tab state
   const [eventsWithTests, setEventsWithTests] = useState<Array<{
     event: { id: string; name: string; division: string }
@@ -441,12 +528,14 @@ export function TDTournamentManageClient({
   }
   
   // For backward compatibility, convert old trial events format (string[]) to new format ({ name, division }[])
-  const normalizedTrialEvents = settingsForm.trialEvents.map(event => {
-    if (typeof event === 'string') {
-      return { name: event, division: getDefaultTrialEventDivision() } // Use tournament's default division
-    }
-    return event
-  })
+  const normalizedTrialEvents = useMemo(() => {
+    return settingsForm.trialEvents.map(event => {
+      if (typeof event === 'string') {
+        return { name: event, division: defaultTrialEventDivision } // Use tournament's default division
+      }
+      return event
+    })
+  }, [settingsForm.trialEvents, defaultTrialEventDivision])
   
   // Delete test dialog state
   const [deleteTestDialogOpen, setDeleteTestDialogOpen] = useState(false)
@@ -956,7 +1045,7 @@ export function TDTournamentManageClient({
           otherDiscounts: settingsForm.otherDiscounts.length > 0 ? JSON.stringify(settingsForm.otherDiscounts) : null,
           eligibilityRequirements: settingsForm.eligibilityRequirements || null,
           eventsRun: settingsForm.eventsRun.length > 0 ? JSON.stringify(settingsForm.eventsRun) : null,
-          trialEvents: settingsForm.trialEvents.length > 0 ? JSON.stringify(settingsForm.trialEvents) : null,
+          trialEvents: JSON.stringify(settingsForm.trialEvents),
         }),
       })
 
@@ -967,6 +1056,12 @@ export function TDTournamentManageClient({
         })
         setIsEditingSettings(false)
         setSettingsFormErrors({}) // Clear errors on success
+        // Update eventsDialogForm if it exists to keep them in sync
+        setEventsDialogForm(prev => ({
+          ...prev,
+          eventsRun: settingsForm.eventsRun,
+          trialEvents: settingsForm.trialEvents,
+        }))
         router.refresh()
       } else {
         const data = await res.json()
@@ -1048,6 +1143,135 @@ export function TDTournamentManageClient({
         : [...prev.eventsRun.filter(id => !divisionCEvents.some(e => e.id === id)), ...divisionCEvents.map(e => e.id)],
     }))
   }
+
+  // Events dialog handlers
+  const handleSaveEventsDialog = async () => {
+    setSavingEventsDialog(true)
+    try {
+      const res = await fetch(`/api/tournaments/${tournament.id}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventsRun: eventsDialogForm.eventsRun.length > 0 ? JSON.stringify(eventsDialogForm.eventsRun) : null,
+          trialEvents: eventsDialogForm.trialEvents.length > 0 ? JSON.stringify(eventsDialogForm.trialEvents) : JSON.stringify([]),
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        
+        // If the API returned updated tournament data, use it to sync forms
+        if (data.tournament) {
+          const updatedTrialEvents = data.tournament.trialEvents ? (() => {
+            try {
+              const parsed = JSON.parse(data.tournament.trialEvents)
+              const defaultDivision = tournament.division === 'C' ? 'C' : tournament.division === 'B' ? 'B' : 'C'
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                if (typeof parsed[0] === 'string') {
+                  return parsed.map((name: string) => ({ name, division: defaultDivision }))
+                }
+                return parsed as Array<{ name: string; division: string }>
+              }
+              return [] as Array<{ name: string; division: string }>
+            } catch (e) {
+              console.error('Error parsing trial events from API response:', e)
+              return eventsDialogForm.trialEvents
+            }
+          })() : []
+          
+          const updatedEventsRun = data.tournament.eventsRun ? (() => {
+            try {
+              return JSON.parse(data.tournament.eventsRun) as string[]
+            } catch (e) {
+              console.error('Error parsing eventsRun from API response:', e)
+              return eventsDialogForm.eventsRun
+            }
+          })() : []
+          
+          // Update both forms with the data from the API response
+          setSettingsForm(prev => ({
+            ...prev,
+            eventsRun: updatedEventsRun,
+            trialEvents: updatedTrialEvents,
+          }))
+          
+          setEventsDialogForm({
+            eventsRun: updatedEventsRun,
+            trialEvents: updatedTrialEvents,
+          })
+        } else {
+          // Fallback: update settingsForm with current dialog form data
+          setSettingsForm(prev => ({
+            ...prev,
+            eventsRun: eventsDialogForm.eventsRun,
+            trialEvents: eventsDialogForm.trialEvents,
+          }))
+        }
+        
+        toast({
+          title: 'Events saved',
+          description: 'Tournament events have been updated.',
+        })
+        
+        setEventsDialogOpen(false)
+        
+        // Refresh to get updated tournament data from server
+        // The useEffect will sync both forms from tournament data after refresh
+        router.refresh()
+      } else {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to save events')
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save events',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingEventsDialog(false)
+    }
+  }
+
+  const handleToggleEventDialog = (eventId: string) => {
+    setEventsDialogForm(prev => ({
+      ...prev,
+      eventsRun: prev.eventsRun.includes(eventId)
+        ? prev.eventsRun.filter(id => id !== eventId)
+        : [...prev.eventsRun, eventId],
+    }))
+  }
+
+  const handleSelectAllDivisionBDialog = () => {
+    const divisionBEvents = events.filter(e => e.division === 'B')
+    const allBSelected = divisionBEvents.every(e => eventsDialogForm.eventsRun.includes(e.id))
+    setEventsDialogForm(prev => ({
+      ...prev,
+      eventsRun: allBSelected
+        ? prev.eventsRun.filter(id => !divisionBEvents.some(e => e.id === id))
+        : [...prev.eventsRun.filter(id => !divisionBEvents.some(e => e.id === id)), ...divisionBEvents.map(e => e.id)],
+    }))
+  }
+
+  const handleSelectAllDivisionCDialog = () => {
+    const divisionCEvents = events.filter(e => e.division === 'C')
+    const allCSelected = divisionCEvents.every(e => eventsDialogForm.eventsRun.includes(e.id))
+    setEventsDialogForm(prev => ({
+      ...prev,
+      eventsRun: allCSelected
+        ? prev.eventsRun.filter(id => !divisionCEvents.some(e => e.id === id))
+        : [...prev.eventsRun.filter(id => !divisionCEvents.some(e => e.id === id)), ...divisionCEvents.map(e => e.id)],
+    }))
+  }
+
+  const normalizedTrialEventsDialog = useMemo(() => {
+    return eventsDialogForm.trialEvents.map(event => {
+      if (typeof event === 'string') {
+        return { name: event, division: defaultTrialEventDivision }
+      }
+      return event
+    })
+  }, [eventsDialogForm.trialEvents, defaultTrialEventDivision])
 
   // Fetch events with tests
   const fetchEventsWithTests = async () => {
@@ -2055,6 +2279,13 @@ export function TDTournamentManageClient({
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={() => setEventsDialogOpen(true)}
+                      variant="outline"
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Manage Events
+                    </Button>
                     <Button 
                       onClick={() => {
                         setShowAuditLogs(true)
@@ -3572,6 +3803,215 @@ export function TDTournamentManageClient({
             .find(t => t.id === noteSheetReviewOpen)?.name || 'Test'}
         />
       )}
+
+      {/* Events Management Dialog */}
+      <Dialog open={eventsDialogOpen} onOpenChange={setEventsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Events</DialogTitle>
+            <DialogDescription>
+              Select which events are being run in this tournament and manage trial events.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* Events Run */}
+            <div>
+              <div className="mb-5">
+                <h3 className="text-base font-semibold text-foreground">Events Run</h3>
+              </div>
+              <div className={`grid gap-4 ${(tournament.division === 'B' || tournament.division === 'C') ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                {/* Division B Events */}
+                {(tournament.division === 'B' || tournament.division === 'B&C') && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-foreground">Division B</h4>
+                      {events.filter(e => e.division === 'B').length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleSelectAllDivisionBDialog}
+                          className="h-7 text-xs"
+                        >
+                          {events.filter(e => e.division === 'B').every(e => eventsDialogForm.eventsRun.includes(e.id)) ? 'Deselect All' : 'Select All'}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-1 max-h-64 overflow-y-auto border rounded-lg p-3">
+                      {events.filter(e => e.division === 'B').map(event => (
+                        <label 
+                          key={event.id} 
+                          className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 p-2 rounded"
+                        >
+                          <Checkbox
+                            checked={eventsDialogForm.eventsRun.includes(event.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setEventsDialogForm(prev => ({
+                                  ...prev,
+                                  eventsRun: [...prev.eventsRun, event.id]
+                                }))
+                              } else {
+                                setEventsDialogForm(prev => ({
+                                  ...prev,
+                                  eventsRun: prev.eventsRun.filter(id => id !== event.id)
+                                }))
+                              }
+                            }}
+                          />
+                          <span>{event.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Division C Events */}
+                {(tournament.division === 'C' || tournament.division === 'B&C') && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-foreground">Division C</h4>
+                      {events.filter(e => e.division === 'C').length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleSelectAllDivisionCDialog}
+                          className="h-7 text-xs"
+                        >
+                          {events.filter(e => e.division === 'C').every(e => eventsDialogForm.eventsRun.includes(e.id)) ? 'Deselect All' : 'Select All'}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-1 max-h-64 overflow-y-auto border rounded-lg p-3">
+                      {events.filter(e => e.division === 'C').map(event => (
+                        <label 
+                          key={event.id} 
+                          className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 p-2 rounded"
+                        >
+                          <Checkbox
+                            checked={eventsDialogForm.eventsRun.includes(event.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setEventsDialogForm(prev => ({
+                                  ...prev,
+                                  eventsRun: [...prev.eventsRun, event.id]
+                                }))
+                              } else {
+                                setEventsDialogForm(prev => ({
+                                  ...prev,
+                                  eventsRun: prev.eventsRun.filter(id => id !== event.id)
+                                }))
+                              }
+                            }}
+                          />
+                          <span>{event.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Trial Events */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-foreground">Trial Events</h4>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter trial event name..."
+                        value={newTrialEventDialog.name}
+                        onChange={(e) => setNewTrialEventDialog(prev => ({ ...prev, name: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newTrialEventDialog.name.trim()) {
+                            e.preventDefault()
+                            setEventsDialogForm(prev => ({
+                              ...prev,
+                              trialEvents: [...prev.trialEvents, { name: newTrialEventDialog.name.trim(), division: newTrialEventDialog.division }]
+                            }))
+                            setNewTrialEventDialog({ name: '', division: defaultTrialEventDivision })
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      {isBCTournament && (
+                        <Select
+                          value={newTrialEventDialog.division}
+                          onValueChange={(value) => setNewTrialEventDialog(prev => ({ ...prev, division: value }))}
+                        >
+                          <SelectTrigger className="w-[100px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="B">Div B</SelectItem>
+                            <SelectItem value="C">Div C</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (newTrialEventDialog.name.trim()) {
+                            setEventsDialogForm(prev => ({
+                              ...prev,
+                              trialEvents: [...prev.trialEvents, { name: newTrialEventDialog.name.trim(), division: newTrialEventDialog.division }]
+                            }))
+                            setNewTrialEventDialog({ name: '', division: defaultTrialEventDivision })
+                          }
+                        }}
+                        disabled={!newTrialEventDialog.name.trim()}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {normalizedTrialEventsDialog.length > 0 && (
+                      <div className="space-y-1 max-h-32 overflow-y-auto border rounded-lg p-3">
+                        {normalizedTrialEventsDialog.map((trialEvent, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between gap-2 text-sm p-2 rounded hover:bg-muted/50"
+                          >
+                            <span className="flex items-center gap-2 flex-1 min-w-0">
+                              <Badge variant="outline" className="bg-purple-500/10 border-purple-500/30 text-purple-700 dark:text-purple-400 text-xs flex-shrink-0">
+                                Trial
+                              </Badge>
+                              <span className="truncate">{trialEvent.name}</span>
+                              <Badge variant="outline" className="text-xs flex-shrink-0">
+                                Div {trialEvent.division}
+                              </Badge>
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEventsDialogForm(prev => ({
+                                  ...prev,
+                                  trialEvents: prev.trialEvents.filter((_, i) => i !== index)
+                                }))
+                              }}
+                              className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEventsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEventsDialog} disabled={savingEventsDialog}>
+              {savingEventsDialog ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

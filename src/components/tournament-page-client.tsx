@@ -576,61 +576,83 @@ export function TournamentPageClient({
                   </div>
 
                   {/* Trial Events */}
-                  {tournament.trialEvents && (() => {
-                    try {
-                      const trialEvents = JSON.parse(tournament.trialEvents) as Array<{ name: string; division: string } | string>
-                      const normalizedTrialEvents = trialEvents.map(event => {
-                        if (typeof event === 'string') {
-                          return { name: event, division: 'B' }
-                        }
-                        return event
-                      })
-                      
-                      if (normalizedTrialEvents.length > 0) {
-                        return (
-                          <div className="flex items-start gap-3">
-                            <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
-                            <div className="flex-1">
-                              <p className="font-medium">Trial Events</p>
-                              <div className="mt-2">
-                                <div className="flex flex-wrap gap-1.5">
-                                  {normalizedTrialEvents.map((trialEvent, index) => {
-                                    const showDivision = tournament.division === 'B&C'
-                                    return (
-                                      <Badge 
-                                        key={index} 
-                                        variant="outline" 
-                                        className="text-xs bg-purple-500/10 border-purple-500/30 text-purple-700 dark:text-purple-400"
-                                      >
-                                        {showDivision ? (
-                                          <span>
-                                            {trialEvent.name}
-                                            <span className="text-muted-foreground">
-                                              {' '}(Trial, Div {trialEvent.division})
-                                            </span>
+                  <div className="flex items-start gap-3">
+                    <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium">Trial Events</p>
+                      <div className="mt-2">
+                        {(() => {
+                          try {
+                            if (!tournament.trialEvents || !tournament.trialEvents.trim()) {
+                              return <p className="text-sm text-muted-foreground">None</p>
+                            }
+                            
+                            const trialEvents = JSON.parse(tournament.trialEvents) as Array<{ name: string; division: string } | string>
+                            const normalizedTrialEvents = trialEvents.map(event => {
+                              if (typeof event === 'string') {
+                                return { name: event, division: 'B' }
+                              }
+                              return event
+                            })
+                            
+                            if (normalizedTrialEvents.length === 0) {
+                              return <p className="text-sm text-muted-foreground">None</p>
+                            }
+                            
+                            // Sort trial events alphabetically by name, with Division B before Division C for same names
+                            const sortedTrialEvents = [...normalizedTrialEvents].sort((a, b) => {
+                              const nameCompare = a.name.localeCompare(b.name)
+                              if (nameCompare !== 0) {
+                                return nameCompare
+                              }
+                              // If names are the same, Division B comes before Division C
+                              if (a.division === 'B' && b.division === 'C') {
+                                return -1
+                              }
+                              if (a.division === 'C' && b.division === 'B') {
+                                return 1
+                              }
+                              return 0
+                            })
+                            
+                            return (
+                              <div className="flex flex-wrap gap-1.5">
+                                {sortedTrialEvents.map((trialEvent, index) => {
+                                  const showDivision = tournament.division === 'B&C'
+                                  return (
+                                    <Badge 
+                                      key={index} 
+                                      variant="outline" 
+                                      className="text-xs bg-purple-500/10 border-purple-500/30 text-purple-700 dark:text-purple-400"
+                                    >
+                                      {showDivision ? (
+                                        <span>
+                                          {trialEvent.name}
+                                          <span className="text-muted-foreground">
+                                            {' '}(Trial, Div {trialEvent.division})
                                           </span>
-                                        ) : (
-                                          <span>
-                                            {trialEvent.name}
-                                            <span className="text-muted-foreground">
-                                              {' '}(Trial)
-                                            </span>
+                                        </span>
+                                      ) : (
+                                        <span>
+                                          {trialEvent.name}
+                                          <span className="text-muted-foreground">
+                                            {' '}(Trial)
                                           </span>
-                                        )}
-                                      </Badge>
-                                    )
-                                  })}
-                                </div>
+                                        </span>
+                                      )}
+                                    </Badge>
+                                  )
+                                })}
                               </div>
-                            </div>
-                          </div>
-                        )
-                      }
-                    } catch (e) {
-                      console.error('Error parsing trial events:', e)
-                    }
-                    return null
-                  })()}
+                            )
+                          } catch (e) {
+                            console.error('Error parsing trial events:', e)
+                            return <p className="text-sm text-muted-foreground">None</p>
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
