@@ -11,16 +11,33 @@ interface BannerSettings {
   backgroundColor: string
 }
 
-export function DiscordBanner() {
-  const [dismissed, setDismissed] = useState(true)
-  const [settings, setSettings] = useState<BannerSettings>({
-    enabled: true,
-    text: 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
-    link: '',
-    backgroundColor: '#5865F2',
+interface DiscordBannerProps {
+  initialSettings?: BannerSettings
+}
+
+export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
+  // Initialize dismissed state immediately from localStorage
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('banner-dismissed')
+    }
+    return false
   })
+  const [settings, setSettings] = useState<BannerSettings>(
+    initialSettings || {
+      enabled: true,
+      text: 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
+      link: '',
+      backgroundColor: '#5865F2',
+    }
+  )
   
   useEffect(() => {
+    // Skip API call if initialSettings were provided (server-side rendered)
+    if (initialSettings) {
+      return
+    }
+
     const fetchSettings = async () => {
       try {
         // Fetch banner settings from the API
@@ -46,26 +63,14 @@ export function DiscordBanner() {
         }
 
         setSettings(bannerSettings)
-
-        // Check if banner is enabled and not dismissed
-        if (bannerSettings.enabled) {
-          const isDismissed = localStorage.getItem('banner-dismissed')
-          if (!isDismissed) {
-            setDismissed(false)
-          }
-        }
       } catch (error) {
         console.error('Failed to fetch banner settings:', error)
-        // Fallback to default settings
-        const isDismissed = localStorage.getItem('banner-dismissed')
-        if (!isDismissed) {
-          setDismissed(false)
-        }
+        // Keep default settings on error
       }
     }
 
     fetchSettings()
-  }, [])
+  }, [initialSettings])
 
   const handleDismiss = () => {
     setDismissed(true)
