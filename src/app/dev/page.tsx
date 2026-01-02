@@ -210,7 +210,7 @@ export default function DevPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 outline-none text-white hover:text-white/80 transition-colors">
-                  {session.user?.image ? (
+                  {session?.user?.image ? (
                     <img
                       src={session.user.image}
                       alt={session.user.name || 'User'}
@@ -219,20 +219,20 @@ export default function DevPage() {
                   ) : (
                     <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
                       <span className="text-sm font-semibold">
-                        {session.user?.name?.charAt(0).toUpperCase() || session.user?.email?.charAt(0).toUpperCase() || 'D'}
+                        {session?.user?.name?.charAt(0).toUpperCase() || session?.user?.email?.charAt(0).toUpperCase() || 'D'}
                       </span>
                     </div>
                   )}
                   <span className="text-sm font-medium hidden sm:block">
-                    {session.user?.name || session.user?.email?.split('@')[0] || 'Developer'}
+                    {session?.user?.name || session?.user?.email?.split('@')[0] || 'Developer'}
                   </span>
                   <ChevronDown className="h-4 w-4 text-white/60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5 text-sm">
-                  <div className="font-medium">{session.user?.name || 'Developer'}</div>
-                  <div className="text-xs text-muted-foreground truncate">{session.user?.email}</div>
+                  <div className="font-medium">{session?.user?.name || 'Developer'}</div>
+                  <div className="text-xs text-muted-foreground truncate">{session?.user?.email}</div>
                 </div>
                 <DropdownMenuItem
                   onClick={() => {
