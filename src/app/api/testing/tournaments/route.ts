@@ -515,7 +515,7 @@ export async function GET(req: NextRequest) {
 
             return {
               testId: et.id,
-              eventId: et.eventId,
+              eventId: et.event?.id || null,
               isESTest: true,
               test: {
                 isESTest: true,
