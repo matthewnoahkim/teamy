@@ -2417,7 +2417,6 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
             setDeletingBudget(false)
           }
         }}
-        loading={deletingBudget}
       />
     </div>
   )
