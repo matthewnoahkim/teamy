@@ -397,11 +397,9 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
     // Convert string division to enum properly
     const divisionsToFetch: Division[] = division === 'B&C' 
       ? [Division.B, Division.C] 
-      : division === 'B' || division === Division.B
+      : division === 'B'
         ? [Division.B]
-        : division === 'C' || division === Division.C
-          ? [Division.C]
-          : [division as Division]
+        : [Division.C]
     const events = await prisma.event.findMany({
       where: {
         division: { in: divisionsToFetch },
@@ -497,11 +495,9 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
     // Convert string division to enum properly
     const divisionsToFetch: Division[] = division === 'B&C' 
       ? [Division.B, Division.C] 
-      : division === 'B' || division === Division.B
+      : division === 'B'
         ? [Division.B]
-        : division === 'C' || division === Division.C
-          ? [Division.C]
-          : [division as Division]
+        : [Division.C]
     const events = await prisma.event.findMany({
       where: {
         division: { in: divisionsToFetch },
@@ -630,11 +626,9 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
     // Convert string division to enum properly
     const divisionsToFetch: Division[] = division === 'B&C' 
       ? [Division.B, Division.C] 
-      : division === 'B' || division === Division.B
+      : division === 'B'
         ? [Division.B]
-        : division === 'C' || division === Division.C
-          ? [Division.C]
-          : [division as Division]
+        : [Division.C]
     const events = await prisma.event.findMany({
       where: {
         division: { in: divisionsToFetch },
