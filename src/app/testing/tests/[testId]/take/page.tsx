@@ -151,7 +151,23 @@ export default async function TournamentTakeTestPage({
         where: {
           id: testId,
         },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          instructions: true,
+          status: true,
+          durationMinutes: true,
+          startAt: true,
+          endAt: true,
+          allowLateUntil: true,
+          requireFullscreen: true,
+          allowCalculator: true,
+          calculatorType: true,
+          allowNoteSheet: true,
+          noteSheetInstructions: true,
+          requireOneSitting: true,
+          maxAttempts: true,
           tournament: {
             select: {
               id: true,
@@ -231,7 +247,7 @@ export default async function TournamentTakeTestPage({
         noteSheetInstructions: esTest.noteSheetInstructions,
         requireOneSitting: esTest.requireOneSitting ?? true,
         testPasswordHash: null, // ESTest doesn't have password
-        maxAttempts: null, // ESTest doesn't have max attempts
+        maxAttempts: esTest.maxAttempts,
         scoreReleaseMode: 'FULL_TEST', // Default for ESTest
         clubId: null, // ESTest doesn't belong to a club
         questions: esTest.questions.map((q) => ({
@@ -493,18 +509,28 @@ export default async function TournamentTakeTestPage({
     })
   }
 
-  // Check maxAttempts limit if no in-progress attempt exists (only for regular Test, not ESTest)
+  // Check maxAttempts limit if no in-progress attempt exists
   // This prevents users from starting a new attempt after they've already reached the limit
-  if (!isESTest && !existingAttempt && test.maxAttempts !== null) {
-    const completedAttempts = await prisma.testAttempt.count({
-      where: {
-        membershipId: membership.id,
-        testId: test.id,
-        status: {
-          in: ['SUBMITTED', 'GRADED'],
-        },
-      },
-    })
+  if (!existingAttempt && test.maxAttempts !== null) {
+    const completedAttempts = isESTest
+      ? await prisma.eSTestAttempt.count({
+          where: {
+            membershipId: membership.id,
+            testId: test.id,
+            status: {
+              in: ['SUBMITTED', 'GRADED'],
+            },
+          },
+        })
+      : await prisma.testAttempt.count({
+          where: {
+            membershipId: membership.id,
+            testId: test.id,
+            status: {
+              in: ['SUBMITTED', 'GRADED'],
+            },
+          },
+        })
 
     if (completedAttempts >= test.maxAttempts) {
       return (

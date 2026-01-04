@@ -714,6 +714,7 @@ export async function POST(request: NextRequest) {
       noteSheetInstructions,
       autoApproveNoteSheet,
       requireOneSitting,
+      maxAttempts,
       questions 
     } = body as {
       staffId: string
@@ -734,6 +735,7 @@ export async function POST(request: NextRequest) {
       noteSheetInstructions?: string
       autoApproveNoteSheet?: boolean
       requireOneSitting?: boolean
+      maxAttempts?: number
       questions?: Array<{
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
         promptMd: string
@@ -793,6 +795,7 @@ export async function POST(request: NextRequest) {
         calculatorType: allowCalculator && calculatorType ? calculatorType as 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' : null,
         noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null,
         autoApproveNoteSheet: allowNoteSheet ? (autoApproveNoteSheet ?? true) : true,
+        maxAttempts: maxAttempts ?? null,
       }
       
       const createdTest = await tx.eSTest.create({
@@ -930,6 +933,7 @@ export async function PUT(request: NextRequest) {
       noteSheetInstructions,
       autoApproveNoteSheet,
       requireOneSitting,
+      maxAttempts,
       questions 
     } = body as {
       testId: string
@@ -949,6 +953,7 @@ export async function PUT(request: NextRequest) {
       noteSheetInstructions?: string
       autoApproveNoteSheet?: boolean
       requireOneSitting?: boolean
+      maxAttempts?: number
       questions?: Array<{
         id?: string
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
@@ -1120,6 +1125,7 @@ export async function PUT(request: NextRequest) {
     if (noteSheetInstructions !== undefined && noteSheetInstructions !== existingTest.noteSheetInstructions) changedFields.push('noteSheetInstructions')
     if (autoApproveNoteSheet !== undefined && autoApproveNoteSheet !== existingTest.autoApproveNoteSheet) changedFields.push('autoApproveNoteSheet')
     if (requireOneSitting !== undefined && requireOneSitting !== existingTest.requireOneSitting) changedFields.push('requireOneSitting')
+    if (maxAttempts !== undefined && maxAttempts !== (existingTest as any).maxAttempts) changedFields.push('maxAttempts')
     if (questions) changedFields.push('questions')
 
     // Use a transaction to update test and questions
@@ -1145,6 +1151,8 @@ export async function PUT(request: NextRequest) {
           ...(autoApproveNoteSheet !== undefined && { autoApproveNoteSheet: allowNoteSheet ? (autoApproveNoteSheet ?? true) : true }),
           // Only include requireOneSitting if provided (will be skipped if column doesn't exist)
           ...(requireOneSitting !== undefined ? { requireOneSitting } : {}),
+          // Only include maxAttempts if provided (will be skipped if column doesn't exist)
+          ...(maxAttempts !== undefined ? { maxAttempts: maxAttempts ?? null } : {}),
         },
       })
 

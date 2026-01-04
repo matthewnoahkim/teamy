@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "ESTest" ADD COLUMN IF NOT EXISTS "maxAttempts" INTEGER;
+

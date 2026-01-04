@@ -1323,6 +1323,8 @@ export function NewTestBuilder({
         if (esMode && staffMembershipId && tournamentId) {
           // ES Mode - use ES API
           apiUrl = '/api/es/tests'
+          const maxAttemptsValue = publishFormData.maxAttempts?.trim()
+          const maxAttempts = maxAttemptsValue ? parseInt(maxAttemptsValue, 10) : undefined
           createPayload = {
             staffId: staffMembershipId,
             tournamentId,
@@ -1339,6 +1341,7 @@ export function NewTestBuilder({
             noteSheetInstructions: payload.allowNoteSheet ? payload.noteSheetInstructions : undefined,
             autoApproveNoteSheet: payload.allowNoteSheet ? ((payload as any).autoApproveNoteSheet ?? true) : undefined,
             requireOneSitting: (payload as any).requireOneSitting ?? true,
+            ...(maxAttempts && !isNaN(maxAttempts) ? { maxAttempts } : {}),
             questions: payload.questions.map((q: any) => {
               const questionPayload: any = {
                 type: q.type,
@@ -1358,7 +1361,13 @@ export function NewTestBuilder({
         } else if (tournamentId) {
           // Tournament mode
           apiUrl = `/api/tournaments/${tournamentId}/tests/create`
-          createPayload = { ...payload, clubId: undefined }
+          const maxAttemptsValue = publishFormData.maxAttempts?.trim()
+          const maxAttempts = maxAttemptsValue ? parseInt(maxAttemptsValue, 10) : undefined
+          createPayload = { 
+            ...payload, 
+            clubId: undefined,
+            ...(maxAttempts && !isNaN(maxAttempts) ? { maxAttempts } : {}),
+          }
         } else {
           // Club mode
           apiUrl = '/api/tests'
@@ -1507,6 +1516,8 @@ export function NewTestBuilder({
           ? new Date(publishFormDataWithDates.allowLateUntil).toISOString()
           : undefined
 
+        const maxAttemptsValue = publishFormData.maxAttempts?.trim()
+        const maxAttempts = maxAttemptsValue ? parseInt(maxAttemptsValue, 10) : undefined
         const response = await fetch('/api/es/tests', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1524,6 +1535,7 @@ export function NewTestBuilder({
             noteSheetInstructions: details.allowNoteSheet ? details.noteSheetInstructions : undefined,
             autoApproveNoteSheet: details.allowNoteSheet ? (details.autoApproveNoteSheet ?? true) : undefined,
             requireOneSitting: details.requireOneSitting ?? true,
+            ...(maxAttempts && !isNaN(maxAttempts) ? { maxAttempts } : {}),
           }),
         })
 
