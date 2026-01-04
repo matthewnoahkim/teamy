@@ -332,18 +332,20 @@ export default async function TournamentTakeTestPage({
   if (!registration) {
     // User is not registered for this tournament
     return (
-      <div className="container mx-auto max-w-4xl px-4 py-8">
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-6">
-          <h1 className="text-2xl font-bold text-destructive mb-2">Access Denied</h1>
-          <p className="text-muted-foreground mb-4">
-            You are not registered for this tournament.
-          </p>
-          <a
-            href="/testing"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Return to Testing Portal
-          </a>
+      <div className="min-h-screen flex items-center justify-center p-4 grid-pattern" style={{ backgroundColor: 'hsl(var(--card))' }}>
+        <div className="container mx-auto max-w-4xl px-4 py-8">
+          <div className="rounded-lg border border-destructive bg-destructive/10 dark:bg-background p-6">
+            <h1 className="text-2xl font-bold text-destructive mb-2">Access Denied</h1>
+            <p className="text-muted-foreground mb-4">
+              You are not registered for this tournament.
+            </p>
+            <a
+              href="/testing"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Return to Testing Portal
+            </a>
+          </div>
         </div>
       </div>
     )
@@ -358,18 +360,20 @@ export default async function TournamentTakeTestPage({
 
   if (!membership) {
     return (
-      <div className="container mx-auto max-w-4xl px-4 py-8">
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-6">
-          <h1 className="text-2xl font-bold text-destructive mb-2">Access Denied</h1>
-          <p className="text-muted-foreground mb-4">
-            Membership not found.
-          </p>
-          <a
-            href="/testing"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Return to Testing Portal
-          </a>
+      <div className="min-h-screen flex items-center justify-center p-4 grid-pattern" style={{ backgroundColor: 'hsl(var(--card))' }}>
+        <div className="container mx-auto max-w-4xl px-4 py-8">
+          <div className="rounded-lg border border-destructive bg-destructive/10 dark:bg-background p-6">
+            <h1 className="text-2xl font-bold text-destructive mb-2">Access Denied</h1>
+            <p className="text-muted-foreground mb-4">
+              Membership not found.
+            </p>
+            <a
+              href="/testing"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Return to Testing Portal
+            </a>
+          </div>
         </div>
       </div>
     )
@@ -378,18 +382,20 @@ export default async function TournamentTakeTestPage({
   // Check if test is published
   if (test.status !== 'PUBLISHED') {
     return (
-      <div className="container mx-auto max-w-4xl px-4 py-8">
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-6">
-          <h1 className="text-2xl font-bold text-destructive mb-2">Test Not Available</h1>
-          <p className="text-muted-foreground mb-4">
-            This test is not published yet.
-          </p>
-          <a
-            href="/testing"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Return to Testing Portal
-          </a>
+      <div className="min-h-screen flex items-center justify-center p-4 grid-pattern" style={{ backgroundColor: 'hsl(var(--card))' }}>
+        <div className="container mx-auto max-w-4xl px-4 py-8">
+          <div className="rounded-lg border border-destructive bg-destructive/10 dark:bg-background p-6">
+            <h1 className="text-2xl font-bold text-destructive mb-2">Test Not Available</h1>
+            <p className="text-muted-foreground mb-4">
+              This test is not published yet.
+            </p>
+            <a
+              href="/testing"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Return to Testing Portal
+            </a>
+          </div>
         </div>
       </div>
     )
@@ -400,18 +406,20 @@ export default async function TournamentTakeTestPage({
   if (!availability.available) {
     // Return error page instead of redirecting
     return (
-      <div className="container mx-auto max-w-4xl px-4 py-8">
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-6">
-          <h1 className="text-2xl font-bold text-destructive mb-2">Test Not Available</h1>
-          <p className="text-muted-foreground mb-4">
-            {availability.reason || 'This test is not currently available.'}
-          </p>
-          <a
-            href="/testing"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Return to Testing Portal
-          </a>
+      <div className="min-h-screen flex items-center justify-center p-4 grid-pattern" style={{ backgroundColor: 'hsl(var(--card))' }}>
+        <div className="container mx-auto max-w-4xl px-4 py-8">
+          <div className="rounded-lg border border-destructive bg-destructive/10 dark:bg-background p-6">
+            <h1 className="text-2xl font-bold text-destructive mb-2">Test Not Available</h1>
+            <p className="text-muted-foreground mb-4">
+              {availability.reason || 'This test is not currently available.'}
+            </p>
+            <a
+              href="/testing"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Return to Testing Portal
+            </a>
+          </div>
         </div>
       </div>
     )

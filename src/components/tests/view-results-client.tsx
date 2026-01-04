@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowLeft, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react'
 import { QuestionPrompt } from '@/components/tests/question-prompt'
 
@@ -37,45 +39,46 @@ export function ViewResultsClient({
   testSettings,
 }: ViewResultsClientProps) {
   const router = useRouter()
+  // Initialize state immediately with props - no waiting
   const [attempt, setAttempt] = useState(initialAttempt)
-  const [allAttempts, setAllAttempts] = useState<any[]>([])
+  const [allAttempts, setAllAttempts] = useState<any[]>(initialAttempt ? [initialAttempt] : [])
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(initialAttempt?.id || null)
-  const [loading, setLoading] = useState(false)
   const [testSettingsState, setTestSettingsState] = useState(testSettings)
 
+  // Fetch all attempts in the background (non-blocking) - only runs once on mount
   useEffect(() => {
-    // Initialize with the initial attempt if provided
-    if (initialAttempt) {
-      setAllAttempts([initialAttempt])
-      setSelectedAttemptId(initialAttempt.id)
-      setAttempt(initialAttempt)
-    }
-
-    // Fetch all attempts
+    // Fetch all attempts in the background without blocking UI
     const fetchAllAttempts = async () => {
-      setLoading(true)
       try {
         const response = await fetch(`/api/tests/${testId}/my-all-attempts`)
         if (response.ok) {
           const data = await response.json()
           const attempts = data.attempts || []
-          setAllAttempts(attempts)
+          if (attempts.length > 0) {
+            // Update attempts list
+            setAllAttempts(attempts)
+            // Only update selected attempt if we don't have one currently selected
+            // or if user hasn't manually changed it
+            setSelectedAttemptId((currentId) => {
+              // If no current selection or current selection not in new list, use first
+              if (!currentId || !attempts.find((a: any) => a.id === currentId)) {
+                setAttempt(attempts[0])
+                return attempts[0].id
+              }
+              // Otherwise keep current selection but update the attempt data
+              const currentAttempt = attempts.find((a: any) => a.id === currentId)
+              if (currentAttempt) {
+                setAttempt(currentAttempt)
+              }
+              return currentId
+            })
+          }
           // Update test settings from API response
           if (data.test) {
             setTestSettingsState({
               releaseScoresAt: data.test.releaseScoresAt ? new Date(data.test.releaseScoresAt) : null,
               scoreReleaseMode: data.test.scoreReleaseMode || 'FULL_TEST',
             })
-          }
-          // Set selected attempt to the first (latest) one if available
-          if (attempts.length > 0) {
-            setSelectedAttemptId(attempts[0].id)
-            setAttempt(attempts[0])
-          } else if (initialAttempt) {
-            // Fallback to initial attempt if no attempts from API
-            setAllAttempts([initialAttempt])
-            setSelectedAttemptId(initialAttempt.id)
-            setAttempt(initialAttempt)
           }
         } else {
           // Fallback to single attempt API
@@ -94,28 +97,17 @@ export function ViewResultsClient({
                 scoreReleaseMode: singleData.test.scoreReleaseMode || 'FULL_TEST',
               })
             }
-          } else if (initialAttempt) {
-            // Keep initial attempt if API fails
-            setAllAttempts([initialAttempt])
-            setSelectedAttemptId(initialAttempt.id)
-            setAttempt(initialAttempt)
           }
         }
       } catch (error) {
         console.error('Failed to fetch results:', error)
-        // Keep initial attempt if API fails
-        if (initialAttempt) {
-          setAllAttempts([initialAttempt])
-          setSelectedAttemptId(initialAttempt.id)
-          setAttempt(initialAttempt)
-        }
-      } finally {
-        setLoading(false)
+        // Silently fail - we already have initialAttempt to show
       }
     }
 
+    // Always fetch in background - initialAttempt is already shown
     fetchAllAttempts()
-  }, [testId, initialAttempt])
+  }, [testId]) // Only depend on testId, not initialAttempt
 
   // Update selected attempt when selection changes
   useEffect(() => {
@@ -203,8 +195,8 @@ export function ViewResultsClient({
         <h1 className="text-3xl font-bold mb-2">{testName}</h1>
         <p className="text-muted-foreground">Your Test Results</p>
         
-        {/* Attempt selector - show if there are multiple attempts */}
-        {allAttempts.length > 1 && (
+        {/* Attempt selector - show immediately if we have any attempts */}
+        {allAttempts.length > 0 && (
           <div className="mt-4">
             <Label htmlFor="attempt-select" className="text-sm font-medium mb-2 block">
               Select Attempt:
@@ -335,6 +327,53 @@ export function ViewResultsClient({
                             <QuestionPrompt promptMd={answer.question.promptMd} className="text-sm" />
                           </div>
                         )}
+                        {answer.question.type.startsWith('MCQ') && answer.question.options && (
+                          <div className="mt-3">
+                            {answer.question.type === 'MCQ_SINGLE' ? (
+                              <RadioGroup value="" disabled className="space-y-2">
+                                {answer.question.options.map((option: any) => (
+                                  <div
+                                    key={option.id}
+                                    className={`flex items-center gap-2 p-3 rounded border ${
+                                      option.isCorrect
+                                        ? 'border-green-300'
+                                        : 'border-border'
+                                    }`}
+                                  >
+                                    <RadioGroupItem value={option.id} id={`preview-${option.id}`} disabled />
+                                    <Label htmlFor={`preview-${option.id}`} className="font-normal flex-1 cursor-default">
+                                      {option.label}
+                                    </Label>
+                                    {option.isCorrect && (
+                                      <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                    )}
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            ) : (
+                              <div className="space-y-2">
+                                {answer.question.options.map((option: any) => (
+                                  <div
+                                    key={option.id}
+                                    className={`flex items-center gap-2 p-3 rounded border ${
+                                      option.isCorrect
+                                        ? 'border-green-300'
+                                        : 'border-border'
+                                    }`}
+                                  >
+                                    <Checkbox id={`preview-${option.id}`} disabled />
+                                    <Label htmlFor={`preview-${option.id}`} className="font-normal flex-1 cursor-default">
+                                      {option.label}
+                                    </Label>
+                                    {option.isCorrect && (
+                                      <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         {testSettingsState.scoreReleaseMode === 'SCORE_WITH_WRONG' ? (
@@ -376,46 +415,45 @@ export function ViewResultsClient({
                     <CardContent className="space-y-3">
                       {/* MCQ Answers */}
                       {answer.question.type.startsWith('MCQ') &&
-                        answer.selectedOptionIds &&
                         answer.question.options && (
                           <div>
                             <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
                               Your Answer
                             </p>
-                            <div className="space-y-2">
-                              {answer.question.options.map((option: any) => {
-                                const isSelected = answer.selectedOptionIds?.includes(option.id)
-                                const isCorrectOption = option.isCorrect
-                                return (
-                                  <div
-                                    key={option.id}
-                                    className={`flex items-center gap-2 p-2 rounded border ${
-                                      isSelected
-                                        ? isCorrectOption
-                                          ? 'border-green-500 bg-green-50 dark:bg-green-950'
-                                          : 'border-red-500 bg-red-50 dark:bg-red-950'
-                                        : isCorrectOption
-                                        ? 'border-green-300 bg-green-50/50 dark:bg-green-950/50'
-                                        : 'border-border'
-                                    }`}
-                                  >
-                                    {isSelected && isCorrectOption && (
-                                      <CheckCircle className="h-4 w-4 text-green-600" />
-                                    )}
-                                    {isSelected && !isCorrectOption && (
-                                      <XCircle className="h-4 w-4 text-red-600" />
-                                    )}
-                                    {!isSelected && isCorrectOption && (
-                                      <CheckCircle className="h-4 w-4 text-green-400" />
-                                    )}
-                                    <span className="flex-1">{option.label}</span>
-                                    {isCorrectOption && !isSelected && (
-                                      <span className="text-xs text-green-600">Correct Answer</span>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
+                            {(!answer.selectedOptionIds || answer.selectedOptionIds.length === 0) ? (
+                              <div className="whitespace-pre-wrap p-3 bg-muted/30 rounded border">
+                                <span className="text-muted-foreground italic">No answer provided</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {answer.question.options
+                                  .filter((option: any) => answer.selectedOptionIds?.includes(option.id))
+                                  .map((option: any) => {
+                                    const isSelected = answer.selectedOptionIds?.includes(option.id) || false
+                                    const isCorrectOption = option.isCorrect
+                                    return (
+                                      <div
+                                        key={option.id}
+                                        className={`flex items-center gap-2 p-2 rounded border ${
+                                          isSelected
+                                            ? isCorrectOption
+                                              ? 'border-green-500 bg-green-50 dark:bg-green-950'
+                                              : 'border-red-500 bg-red-50 dark:bg-red-950'
+                                            : 'border-border'
+                                        }`}
+                                      >
+                                        {isSelected && isCorrectOption && (
+                                          <CheckCircle className="h-4 w-4 text-green-600" />
+                                        )}
+                                        {isSelected && !isCorrectOption && (
+                                          <XCircle className="h-4 w-4 text-red-600" />
+                                        )}
+                                        <span className="flex-1">{option.label}</span>
+                                      </div>
+                                    )
+                                  })}
+                              </div>
+                            )}
                           </div>
                         )}
 

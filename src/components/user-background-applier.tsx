@@ -58,10 +58,27 @@ export function UserBackgroundApplier() {
         `
 
         if (status !== 'authenticated' || !session?.user?.id) {
-          styleEl!.textContent = headerCss + css + `
-            body {
-              background: transparent !important;
+          styleEl!.textContent = headerCss + `
+            html {
+              background-color: hsl(var(--background)) !important;
               background-image: none !important;
+            }
+            body {
+              background-color: transparent !important;
+              background-attachment: fixed !important;
+              background-size: 24px 24px !important;
+              background-position: 0 0 !important;
+              background-repeat: repeat !important;
+            }
+            body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
+            }
+            .dark body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
             }
           `
           document.body.classList.add('grid-pattern')
@@ -70,10 +87,27 @@ export function UserBackgroundApplier() {
 
         const response = await fetch('/api/user/preferences')
         if (!response.ok) {
-          styleEl!.textContent = headerCss + css + `
-            body {
-              background: transparent !important;
+          styleEl!.textContent = headerCss + `
+            html {
+              background-color: hsl(var(--background)) !important;
               background-image: none !important;
+            }
+            body {
+              background-color: transparent !important;
+              background-attachment: fixed !important;
+              background-size: 24px 24px !important;
+              background-position: 0 0 !important;
+              background-repeat: repeat !important;
+            }
+            body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
+            }
+            .dark body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
             }
           `
           document.body.classList.add('grid-pattern')
@@ -84,10 +118,27 @@ export function UserBackgroundApplier() {
         const preferences = data.preferences as Record<string, unknown> | null
 
         if (!preferences || !preferences.backgroundType) {
-          styleEl!.textContent = headerCss + css + `
-            body {
-              background: transparent !important;
+          styleEl!.textContent = headerCss + `
+            html {
+              background-color: hsl(var(--background)) !important;
               background-image: none !important;
+            }
+            body {
+              background-color: transparent !important;
+              background-attachment: fixed !important;
+              background-size: 24px 24px !important;
+              background-position: 0 0 !important;
+              background-repeat: repeat !important;
+            }
+            body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
+            }
+            .dark body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
             }
           `
           document.body.classList.add('grid-pattern')
@@ -98,10 +149,31 @@ export function UserBackgroundApplier() {
         document.body.classList.remove('grid-pattern')
 
         if (bgType === 'grid') {
-          styleEl!.textContent = headerCss + css + `
-            body {
-              background: transparent !important;
+          styleEl!.textContent = headerCss + `
+            :root {
+              --user-background: none;
+              --user-background-image: none;
+            }
+            html {
+              background-color: hsl(var(--background)) !important;
               background-image: none !important;
+            }
+            body {
+              background-color: transparent !important;
+              background-attachment: fixed !important;
+              background-size: 24px 24px !important;
+              background-position: 0 0 !important;
+              background-repeat: repeat !important;
+            }
+            body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
+            }
+            .dark body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
             }
           `
           document.body.classList.add('grid-pattern')
@@ -174,10 +246,27 @@ export function UserBackgroundApplier() {
               }
             `
           } else {
-            styleEl!.textContent = headerCss + css + `
-              body {
-                background: transparent !important;
+            styleEl!.textContent = headerCss + `
+              html {
+                background-color: hsl(var(--background)) !important;
                 background-image: none !important;
+              }
+              body {
+                background-color: transparent !important;
+                background-attachment: fixed !important;
+                background-size: 24px 24px !important;
+                background-position: 0 0 !important;
+                background-repeat: repeat !important;
+              }
+              body.grid-pattern {
+                background-image: 
+                  linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
+              }
+              .dark body.grid-pattern {
+                background-image: 
+                  linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
               }
             `
             document.body.classList.add('grid-pattern')
@@ -217,10 +306,27 @@ export function UserBackgroundApplier() {
             }
           `
         } else {
-          styleEl!.textContent = headerCss + css + `
-            body {
-              background: transparent !important;
+          styleEl!.textContent = headerCss + `
+            html {
+              background-color: hsl(var(--background)) !important;
               background-image: none !important;
+            }
+            body {
+              background-color: transparent !important;
+              background-attachment: fixed !important;
+              background-size: 24px 24px !important;
+              background-position: 0 0 !important;
+              background-repeat: repeat !important;
+            }
+            body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
+            }
+            .dark body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
             }
           `
           document.body.classList.add('grid-pattern')
@@ -228,9 +334,26 @@ export function UserBackgroundApplier() {
       } catch (error) {
         console.error('Error applying user background:', error)
         styleEl!.textContent = headerCss + `
-          body {
-            background: transparent !important;
+          html {
+            background-color: hsl(var(--background)) !important;
             background-image: none !important;
+          }
+          body {
+            background-color: transparent !important;
+            background-attachment: fixed !important;
+            background-size: 24px 24px !important;
+            background-position: 0 0 !important;
+            background-repeat: repeat !important;
+          }
+          body.grid-pattern {
+            background-image: 
+              linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
+          }
+          .dark body.grid-pattern {
+            background-image: 
+              linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
           }
         `
         document.body.classList.add('grid-pattern')

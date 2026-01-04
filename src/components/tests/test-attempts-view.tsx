@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
 import { Users, Eye, AlertTriangle, CheckCircle, XCircle, Clock, Info, Save, Sparkles, Loader2 } from 'lucide-react'
 import { QuestionPrompt } from '@/components/tests/question-prompt'
@@ -225,14 +227,10 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
 
     setSaving(true)
     try {
-      // Only send grades that have changed or need grading
+      // Send all grades that have been edited
       const gradesToSave = Object.values(gradeEdits).filter((grade) => {
         const answer = selectedAttempt.answers.find((a) => a.id === grade.answerId)
-        if (!answer) return false
-        
-        // Include if it is an FRQ that needs grading
-        const isFRQ = answer.question.type === 'SHORT_TEXT' || answer.question.type === 'LONG_TEXT'
-        return isFRQ
+        return answer !== undefined
       })
 
       const response = await fetch(`/api/tests/${testId}/attempts/${selectedAttempt.id}/grade`, {
@@ -640,31 +638,29 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                   <h3 className="font-semibold text-lg">Responses</h3>
                   <div className="flex items-center gap-2">
                     {selectedAttempt.answers.some(a => a.question.type === 'SHORT_TEXT' || a.question.type === 'LONG_TEXT') && (
-                      <>
-                        <Button 
-                          onClick={() => handleRequestAiGrading('all')} 
-                          disabled={requestingAiGrading}
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                        >
-                          {requestingAiGrading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-4 w-4" />
-                          )}
-                          {requestingAiGrading ? 'Generating...' : 'AI Grade All'}
-                        </Button>
-                        <Button 
-                          onClick={handleSaveGrades} 
-                          disabled={saving}
-                          className="gap-2"
-                        >
-                          <Save className="h-4 w-4" />
-                          {saving ? 'Saving...' : 'Save Grades'}
-                        </Button>
-                      </>
+                      <Button 
+                        onClick={() => handleRequestAiGrading('all')} 
+                        disabled={requestingAiGrading}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        {requestingAiGrading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                        {requestingAiGrading ? 'Generating...' : 'AI Grade All'}
+                      </Button>
                     )}
+                    <Button 
+                      onClick={handleSaveGrades} 
+                      disabled={saving}
+                      className="gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      {saving ? 'Saving...' : 'Save Grades'}
+                    </Button>
                   </div>
                 </div>
                 {selectedAttempt.answers && selectedAttempt.answers.length > 0 ? (
@@ -679,6 +675,53 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                             <div className="text-sm text-muted-foreground mt-1">
                               <QuestionPrompt promptMd={answer.question.promptMd} />
                             </div>
+                            {answer.question.type.startsWith('MCQ') && answer.question.options && (
+                              <div className="mt-3">
+                                {answer.question.type === 'MCQ_SINGLE' ? (
+                                  <RadioGroup value="" disabled className="space-y-2">
+                                    {answer.question.options.map((option) => (
+                                      <div
+                                        key={option.id}
+                                        className={`flex items-center gap-2 p-3 rounded border ${
+                                          option.isCorrect
+                                            ? 'border-green-300'
+                                            : 'border-border'
+                                        }`}
+                                      >
+                                        <RadioGroupItem value={option.id} id={`preview-${option.id}`} disabled />
+                                        <Label htmlFor={`preview-${option.id}`} className="font-normal flex-1 cursor-default">
+                                          {option.label}
+                                        </Label>
+                                        {option.isCorrect && (
+                                          <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </RadioGroup>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {answer.question.options.map((option) => (
+                                      <div
+                                        key={option.id}
+                                        className={`flex items-center gap-2 p-3 rounded border ${
+                                          option.isCorrect
+                                            ? 'border-green-300'
+                                            : 'border-border'
+                                        }`}
+                                      >
+                                        <Checkbox id={`preview-${option.id}`} disabled />
+                                        <Label htmlFor={`preview-${option.id}`} className="font-normal flex-1 cursor-default">
+                                          {option.label}
+                                        </Label>
+                                        {option.isCorrect && (
+                                          <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline">
@@ -694,39 +737,41 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         {/* Student's Answer */}
-                        {answer.question.type.startsWith('MCQ') && answer.selectedOptionIds && (
+                        {answer.question.type.startsWith('MCQ') && answer.question.options && (
                           <div>
                             <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
                               Student&apos;s Answer
                             </p>
-                            <div className="space-y-2">
-                              {answer.question.options.map((option) => {
-                                const isSelected = answer.selectedOptionIds?.includes(option.id)
-                                const isCorrect = option.isCorrect
-                                return (
-                                  <div
-                                    key={option.id}
-                                    className={`flex items-center gap-2 p-2 rounded border ${
-                                      isSelected
-                                        ? isCorrect
-                                          ? 'border-green-500 bg-green-50 dark:bg-green-950'
-                                          : 'border-red-500 bg-red-50 dark:bg-red-950'
-                                        : isCorrect
-                                        ? 'border-green-300 bg-green-50/50 dark:bg-green-950/50'
-                                        : 'border-border'
-                                    }`}
-                                  >
-                                    {isSelected && isCorrect && <CheckCircle className="h-4 w-4 text-green-600" />}
-                                    {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600" />}
-                                    {!isSelected && isCorrect && <CheckCircle className="h-4 w-4 text-green-400" />}
-                                    <span className="flex-1">{option.label}</span>
-                                    {isCorrect && !isSelected && (
-                                      <span className="text-xs text-green-600">Correct</span>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
+                            {(!answer.selectedOptionIds || answer.selectedOptionIds.length === 0) ? (
+                              <div className="whitespace-pre-wrap p-3 bg-muted/30 rounded border">
+                                <span className="text-muted-foreground italic">No answer provided</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {answer.question.options
+                                  .filter((option) => answer.selectedOptionIds?.includes(option.id))
+                                  .map((option) => {
+                                    const isSelected = answer.selectedOptionIds?.includes(option.id) || false
+                                    const isCorrect = option.isCorrect
+                                    return (
+                                      <div
+                                        key={option.id}
+                                        className={`flex items-center gap-2 p-2 rounded border ${
+                                          isSelected
+                                            ? isCorrect
+                                              ? 'border-green-500 bg-green-50 dark:bg-green-950'
+                                              : 'border-red-500 bg-red-50 dark:bg-red-950'
+                                            : 'border-border'
+                                        }`}
+                                      >
+                                        {isSelected && isCorrect && <CheckCircle className="h-4 w-4 text-green-600" />}
+                                        {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600" />}
+                                        <span className="flex-1">{option.label}</span>
+                                      </div>
+                                    )
+                                  })}
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -739,33 +784,36 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                           </div>
                         )}
 
-                        {/* FRQ Questions - Show Grading Interface */}
-                        {(answer.question.type === 'SHORT_TEXT' || answer.question.type === 'LONG_TEXT') && (
-                          <div className="space-y-4">
-                            {/* Student's Answer */}
-                            <div>
-                              <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-                                Student&apos;s Answer
-                              </p>
-                              <div className="whitespace-pre-wrap p-3 bg-muted/30 rounded border">
-                                {answer.answerText && answer.answerText.trim() ? (
-                                  answer.answerText
-                                ) : (
-                                  <span className="text-muted-foreground italic">No answer provided</span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Example Solution */}
-                            {answer.question.explanation && (
-                              <div>
-                                <p className="text-xs font-semibold uppercase text-green-600 dark:text-green-400 mb-2">
-                                  Example Solution / Grading Guide
-                                </p>
-                                <div className="whitespace-pre-wrap p-3 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-800">
-                                  {answer.question.explanation}
+                        {/* Grading Interface - Available for all question types */}
+                        <div className="space-y-4">
+                            {/* Student's Answer - Only for FRQ questions */}
+                            {(answer.question.type === 'SHORT_TEXT' || answer.question.type === 'LONG_TEXT') && (
+                              <>
+                                <div>
+                                  <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+                                    Student&apos;s Answer
+                                  </p>
+                                  <div className="whitespace-pre-wrap p-3 bg-muted/30 rounded border">
+                                    {answer.answerText && answer.answerText.trim() ? (
+                                      answer.answerText
+                                    ) : (
+                                      <span className="text-muted-foreground italic">No answer provided</span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
+
+                                {/* Example Solution */}
+                                {answer.question.explanation && (
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase text-green-600 dark:text-green-400 mb-2">
+                                      Example Solution / Grading Guide
+                                    </p>
+                                    <div className="whitespace-pre-wrap p-3 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-800">
+                                      {answer.question.explanation}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
                             )}
 
                             {/* AI Suggestion */}
@@ -848,7 +896,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                   <Label htmlFor={`points-${answer.id}`} className="text-sm font-semibold">
                                     Points Awarded (max: {answer.question.points})
                                   </Label>
-                                  {!aiSuggestions[answer.id] && (
+                                  {!aiSuggestions[answer.id] && (answer.question.type === 'SHORT_TEXT' || answer.question.type === 'LONG_TEXT') && (
                                     <Button
                                       size="sm"
                                       variant="ghost"
@@ -896,17 +944,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                               )}
                             </div>
                           </div>
-                        )}
 
-                        {/* Show saved grader note for non-FRQ questions */}
-                        {answer.question.type !== 'SHORT_TEXT' && answer.question.type !== 'LONG_TEXT' && answer.graderNote && (
-                          <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded">
-                            <p className="text-xs font-semibold uppercase text-blue-900 dark:text-blue-100 mb-1">
-                              Grader Note
-                            </p>
-                            <p className="text-sm text-blue-900 dark:text-blue-100">{answer.graderNote}</p>
-                          </div>
-                        )}
                       </CardContent>
                     </Card>
                   ))

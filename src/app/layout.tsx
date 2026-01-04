@@ -35,12 +35,14 @@ function generateBackgroundStyles(preferences: Record<string, unknown> | null): 
     // Default grid pattern - html gets default background, body is transparent with grid-pattern class
     backgroundCss = `
       html {
-        background: hsl(var(--background)) !important;
-        background-image: none !important;
+        background-color: hsl(var(--background)) !important;
       }
       body {
-        background: transparent !important;
-        background-image: none !important;
+        background-color: transparent !important;
+        background-size: 24px 24px !important;
+        background-position: 0 0 !important;
+        background-repeat: repeat !important;
+        background-attachment: fixed !important;
       }
     `
   } else if (bgType === 'solid' && preferences?.backgroundColor) {
