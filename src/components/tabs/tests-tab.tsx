@@ -8,12 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Clock, Users, FileText, AlertCircle, Play, Eye, Trash2, Lock, Search, Edit, Calculator as CalcIcon, FileEdit, Settings } from 'lucide-react'
+import { Plus, Clock, Users, FileText, AlertCircle, Play, Eye, Trash2, Lock, Search, Edit, Calculator as CalcIcon, FileEdit, Settings, Copy } from 'lucide-react'
 import { NoteSheetUpload } from '@/components/tests/note-sheet-upload'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PageLoading } from '@/components/ui/loading-spinner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { format } from 'date-fns'
 
 interface TestsTabProps {
   clubId: string
@@ -39,6 +41,16 @@ interface Test {
   maxAttempts: number | null
   scoreReleaseMode: 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST'
   createdAt: string
+  updatedAt: string
+  createdByMembershipId: string
+  createdByMembership?: {
+    id: string
+    user: {
+      id: string
+      name: string | null
+      email: string
+    }
+  }
   _count: {
     questions: number
     attempts: number
@@ -408,6 +420,34 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     window.location.href = `/club/${clubId}/tests/${test.id}?view=test`
   }
 
+  const handleDuplicateTest = async (testId: string) => {
+    try {
+      const response = await fetch(`/api/tests/${testId}/duplicate`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to duplicate test')
+      }
+
+      toast({
+        title: 'Test Duplicated',
+        description: 'The test has been duplicated as a draft.',
+      })
+
+      // Refresh tests list
+      await fetchTests()
+    } catch (error: any) {
+      console.error('Failed to duplicate test:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to duplicate test',
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleTakeTest = (test: Test) => {
     // Navigate to test player
     window.location.href = `/club/${clubId}/tests/${test.id}/take`
@@ -542,114 +582,167 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     return { drafts: draftsList, scheduled: scheduledList, opened: openedList, completed: completedList }
   }, [tests, searchQuery, statusFilter, isAdmin, userAttempts])
 
-  const renderTestCard = (test: Test) => (
-    <Card key={test.id} id={`test-${test.id}`}>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <CardTitle>
-                {searchQuery ? highlightText(test.name, searchQuery) : test.name}
-              </CardTitle>
-              {getStatusBadge(test.status)}
-              {test.requireFullscreen && (
-                <Badge variant="outline" className="gap-1">
-                  <Lock className="h-3 w-3" />
-                  Lockdown
-                </Badge>
+  const renderTestCard = (test: Test) => {
+    const getCalculatorTypeLabel = () => {
+      if (!test.allowCalculator || !test.calculatorType) return null
+      if (test.calculatorType === 'FOUR_FUNCTION') return 'Four Function'
+      if (test.calculatorType === 'SCIENTIFIC') return 'Scientific'
+      return 'Graphing'
+    }
+
+    const calculatorTypeLabel = getCalculatorTypeLabel()
+    const creatorName = test.createdByMembership?.user?.name || test.createdByMembership?.user?.email || 'Unknown'
+    const attemptCount = test._count?.attempts ?? 0
+
+    return (
+      <Card key={test.id} id={`test-${test.id}`}>
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <CardTitle>
+                  {searchQuery ? highlightText(test.name, searchQuery) : test.name}
+                </CardTitle>
+                {getStatusBadge(test.status)}
+                {test.requireFullscreen && (
+                  <Badge variant="outline" className="gap-1">
+                    <Lock className="h-3 w-3" />
+                    Lockdown
+                  </Badge>
+                )}
+                {test.allowCalculator && test.calculatorType && (
+                  <Badge variant="outline" className="gap-1">
+                    <CalcIcon className="h-3 w-3" />
+                    {test.calculatorType === 'FOUR_FUNCTION' ? 'Basic Calc' : 
+                     test.calculatorType === 'SCIENTIFIC' ? 'Scientific Calc' : 
+                     'Graphing Calc'}
+                  </Badge>
+                )}
+              </div>
+              {test.description && (
+                <CardDescription className="mb-2">
+                  {searchQuery ? highlightText(test.description, searchQuery) : test.description}
+                </CardDescription>
               )}
-              {test.allowCalculator && test.calculatorType && (
-                <Badge variant="outline" className="gap-1">
-                  <CalcIcon className="h-3 w-3" />
-                  {test.calculatorType === 'FOUR_FUNCTION' ? 'Basic Calc' : 
-                   test.calculatorType === 'SCIENTIFIC' ? 'Scientific Calc' : 
-                   'Graphing Calc'}
-                </Badge>
-              )}
+              <div className={`flex items-center gap-3 text-sm text-muted-foreground ${test.status === 'DRAFT' ? 'mt-2 mb-0' : 'mt-3 mb-1'}`}>
+                {test.status === 'PUBLISHED' ? (
+                  <>
+                    <span>{test._count?.questions ?? 0} question{(test._count?.questions ?? 0) !== 1 ? 's' : ''}</span>
+                    <span>•</span>
+                    <span>{test.durationMinutes} minute{test.durationMinutes !== 1 ? 's' : ''}</span>
+                    <span>•</span>
+                    <span>{attemptCount} attempt{attemptCount !== 1 ? 's' : ''}</span>
+                    {calculatorTypeLabel && (
+                      <>
+                        <span>•</span>
+                        <span>{calculatorTypeLabel}</span>
+                      </>
+                    )}
+                    <span>•</span>
+                    <span>Created by {creatorName}</span>
+                    {test.updatedAt && test.updatedAt !== test.createdAt && (
+                      <>
+                        <span>•</span>
+                        <span>Last edited {format(new Date(test.updatedAt), 'MMM d, yyyy')}</span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span>{test._count?.questions ?? 0} question{(test._count?.questions ?? 0) !== 1 ? 's' : ''}</span>
+                    <span>•</span>
+                    <span>{test.durationMinutes} minute{test.durationMinutes !== 1 ? 's' : ''}</span>
+                    {calculatorTypeLabel && (
+                      <>
+                        <span>•</span>
+                        <span>{calculatorTypeLabel}</span>
+                      </>
+                    )}
+                    <span>•</span>
+                    <span>Created by {creatorName}</span>
+                    {test.updatedAt && test.updatedAt !== test.createdAt && (
+                      <>
+                        <span>•</span>
+                        <span>Last edited by {format(new Date(test.updatedAt), 'MMM d, yyyy')}</span>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            {test.description && (
-              <CardDescription>
-                {searchQuery ? highlightText(test.description, searchQuery) : test.description}
-              </CardDescription>
+            {isAdmin && (
+              <TooltipProvider>
+                <div className="flex gap-2">
+                  {test.status === 'DRAFT' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleViewTest(test)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleViewResponses(test)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Responses
+                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDuplicateTest(test.id)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Duplicate</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewSettings(test)}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Settings</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </>
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteClick(test)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Delete</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
             )}
           </div>
-          {isAdmin && (
-            <div className="flex gap-2">
-              {test.status === 'DRAFT' ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleViewTest(test)}
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleViewResponses(test)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Responses
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleViewSettings(test)}
-                  >
-                    <Settings className="h-4 w-4 mr-1" />
-                    Settings
-                  </Button>
-                </>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleDeleteClick(test)}
-                className="text-red-600 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="flex items-center gap-2 text-sm">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{test.durationMinutes} minutes</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            <span>{test._count?.questions ?? 0} questions</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span>{userAttempts.get(test.id)?.attemptsUsed || 0} attempt{(userAttempts.get(test.id)?.attemptsUsed || 0) !== 1 ? 's' : ''}</span>
-          </div>
-          {test.maxAttempts && (
-            <div className="flex items-center gap-2 text-sm">
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
-              <span>Max: {test.maxAttempts}</span>
-            </div>
-          )}
-          {test.allowCalculator && test.calculatorType && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CalcIcon className="h-4 w-4" />
-              <span>
-                {test.calculatorType === 'FOUR_FUNCTION' ? 'Four Function' : 
-                 test.calculatorType === 'SCIENTIFIC' ? 'Scientific' : 
-                 'Graphing'} Calculator
-              </span>
-            </div>
-          )}
-          <div className="text-sm text-muted-foreground col-span-2">
-            {getTestTimeInfo(test)}
-          </div>
-        </div>
+        </CardHeader>
+        <CardContent className={test.status === 'DRAFT' ? 'pt-0 pb-0' : ''}>
 
         {test.status === 'PUBLISHED' && test.startAt && test.allowNoteSheet && (() => {
           const noteSheet = noteSheets.get(test.id)
@@ -804,7 +897,8 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
         )}
       </CardContent>
     </Card>
-  )
+    )
+  }
 
   if (loading) {
     return (

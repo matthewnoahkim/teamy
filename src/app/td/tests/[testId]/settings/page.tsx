@@ -132,6 +132,8 @@ export default async function TDTestSettingsPage({ params }: Props) {
       releaseScoresAt: true,
       scoreReleaseMode: true,
       scoresReleased: true,
+      updatedAt: true,
+      createdAt: true,
       event: {
         select: {
           id: true,
@@ -270,6 +272,13 @@ export default async function TDTestSettingsPage({ params }: Props) {
                 label="Scores Released At"
                 value={releaseScoresAt ? formatDateTime(releaseScoresAt instanceof Date ? releaseScoresAt.toISOString() : releaseScoresAt) : (scoresReleased ? 'Manually released' : 'Not released')}
               />
+              {esTest.updatedAt && esTest.updatedAt !== esTest.createdAt && (
+                <InfoItem
+                  icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+                  label="Last Edited"
+                  value={formatDateTime(esTest.updatedAt.toISOString())}
+                />
+              )}
             </CardContent>
           </Card>
 

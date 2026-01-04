@@ -122,6 +122,7 @@ export async function GET(req: NextRequest) {
         scoreReleaseMode: true,
         createdAt: true,
         updatedAt: true,
+        createdByMembershipId: true,
         assignments: {
           select: {
             assignedScope: true,
@@ -140,10 +141,30 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
+    // Fetch createdBy memberships for all tests
+    const membershipIds = [...new Set(allTests.map(t => t.createdByMembershipId).filter(Boolean))]
+    const memberships = membershipIds.length > 0 ? await prisma.membership.findMany({
+      where: { id: { in: membershipIds } },
+      select: {
+        id: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    }) : []
+    const membershipMap = new Map(memberships.map(m => [m.id, m]))
+
     // Admins see everything
     if (isAdminUser) {
-      // Remove assignments from response (not needed by client)
-      const tests = allTests.map(({ assignments, ...test }) => test)
+      // Remove assignments from response and add createdByMembership
+      const tests = allTests.map(({ assignments, ...test }) => ({
+        ...test,
+        createdByMembership: test.createdByMembershipId ? membershipMap.get(test.createdByMembershipId) : undefined,
+      }))
       return NextResponse.json({ tests })
     }
 
@@ -187,8 +208,11 @@ export async function GET(req: NextRequest) {
       })
     })
 
-    // Remove assignments from response (not needed by client)
-    const tests = filteredTests.map(({ assignments, ...test }) => test)
+    // Remove assignments from response and add createdByMembership
+    const tests = filteredTests.map(({ assignments, ...test }) => ({
+      ...test,
+      createdByMembership: test.createdByMembershipId ? membershipMap.get(test.createdByMembershipId) : undefined,
+    }))
 
     return NextResponse.json({ tests })
   } catch (error) {

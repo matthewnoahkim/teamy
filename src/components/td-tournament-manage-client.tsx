@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/components/ui/use-toast'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { 
   LogOut, 
   Clock, 
@@ -48,6 +49,7 @@ import {
   User,
   Eye,
   Unlock,
+  Copy,
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -1488,6 +1490,34 @@ export function TDTournamentManageClient({
     setDeleteTestDialogOpen(true)
   }
 
+  const handleDuplicateTest = async (testId: string) => {
+    try {
+      const response = await fetch(`/api/es/tests/${testId}/duplicate`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to duplicate test')
+      }
+
+      toast({
+        title: 'Test Duplicated',
+        description: 'The test has been duplicated as a draft.',
+      })
+
+      // Refresh tests list
+      fetchEventsWithTests()
+    } catch (error: any) {
+      console.error('Failed to duplicate test:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to duplicate test',
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleDeleteTestConfirm = async () => {
     if (!testToDelete) return
 
@@ -2612,6 +2642,8 @@ export function TDTournamentManageClient({
                                       </div>
                                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
                                         <span>{test.questions.length} question{test.questions.length !== 1 ? 's' : ''}</span>
+                                        <span>•</span>
+                                        <span>{test.durationMinutes} minute{test.durationMinutes !== 1 ? 's' : ''}</span>
                                         {test.createdBy && (
                                           <>
                                             <span>•</span>
@@ -2622,66 +2654,91 @@ export function TDTournamentManageClient({
                                           <>
                                             <span>•</span>
                                             <span>
-                                              Last edited {
-                                                test.staff && test.createdBy && test.staff.id !== test.createdBy.id 
-                                                  ? `by ${test.staff.name || test.staff.email} `
-                                                  : test.staff
-                                                    ? `by ${test.staff.name || test.staff.email} `
-                                                    : test.createdBy 
-                                                      ? `by ${test.createdBy.name || test.createdBy.email} `
-                                                      : ''
-                                              }
-                                              on {format(new Date(test.updatedAt), 'MMM d, yyyy \'at\' h:mm a')}
+                                              Last edited {format(new Date(test.updatedAt), 'MMM d, yyyy')}
                                             </span>
                                           </>
                                         )}
                                       </div>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <TooltipProvider>
+                                      <div className="flex gap-2">
+                                        {test.status !== 'PUBLISHED' && (
+                                          <Link href={`/td/tests/${test.id}`}>
+                                            <Button variant="outline" size="sm">
+                                              <Edit className="h-4 w-4 mr-1" />
+                                              Edit
+                                            </Button>
+                                          </Link>
+                                        )}
                                       {test.status === 'PUBLISHED' && (
-                                        <>
-                                          <Link href={`/td/tests/${test.id}/responses`}>
-                                            <Button variant="outline" size="sm">
-                                              <Eye className="h-4 w-4 mr-1" />
-                                              Responses
-                                            </Button>
-                                          </Link>
-                                          <Link href={`/td/tests/${test.id}/settings`}>
-                                            <Button variant="outline" size="sm">
-                                              <Settings className="h-4 w-4 mr-1" />
-                                              Settings
-                                            </Button>
-                                          </Link>
-                                        </>
-                                      )}
-                                      {test.allowNoteSheet && (
-                                        <Button 
-                                          variant="outline" 
-                                          size="sm"
-                                          onClick={() => setNoteSheetReviewOpen(test.id)}
-                                        >
-                                          <FileText className="h-4 w-4 mr-1" />
-                                          Note Sheets
-                                        </Button>
-                                      )}
-                                      {test.status !== 'PUBLISHED' && (
-                                        <Link href={`/td/tests/${test.id}`}>
+                                        <Link href={`/td/tests/${test.id}/responses`}>
                                           <Button variant="outline" size="sm">
-                                            <Edit className="h-4 w-4 mr-1" />
-                                            Edit
+                                            <Eye className="h-4 w-4 mr-1" />
+                                            Responses
                                           </Button>
                                         </Link>
                                       )}
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => handleDeleteTestClick({ id: test.id, name: test.name })}
-                                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                      >
-                                        <Trash2 className="h-4 w-4 mr-1" />
-                                        Delete
-                                      </Button>
-                                    </div>
+                                        {test.allowNoteSheet && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                onClick={() => setNoteSheetReviewOpen(test.id)}
+                                              >
+                                                <FileText className="h-4 w-4" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>Note Sheets</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button 
+                                              variant="outline" 
+                                              size="sm"
+                                              onClick={() => handleDuplicateTest(test.id)}
+                                            >
+                                              <Copy className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>Duplicate</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                        {test.status === 'PUBLISHED' && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Link href={`/td/tests/${test.id}/settings`}>
+                                                <Button variant="outline" size="sm">
+                                                  <Settings className="h-4 w-4" />
+                                                </Button>
+                                              </Link>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>Settings</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        )}
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button 
+                                              variant="outline" 
+                                              size="sm"
+                                              onClick={() => handleDeleteTestClick({ id: test.id, name: test.name })}
+                                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>Delete</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </div>
+                                    </TooltipProvider>
                                   </div>
                                 ))}
                               </div>

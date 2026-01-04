@@ -1079,17 +1079,17 @@ export function NewTestBuilder({
           const existingQuestionIds = new Set(test.questions.map(q => q.id))
           
           // Build questions array for ES API
-          // Include startAt/endAt if they exist in publishFormData (when publishing) or test data (when updating)
+          // When andPublish is true, don't set dates yet - they'll be set when the publish dialog's "Publish" button is clicked
+          // When andPublish is false, preserve existing dates from the test
           const testWithDates = test as any
-          const publishFormDataWithDates = publishFormData as any
-          const startAtISO = andPublish && publishFormData.startAt 
-            ? new Date(publishFormData.startAt).toISOString() 
+          const startAtISO = andPublish 
+            ? undefined // Don't set dates when opening publish dialog - wait for actual publish
             : (testWithDates.startAt ? new Date(testWithDates.startAt).toISOString() : undefined)
-          const endAtISO = andPublish && publishFormData.endAt 
-            ? new Date(publishFormData.endAt).toISOString() 
+          const endAtISO = andPublish 
+            ? undefined // Don't set dates when opening publish dialog - wait for actual publish
             : (testWithDates.endAt ? new Date(testWithDates.endAt).toISOString() : undefined)
-          const allowLateUntilISO = andPublish && publishFormDataWithDates.allowLateUntil && publishFormDataWithDates.allowLateUntil.trim()
-            ? new Date(publishFormDataWithDates.allowLateUntil).toISOString()
+          const allowLateUntilISO = andPublish 
+            ? undefined // Don't set dates when opening publish dialog - wait for actual publish
             : (testWithDates.allowLateUntil ? new Date(testWithDates.allowLateUntil).toISOString() : undefined)
 
           updatePayload = {
@@ -1098,7 +1098,7 @@ export function NewTestBuilder({
             description: payload.description,
             instructions: payload.instructions,
             durationMinutes: payload.durationMinutes,
-            status: andPublish ? 'PUBLISHED' : test.status,
+            status: test.status, // Don't publish here - only publish when dialog's "Publish" button is clicked
             eventId: initialEventId || undefined,
             startAt: startAtISO,
             endAt: endAtISO,
