@@ -221,7 +221,7 @@ function parsePromptMd(promptMd: string): {
   }
   
   // Parse context and prompt
-  const parts = mainContent.split('---').map(p => p.trim()).filter(p => p)
+  const parts = mainContent.split('---').map((p: string) => p.trim()).filter((p: string) => p)
   
   if (parts.length === 2) {
     const contextData = extractTablesFromSection(parts[0])

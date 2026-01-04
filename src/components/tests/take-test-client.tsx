@@ -1070,7 +1070,7 @@ export function TakeTestClient({
                       const partsText = frqPartsMatch[1]
                       
                       // Parse context and prompt from main content (split on ---)
-                      const parts = mainContent.split('---').map(p => p.trim()).filter(p => p)
+                      const parts = mainContent.split('---').map((p: string) => p.trim()).filter((p: string) => p)
                       const contextSection = parts.length > 1 ? parts[0] : ''
                       const promptSection = parts.length > 1 ? parts[1] : mainContent
                       
