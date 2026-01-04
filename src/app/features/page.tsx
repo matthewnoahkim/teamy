@@ -48,7 +48,7 @@ const heroFeatures = [
 export default function FeaturesPage() {
   return (
     <PublicPageLayout>
-      <div className="py-6 sm:py-12 px-4 sm:px-6">
+      <div className="py-8 sm:py-12 lg:py-16 px-4 sm:px-6 lg:px-8">
         {/* Scroll-driven feature showcase with header and footer */}
         <ScrollDrivenFeatures features={heroFeatures} />
       </div>

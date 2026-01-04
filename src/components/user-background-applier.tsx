@@ -237,7 +237,10 @@ export function UserBackgroundApplier() {
       }
     }
 
-    applyBackground()
+    // Use requestAnimationFrame to ensure DOM is ready and hydration is complete
+    const rafId = requestAnimationFrame(() => {
+      applyBackground()
+    })
 
     // Listen for custom event to update background when changed
     const handleBackgroundUpdate = () => {
@@ -252,6 +255,7 @@ export function UserBackgroundApplier() {
     window.addEventListener('focus', handleFocus)
 
     return () => {
+      cancelAnimationFrame(rafId)
       window.removeEventListener('userBackgroundUpdated', handleBackgroundUpdate)
       window.removeEventListener('focus', handleFocus)
     }

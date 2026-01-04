@@ -20,7 +20,7 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
       <DiscordBanner />
       
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav" suppressHydrationWarning>
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 overflow-x-auto">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">

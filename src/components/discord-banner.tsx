@@ -16,13 +16,8 @@ interface DiscordBannerProps {
 }
 
 export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
-  // Initialize dismissed state immediately from localStorage
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('banner-dismissed')
-    }
-    return false
-  })
+  // Initialize dismissed state - always false on server, will be updated in useEffect
+  const [dismissed, setDismissed] = useState(false)
   const [settings, setSettings] = useState<BannerSettings>(
     initialSettings || {
       enabled: true,
@@ -32,6 +27,15 @@ export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
     }
   )
   
+  useEffect(() => {
+    // Check localStorage for dismissed state after hydration (only once on mount)
+    if (typeof window !== 'undefined') {
+      const isDismissed = !!localStorage.getItem('banner-dismissed')
+      setDismissed(isDismissed)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     // Skip API call if initialSettings were provided (server-side rendered)
     if (initialSettings) {

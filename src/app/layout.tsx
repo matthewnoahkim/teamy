@@ -194,14 +194,14 @@ export default async function RootLayout({
   
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans antialiased ${bodyClass}`}>
+      <body className={`font-sans antialiased ${bodyClass}`} suppressHydrationWarning>
         {/* Critical blocking script: Apply styles immediately before any rendering */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  // Apply theme first
+                  // Apply theme first - this modifies html element which has suppressHydrationWarning
                   var theme = localStorage.getItem('theme');
                   var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                   var resolvedTheme = theme || systemTheme;
@@ -212,10 +212,14 @@ export default async function RootLayout({
                   }
                   
                   // Immediately inject background styles into head before any paint
-                  var style = document.createElement('style');
-                  style.id = 'user-background-styles-inline';
-                  style.textContent = ${JSON.stringify(backgroundStyles)};
-                  (document.head || document.getElementsByTagName('head')[0] || document.documentElement).appendChild(style);
+                  // Check if style already exists to avoid duplicates
+                  var existingStyle = document.getElementById('user-background-styles-inline');
+                  if (!existingStyle) {
+                    var style = document.createElement('style');
+                    style.id = 'user-background-styles-inline';
+                    style.textContent = ${JSON.stringify(backgroundStyles)};
+                    (document.head || document.getElementsByTagName('head')[0] || document.documentElement).appendChild(style);
+                  }
                 } catch (e) {
                   console.error('Error applying initial styles:', e);
                 }

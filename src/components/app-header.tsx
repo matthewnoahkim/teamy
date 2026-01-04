@@ -53,7 +53,7 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav" suppressHydrationWarning>
         <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 md:gap-4 min-w-0">
             {showBackButton && backHref && (

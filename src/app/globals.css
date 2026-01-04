@@ -397,4 +397,73 @@
       rgba(255, 255, 255, 0) 100%
     );
   }
+
+  /* Modern smooth transitions */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes gentleFloat {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px);
+    }
+    50% {
+      transform: translateY(-12px) translateX(6px);
+    }
+  }
+
+  .animate-gentle-float {
+    animation: gentleFloat 10s ease-in-out infinite;
+  }
+
+  /* Smooth scroll-driven transitions */
+  .scroll-smooth-transition {
+    transition: all 1000ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Glass morphism enhancement */
+  .glass-modern {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .dark .glass-modern {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Elegant gradient animations */
+  @keyframes gradientShift {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .animate-gradient-shift {
+    background-size: 200% 200%;
+    animation: gradientShift 8s ease infinite;
+  }
 }
