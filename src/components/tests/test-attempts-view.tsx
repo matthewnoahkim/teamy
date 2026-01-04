@@ -67,7 +67,7 @@ interface Attempt {
 
 interface GradeEdit {
   answerId: string
-  pointsAwarded: number
+  pointsAwarded: number | null // null = not graded
   graderNote: string
   partPoints?: (number | null)[] // For multipart FRQs
 }
@@ -177,7 +177,11 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
       
       edits[answer.id] = {
         answerId: answer.id,
-        pointsAwarded: answer.pointsAwarded !== null ? answer.pointsAwarded : 0,
+        // Only set pointsAwarded if it's been graded (gradedAt is not null)
+        // If never graded, keep as null (empty field, shows as ungraded)
+        pointsAwarded: answer.gradedAt !== null && answer.pointsAwarded !== null && answer.pointsAwarded !== undefined 
+          ? answer.pointsAwarded 
+          : null,
         graderNote: graderNoteText,
         partPoints,
       }
@@ -275,20 +279,26 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
   }
 
   const handleGradeEdit = (answerId: string, field: 'pointsAwarded' | 'graderNote', value: number | string) => {
-    setGradeEdits((prev) => ({
+    setGradeEdits((prev) => {
+      const newValue = field === 'pointsAwarded' 
+        ? (value === '' || value === null || value === undefined ? null : (typeof value === 'string' ? (value.trim() === '' ? null : parseFloat(value)) : value))
+        : value
+      
+      return {
       ...prev,
       [answerId]: {
         ...prev[answerId],
-        [field]: value,
-        // Reset partPoints if manually editing total points (not from parts)
-        ...(field === 'pointsAwarded' && !prev[answerId]?.partPoints ? {} : {}),
-      },
-    }))
+          [field]: newValue,
+          // Reset partPoints if manually editing total points (not from parts)
+          ...(field === 'pointsAwarded' && !prev[answerId]?.partPoints ? {} : {}),
+        },
+      }
+    })
   }
 
   const handlePartGradeEdit = (answerId: string, partIndex: number, value: number | string, maxPoints: number) => {
     setGradeEdits((prev) => {
-      const current = prev[answerId] || { answerId, pointsAwarded: 0, graderNote: '' }
+      const current = prev[answerId] || { answerId, pointsAwarded: null, graderNote: '' }
       const partPoints = current.partPoints || []
       const newPartPoints = [...partPoints]
       
@@ -297,19 +307,24 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
         newPartPoints.push(null)
       }
       
-      // Clamp value to max points
+      // Handle value: empty string or null = not graded
       let clampedValue: number | null = null
-      if (value !== '' && value !== null) {
-        const numValue = Number(value)
-        clampedValue = Math.min(Math.max(0, numValue), maxPoints)
+      if (value !== '' && value !== null && value !== undefined) {
+        const numValue = typeof value === 'string' 
+          ? (value.trim() === '' ? NaN : parseFloat(value))
+          : value
+        if (!isNaN(numValue) && isFinite(numValue)) {
+          clampedValue = Math.min(Math.max(0, numValue), maxPoints)
+        }
       }
       
       newPartPoints[partIndex] = clampedValue
       
-      // Calculate total from part points
-      const totalPoints = newPartPoints.reduce((sum: number, pts) => {
-        return sum + (pts || 0)
-      }, 0)
+      // Calculate total from part points - only if at least one part is graded
+      const hasAnyGradedPart = newPartPoints.some(pts => pts !== null && pts !== undefined)
+      const totalPoints = hasAnyGradedPart 
+        ? newPartPoints.reduce((sum: number, pts) => sum + (pts || 0), 0)
+        : null
       
       return {
         ...prev,
@@ -327,13 +342,33 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
 
     setSaving(true)
     try {
-      // Send all grades that have been edited
+      // Save all grades that have been edited, including ones to be cleared (ungraded)
+      // This includes:
+      // 1. Grades explicitly set (not null) - including 0 (explicitly graded as 0)
+      // 2. Previously graded answers that are now cleared (null) - to ungrade them
       const gradesToSave = Object.values(gradeEdits)
         .filter((grade) => {
-          const answer = selectedAttempt.answers.find((a) => a.id === grade.answerId)
-          return answer !== undefined
+        const answer = selectedAttempt.answers.find((a) => a.id === grade.answerId)
+          if (!answer) return false
+          
+          // For multipart FRQs, check if any part has been graded OR if it was previously graded and is now cleared
+          if (grade.partPoints && grade.partPoints.length > 0) {
+            const hasAnyGradedPart = grade.partPoints.some(pts => pts !== null && pts !== undefined)
+            const wasPreviouslyGraded = answer.gradedAt !== null
+            // Include if has graded parts, or was graded but is now cleared (all parts null)
+            return hasAnyGradedPart || (wasPreviouslyGraded && !hasAnyGradedPart)
+          }
+          
+          // For single-part, include if:
+          // - pointsAwarded is explicitly set (not null), OR
+          // - it was previously graded but is now cleared (null)
+          const wasPreviouslyGraded = answer.gradedAt !== null
+          const isNowCleared = grade.pointsAwarded === null || grade.pointsAwarded === undefined
+          return (grade.pointsAwarded !== null && grade.pointsAwarded !== undefined) || (wasPreviouslyGraded && isNowCleared)
         })
         .map((grade) => {
+          const answer = selectedAttempt.answers.find((a) => a.id === grade.answerId)!
+          
           // For multipart FRQs, store part points in graderNote as JSON
           let graderNote = grade.graderNote || ''
           
@@ -348,12 +383,25 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
             graderNote = JSON.stringify(noteData)
           }
           
+          // Calculate total for multipart, or use single value
+          let pointsAwarded: number | null = null
+          if (grade.partPoints && grade.partPoints.length > 0) {
+            // For multipart, sum the part points (null if all are null)
+            const hasAnyGradedPart = grade.partPoints.some(pts => pts !== null && pts !== undefined)
+            if (hasAnyGradedPart) {
+              pointsAwarded = grade.partPoints.reduce((sum: number, pts) => sum + (pts || 0), 0)
+            }
+            // If all parts are null, pointsAwarded stays null (to ungrade)
+          } else {
+            pointsAwarded = grade.pointsAwarded ?? null
+          }
+          
           return {
             answerId: grade.answerId,
-            pointsAwarded: grade.pointsAwarded,
+            pointsAwarded, // Can be null to indicate "ungrade"
             graderNote,
           }
-        })
+      })
 
       const response = await fetch(`/api/tests/${testId}/attempts/${selectedAttempt.id}/grade`, {
         method: 'PATCH',
@@ -392,18 +440,82 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
     totalCount: number
   } => {
     const totalCount = attempt.answers.length
-    const gradedCount = attempt.answers.filter((a) => a.gradedAt !== null).length
+    
+    // Check each answer to see if it's fully graded
+    // For multipart FRQs, check if all parts are graded
+    let fullyGradedCount = 0
+    let partiallyGradedCount = 0
+    
+    attempt.answers.forEach((answer) => {
+      const isFreeResponse = answer.question.type === 'LONG_TEXT' || answer.question.type === 'SHORT_TEXT'
+      
+      if (isFreeResponse) {
+        // Check if it's a multipart FRQ
+        const promptMd = answer.question.promptMd || ''
+        const isMultipart = promptMd.includes('---FRQ_PARTS---')
+        
+        if (isMultipart && answer.graderNote && answer.gradedAt !== null) {
+          // Parse partPoints from graderNote to check if all parts are graded
+          try {
+            const parsed = JSON.parse(answer.graderNote)
+            if (parsed && typeof parsed === 'object' && Array.isArray(parsed.partPoints)) {
+              const partPoints = parsed.partPoints
+              
+              // Extract expected number of parts from promptMd
+              const partsText = promptMd.match(/---FRQ_PARTS---\n\n([\s\S]+)$/)?.[1]
+              if (partsText) {
+                const partRegex = /\[PART:([a-z]):(\d+(?:\.\d+)?)\]\n([\s\S]*?)(?=\n\n\[PART:|$)/g
+                const expectedParts: any[] = []
+                let match
+                while ((match = partRegex.exec(partsText)) !== null) {
+                  expectedParts.push(match[1])
+                }
+                
+                // Check if all expected parts are graded
+                if (expectedParts.length > 0) {
+                  const allPartsGraded = expectedParts.every((_, index) => {
+                    return partPoints[index] !== null && partPoints[index] !== undefined
+                  })
+                  if (allPartsGraded) {
+                    fullyGradedCount++
+                  } else {
+                    partiallyGradedCount++
+                  }
+                  return
+                }
+              }
+            }
+          } catch {
+            // If parsing fails, treat as single-part
+          }
+        }
+        
+        // Single-part FRQ: check if gradedAt is set
+        if (answer.gradedAt !== null) {
+          fullyGradedCount++
+        }
+      } else {
+        // Auto-graded questions
+        if (answer.gradedAt !== null || (
+          answer.selectedOptionIds !== null || 
+          answer.numericAnswer !== null ||
+          answer.answerText !== null
+        )) {
+          fullyGradedCount++
+        }
+      }
+    })
 
     let status: 'UNGRADED' | 'PARTIALLY_GRADED' | 'FULLY_GRADED'
-    if (gradedCount === 0) {
+    if (fullyGradedCount === 0 && partiallyGradedCount === 0) {
       status = 'UNGRADED'
-    } else if (gradedCount === totalCount) {
+    } else if (fullyGradedCount === totalCount && partiallyGradedCount === 0) {
       status = 'FULLY_GRADED'
     } else {
       status = 'PARTIALLY_GRADED'
     }
 
-    return { status, gradedCount, totalCount }
+    return { status, gradedCount: fullyGradedCount + partiallyGradedCount, totalCount }
   }
 
   const calculateScoreBreakdown = (attempt: Attempt): {
@@ -605,9 +717,30 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                               </span>
                             </div>
                           )}
-                          <div className={`flex items-center gap-1 ${attempt.tabSwitchCount > 0 ? 'text-orange-600' : 'text-muted-foreground'}`}>
-                            {attempt.tabSwitchCount > 0 && <AlertTriangle className="h-3 w-3" />}
-                            <span>{attempt.tabSwitchCount} tab switch{attempt.tabSwitchCount !== 1 ? 'es' : ''}</span>
+                          <div className={`flex items-center gap-1 ${(() => {
+                            // Calculate actual tab switch count from proctoring events
+                            const tabSwitchEvents = attempt.proctorEvents?.filter(
+                              e => e.kind === 'TAB_SWITCH' || e.kind === 'BLUR' || e.kind === 'VISIBILITY_HIDDEN'
+                            ) || []
+                            return tabSwitchEvents.length > 0
+                          })() ? 'text-orange-600' : 'text-muted-foreground'}`}>
+                            {(() => {
+                              // Calculate actual tab switch count from proctoring events
+                              const tabSwitchEvents = attempt.proctorEvents?.filter(
+                                e => e.kind === 'TAB_SWITCH' || e.kind === 'BLUR' || e.kind === 'VISIBILITY_HIDDEN'
+                              ) || []
+                              return tabSwitchEvents.length > 0
+                            })() && <AlertTriangle className="h-3 w-3" />}
+                            <span>
+                              {(() => {
+                                // Calculate actual tab switch count from proctoring events
+                                const tabSwitchEvents = attempt.proctorEvents?.filter(
+                                  e => e.kind === 'TAB_SWITCH' || e.kind === 'BLUR' || e.kind === 'VISIBILITY_HIDDEN'
+                                ) || []
+                                const count = tabSwitchEvents.length
+                                return `${count} tab switch${count !== 1 ? 'es' : ''}`
+                              })()}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -690,8 +823,20 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                 )}
                 <div>
                   <p className="text-xs text-muted-foreground uppercase">Tab Switches</p>
-                  <p className={`text-lg font-semibold ${selectedAttempt.tabSwitchCount > 0 ? 'text-orange-600' : ''}`}>
-                    {selectedAttempt.tabSwitchCount}
+                  <p className={`text-lg font-semibold ${(() => {
+                    // Calculate actual tab switch count from proctoring events
+                    const tabSwitchEvents = selectedAttempt.proctorEvents?.filter(
+                      e => e.kind === 'TAB_SWITCH' || e.kind === 'BLUR' || e.kind === 'VISIBILITY_HIDDEN'
+                    ) || []
+                    return tabSwitchEvents.length > 0
+                  })() ? 'text-orange-600' : ''}`}>
+                    {(() => {
+                      // Calculate actual tab switch count from proctoring events
+                      const tabSwitchEvents = selectedAttempt.proctorEvents?.filter(
+                        e => e.kind === 'TAB_SWITCH' || e.kind === 'BLUR' || e.kind === 'VISIBILITY_HIDDEN'
+                      ) || []
+                      return tabSwitchEvents.length
+                    })()}
                   </p>
                 </div>
                 {selectedAttempt.timeOffPageSeconds > 0 && (
@@ -719,7 +864,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                       Proctoring Events ({selectedAttempt.proctorEvents.length})
                     </CardTitle>
                     <CardDescription>
-                      Detailed timeline of tab switches and other suspicious activity
+                      Detailed timeline of all proctoring events (tab switches, fullscreen exits, devtools, paste/copy, etc.)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -735,16 +880,83 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Badge variant="outline" className="text-xs">
-                                {event.kind.replace(/_/g, ' ')}
+                                {event.kind === 'TAB_SWITCH' ? 'Tab Switch' :
+                                 event.kind === 'VISIBILITY_HIDDEN' ? 'Visibility Hidden' :
+                                 event.kind === 'EXIT_FULLSCREEN' ? 'Exit Fullscreen' :
+                                 event.kind === 'DEVTOOLS_OPEN' ? 'DevTools Open' :
+                                 event.kind === 'CONTEXTMENU' ? 'Context Menu' :
+                                 event.kind === 'NETWORK_OFFLINE' ? 'Network Offline' :
+                                 event.kind === 'PASTE' ? 'Paste' :
+                                 event.kind === 'COPY' ? 'Copy' :
+                                 event.kind.replace(/_/g, ' ')}
                               </Badge>
                               <span className="text-xs text-muted-foreground">
                                 {new Date(event.ts).toLocaleTimeString()}
                               </span>
+                              {event.kind === 'TAB_SWITCH' && event.meta && typeof event.meta === 'object' && 'timeOffSeconds' in event.meta && (
+                                <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                                  {typeof event.meta.timeOffSeconds === 'number' && event.meta.timeOffSeconds > 0
+                                    ? `Off site: ${Math.floor(event.meta.timeOffSeconds / 60)}m ${event.meta.timeOffSeconds % 60}s`
+                                    : 'Off site: <1s'}
+                                </span>
+                              )}
                             </div>
                             {event.meta && Object.keys(event.meta).length > 0 && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {JSON.stringify(event.meta)}
-                              </p>
+                              <div className="mt-1">
+                                {(() => {
+                                  const meta = event.meta as any
+                                  
+                                  // Format based on event type
+                                  if (event.kind === 'PASTE' || event.kind === 'COPY') {
+                                    if (meta.dataLength !== undefined) {
+                                      return (
+                                        <p className="text-xs text-muted-foreground">
+                                          Data length: {meta.dataLength} {meta.dataLength === 1 ? 'character' : 'characters'}
+                                        </p>
+                                      )
+                                    }
+                                  }
+                                  
+                                  // Don't show meta for TAB_SWITCH (already shown above) or events with only timestamp/leftAt
+                                  if (event.kind === 'TAB_SWITCH') {
+                                    return null
+                                  }
+                                  
+                                  // For VISIBILITY_HIDDEN and BLUR, don't show anything if only leftAt/timestamp
+                                  if (event.kind === 'VISIBILITY_HIDDEN' || event.kind === 'BLUR') {
+                                    const keys = Object.keys(meta)
+                                    if (keys.length <= 2 && (keys.includes('timestamp') || keys.includes('leftAt'))) {
+                                      return null
+                                    }
+                                  }
+                                  
+                                  // For EXIT_FULLSCREEN, don't show if only timestamp
+                                  if (event.kind === 'EXIT_FULLSCREEN' && Object.keys(meta).length === 1 && 'timestamp' in meta) {
+                                    return null
+                                  }
+                                  
+                                  // Show formatted info for other events
+                                  const displayParts: string[] = []
+                                  if (meta.dataLength !== undefined) {
+                                    displayParts.push(`${meta.dataLength} ${meta.dataLength === 1 ? 'character' : 'characters'}`)
+                                  }
+                                  if (meta.timeOffSeconds !== undefined) {
+                                    const minutes = Math.floor(meta.timeOffSeconds / 60)
+                                    const seconds = meta.timeOffSeconds % 60
+                                    displayParts.push(`Off site: ${minutes}m ${seconds}s`)
+                                  }
+                                  
+                                  if (displayParts.length > 0) {
+                                    return (
+                                      <p className="text-xs text-muted-foreground">
+                                        {displayParts.join(', ')}
+                                      </p>
+                                    )
+                                  }
+                                  
+                                  return null
+                                })()}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -952,7 +1164,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                             <Badge variant="outline">
                               {answer.question.type.replace('MCQ_', '').replace('_', ' ')}
                             </Badge>
-                            {answer.pointsAwarded !== null && (
+                            {answer.gradedAt !== null && answer.pointsAwarded !== null && (
                               <Badge variant={answer.pointsAwarded > 0 ? 'default' : 'destructive'}>
                                 {answer.pointsAwarded} / {answer.question.points} pts
                               </Badge>
@@ -1017,8 +1229,8 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                 <div className="space-y-4">
                                   <div className="flex items-center gap-2 pb-2 border-b border-border/50">
                                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                      Student&apos;s Answer
-                                    </p>
+                                    Student&apos;s Answer
+                                  </p>
                                   </div>
                                   {(() => {
                                     // Check if this is a multipart FRQ
@@ -1049,7 +1261,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                           <div className="space-y-5">
                                             {frqParts.map((part, partIdx) => {
                                               const partPoints = currentPartPoints[partIdx] ?? null
-                                              const displayValue = partPoints === null || partPoints === 0 ? '' : partPoints
+                                              const displayValue = partPoints === null || partPoints === undefined ? '' : partPoints
                                               
                                               // Check for part-level AI suggestion
                                               const suggestion = aiSuggestions[answer.id]
@@ -1109,39 +1321,58 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                                         </div>
                                                         <Input
                                                           id={`part-points-${answer.id}-${partIdx}`}
-                                                          type="number"
-                                                          min="0"
-                                                          max={part.points}
-                                                          step="0.5"
-                                                          value={displayValue}
+                                                          type="text"
+                                                          inputMode="decimal"
+                                                          value={(() => {
+                                                            // Check if this answer has been edited
+                                                            const hasEdit = answer.id in gradeEdits
+                                                            const partPoints = hasEdit ? gradeEdits[answer.id]?.partPoints : undefined
+                                                            const partValue = partPoints && partPoints[partIdx] !== undefined ? partPoints[partIdx] : null
+                                                            if (partValue === null || partValue === undefined) return ''
+                                                            return partValue.toString()
+                                                          })()}
                                                           onChange={(e) => {
                                                             const inputValue = e.target.value
-                                                            if (inputValue === '') {
+                                                            // Allow empty string - immediately set to null
+                                                            if (inputValue === '' || inputValue === '-') {
                                                               handlePartGradeEdit(answer.id, partIdx, '', part.points)
-                                                            } else {
+                                                              return
+                                                            }
+                                                            
+                                                            // Allow typing decimals and numbers
+                                                            if (/^-?\d*\.?\d*$/.test(inputValue)) {
                                                               const numValue = parseFloat(inputValue)
-                                                              if (!isNaN(numValue)) {
-                                                                // Clamp to max points
+                                                              if (!isNaN(numValue) && isFinite(numValue)) {
+                                                                // Clamp to max points while typing
                                                                 const clampedValue = Math.min(Math.max(0, numValue), part.points)
                                                                 handlePartGradeEdit(answer.id, partIdx, clampedValue, part.points)
+                                                              } else if (inputValue === '.' || inputValue === '-') {
+                                                                // Allow typing decimal point or minus, don't update yet
+                                                                // Don't update state for partial input
+                                                                return
+                                                              } else {
+                                                                // Invalid, clear it
+                                                                handlePartGradeEdit(answer.id, partIdx, '', part.points)
                                                               }
                                                             }
                                                           }}
                                                           onBlur={(e) => {
-                                                            const inputValue = e.target.value
-                                                            if (inputValue !== '') {
+                                                            const inputValue = e.target.value.trim()
+                                                            // If empty on blur, keep as null (not graded)
+                                                            if (inputValue === '' || inputValue === '-' || inputValue === '.') {
+                                                              handlePartGradeEdit(answer.id, partIdx, '', part.points)
+                                                            } else {
+                                                              // Validate and clamp on blur
                                                               const numValue = parseFloat(inputValue)
-                                                              if (!isNaN(numValue)) {
-                                                                // Ensure value is clamped on blur
+                                                              if (!isNaN(numValue) && isFinite(numValue)) {
                                                                 const clampedValue = Math.min(Math.max(0, numValue), part.points)
-                                                                if (clampedValue !== numValue) {
-                                                                  e.target.value = clampedValue.toString()
-                                                                  handlePartGradeEdit(answer.id, partIdx, clampedValue, part.points)
-                                                                }
+                                                                handlePartGradeEdit(answer.id, partIdx, clampedValue, part.points)
+                                                              } else {
+                                                                // Invalid input, clear it
+                                                                handlePartGradeEdit(answer.id, partIdx, '', part.points)
                                                               }
                                                             }
                                                           }}
-                                                          placeholder="0"
                                                           className="w-28 h-10 text-sm font-semibold text-center"
                                                         />
                                                         <p className="text-[10px] text-muted-foreground">max: {part.points}</p>
@@ -1194,12 +1425,12 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                     // Fallback to single answer display
                                     return (
                                       <div className="whitespace-pre-wrap p-4 bg-muted/40 dark:bg-muted/20 rounded-lg border border-border min-h-[100px] shadow-sm">
-                                        {answer.answerText && answer.answerText.trim() ? (
+                                    {answer.answerText && answer.answerText.trim() ? (
                                           <p className="text-sm leading-relaxed">{answer.answerText}</p>
-                                        ) : (
-                                          <span className="text-muted-foreground italic">No answer provided</span>
-                                        )}
-                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground italic">No answer provided</span>
+                                    )}
+                                  </div>
                                     )
                                   })()}
                                 </div>
@@ -1224,7 +1455,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                 <div className="flex items-center justify-between pb-3 border-b border-purple-200 dark:border-purple-700">
                                   <div className="flex items-center gap-2.5">
                                     <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-900/50">
-                                      <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                    <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                     </div>
                                     <p className="text-sm font-semibold text-purple-900 dark:text-purple-100">
                                       AI Suggestion
@@ -1289,8 +1520,8 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                   <div className="pt-2 border-t border-purple-200 dark:border-purple-700">
                                     <p className="text-xs text-muted-foreground">
                                       <Clock className="h-3 w-3 inline mr-1" />
-                                      Generated: {new Date(aiSuggestions[answer.id].createdAt).toLocaleString()}
-                                    </p>
+                                    Generated: {new Date(aiSuggestions[answer.id].createdAt).toLocaleString()}
+                                  </p>
                                   </div>
                                 </div>
                               </div>
@@ -1318,7 +1549,39 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                               }
                               
                               const isMultipart = frqParts.length > 0
-                              const currentTotal = gradeEdits[answer.id]?.pointsAwarded ?? (answer.pointsAwarded ?? 0)
+                              
+                              // Check if this answer has been edited in gradeEdits
+                              const hasEdit = answer.id in gradeEdits
+                              
+                              // If edited, use the edited value (even if null - meaning cleared/ungraded)
+                              // Otherwise, only use answer.pointsAwarded if it was actually graded (gradedAt is not null)
+                              const currentTotal = hasEdit 
+                                ? gradeEdits[answer.id]?.pointsAwarded 
+                                : (answer.gradedAt !== null ? (answer.pointsAwarded ?? null) : null)
+                              
+                              // Get partPoints from edits or from saved answer
+                              let currentPartPoints: (number | null)[] = []
+                              const editPartPoints = hasEdit ? gradeEdits[answer.id]?.partPoints : undefined
+                              if (editPartPoints && Array.isArray(editPartPoints)) {
+                                currentPartPoints = editPartPoints
+                              } else if (answer.graderNote && isMultipart) {
+                                // Load from saved graderNote if not in edits
+                                try {
+                                  const parsed = JSON.parse(answer.graderNote)
+                                  if (parsed && typeof parsed === 'object' && Array.isArray(parsed.partPoints)) {
+                                    currentPartPoints = parsed.partPoints
+                                  }
+                                } catch {
+                                  // If parsing fails, treat as plain text
+                                }
+                              }
+                              
+                              const hasAnyGradedPart = isMultipart && currentPartPoints.some((pts: number | null) => pts !== null && pts !== undefined)
+                              // For multipart, check if all parts are graded
+                              const allPartsGraded = isMultipart && frqParts.length > 0 && currentPartPoints.length === frqParts.length && 
+                                currentPartPoints.every((pts: number | null) => pts !== null && pts !== undefined)
+                              const isGraded = isMultipart ? hasAnyGradedPart : (currentTotal !== null && currentTotal !== undefined)
+                              const isFullyGraded = isMultipart ? allPartsGraded : (currentTotal !== null && currentTotal !== undefined)
                               
                               return (
                                 <div className="space-y-4 p-5 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800 shadow-sm">
@@ -1327,13 +1590,21 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                       {/* Multipart - Show total (no overall AI Grade button, grade by part instead) */}
                                       <div className="flex items-center justify-between pb-3 border-b border-blue-200 dark:border-blue-700">
                                         <div className="flex items-baseline gap-3">
-                                          <div>
+                              <div>
                                             <Label className="text-sm font-semibold text-foreground">
                                               Total Points
-                                            </Label>
+                                  </Label>
                                             <div className="flex items-baseline gap-2 mt-1">
-                                              <span className="text-2xl font-bold">{currentTotal}</span>
-                                              <span className="text-sm text-muted-foreground">/ {answer.question.points}</span>
+                                              {!isGraded ? (
+                                                <span className="text-lg text-muted-foreground italic">Ungraded</span>
+                                              ) : !isFullyGraded ? (
+                                                <span className="text-lg text-orange-600 dark:text-orange-400 italic font-semibold">Partially graded</span>
+                                              ) : (
+                                                <>
+                                                  <span className="text-2xl font-bold">{currentTotal ?? 0}</span>
+                                                  <span className="text-sm text-muted-foreground">/ {answer.question.points}</span>
+                                                </>
+                                              )}
                                             </div>
                                           </div>
                                         </div>
@@ -1342,41 +1613,107 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                   ) : (
                                     <>
                                       {/* Single Part Grading */}
+                                      <div className="flex items-center justify-between pb-3 border-b border-blue-200 dark:border-blue-700">
+                                        <div className="flex items-baseline gap-3 flex-1">
+                                          <div>
+                                            <Label className="text-sm font-semibold text-foreground">
+                                              Total Points
+                                            </Label>
+                                            <div className="flex items-baseline gap-2 mt-1">
+                                              {!isGraded ? (
+                                                <span className="text-lg text-muted-foreground italic">Ungraded</span>
+                                              ) : (
+                                                <>
+                                                  <span className="text-2xl font-bold">{currentTotal ?? 0}</span>
+                                                  <span className="text-sm text-muted-foreground">/ {answer.question.points}</span>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                  {!aiSuggestions[answer.id] && (answer.question.type === 'SHORT_TEXT' || answer.question.type === 'LONG_TEXT') && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleRequestAiGrading('single', answer.id)}
+                                            disabled={requestingAiGrading !== null}
+                                      className="h-6 px-2 gap-1 text-xs"
+                                    >
+                                            {requestingAiGrading === answer.id ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <Sparkles className="h-3 w-3" />
+                                      )}
+                                      AI Grade
+                                    </Button>
+                                  )}
+                                </div>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                          <div className="flex items-center justify-between mb-1">
-                                            <Label htmlFor={`points-${answer.id}`} className="text-sm font-semibold">
-                                              Points Awarded (max: {answer.question.points})
-                                            </Label>
-                                            {!aiSuggestions[answer.id] && (answer.question.type === 'SHORT_TEXT' || answer.question.type === 'LONG_TEXT') && (
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => handleRequestAiGrading('single', answer.id)}
-                                                disabled={requestingAiGrading !== null}
-                                                className="h-6 px-2 gap-1 text-xs"
-                                              >
-                                                {requestingAiGrading === answer.id ? (
-                                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                                ) : (
-                                                  <Sparkles className="h-3 w-3" />
-                                                )}
-                                                AI Grade
-                                              </Button>
-                                            )}
-                                          </div>
-                                          <Input
-                                            id={`points-${answer.id}`}
-                                            type="number"
-                                            min="0"
-                                            max={answer.question.points}
-                                            step="0.5"
-                                            value={currentTotal === 0 ? '' : currentTotal}
-                                            onChange={(e) => handleGradeEdit(answer.id, 'pointsAwarded', e.target.value === '' ? 0 : parseFloat(e.target.value))}
-                                            placeholder="0"
-                                            className="mt-1"
-                                          />
-                                        </div>
+                                          <Label htmlFor={`points-${answer.id}`} className="text-sm font-semibold">
+                                            Points Awarded (max: {answer.question.points})
+                                          </Label>
+                                <Input
+                                  id={`points-${answer.id}`}
+                                  type="text"
+                                  inputMode="decimal"
+                                            value={(() => {
+                                              // Check if this answer has been edited
+                                              const hasEdit = answer.id in gradeEdits
+                                              // If edited, use the edited value (even if null - meaning cleared)
+                                              // Otherwise, only use original if it was actually graded
+                                              const editValue = hasEdit 
+                                                ? gradeEdits[answer.id]?.pointsAwarded
+                                                : (answer.gradedAt !== null ? (answer.pointsAwarded ?? null) : null)
+                                              
+                                              if (editValue === null || editValue === undefined) return ''
+                                              return editValue.toString()
+                                            })()}
+                                            onChange={(e) => {
+                                              const inputValue = e.target.value
+                                              // Allow empty string - immediately set to null
+                                              if (inputValue === '' || inputValue === '-') {
+                                                handleGradeEdit(answer.id, 'pointsAwarded', '')
+                                                return
+                                              }
+                                              
+                                              // Allow typing decimals and numbers
+                                              if (/^-?\d*\.?\d*$/.test(inputValue)) {
+                                                const numValue = parseFloat(inputValue)
+                                                if (!isNaN(numValue) && isFinite(numValue)) {
+                                                  // Clamp to max while typing
+                                                  const clampedValue = Math.min(Math.max(0, numValue), answer.question.points)
+                                                  handleGradeEdit(answer.id, 'pointsAwarded', clampedValue)
+                                                } else if (inputValue === '.' || inputValue === '-') {
+                                                  // Allow typing decimal point or minus, don't update yet
+                                                  // Don't update state for partial input
+                                                  return
+                                                } else {
+                                                  // Invalid, clear it
+                                                  handleGradeEdit(answer.id, 'pointsAwarded', '')
+                                                }
+                                              }
+                                            }}
+                                            onBlur={(e) => {
+                                              const inputValue = e.target.value.trim()
+                                              // If empty on blur, keep as null (not graded)
+                                              if (inputValue === '' || inputValue === '-' || inputValue === '.') {
+                                                handleGradeEdit(answer.id, 'pointsAwarded', '')
+                                              } else {
+                                                // Validate and clamp on blur
+                                                const numValue = parseFloat(inputValue)
+                                                if (!isNaN(numValue) && isFinite(numValue)) {
+                                                  const clampedValue = Math.min(Math.max(0, numValue), answer.question.points)
+                                                  handleGradeEdit(answer.id, 'pointsAwarded', clampedValue)
+                                                } else {
+                                                  // Invalid input, clear it
+                                                  handleGradeEdit(answer.id, 'pointsAwarded', '')
+                                                }
+                                              }
+                                            }}
+                                  className="mt-1"
+                                />
+                              </div>
                                       </div>
                                     </>
                                   )}
@@ -1384,24 +1721,24 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                   {/* Feedback Section (common for both) */}
                                   <div className="pt-2">
                                     <Label htmlFor={`feedback-${answer.id}`} className="text-sm font-semibold mb-2 block">
-                                      Feedback (optional)
-                                    </Label>
-                                    <Textarea
-                                      id={`feedback-${answer.id}`}
+                                  Feedback (optional)
+                                </Label>
+                                <Textarea
+                                  id={`feedback-${answer.id}`}
                                       placeholder="Provide feedback to the student..."
-                                      value={gradeEdits[answer.id]?.graderNote ?? ''}
-                                      onChange={(e) => handleGradeEdit(answer.id, 'graderNote', e.target.value)}
+                                  value={gradeEdits[answer.id]?.graderNote ?? ''}
+                                  onChange={(e) => handleGradeEdit(answer.id, 'graderNote', e.target.value)}
                                       className="min-h-[100px] resize-y"
-                                    />
-                                  </div>
+                                />
+                              </div>
                                   
-                                  {answer.gradedAt && (
+                              {answer.gradedAt && (
                                     <div className="text-xs text-muted-foreground pt-2 border-t border-blue-200 dark:border-blue-700">
                                       <Clock className="h-3 w-3 inline mr-1" />
-                                      Last graded: {new Date(answer.gradedAt).toLocaleString()}
-                                    </div>
-                                  )}
+                                  Last graded: {new Date(answer.gradedAt).toLocaleString()}
                                 </div>
+                              )}
+                            </div>
                               )
                             })()}
                           </div>

@@ -185,13 +185,20 @@ export function TakeTestClient({
       setIsPageVisible(isVisible)
 
       if (!isVisible) {
-        setOffPageStartTime(Date.now())
+        // User switched away - record when they left
+        const leftAt = Date.now()
+        setOffPageStartTime(leftAt)
         setTabSwitchCount((prev: number) => prev + 1)
-        recordProctorEvent('TAB_SWITCH')
       } else {
+        // User returned - record TAB_SWITCH with time off site
         if (offPageStartTime) {
           const timeOff = Math.floor((Date.now() - offPageStartTime) / 1000)
           setTimeOffPageSeconds((prev: number) => prev + timeOff)
+          recordProctorEvent('TAB_SWITCH', { 
+            timeOffSeconds: timeOff,
+            leftAt: new Date(offPageStartTime).toISOString(),
+            returnedAt: new Date().toISOString()
+          })
           setOffPageStartTime(null)
         }
       }
@@ -199,9 +206,10 @@ export function TakeTestClient({
 
     const handleBlur = () => {
       if (document.hidden) {
-        setOffPageStartTime(Date.now())
+        // User switched away - record when they left
+        const leftAt = Date.now()
+        setOffPageStartTime(leftAt)
         setTabSwitchCount((prev: number) => prev + 1)
-        recordProctorEvent('BLUR')
       }
     }
 
@@ -209,6 +217,12 @@ export function TakeTestClient({
       if (offPageStartTime) {
         const timeOff = Math.floor((Date.now() - offPageStartTime) / 1000)
         setTimeOffPageSeconds((prev: number) => prev + timeOff)
+        // Record the time off site in the meta when returning
+        recordProctorEvent('TAB_SWITCH', { 
+          timeOffSeconds: timeOff,
+          leftAt: new Date(offPageStartTime).toISOString(),
+          returnedAt: new Date().toISOString()
+        })
         setOffPageStartTime(null)
       }
     }
@@ -220,14 +234,59 @@ export function TakeTestClient({
         return
       }
       
-      // If user manually exited fullscreen while test is active, show the prompt
+      // If user manually exited fullscreen while test is active, show the prompt and record event
       if (test.requireFullscreen && started && attempt && !document.fullscreenElement) {
         // User manually exited fullscreen (e.g., pressed Escape) - show prompt
         setNeedsFullscreenPrompt(true)
+        recordProctorEvent('EXIT_FULLSCREEN', { timestamp: Date.now() })
       } else if (document.fullscreenElement && needsFullscreenPrompt) {
         // Fullscreen was entered - hide the prompt
         setNeedsFullscreenPrompt(false)
       }
+    }
+
+    // Detect DevTools opening/closing
+    const detectDevTools = () => {
+      let devtools = { open: false, orientation: null as string | null }
+      const threshold = 160
+      
+      const checkDevTools = () => {
+        if (window.outerHeight - window.innerHeight > threshold || 
+            window.outerWidth - window.innerWidth > threshold) {
+          if (!devtools.open) {
+            devtools.open = true
+            recordProctorEvent('DEVTOOLS_OPEN', { timestamp: Date.now() })
+          }
+        } else {
+          devtools.open = false
+        }
+      }
+      
+      // Check periodically
+      const devtoolsInterval = setInterval(checkDevTools, 500)
+      
+      return () => clearInterval(devtoolsInterval)
+    }
+
+    // Handle paste events
+    const handlePaste = (e: ClipboardEvent) => {
+      recordProctorEvent('PASTE', { 
+        timestamp: Date.now(),
+        dataLength: e.clipboardData?.getData('text').length || 0
+      })
+    }
+
+    // Handle copy events
+    const handleCopy = (e: ClipboardEvent) => {
+      recordProctorEvent('COPY', { 
+        timestamp: Date.now(),
+        dataLength: window.getSelection()?.toString().length || 0
+      })
+    }
+
+    // Handle context menu (right-click)
+    const handleContextMenu = (e: MouseEvent) => {
+      recordProctorEvent('CONTEXTMENU', { timestamp: Date.now() })
     }
 
     if (started && attempt) {
@@ -235,6 +294,12 @@ export function TakeTestClient({
       window.addEventListener('blur', handleBlur)
       window.addEventListener('focus', handleFocus)
       document.addEventListener('fullscreenchange', handleFullscreenChange)
+      document.addEventListener('paste', handlePaste)
+      document.addEventListener('copy', handleCopy)
+      document.addEventListener('contextmenu', handleContextMenu)
+
+      // Start DevTools detection
+      const devtoolsCleanup = detectDevTools()
 
       // Periodically update tab tracking on server
       trackingIntervalRef.current = setInterval(async () => {
@@ -253,16 +318,24 @@ export function TakeTestClient({
           }
         }
       }, 10000) // Update every 10 seconds
+
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        window.removeEventListener('blur', handleBlur)
+        window.removeEventListener('focus', handleFocus)
+        document.removeEventListener('fullscreenchange', handleFullscreenChange)
+        document.removeEventListener('paste', handlePaste)
+        document.removeEventListener('copy', handleCopy)
+        document.removeEventListener('contextmenu', handleContextMenu)
+        devtoolsCleanup()
+        if (trackingIntervalRef.current) {
+          clearInterval(trackingIntervalRef.current)
+        }
+      }
     }
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('blur', handleBlur)
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('fullscreenchange', handleFullscreenChange)
-      if (trackingIntervalRef.current) {
-        clearInterval(trackingIntervalRef.current)
-      }
+      // Cleanup if not started
     }
   }, [started, attempt, tabSwitchCount, timeOffPageSeconds, test.id, test.requireFullscreen, offPageStartTime, toast])
 
