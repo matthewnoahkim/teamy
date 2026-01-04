@@ -4,20 +4,48 @@ import { HomeNav } from '@/components/home-nav'
 import { DiscordBanner } from '@/components/discord-banner'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 interface PublicPageLayoutProps {
   children: React.ReactNode
   hideFooter?: boolean
 }
 
+async function getBannerSettings() {
+  try {
+    const [enabledSetting, textSetting, linkSetting, bgSetting] = await Promise.all([
+      prisma.siteSetting.findUnique({ where: { key: 'banner_enabled' } }),
+      prisma.siteSetting.findUnique({ where: { key: 'banner_text' } }),
+      prisma.siteSetting.findUnique({ where: { key: 'banner_link' } }),
+      prisma.siteSetting.findUnique({ where: { key: 'banner_background_color' } }),
+    ])
+
+    return {
+      enabled: enabledSetting?.value === 'true',
+      text: textSetting?.value || 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
+      link: linkSetting?.value || '',
+      backgroundColor: bgSetting?.value || '#5865F2',
+    }
+  } catch (error) {
+    console.error('Failed to fetch banner settings:', error)
+    return {
+      enabled: true,
+      text: 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
+      link: '',
+      backgroundColor: '#5865F2',
+    }
+  }
+}
+
 export async function PublicPageLayout({ children, hideFooter = false }: PublicPageLayoutProps) {
   const session = await getServerSession(authOptions)
   const isLoggedIn = !!session?.user
+  const bannerSettings = await getBannerSettings()
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Discord Banner */}
-      <DiscordBanner />
+      <DiscordBanner initialSettings={bannerSettings} />
       
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav" suppressHydrationWarning>

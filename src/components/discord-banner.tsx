@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { X } from 'lucide-react'
 import Link from 'next/link'
 
@@ -15,9 +15,45 @@ interface DiscordBannerProps {
   initialSettings?: BannerSettings
 }
 
+// Generate a hash from banner content to create a unique ID
+function generateBannerId(text: string, backgroundColor: string, link: string): string {
+  const content = `${text}|${backgroundColor}|${link}`
+  let hash = 0
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32-bit integer
+  }
+  return `banner-${Math.abs(hash).toString(36)}`
+}
+
+// Get dismissed banner IDs from localStorage
+function getDismissedBannerIds(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const stored = localStorage.getItem('banner-dismissed-ids')
+    if (!stored) return []
+    return JSON.parse(stored)
+  } catch {
+    return []
+  }
+}
+
+// Add a banner ID to the dismissed list
+function dismissBannerId(bannerId: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    const dismissed = getDismissedBannerIds()
+    if (!dismissed.includes(bannerId)) {
+      dismissed.push(bannerId)
+      localStorage.setItem('banner-dismissed-ids', JSON.stringify(dismissed))
+    }
+  } catch (error) {
+    console.error('Failed to save dismissed banner ID:', error)
+  }
+}
+
 export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
-  // Initialize dismissed state - always false on server, will be updated in useEffect
-  const [dismissed, setDismissed] = useState(false)
   const [settings, setSettings] = useState<BannerSettings>(
     initialSettings || {
       enabled: true,
@@ -27,14 +63,22 @@ export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
     }
   )
   
+  // Generate banner ID from current settings
+  const bannerId = useMemo(() => 
+    generateBannerId(settings.text, settings.backgroundColor, settings.link),
+    [settings.text, settings.backgroundColor, settings.link]
+  )
+
+  // Track if component has mounted to prevent hydration mismatch
+  const [mounted, setMounted] = useState(false)
+  const [isDismissed, setIsDismissed] = useState(true) // Start as true to prevent flash
+
+  // Check dismissal state after mounting and when banner ID changes
   useEffect(() => {
-    // Check localStorage for dismissed state after hydration (only once on mount)
-    if (typeof window !== 'undefined') {
-      const isDismissed = !!localStorage.getItem('banner-dismissed')
-      setDismissed(isDismissed)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    setMounted(true)
+    const dismissed = getDismissedBannerIds()
+    setIsDismissed(dismissed.includes(bannerId))
+  }, [bannerId])
 
   useEffect(() => {
     // Skip API call if initialSettings were provided (server-side rendered)
@@ -77,11 +121,12 @@ export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
   }, [initialSettings])
 
   const handleDismiss = () => {
-    setDismissed(true)
-    localStorage.setItem('banner-dismissed', 'true')
+    dismissBannerId(bannerId)
+    setIsDismissed(true)
   }
 
-  if (dismissed || !settings.enabled) return null
+  // Don't render until mounted to prevent hydration mismatch
+  if (!mounted || isDismissed || !settings.enabled) return null
 
   const BannerContent = () => (
     <span className="font-medium">{settings.text}</span>
