@@ -27,6 +27,14 @@ export default async function TournamentManagePage({ params }: Props) {
   // Get tournament data
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
+    include: {
+      hostingRequest: {
+        select: {
+          division: true,
+          tournamentLevel: true,
+        },
+      },
+    },
   })
   
   if (!tournament) {
@@ -83,7 +91,7 @@ export default async function TournamentManagePage({ params }: Props) {
   })
 
   // Get display division from hosting request (supports "B&C"), fallback to tournament division
-  const displayDivision = request?.division || tournament.division
+  const displayDivision = tournament.hostingRequest?.division || tournament.division
 
   // Parse eventsRun to get list of event IDs being run in this tournament
   let eventsRunIds: string[] = []
@@ -165,7 +173,7 @@ export default async function TournamentManagePage({ params }: Props) {
     eligibilityRequirements: tournament.eligibilityRequirements,
     eventsRun: tournament.eventsRun,
     trialEvents: tournament.trialEvents,
-    level: request?.tournamentLevel || null,
+    level: tournament.hostingRequest?.tournamentLevel || null,
     published: tournament.published,
   }
 

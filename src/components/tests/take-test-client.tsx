@@ -170,11 +170,21 @@ export function TakeTestClient({
       if (!attempt || attempt.status !== 'IN_PROGRESS') return
       
       try {
-        await fetch(`/api/tests/${test.id}/attempts/${attempt.id}/proctor-events`, {
+        // Use ES endpoint if tournamentId is present (ES test), otherwise use regular endpoint
+        const endpoint = tournamentId 
+          ? `/api/es/tests/${test.id}/attempts/${attempt.id}/proctor-events`
+          : `/api/tests/${test.id}/attempts/${attempt.id}/proctor-events`
+        
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ kind, meta }),
         })
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('Failed to record proctor event:', response.status, errorData)
+        }
       } catch (error) {
         console.error('Failed to record proctor event:', error)
       }
@@ -305,7 +315,12 @@ export function TakeTestClient({
       trackingIntervalRef.current = setInterval(async () => {
         if (attempt && attempt.status === 'IN_PROGRESS') {
           try {
-            await fetch(`/api/tests/${test.id}/attempts/${attempt.id}/tab-tracking`, {
+            // Use ES endpoint if tournamentId is present (ES test), otherwise use regular endpoint
+            const endpoint = tournamentId 
+              ? `/api/es/tests/${test.id}/attempts/${attempt.id}/tab-tracking`
+              : `/api/tests/${test.id}/attempts/${attempt.id}/tab-tracking`
+            
+            const response = await fetch(endpoint, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -313,6 +328,11 @@ export function TakeTestClient({
                 timeOffPageSeconds,
               }),
             })
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              console.error('Failed to update tab tracking:', response.status, errorData)
+            }
           } catch (error) {
             console.error('Failed to update tab tracking:', error)
           }
@@ -337,7 +357,7 @@ export function TakeTestClient({
     return () => {
       // Cleanup if not started
     }
-  }, [started, attempt, tabSwitchCount, timeOffPageSeconds, test.id, test.requireFullscreen, offPageStartTime, toast])
+  }, [started, attempt, tabSwitchCount, timeOffPageSeconds, test.id, test.requireFullscreen, offPageStartTime, toast, tournamentId])
 
   const handleStartTest = async () => {
     if (test.testPasswordHash && !isAdmin && !password) {

@@ -747,14 +747,17 @@ model AttemptAnswer {
 }
 
 model ProctorEvent {
-  id        String           @id @default(cuid())
-  attemptId String
-  kind      ProctorEventKind
-  ts        DateTime         @default(now())
-  meta      Json?
-  attempt   TestAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  id          String           @id @default(cuid())
+  attemptId   String?          // Optional for regular TestAttempt
+  esAttemptId String?          // Optional for ESTestAttempt
+  kind        ProctorEventKind
+  ts          DateTime         @default(now())
+  meta        Json?
+  attempt     TestAttempt?     @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  esAttempt   ESTestAttempt?   @relation(fields: [esAttemptId], references: [id], onDelete: Cascade)
 
   @@index([attemptId])
+  @@index([esAttemptId])
   @@index([ts])
 }
 
@@ -1416,6 +1419,7 @@ model ESTestAttempt {
   membership            Membership            @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   test                  ESTest                @relation(fields: [testId], references: [id], onDelete: Cascade)
   answers               ESTestAttemptAnswer[]
+  proctorEvents         ProctorEvent[]
 
   @@index([testId])
   @@index([membershipId])

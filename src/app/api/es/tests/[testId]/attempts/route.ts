@@ -52,6 +52,11 @@ export async function GET(
             },
           },
         },
+        proctorEvents: {
+          orderBy: {
+            ts: 'asc',
+          },
+        },
       },
       orderBy: [
         { submittedAt: 'desc' },
@@ -117,6 +122,12 @@ export async function GET(
               name: membership.club.name,
             }
           : null,
+        proctorEvents: attempt.proctorEvents.map((event) => ({
+          id: event.id,
+          kind: event.kind,
+          ts: event.ts.toISOString(),
+          meta: event.meta,
+        })),
         answers: attempt.answers.map((answer) => ({
           id: answer.id,
           questionId: answer.questionId,
