@@ -2223,7 +2223,7 @@ export function NewTestBuilder({
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Click "Apply Defaults" to fill in the form fields with tournament default settings.
+                  Click &quot;Apply Defaults&quot; to fill in the form fields with tournament default settings.
                 </p>
                 <div className="text-xs text-muted-foreground space-y-1 mt-2">
                   {defaultTestSettings.defaultDurationMinutes && (

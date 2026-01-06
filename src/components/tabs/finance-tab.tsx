@@ -1185,16 +1185,6 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
     })
   }
 
-  if (loading) {
-    return (
-      <PageLoading
-        title="Loading finances"
-        description="Fetching expenses and budget information..."
-        variant="orbit"
-      />
-    )
-  }
-
   // Calculate pending purchase requests count
   const pendingRequestsCount = useMemo(() => 
     purchaseRequests.filter(req => req.status === 'PENDING').length,
@@ -1206,6 +1196,16 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
     ).length,
     [purchaseRequests, currentMembershipId]
   )
+
+  if (loading) {
+    return (
+      <PageLoading
+        title="Loading finances"
+        description="Fetching expenses and budget information..."
+        variant="orbit"
+      />
+    )
+  }
 
   return (
     <div className="space-y-6">
