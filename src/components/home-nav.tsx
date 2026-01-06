@@ -77,7 +77,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
       const button = buttonRefs.current[openDropdown]
       const rect = button.getBoundingClientRect()
       setDropdownPosition({
-        top: rect.bottom - 12,
+        top: rect.bottom,
         left: rect.left,
       })
     }
@@ -172,6 +172,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
         <div
           className="fixed z-[9999]"
           style={{
+            marginTop: '5px',
             top: `${dropdownPosition.top}px`,
             left: `${dropdownPosition.left}px`,
           }}
