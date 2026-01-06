@@ -77,7 +77,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
       const button = buttonRefs.current[openDropdown]
       const rect = button.getBoundingClientRect()
       setDropdownPosition({
-        top: rect.bottom + 8,
+        top: rect.bottom - 12,
         left: rect.left,
       })
     }
@@ -190,7 +190,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
           <div className={cn(
             "w-64 rounded-xl shadow-xl border backdrop-blur-xl",
             isLight
-              ? "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+              ? "bg-popover border-border"
               : "bg-background border-border"
           )}>
             <div className="p-1.5">
@@ -206,7 +206,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                         "block px-4 py-2 rounded-lg transition-colors text-sm font-medium",
                         active
                           ? "bg-teamy-primary/10 text-teamy-primary"
-                          : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-700"
+                          : "text-foreground hover:bg-secondary"
                       )}
                     >
                       {subItem.label}
@@ -262,7 +262,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                             : "text-white/80 hover:text-white hover:bg-white/5"
                           : active
                             ? "text-foreground bg-teamy-primary/10"
-                            : "text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                       )}
                     >
                       {item.label}
@@ -294,7 +294,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                                     : "text-white/80 hover:text-white hover:bg-white/5"
                                   : active
                                     ? "text-foreground bg-teamy-primary/10"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                               )}
                             >
                               {subItem.label}
