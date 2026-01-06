@@ -106,10 +106,10 @@ export default async function TournamentPage({ params }: Props) {
       division: displayDivision,
       description: tournamentById.description,
       isOnline: tournamentById.isOnline,
-      startDate: tournamentById.startDate.toISOString(),
-      endDate: tournamentById.endDate.toISOString(),
-      startTime: tournamentById.startTime.toISOString(),
-      endTime: tournamentById.endTime.toISOString(),
+      startDate: tournamentById.startDate?.toISOString() || new Date().toISOString(),
+      endDate: tournamentById.endDate?.toISOString() || new Date().toISOString(),
+      startTime: tournamentById.startTime?.toISOString() || new Date().toISOString(),
+      endTime: tournamentById.endTime?.toISOString() || new Date().toISOString(),
       location: tournamentById.location,
       price: tournamentById.price,
       additionalTeamPrice: tournamentById.additionalTeamPrice,
@@ -142,7 +142,7 @@ export default async function TournamentPage({ params }: Props) {
 
     // Pre-fetch events not offered
     let initialEventsNotRun: Array<{ id: string; name: string; division: string }> = []
-    if (serializedTournament?.eventsRun && serializedTournament.eventsRun.trim()) {
+    if (serializedTournament.eventsRun && serializedTournament.eventsRun.trim()) {
       try {
         const eventsRunIds = JSON.parse(serializedTournament.eventsRun) as string[]
         if (Array.isArray(eventsRunIds) && eventsRunIds.length > 0) {
@@ -351,6 +351,11 @@ export default async function TournamentPage({ params }: Props) {
     notFound()
   }
 
+  // Ensure tournament exists - if not, we can't display the page
+  if (!hostingRequest.tournament) {
+    notFound()
+  }
+
   // Get user's clubs if logged in (for registration)
   let userClubs: { id: string; name: string; division: string; teams: { id: string; name: string }[] }[] = []
   if (session?.user) {
@@ -389,18 +394,18 @@ export default async function TournamentPage({ params }: Props) {
 
   // Serialize tournament data
   // Use hosting request division for display (supports "B&C")
-  const displayDivision = hostingRequest.division || hostingRequest.tournament?.division || 'C'
-  const serializedTournament = hostingRequest.tournament ? {
+  const displayDivision = hostingRequest.division || hostingRequest.tournament.division || 'C'
+  const serializedTournament = {
     id: hostingRequest.tournament.id,
     name: hostingRequest.tournament.name,
     slug: hostingRequest.tournament.slug,
     division: displayDivision,
     description: hostingRequest.tournament.description,
     isOnline: hostingRequest.tournament.isOnline,
-    startDate: hostingRequest.tournament.startDate.toISOString(),
-    endDate: hostingRequest.tournament.endDate.toISOString(),
-    startTime: hostingRequest.tournament.startTime.toISOString(),
-    endTime: hostingRequest.tournament.endTime.toISOString(),
+    startDate: hostingRequest.tournament.startDate?.toISOString() || new Date().toISOString(),
+    endDate: hostingRequest.tournament.endDate?.toISOString() || new Date().toISOString(),
+    startTime: hostingRequest.tournament.startTime?.toISOString() || new Date().toISOString(),
+    endTime: hostingRequest.tournament.endTime?.toISOString() || new Date().toISOString(),
     location: hostingRequest.tournament.location,
     price: hostingRequest.tournament.price,
     additionalTeamPrice: hostingRequest.tournament.additionalTeamPrice,
@@ -414,7 +419,7 @@ export default async function TournamentPage({ params }: Props) {
     eligibilityRequirements: hostingRequest.tournament.eligibilityRequirements,
     eventsRun: hostingRequest.tournament.eventsRun,
     trialEvents: hostingRequest.tournament.trialEvents,
-  } : null
+  }
 
   // Load page content
   let initialSections: Array<{ id: string; type: 'header' | 'text' | 'image' | 'html'; title: string; content: string }> | undefined = undefined
@@ -433,7 +438,7 @@ export default async function TournamentPage({ params }: Props) {
 
   // Pre-fetch events not offered
   let initialEventsNotRun: Array<{ id: string; name: string; division: string }> = []
-  if (serializedTournament?.eventsRun && serializedTournament.eventsRun.trim()) {
+  if (serializedTournament.eventsRun && serializedTournament.eventsRun.trim()) {
     try {
       const eventsRunIds = JSON.parse(serializedTournament.eventsRun) as string[]
       if (Array.isArray(eventsRunIds) && eventsRunIds.length > 0) {
@@ -473,7 +478,7 @@ export default async function TournamentPage({ params }: Props) {
   // Check if user is registered and if tests are available
   let isRegistered = false
   let hasAvailableTests = false
-  if (session?.user?.id && hostingRequest.tournament) {
+  if (session?.user?.id) {
     // Get user memberships
     const memberships = await prisma.membership.findMany({
       where: { userId: session.user.id },
