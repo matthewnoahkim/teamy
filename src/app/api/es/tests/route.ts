@@ -1126,7 +1126,7 @@ export async function PUT(request: NextRequest) {
 
     // If publishing, fetch tournament default settings to apply
     let tournamentDefaults: any = null
-    if (status === 'PUBLISHED' && existingTest.status !== 'PUBLISHED') {
+    if (status === 'PUBLISHED') {
       const tournament = await prisma.tournament.findUnique({
         where: { id: existingTest.tournamentId },
         select: {

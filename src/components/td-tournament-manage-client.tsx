@@ -389,12 +389,12 @@ export function TDTournamentManageClient({
     price: tournament.price?.toString() || '0',
     additionalTeamPrice: tournament.additionalTeamPrice?.toString() || '',
     feeStructure: tournament.feeStructure || 'flat',
-    registrationStartDate: tournament.registrationStartDate?.split('T')[0] || '',
-    registrationEndDate: tournament.registrationEndDate?.split('T')[0] || '',
+    registrationStartDate: tournament.registrationStartDate ? tournament.registrationStartDate.split('T')[0] : undefined,
+    registrationEndDate: tournament.registrationEndDate ? tournament.registrationEndDate.split('T')[0] : undefined,
     earlyBirdDiscount: tournament.earlyBirdDiscount?.toString() || '',
-    earlyBirdDeadline: tournament.earlyBirdDeadline?.split('T')[0] || '',
+    earlyBirdDeadline: tournament.earlyBirdDeadline ? tournament.earlyBirdDeadline.split('T')[0] : undefined,
     lateFee: tournament.lateFee?.toString() || '',
-    lateFeeStartDate: tournament.lateFeeStartDate?.split('T')[0] || '',
+    lateFeeStartDate: tournament.lateFeeStartDate ? tournament.lateFeeStartDate.split('T')[0] : undefined,
     otherDiscounts: tournament.otherDiscounts ? JSON.parse(tournament.otherDiscounts) as OtherDiscount[] : [],
     eligibilityRequirements: tournament.eligibilityRequirements || '',
     eventsRun: tournament.eventsRun ? JSON.parse(tournament.eventsRun) as string[] : [],
@@ -684,9 +684,7 @@ export function TDTournamentManageClient({
           defaultReleaseScoresAt: defaultTestSettingsForm.defaultReleaseScoresAt 
             ? new Date(defaultTestSettingsForm.defaultReleaseScoresAt).toISOString()
             : null,
-          defaultScoreReleaseMode: defaultTestSettingsForm.defaultScoreReleaseMode && defaultTestSettingsForm.defaultScoreReleaseMode !== '' 
-            ? defaultTestSettingsForm.defaultScoreReleaseMode 
-            : null,
+          defaultScoreReleaseMode: defaultTestSettingsForm.defaultScoreReleaseMode || null,
           defaultRequireFullscreen: defaultTestSettingsForm.defaultRequireFullscreen,
           defaultAllowCalculator: defaultTestSettingsForm.defaultAllowCalculator,
           defaultCalculatorType: defaultTestSettingsForm.defaultAllowCalculator && defaultTestSettingsForm.defaultCalculatorType
@@ -3854,7 +3852,7 @@ export function TDTournamentManageClient({
                         <>
                           <Input
                             type="date"
-                            value={settingsForm.registrationStartDate}
+                            value={settingsForm.registrationStartDate ?? undefined}
                             onChange={e => {
                               const newRegStart = e.target.value
                               setSettingsForm(prev => ({ ...prev, registrationStartDate: newRegStart }))
@@ -3896,7 +3894,7 @@ export function TDTournamentManageClient({
                         <>
                           <Input
                             type="date"
-                            value={settingsForm.registrationEndDate}
+                            value={settingsForm.registrationEndDate ?? undefined}
                             min={settingsForm.registrationStartDate || undefined}
                             onChange={e => {
                               const newRegEnd = e.target.value
@@ -3963,7 +3961,7 @@ export function TDTournamentManageClient({
                           <>
                             <Input
                               type="date"
-                              value={settingsForm.earlyBirdDeadline}
+                              value={settingsForm.earlyBirdDeadline ?? undefined}
                               max={settingsForm.registrationEndDate || undefined}
                               onChange={e => {
                                 const newEarlyBird = e.target.value
@@ -4015,7 +4013,7 @@ export function TDTournamentManageClient({
                           <>
                             <Input
                               type="date"
-                              value={settingsForm.lateFeeStartDate}
+                              value={settingsForm.lateFeeStartDate ?? undefined}
                               min={settingsForm.registrationStartDate || undefined}
                               onChange={e => {
                                 const newLateFeeStart = e.target.value
@@ -4299,7 +4297,7 @@ export function TDTournamentManageClient({
                           ) : (
                             <p className="text-base font-semibold py-1.5">
                               {defaultTestSettings?.defaultScoreReleaseMode 
-                                ? defaultTestSettings.defaultScoreReleaseMode.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                ? defaultTestSettings.defaultScoreReleaseMode.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
                                 : <span className="text-muted-foreground italic font-normal">Not set</span>}
                             </p>
                           )}
@@ -4388,7 +4386,7 @@ export function TDTournamentManageClient({
                         {defaultTestSettings?.defaultAllowCalculator && !isEditingDefaultTestSettings && (
                           <div className="ml-6">
                             <p className="text-sm text-muted-foreground">
-                              Type: {defaultTestSettings.defaultCalculatorType?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Not set'}
+                              Type: {defaultTestSettings.defaultCalculatorType?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Not set'}
                             </p>
                           </div>
                         )}

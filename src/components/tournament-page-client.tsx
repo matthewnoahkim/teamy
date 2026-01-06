@@ -394,7 +394,7 @@ export function TournamentPageClient({
                     <Avatar 
                       className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all"
                     >
-                      <AvatarImage src={null} />
+                      <AvatarImage src={undefined} />
                       <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
                         {currentUserName?.charAt(0) || user.email.charAt(0).toUpperCase()}
                       </AvatarFallback>
