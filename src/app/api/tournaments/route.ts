@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     const managedByParam = searchParams.get('managedBy')
     const teamRegisteredParam = validateBoolean(searchParams.get('teamRegistered'))
     const pendingApprovalParam = validateBoolean(searchParams.get('pendingApproval'))
-    const sortBy = validateEnum(searchParams.get('sortBy'), ['date-asc', 'date-desc', 'name-asc', 'name-desc'] as const, 'date-asc') ?? 'date-asc'
+    const sortBy = validateEnum(searchParams.get('sortBy'), ['date-asc', 'date-desc', 'name-asc', 'name-desc', 'price-asc', 'price-desc', 'popularity-asc', 'popularity-desc'] as const, 'date-asc') ?? 'date-asc'
     
     // Only filter by upcoming if explicitly set to 'true'
     // If not provided or 'false', return ALL tournaments (past and future)
@@ -199,6 +199,10 @@ export async function GET(req: NextRequest) {
       orderBy = { startDate: 'asc' }
     } else if (sortBy === 'date-desc') {
       orderBy = { startDate: 'desc' }
+    } else if (sortBy === 'name-asc') {
+      orderBy = { name: 'asc' }
+    } else if (sortBy === 'name-desc') {
+      orderBy = { name: 'desc' }
     } else if (sortBy === 'price-asc') {
       orderBy = { price: 'asc' }
     } else if (sortBy === 'price-desc') {

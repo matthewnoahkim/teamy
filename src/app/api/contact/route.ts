@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanitizeString } from '@/lib/input-validation'
+import { z } from 'zod'
 
 const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1441856071911211228/fXL-cAc4oLN2flLH3W7nDcTGkupuKNvETf1ExSUqhSuCo8ZUrY5vovxIWQjY7qNBkRtf'
+
+// Validation schema for contact form
+const contactFormSchema = z.object({
+  name: z.string().min(1).max(200).transform((val) => sanitizeString(val, 200)),
+  email: z.string().email().max(255).transform((val) => sanitizeString(val, 255)),
+  subject: z.string().min(1).max(200).transform((val) => sanitizeString(val, 200)),
+  message: z.string().min(1).max(5000).transform((val) => sanitizeString(val, 5000)),
+})
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, subject, message } = body
-
-    // Validate input
-    if (!name || !email || !subject || !message) {
+    
+    // Validate and sanitize input using Zod
+    const validationResult = contactFormSchema.safeParse(body)
+    
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'All fields are required' },
+        { error: 'Invalid input', details: validationResult.error.errors },
         { status: 400 }
       )
     }
+    
+    const { name, email, subject, message } = validationResult.data
 
     // Create Discord embed message
     const discordPayload = {
