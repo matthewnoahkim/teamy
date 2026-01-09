@@ -55,6 +55,13 @@ export function HomeClient({ memberships: initialMemberships, user }: HomeClient
     }
   }, [])
 
+  // Only fetch if initial data is missing
+  useEffect(() => {
+    if (!initialMemberships || initialMemberships.length === 0) {
+      fetchMemberships()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const isDashboardRoute = pathname === '/dashboard'
   useBackgroundRefresh(
     () => fetchMemberships({ silent: true }),

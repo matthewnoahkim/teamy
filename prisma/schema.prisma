@@ -1235,6 +1235,7 @@ model TournamentHostingRequest {
 
   @@index([status])
   @@index([createdAt])
+  @@index([directorEmail])
 }
 
 model BlogPost {

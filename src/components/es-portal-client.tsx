@@ -371,8 +371,10 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
     lastFetchTime.current = now
     setLoadingTests(true)
     try {
-      // Only use cache-busting when forced (e.g., after delete)
-      const url = force ? `/api/es/tests?t=${Date.now()}` : '/api/es/tests'
+      // Use includeQuestions=false to reduce payload size (we already have questions from server)
+      const url = force 
+        ? `/api/es/tests?includeQuestions=false&t=${Date.now()}` 
+        : '/api/es/tests?includeQuestions=false'
       const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
@@ -419,7 +421,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
   useEffect(() => {
     // Check if tests are already in the initial state (from server-side)
     const hasServerSideTests = staffMembershipsWithTests.some(m => 
-      m.events.some(e => Array.isArray(e.tests))
+      m.events.some(e => Array.isArray(e.tests) && e.tests.length > 0)
     )
     
     // Only fetch if we don't already have tests from server-side

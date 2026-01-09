@@ -118,7 +118,14 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ memberships })
+    return NextResponse.json(
+      { memberships },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=30', // Cache for 30 seconds
+        },
+      }
+    )
   } catch (error) {
     console.error('Get clubs error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
