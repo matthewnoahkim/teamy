@@ -26,7 +26,7 @@ export function TournamentTestCreator({
   const router = useRouter()
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+    <div className="min-h-screen bg-background grid-pattern">
       {/* Animated background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400/20 to-cyan-400/20 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-3xl opacity-40 animate-blob"></div>

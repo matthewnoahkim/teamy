@@ -187,7 +187,8 @@ export function UserBackgroundApplier() {
             html,
             body.grid-pattern,
             html.grid-pattern,
-            .grid-pattern {
+            .grid-pattern,
+            *[class*="grid-pattern"] {
               background: ${color} !important;
               background-image: none !important;
               background-attachment: fixed !important;
@@ -224,7 +225,8 @@ export function UserBackgroundApplier() {
               html,
               body.grid-pattern,
               html.grid-pattern,
-              .grid-pattern {
+              .grid-pattern,
+              *[class*="grid-pattern"] {
                 background: ${gradient} !important;
                 background-image: ${gradient} !important;
                 background-attachment: fixed !important;
@@ -281,7 +283,8 @@ export function UserBackgroundApplier() {
             html,
             body.grid-pattern,
             html.grid-pattern,
-            .grid-pattern {
+            .grid-pattern,
+            *[class*="grid-pattern"] {
               background-image: url(${imageUrl}) !important;
               background-color: transparent !important;
               background-size: cover !important;

@@ -647,6 +647,9 @@ export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated 
                               )}
                             </div>
                           </div>
+                          <p className="text-xs text-muted-foreground">
+                            Letters, numbers, and hyphens only. Leave blank for auto-generated.
+                          </p>
                           {slugError && (
                             <p className="text-xs text-destructive">
                               {slugError}
@@ -655,11 +658,6 @@ export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated 
                           {!slugError && slugAvailable === true && formData.preferredSlug.trim() && (
                             <p className="text-xs text-green-600 dark:text-green-400">
                               This slug is available
-                            </p>
-                          )}
-                          {!slugError && slugAvailable === null && (
-                            <p className="text-xs text-muted-foreground">
-                              Letters, numbers, and hyphens only. Leave blank for auto-generated.
                             </p>
                           )}
                         </div>
@@ -706,6 +704,9 @@ export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated 
                                   required
                                   className={emailError ? 'border-destructive' : ''}
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                  TD portal access will be granted to this email upon approval.
+                                </p>
                                 {emailError && (
                                   <p className="text-xs text-destructive">{emailError}</p>
                                 )}

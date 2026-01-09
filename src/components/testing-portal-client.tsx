@@ -420,8 +420,8 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern flex flex-col">
-        <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <div className="min-h-screen bg-background grid-pattern flex flex-col">
+        <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
           <div className="container mx-auto px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Logo size="md" href="/" variant="light" />
@@ -469,9 +469,9 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern flex flex-col">
+    <div className="min-h-screen bg-background grid-pattern flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Logo size="md" href="/" variant="light" />
@@ -578,7 +578,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                               const availability = checkTestAvailability(test)
                               return availability.available
                             }).map((test) => (
-                              <Card key={test.id} className="bg-slate-50 dark:bg-slate-800 hover:shadow-lg transition-shadow">
+                              <Card key={test.id} className="bg-card hover:shadow-lg transition-shadow">
                                 <CardContent className="p-6">
                                   <div className="space-y-4">
                                     {/* Header */}
@@ -825,7 +825,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
 
                                     {/* Instructions if available */}
                                     {test.instructions && (
-                                      <div className="bg-slate-100 dark:bg-slate-900/50 rounded-md p-3 border border-slate-200 dark:border-slate-700">
+                                      <div className="bg-muted rounded-md p-3 border border-border">
                                         <div className="flex items-start gap-2">
                                           <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                                           <div>
@@ -954,7 +954,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                               const availability = checkTestAvailability(test)
                               return availability.available
                             }).map((test) => (
-                              <Card key={test.id} className="bg-slate-50 dark:bg-slate-800 hover:shadow-lg transition-shadow">
+                              <Card key={test.id} className="bg-card hover:shadow-lg transition-shadow">
                                 <CardContent className="p-6">
                                   <div className="space-y-4">
                                     {/* Header */}
@@ -1201,7 +1201,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
 
                                     {/* Instructions if available */}
                                     {test.instructions && (
-                                      <div className="bg-slate-100 dark:bg-slate-900/50 rounded-md p-3 border border-slate-200 dark:border-slate-700">
+                                      <div className="bg-muted rounded-md p-3 border border-border">
                                         <div className="flex items-start gap-2">
                                           <HelpCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                                           <div>

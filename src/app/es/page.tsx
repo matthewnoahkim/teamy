@@ -353,7 +353,7 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
   )
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern" />}>
+    <Suspense fallback={<div className="min-h-screen bg-background grid-pattern" />}>
       <ESPortalClient 
         user={session.user} 
         staffMemberships={serializedStaffMemberships} 

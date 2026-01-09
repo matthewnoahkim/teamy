@@ -41,12 +41,13 @@ interface PaperworkTabProps {
   clubId: string
   user: any
   isAdmin: boolean
+  initialForms?: any[]
 }
 
-export function PaperworkTab({ clubId, user, isAdmin }: PaperworkTabProps) {
+export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkTabProps) {
   const { toast } = useToast()
-  const [forms, setForms] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [forms, setForms] = useState<any[]>(initialForms || [])
+  const [loading, setLoading] = useState(!initialForms)
   const [uploading, setUploading] = useState(false)
   
   // Dialogs
@@ -64,13 +65,10 @@ export function PaperworkTab({ clubId, user, isAdmin }: PaperworkTabProps) {
   const submissionFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    // Debounce to prevent rapid API calls
-    const timer = setTimeout(() => {
+    if (!initialForms) {
       fetchForms()
-    }, 100)
-    
-    return () => clearTimeout(timer)
-  }, [clubId])
+    }
+  }, [clubId, initialForms])
 
   const fetchForms = async () => {
     try {

@@ -11,7 +11,7 @@ interface HomeHeroProps {
 
 export function HomeHero({ isLoggedIn }: HomeHeroProps) {
   return (
-    <section className="flex-1 flex items-center justify-center px-4 sm:px-6 py-12 sm:py-16 bg-slate-50 dark:bg-slate-900 grid-pattern min-h-0 overflow-y-auto">
+    <section className="flex-1 flex items-center justify-center px-4 sm:px-6 py-12 sm:py-16 bg-background grid-pattern min-h-0 overflow-y-auto">
       <div className="w-full mx-auto text-center space-y-4 sm:space-y-5">
         {/* Badge */}
         <ScrollAnimate animation="elegant" delay={0} duration={800}>

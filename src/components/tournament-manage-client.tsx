@@ -224,7 +224,7 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+      <div className="min-h-screen bg-background grid-pattern">
         <AppHeader user={user} />
         <PageLoading title="Loading tournament" description="Fetching tournament details..." />
       </div>

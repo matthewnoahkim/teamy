@@ -19,6 +19,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/components/ui/use-toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import { 
   LogOut, 
   Clock, 
@@ -50,6 +58,8 @@ import {
   Eye,
   Unlock,
   Copy,
+  Save,
+  Pencil,
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -244,6 +254,8 @@ export function TDTournamentManageClient({
   const storageKey = `td-tournament-tab-${tournament.id}`
   const [activeTab, setActiveTab] = useState<'staff' | 'timeline' | 'settings' | 'events' | 'teams'>('staff')
   const [isHydrated, setIsHydrated] = useState(false)
+  const [editUsernameOpen, setEditUsernameOpen] = useState(false)
+  const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
   
   // Load saved tab from localStorage on mount and mark as hydrated
   useEffect(() => {
@@ -330,20 +342,59 @@ export function TDTournamentManageClient({
     earlyBirdDeadline?: string
     lateFeeStartDate?: string
   }>({})
+
+  // Default test settings state
+  const [defaultTestSettings, setDefaultTestSettings] = useState<any>(null)
+  const [loadingDefaultTestSettings, setLoadingDefaultTestSettings] = useState(true)
+  const [isEditingDefaultTestSettings, setIsEditingDefaultTestSettings] = useState(false)
+  const [savingDefaultTestSettings, setSavingDefaultTestSettings] = useState(false)
+  const [defaultTestSettingsForm, setDefaultTestSettingsForm] = useState({
+    defaultDurationMinutes: '',
+    defaultStartAt: '',
+    defaultEndAt: '',
+    defaultReleaseScoresAt: '',
+    defaultScoreReleaseMode: 'FULL_TEST' as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST' | '',
+    defaultRequireFullscreen: true,
+    defaultAllowCalculator: false,
+    defaultCalculatorType: 'FOUR_FUNCTION' as 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' | '',
+    defaultAllowNoteSheet: false,
+    defaultAutoApproveNoteSheet: true,
+    defaultRequireOneSitting: true,
+    defaultMaxAttempts: '',
+  })
   const [settingsForm, setSettingsForm] = useState({
-    startDate: tournament.startDate?.split('T')[0] || '',
-    endDate: tournament.endDate?.split('T')[0] || '',
+    // Extract dates from time fields to ensure consistency
+    startDate: tournament.startTime 
+      ? (() => {
+          const dt = new Date(tournament.startTime)
+          // Get date in local timezone to match what user sees
+          const year = dt.getFullYear()
+          const month = String(dt.getMonth() + 1).padStart(2, '0')
+          const day = String(dt.getDate()).padStart(2, '0')
+          return `${year}-${month}-${day}`
+        })()
+      : tournament.startDate?.split('T')[0] || '',
+    endDate: tournament.endTime 
+      ? (() => {
+          const dt = new Date(tournament.endTime)
+          // Get date in local timezone to match what user sees
+          const year = dt.getFullYear()
+          const month = String(dt.getMonth() + 1).padStart(2, '0')
+          const day = String(dt.getDate()).padStart(2, '0')
+          return `${year}-${month}-${day}`
+        })()
+      : tournament.endDate?.split('T')[0] || '',
     startTime: tournament.startTime?.slice(11, 16) || '',
     endTime: tournament.endTime?.slice(11, 16) || '',
     price: tournament.price?.toString() || '0',
     additionalTeamPrice: tournament.additionalTeamPrice?.toString() || '',
     feeStructure: tournament.feeStructure || 'flat',
-    registrationStartDate: tournament.registrationStartDate?.split('T')[0] || '',
-    registrationEndDate: tournament.registrationEndDate?.split('T')[0] || '',
+    registrationStartDate: tournament.registrationStartDate ? tournament.registrationStartDate.split('T')[0] : undefined,
+    registrationEndDate: tournament.registrationEndDate ? tournament.registrationEndDate.split('T')[0] : undefined,
     earlyBirdDiscount: tournament.earlyBirdDiscount?.toString() || '',
-    earlyBirdDeadline: tournament.earlyBirdDeadline?.split('T')[0] || '',
+    earlyBirdDeadline: tournament.earlyBirdDeadline ? tournament.earlyBirdDeadline.split('T')[0] : undefined,
     lateFee: tournament.lateFee?.toString() || '',
-    lateFeeStartDate: tournament.lateFeeStartDate?.split('T')[0] || '',
+    lateFeeStartDate: tournament.lateFeeStartDate ? tournament.lateFeeStartDate.split('T')[0] : undefined,
     otherDiscounts: tournament.otherDiscounts ? JSON.parse(tournament.otherDiscounts) as OtherDiscount[] : [],
     eligibilityRequirements: tournament.eligibilityRequirements || '',
     eventsRun: tournament.eventsRun ? JSON.parse(tournament.eventsRun) as string[] : [],
@@ -573,6 +624,107 @@ export function TDTournamentManageClient({
   const handleSignOut = () => {
     signOut({ callbackUrl: '/td' })
   }
+
+  // Fetch default test settings
+  const fetchDefaultTestSettings = async () => {
+    setLoadingDefaultTestSettings(true)
+    try {
+      const res = await fetch(`/api/td/tournaments/${tournament.id}/default-test-settings`)
+      if (res.ok) {
+        const data = await res.json()
+        setDefaultTestSettings(data.defaultTestSettings)
+        // Populate form with existing values
+        if (data.defaultTestSettings) {
+          setDefaultTestSettingsForm({
+            defaultDurationMinutes: data.defaultTestSettings.defaultDurationMinutes?.toString() || '',
+            defaultStartAt: data.defaultTestSettings.defaultStartAt 
+              ? new Date(data.defaultTestSettings.defaultStartAt).toISOString().slice(0, 16)
+              : '',
+            defaultEndAt: data.defaultTestSettings.defaultEndAt 
+              ? new Date(data.defaultTestSettings.defaultEndAt).toISOString().slice(0, 16)
+              : '',
+            defaultReleaseScoresAt: data.defaultTestSettings.defaultReleaseScoresAt 
+              ? new Date(data.defaultTestSettings.defaultReleaseScoresAt).toISOString().slice(0, 16)
+              : '',
+            defaultScoreReleaseMode: data.defaultTestSettings.defaultScoreReleaseMode || 'FULL_TEST',
+            defaultRequireFullscreen: data.defaultTestSettings.defaultRequireFullscreen ?? true,
+            defaultAllowCalculator: data.defaultTestSettings.defaultAllowCalculator ?? false,
+            defaultCalculatorType: data.defaultTestSettings.defaultCalculatorType || 'FOUR_FUNCTION',
+            defaultAllowNoteSheet: data.defaultTestSettings.defaultAllowNoteSheet ?? false,
+            defaultAutoApproveNoteSheet: data.defaultTestSettings.defaultAutoApproveNoteSheet ?? true,
+            defaultRequireOneSitting: data.defaultTestSettings.defaultRequireOneSitting ?? true,
+            defaultMaxAttempts: data.defaultTestSettings.defaultMaxAttempts?.toString() || '',
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch default test settings:', error)
+    } finally {
+      setLoadingDefaultTestSettings(false)
+    }
+  }
+
+  // Save default test settings
+  const handleSaveDefaultTestSettings = async () => {
+    setSavingDefaultTestSettings(true)
+    try {
+      const res = await fetch(`/api/td/tournaments/${tournament.id}/default-test-settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          defaultDurationMinutes: defaultTestSettingsForm.defaultDurationMinutes 
+            ? parseInt(defaultTestSettingsForm.defaultDurationMinutes) 
+            : null,
+          defaultStartAt: defaultTestSettingsForm.defaultStartAt 
+            ? new Date(defaultTestSettingsForm.defaultStartAt).toISOString()
+            : null,
+          defaultEndAt: defaultTestSettingsForm.defaultEndAt 
+            ? new Date(defaultTestSettingsForm.defaultEndAt).toISOString()
+            : null,
+          defaultReleaseScoresAt: defaultTestSettingsForm.defaultReleaseScoresAt 
+            ? new Date(defaultTestSettingsForm.defaultReleaseScoresAt).toISOString()
+            : null,
+          defaultScoreReleaseMode: defaultTestSettingsForm.defaultScoreReleaseMode || null,
+          defaultRequireFullscreen: defaultTestSettingsForm.defaultRequireFullscreen,
+          defaultAllowCalculator: defaultTestSettingsForm.defaultAllowCalculator,
+          defaultCalculatorType: defaultTestSettingsForm.defaultAllowCalculator && defaultTestSettingsForm.defaultCalculatorType
+            ? defaultTestSettingsForm.defaultCalculatorType
+            : null,
+          defaultAllowNoteSheet: defaultTestSettingsForm.defaultAllowNoteSheet,
+          defaultAutoApproveNoteSheet: defaultTestSettingsForm.defaultAllowNoteSheet && defaultTestSettingsForm.defaultAutoApproveNoteSheet,
+          defaultRequireOneSitting: defaultTestSettingsForm.defaultRequireOneSitting,
+          defaultMaxAttempts: defaultTestSettingsForm.defaultMaxAttempts 
+            ? parseInt(defaultTestSettingsForm.defaultMaxAttempts) 
+            : null,
+        }),
+      })
+
+      if (res.ok) {
+        toast({
+          title: 'Default test settings saved',
+          description: 'These settings will be applied when tests are published.',
+        })
+        setIsEditingDefaultTestSettings(false)
+        await fetchDefaultTestSettings()
+      } else {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to save default test settings')
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save default test settings',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingDefaultTestSettings(false)
+    }
+  }
+
+  // Fetch default test settings on mount
+  useEffect(() => {
+    fetchDefaultTestSettings()
+  }, [tournament.id])
 
   // Fetch staff
   const fetchStaff = async () => {
@@ -1050,14 +1202,36 @@ export function TDTournamentManageClient({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          startDate: settingsForm.startDate ? new Date(settingsForm.startDate).toISOString() : null,
-          endDate: settingsForm.endDate ? new Date(settingsForm.endDate).toISOString() : null,
           startTime: settingsForm.startDate && settingsForm.startTime 
             ? new Date(`${settingsForm.startDate}T${settingsForm.startTime}`).toISOString() 
             : null,
           endTime: settingsForm.endDate && settingsForm.endTime 
             ? new Date(`${settingsForm.endDate}T${settingsForm.endTime}`).toISOString() 
             : null,
+          // Extract date-only values from the combined datetime to ensure consistency
+          // Use the date from the local time representation to match what users see
+          startDate: settingsForm.startDate && settingsForm.startTime 
+            ? (() => {
+                const dt = new Date(`${settingsForm.startDate}T${settingsForm.startTime}`)
+                // Get date components in local timezone (what user entered)
+                const year = dt.getFullYear()
+                const month = dt.getMonth()
+                const day = dt.getDate()
+                // Create UTC date at midnight for that date to avoid timezone shifts
+                return new Date(Date.UTC(year, month, day)).toISOString()
+              })()
+            : settingsForm.startDate ? new Date(settingsForm.startDate + 'T00:00:00').toISOString() : null,
+          endDate: settingsForm.endDate && settingsForm.endTime 
+            ? (() => {
+                const dt = new Date(`${settingsForm.endDate}T${settingsForm.endTime}`)
+                // Get date components in local timezone (what user entered)
+                const year = dt.getFullYear()
+                const month = dt.getMonth()
+                const day = dt.getDate()
+                // Create UTC date at midnight for that date to avoid timezone shifts
+                return new Date(Date.UTC(year, month, day)).toISOString()
+              })()
+            : settingsForm.endDate ? new Date(settingsForm.endDate + 'T00:00:00').toISOString() : null,
           price: settingsForm.price ? parseFloat(settingsForm.price) : 0,
           additionalTeamPrice: settingsForm.additionalTeamPrice ? parseFloat(settingsForm.additionalTeamPrice) : null,
           feeStructure: settingsForm.feeStructure,
@@ -1554,9 +1728,9 @@ export function TDTournamentManageClient({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern flex flex-col">
+    <div className="min-h-screen bg-background grid-pattern flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Logo size="md" href="/" variant="light" />
@@ -1564,28 +1738,37 @@ export function TDTournamentManageClient({
             <span className="text-white font-semibold">TD Portal</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Avatar className="h-8 w-8 sm:h-9 sm:w-9 ring-2 ring-white/30">
-              <AvatarImage src={user.image || ''} />
-              <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
-                {user.name?.charAt(0) || user.email.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="hidden sm:block max-w-[120px] md:max-w-none">
-              <p className="text-xs sm:text-sm font-medium text-white truncate">
-                {user.name || user.email}
-              </p>
-              <p className="text-[10px] sm:text-xs text-white/60 truncate">{user.email}</p>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 sm:gap-3 outline-none">
+                  <Avatar className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all">
+                    <AvatarImage src={user.image || ''} />
+                    <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
+                      {currentUserName?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden sm:block text-left max-w-[120px] md:max-w-none">
+                    <p className="text-xs sm:text-sm font-medium text-white truncate">
+                      {currentUserName || user.email}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-white/60 truncate">{user.email}</p>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-white/60 hidden sm:block" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Username
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ThemeToggle variant="header" />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-              className="px-2 sm:px-3 text-white hover:bg-white/20 hover:text-white transition-colors duration-200 rounded-md"
-            >
-              <LogOut className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline text-sm">Sign Out</span>
-            </Button>
           </div>
         </div>
       </header>
@@ -3223,6 +3406,11 @@ export function TDTournamentManageClient({
                         onClick={handleSaveSettings} 
                         disabled={savingSettings || Object.values(settingsFormErrors).some(err => err !== undefined)}
                       >
+                        {savingSettings ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
                         {savingSettings ? 'Saving...' : 'Save Changes'}
                       </Button>
                     </div>
@@ -3267,7 +3455,7 @@ export function TDTournamentManageClient({
                           )}
                         </>
                       ) : (
-                        <p className="text-base font-semibold py-1.5">{tournament.startDate ? format(new Date(tournament.startDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
+                        <p className="text-base font-semibold py-1.5">{tournament.startTime ? format(new Date(tournament.startTime), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -3340,7 +3528,7 @@ export function TDTournamentManageClient({
                           )}
                         </>
                       ) : (
-                        <p className="text-base font-semibold py-1.5">{tournament.endDate ? format(new Date(tournament.endDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
+                        <p className="text-base font-semibold py-1.5">{tournament.endTime ? format(new Date(tournament.endTime), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">Not set</span>}</p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -3664,7 +3852,7 @@ export function TDTournamentManageClient({
                         <>
                           <Input
                             type="date"
-                            value={settingsForm.registrationStartDate}
+                            value={settingsForm.registrationStartDate ?? undefined}
                             onChange={e => {
                               const newRegStart = e.target.value
                               setSettingsForm(prev => ({ ...prev, registrationStartDate: newRegStart }))
@@ -3706,7 +3894,7 @@ export function TDTournamentManageClient({
                         <>
                           <Input
                             type="date"
-                            value={settingsForm.registrationEndDate}
+                            value={settingsForm.registrationEndDate ?? undefined}
                             min={settingsForm.registrationStartDate || undefined}
                             onChange={e => {
                               const newRegEnd = e.target.value
@@ -3773,7 +3961,7 @@ export function TDTournamentManageClient({
                           <>
                             <Input
                               type="date"
-                              value={settingsForm.earlyBirdDeadline}
+                              value={settingsForm.earlyBirdDeadline ?? undefined}
                               max={settingsForm.registrationEndDate || undefined}
                               onChange={e => {
                                 const newEarlyBird = e.target.value
@@ -3825,7 +4013,7 @@ export function TDTournamentManageClient({
                           <>
                             <Input
                               type="date"
-                              value={settingsForm.lateFeeStartDate}
+                              value={settingsForm.lateFeeStartDate ?? undefined}
                               min={settingsForm.registrationStartDate || undefined}
                               onChange={e => {
                                 const newLateFeeStart = e.target.value
@@ -3936,6 +4124,317 @@ export function TDTournamentManageClient({
                     )}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Default Test Settings Card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Default Test Creation Settings
+                    </CardTitle>
+                    <CardDescription>
+                      Configure default settings that will be applied when tests are published
+                    </CardDescription>
+                  </div>
+                  {!isEditingDefaultTestSettings ? (
+                    <Button onClick={() => setIsEditingDefaultTestSettings(true)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Defaults
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => {
+                        setIsEditingDefaultTestSettings(false)
+                        fetchDefaultTestSettings() // Reset form
+                      }}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={handleSaveDefaultTestSettings} 
+                        disabled={savingDefaultTestSettings}
+                      >
+                        {savingDefaultTestSettings ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {savingDefaultTestSettings ? 'Saving...' : 'Save Defaults'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {loadingDefaultTestSettings ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <>
+                    {/* Time Limit */}
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default Time Limit (minutes)</Label>
+                        {isEditingDefaultTestSettings ? (
+                          <Input
+                            type="number"
+                            min="1"
+                            value={defaultTestSettingsForm.defaultDurationMinutes}
+                            onChange={e => setDefaultTestSettingsForm(prev => ({ ...prev, defaultDurationMinutes: e.target.value }))}
+                            placeholder="e.g., 60"
+                          />
+                        ) : (
+                          <p className="text-base font-semibold py-1.5">
+                            {defaultTestSettings?.defaultDurationMinutes 
+                              ? `${defaultTestSettings.defaultDurationMinutes} minutes` 
+                              : <span className="text-muted-foreground italic font-normal">Not set</span>}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default Max Attempts</Label>
+                        {isEditingDefaultTestSettings ? (
+                          <Input
+                            type="number"
+                            min="1"
+                            value={defaultTestSettingsForm.defaultMaxAttempts}
+                            onChange={e => setDefaultTestSettingsForm(prev => ({ ...prev, defaultMaxAttempts: e.target.value }))}
+                            placeholder="e.g., 1"
+                          />
+                        ) : (
+                          <p className="text-base font-semibold py-1.5">
+                            {defaultTestSettings?.defaultMaxAttempts 
+                              ? defaultTestSettings.defaultMaxAttempts 
+                              : <span className="text-muted-foreground italic font-normal">Unlimited</span>}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Test Taking Window */}
+                    <div className="border-t pt-6">
+                      <h3 className="text-base font-semibold mb-4 text-foreground">Test Taking Window</h3>
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default Start Date/Time</Label>
+                          {isEditingDefaultTestSettings ? (
+                            <Input
+                              type="datetime-local"
+                              value={defaultTestSettingsForm.defaultStartAt}
+                              onChange={e => setDefaultTestSettingsForm(prev => ({ ...prev, defaultStartAt: e.target.value }))}
+                            />
+                          ) : (
+                            <p className="text-base font-semibold py-1.5">
+                              {defaultTestSettings?.defaultStartAt 
+                                ? format(new Date(defaultTestSettings.defaultStartAt), 'MMMM d, yyyy h:mm a') 
+                                : <span className="text-muted-foreground italic font-normal">Not set</span>}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default End Date/Time</Label>
+                          {isEditingDefaultTestSettings ? (
+                            <Input
+                              type="datetime-local"
+                              value={defaultTestSettingsForm.defaultEndAt}
+                              min={defaultTestSettingsForm.defaultStartAt || undefined}
+                              onChange={e => setDefaultTestSettingsForm(prev => ({ ...prev, defaultEndAt: e.target.value }))}
+                            />
+                          ) : (
+                            <p className="text-base font-semibold py-1.5">
+                              {defaultTestSettings?.defaultEndAt 
+                                ? format(new Date(defaultTestSettings.defaultEndAt), 'MMMM d, yyyy h:mm a') 
+                                : <span className="text-muted-foreground italic font-normal">Not set</span>}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Score Release */}
+                    <div className="border-t pt-6">
+                      <h3 className="text-base font-semibold mb-4 text-foreground">Score Release</h3>
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default Release Date</Label>
+                          {isEditingDefaultTestSettings ? (
+                            <Input
+                              type="datetime-local"
+                              value={defaultTestSettingsForm.defaultReleaseScoresAt}
+                              onChange={e => setDefaultTestSettingsForm(prev => ({ ...prev, defaultReleaseScoresAt: e.target.value }))}
+                            />
+                          ) : (
+                            <p className="text-base font-semibold py-1.5">
+                              {defaultTestSettings?.defaultReleaseScoresAt 
+                                ? format(new Date(defaultTestSettings.defaultReleaseScoresAt), 'MMMM d, yyyy h:mm a') 
+                                : <span className="text-muted-foreground italic font-normal">Not set</span>}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default Release Mode</Label>
+                          {isEditingDefaultTestSettings ? (
+                            <Select
+                              value={defaultTestSettingsForm.defaultScoreReleaseMode}
+                              onValueChange={(value: 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST') => 
+                                setDefaultTestSettingsForm(prev => ({ ...prev, defaultScoreReleaseMode: value }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select release mode" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="NONE">None</SelectItem>
+                                <SelectItem value="SCORE_ONLY">Score Only</SelectItem>
+                                <SelectItem value="SCORE_WITH_WRONG">Score with Wrong Answers</SelectItem>
+                                <SelectItem value="FULL_TEST">Full Test</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <p className="text-base font-semibold py-1.5">
+                              {defaultTestSettings?.defaultScoreReleaseMode 
+                                ? defaultTestSettings.defaultScoreReleaseMode.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+                                : <span className="text-muted-foreground italic font-normal">Not set</span>}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Test Settings */}
+                    <div className="border-t pt-6">
+                      <h3 className="text-base font-semibold mb-4 text-foreground">Test Settings</h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label>Require Fullscreen</Label>
+                            <p className="text-sm text-muted-foreground">Force students to use fullscreen mode</p>
+                          </div>
+                          {isEditingDefaultTestSettings ? (
+                            <Checkbox
+                              checked={defaultTestSettingsForm.defaultRequireFullscreen}
+                              onCheckedChange={(checked) => 
+                                setDefaultTestSettingsForm(prev => ({ ...prev, defaultRequireFullscreen: checked as boolean }))
+                              }
+                            />
+                          ) : (
+                            <Badge variant={(defaultTestSettings?.defaultRequireFullscreen ?? true) ? 'default' : 'secondary'}>
+                              {(defaultTestSettings?.defaultRequireFullscreen ?? true) ? 'Yes' : 'No'}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label>Require One Sitting</Label>
+                            <p className="text-sm text-muted-foreground">Students must complete test in one session</p>
+                          </div>
+                          {isEditingDefaultTestSettings ? (
+                            <Checkbox
+                              checked={defaultTestSettingsForm.defaultRequireOneSitting}
+                              onCheckedChange={(checked) => 
+                                setDefaultTestSettingsForm(prev => ({ ...prev, defaultRequireOneSitting: checked as boolean }))
+                              }
+                            />
+                          ) : (
+                            <Badge variant={defaultTestSettings?.defaultRequireOneSitting !== false ? 'default' : 'secondary'}>
+                              {defaultTestSettings?.defaultRequireOneSitting !== false ? 'Yes' : 'No'}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label>Allow Calculator</Label>
+                            <p className="text-sm text-muted-foreground">Enable calculator for students</p>
+                          </div>
+                          {isEditingDefaultTestSettings ? (
+                            <Checkbox
+                              checked={defaultTestSettingsForm.defaultAllowCalculator}
+                              onCheckedChange={(checked) => 
+                                setDefaultTestSettingsForm(prev => ({ ...prev, defaultAllowCalculator: checked as boolean }))
+                              }
+                            />
+                          ) : (
+                            <Badge variant={defaultTestSettings?.defaultAllowCalculator ? 'default' : 'secondary'}>
+                              {defaultTestSettings?.defaultAllowCalculator ? 'Yes' : 'No'}
+                            </Badge>
+                          )}
+                        </div>
+                        {defaultTestSettingsForm.defaultAllowCalculator && isEditingDefaultTestSettings && (
+                          <div className="ml-6 space-y-2">
+                            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calculator Type</Label>
+                            <Select
+                              value={defaultTestSettingsForm.defaultCalculatorType}
+                              onValueChange={(value: 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING') => 
+                                setDefaultTestSettingsForm(prev => ({ ...prev, defaultCalculatorType: value }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select calculator type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FOUR_FUNCTION">4-Function</SelectItem>
+                                <SelectItem value="SCIENTIFIC">Scientific</SelectItem>
+                                <SelectItem value="GRAPHING">Graphing</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {defaultTestSettings?.defaultAllowCalculator && !isEditingDefaultTestSettings && (
+                          <div className="ml-6">
+                            <p className="text-sm text-muted-foreground">
+                              Type: {defaultTestSettings.defaultCalculatorType?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Not set'}
+                            </p>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label>Allow Note Sheet</Label>
+                            <p className="text-sm text-muted-foreground">Students can upload note sheets</p>
+                          </div>
+                          {isEditingDefaultTestSettings ? (
+                            <Checkbox
+                              checked={defaultTestSettingsForm.defaultAllowNoteSheet}
+                              onCheckedChange={(checked) => 
+                                setDefaultTestSettingsForm(prev => ({ ...prev, defaultAllowNoteSheet: checked as boolean }))
+                              }
+                            />
+                          ) : (
+                            <Badge variant={defaultTestSettings?.defaultAllowNoteSheet ? 'default' : 'secondary'}>
+                              {defaultTestSettings?.defaultAllowNoteSheet ? 'Yes' : 'No'}
+                            </Badge>
+                          )}
+                        </div>
+                        {defaultTestSettingsForm.defaultAllowNoteSheet && isEditingDefaultTestSettings && (
+                          <div className="ml-6 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <Label>Auto-Approve Note Sheets</Label>
+                                <p className="text-sm text-muted-foreground">Automatically approve uploaded note sheets</p>
+                              </div>
+                              <Checkbox
+                                checked={defaultTestSettingsForm.defaultAutoApproveNoteSheet}
+                                onCheckedChange={(checked) => 
+                                  setDefaultTestSettingsForm(prev => ({ ...prev, defaultAutoApproveNoteSheet: checked as boolean }))
+                                }
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {defaultTestSettings?.defaultAllowNoteSheet && !isEditingDefaultTestSettings && (
+                          <div className="ml-6">
+                            <p className="text-sm text-muted-foreground">
+                              Auto-approve: {defaultTestSettings.defaultAutoApproveNoteSheet !== false ? 'Yes' : 'No'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -4212,6 +4711,13 @@ export function TDTournamentManageClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditUsernameDialog
+        open={editUsernameOpen}
+        onOpenChange={setEditUsernameOpen}
+        currentName={currentUserName}
+        onNameUpdated={setCurrentUserName}
+      />
     </div>
   )
 }

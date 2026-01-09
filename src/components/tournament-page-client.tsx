@@ -9,6 +9,17 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { signOut } from 'next-auth/react'
+import { EditUsernameDialog } from '@/components/edit-username-dialog'
+import { Pencil, LogOut, ChevronDown } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -127,6 +138,8 @@ export function TournamentPageClient({
 }: TournamentPageClientProps) {
   const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
+  const [editUsernameOpen, setEditUsernameOpen] = useState(false)
+  const [currentUserName, setCurrentUserName] = useState(user?.name ?? null)
   const defaultSections: Section[] = [
     {
       id: '1',
@@ -359,13 +372,61 @@ export function TournamentPageClient({
     }
   }
 
+  const handleSignOut = async () => {
+    try {
+      await signOut({ callbackUrl: '/' })
+    } catch (error) {
+      console.error('Sign out error', error)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground grid-pattern flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-4">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 sm:gap-3 outline-none">
+                    <Avatar 
+                      className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all"
+                    >
+                      <AvatarImage src={undefined} />
+                      <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
+                        {currentUserName?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="hidden sm:block text-left max-w-[120px] md:max-w-none">
+                      <p className="text-xs sm:text-sm font-medium text-white truncate">
+                        {currentUserName || user.email}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-white/60 truncate">{user.email}</p>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-white/60 hidden sm:block" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Username
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link href={`/login?callbackUrl=${encodeURIComponent(`/tournaments/${hostingRequest.preferredSlug || tournament?.slug || tournament?.id || hostingRequest.id}`)}`} className="hidden md:block">
+                <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm">
+                  Sign In
+                </button>
+              </Link>
+            )}
             <ThemeToggle variant="header" />
             {isDirector && !isEditing && (
               <Button 
@@ -400,25 +461,19 @@ export function TournamentPageClient({
                 </Button>
               </>
             )}
-            {user ? (
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/10 transition-colors">
-                  Dashboard
-                </Button>
-              </Link>
-            ) : (
-              <Link href={`/login?callbackUrl=${encodeURIComponent(`/tournaments/${hostingRequest.preferredSlug || tournament?.slug || tournament?.id || hostingRequest.id}`)}`}>
-                <Button variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/10 transition-colors">
-                  Sign In
-                </Button>
-              </Link>
-            )}
           </div>
         </div>
       </header>
+      
+      <EditUsernameDialog
+        open={editUsernameOpen}
+        onOpenChange={setEditUsernameOpen}
+        currentName={currentUserName}
+        onNameUpdated={setCurrentUserName}
+      />
 
       {/* Tournament Hero */}
-      <section className="bg-gradient-to-b from-teamy-primary/10 to-transparent py-12 px-4">
+      <section className="py-12 px-4">
         <div className="max-w-4xl mx-auto text-center space-y-4">
           <div className="flex justify-center gap-2 mb-4">
             <Badge variant="outline" className="text-sm">
@@ -498,22 +553,29 @@ export function TournamentPageClient({
                   <div className="flex items-start gap-3">
                     <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">Date</p>
+                      <p className="font-medium">Date & Time</p>
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(tournament.startDate), 'EEEE, MMMM d, yyyy')}
-                        {tournament.startDate !== tournament.endDate && (
-                          <> - {format(new Date(tournament.endDate), 'MMMM d, yyyy')}</>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Time</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(tournament.startTime), 'h:mm a')} - {format(new Date(tournament.endTime), 'h:mm a')}
+                        {(() => {
+                          const startDateTime = new Date(tournament.startTime)
+                          const endDateTime = new Date(tournament.endTime)
+                          const startDateOnly = new Date(startDateTime.getFullYear(), startDateTime.getMonth(), startDateTime.getDate())
+                          const endDateOnly = new Date(endDateTime.getFullYear(), endDateTime.getMonth(), endDateTime.getDate())
+                          const sameDay = startDateOnly.getTime() === endDateOnly.getTime()
+                          
+                          if (sameDay) {
+                            return (
+                              <>
+                                {format(startDateTime, 'MMM d, h:mm a')} – {format(endDateTime, 'h:mm a')}
+                              </>
+                            )
+                          } else {
+                            return (
+                              <>
+                                {format(startDateTime, 'MMM d, h:mm a')} – {format(endDateTime, 'MMM d, h:mm a')}
+                              </>
+                            )
+                          }
+                        })()}
                       </p>
                     </div>
                   </div>
@@ -898,6 +960,7 @@ export function TournamentPageClient({
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
               <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
             </div>
             <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
           </div>

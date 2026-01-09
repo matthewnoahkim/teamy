@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -69,6 +69,11 @@ export function TakeTestClient({
   const pausedAtRef = useRef<number | null>(null) // Timestamp when user saved and exited
   const totalPausedSecondsRef = useRef<number>(0) // Total seconds paused (accumulated)
   const attemptRef = useRef(attempt) // Keep ref to latest attempt for back button handler
+  const tabSwitchCountRef = useRef(tabSwitchCount) // Ref for tab switch count to avoid dependency
+  const timeOffPageSecondsRef = useRef(timeOffPageSeconds) // Ref for time off page to avoid dependency
+  const offPageStartTimeRef = useRef(offPageStartTime) // Ref for off page start time to avoid dependency
+  const testIdRef = useRef(test.id) // Ref for test ID to avoid dependency
+  const tournamentIdRef = useRef(tournamentId) // Ref for tournament ID to avoid dependency
 
   // Load existing answers
   useEffect(() => {
@@ -159,21 +164,27 @@ export function TakeTestClient({
     }
   }
 
-  // Keep attempt ref updated for back button handler
+  // Keep refs updated
   useEffect(() => {
     attemptRef.current = attempt
-  }, [attempt])
+    tabSwitchCountRef.current = tabSwitchCount
+    timeOffPageSecondsRef.current = timeOffPageSeconds
+    offPageStartTimeRef.current = offPageStartTime
+    testIdRef.current = test.id
+    tournamentIdRef.current = tournamentId
+  }, [attempt, tabSwitchCount, timeOffPageSeconds, offPageStartTime, test.id, tournamentId])
 
   // Track page visibility and tab switching
   useEffect(() => {
     const recordProctorEvent = async (kind: string, meta?: any) => {
-      if (!attempt || attempt.status !== 'IN_PROGRESS') return
+      const currentAttempt = attemptRef.current
+      if (!currentAttempt || currentAttempt.status !== 'IN_PROGRESS') return
       
       try {
         // Use ES endpoint if tournamentId is present (ES test), otherwise use regular endpoint
-        const endpoint = tournamentId 
-          ? `/api/es/tests/${test.id}/attempts/${attempt.id}/proctor-events`
-          : `/api/tests/${test.id}/attempts/${attempt.id}/proctor-events`
+        const endpoint = tournamentIdRef.current 
+          ? `/api/es/tests/${testIdRef.current}/attempts/${currentAttempt.id}/proctor-events`
+          : `/api/tests/${testIdRef.current}/attempts/${currentAttempt.id}/proctor-events`
         
         const response = await fetch(endpoint, {
           method: 'POST',
@@ -201,12 +212,13 @@ export function TakeTestClient({
         setTabSwitchCount((prev: number) => prev + 1)
       } else {
         // User returned - record TAB_SWITCH with time off site
-        if (offPageStartTime) {
-          const timeOff = Math.floor((Date.now() - offPageStartTime) / 1000)
+        const currentOffPageStartTime = offPageStartTimeRef.current
+        if (currentOffPageStartTime) {
+          const timeOff = Math.floor((Date.now() - currentOffPageStartTime) / 1000)
           setTimeOffPageSeconds((prev: number) => prev + timeOff)
           recordProctorEvent('TAB_SWITCH', { 
             timeOffSeconds: timeOff,
-            leftAt: new Date(offPageStartTime).toISOString(),
+            leftAt: new Date(currentOffPageStartTime).toISOString(),
             returnedAt: new Date().toISOString()
           })
           setOffPageStartTime(null)
@@ -224,13 +236,14 @@ export function TakeTestClient({
     }
 
     const handleFocus = () => {
-      if (offPageStartTime) {
-        const timeOff = Math.floor((Date.now() - offPageStartTime) / 1000)
+      const currentOffPageStartTime = offPageStartTimeRef.current
+      if (currentOffPageStartTime) {
+        const timeOff = Math.floor((Date.now() - currentOffPageStartTime) / 1000)
         setTimeOffPageSeconds((prev: number) => prev + timeOff)
         // Record the time off site in the meta when returning
         recordProctorEvent('TAB_SWITCH', { 
           timeOffSeconds: timeOff,
-          leftAt: new Date(offPageStartTime).toISOString(),
+          leftAt: new Date(currentOffPageStartTime).toISOString(),
           returnedAt: new Date().toISOString()
         })
         setOffPageStartTime(null)
@@ -313,19 +326,20 @@ export function TakeTestClient({
 
       // Periodically update tab tracking on server
       trackingIntervalRef.current = setInterval(async () => {
-        if (attempt && attempt.status === 'IN_PROGRESS') {
+        const currentAttempt = attemptRef.current
+        if (currentAttempt && currentAttempt.status === 'IN_PROGRESS') {
           try {
             // Use ES endpoint if tournamentId is present (ES test), otherwise use regular endpoint
-            const endpoint = tournamentId 
-              ? `/api/es/tests/${test.id}/attempts/${attempt.id}/tab-tracking`
-              : `/api/tests/${test.id}/attempts/${attempt.id}/tab-tracking`
+            const endpoint = tournamentIdRef.current 
+              ? `/api/es/tests/${testIdRef.current}/attempts/${currentAttempt.id}/tab-tracking`
+              : `/api/tests/${testIdRef.current}/attempts/${currentAttempt.id}/tab-tracking`
             
             const response = await fetch(endpoint, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                tabSwitchCount,
-                timeOffPageSeconds,
+                tabSwitchCount: tabSwitchCountRef.current,
+                timeOffPageSeconds: timeOffPageSecondsRef.current,
               }),
             })
             
@@ -357,7 +371,7 @@ export function TakeTestClient({
     return () => {
       // Cleanup if not started
     }
-  }, [started, attempt, tabSwitchCount, timeOffPageSeconds, test.id, test.requireFullscreen, offPageStartTime, toast, tournamentId])
+  }, [started, attempt, test.requireFullscreen]) // Reduced dependencies - using refs for values only read in callbacks
 
   const handleStartTest = async () => {
     if (test.testPasswordHash && !isAdmin && !password) {
@@ -505,8 +519,8 @@ export function TakeTestClient({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Check if there are unanswered questions
-  const getUnansweredQuestions = () => {
+  // Check if there are unanswered questions - memoized to avoid recalculating on every render
+  const unansweredQuestions = useMemo(() => {
     return test.questions.filter((question: any) => {
       // TEXT_BLOCK questions are stored as SHORT_TEXT with 0 points - they don't require answers
       const isTextBlock = question.type === 'SHORT_TEXT' && Number(question.points) === 0
@@ -524,7 +538,7 @@ export function TakeTestClient({
         return !answer.answerText || answer.answerText.trim() === ''
       }
     })
-  }
+  }, [test.questions, answers])
 
   const handleSubmit = useCallback(async () => {
     if (!attempt) return
@@ -817,7 +831,7 @@ export function TakeTestClient({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 grid-pattern">
+    <div className="min-h-screen flex flex-col bg-background grid-pattern">
       {/* Sticky header with test info and timer */}
       <div className="sticky top-0 z-40 bg-background border-b backdrop-blur-sm bg-background/95">
         <div className="container mx-auto max-w-6xl px-4 py-3">
@@ -1262,14 +1276,14 @@ export function TakeTestClient({
         <div className="container mx-auto max-w-6xl px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              {(markedForReview.size > 0 || getUnansweredQuestions().length > 0) && (
+              {(markedForReview.size > 0 || unansweredQuestions.length > 0) && (
                 <div className="text-sm text-amber-600 dark:text-amber-400">
                   {markedForReview.size > 0 && (
                     <span>{markedForReview.size} marked for review</span>
                   )}
-                  {markedForReview.size > 0 && getUnansweredQuestions().length > 0 && <span> • </span>}
-                  {getUnansweredQuestions().length > 0 && (
-                    <span>{getUnansweredQuestions().length} unanswered</span>
+                  {markedForReview.size > 0 && unansweredQuestions.length > 0 && <span> • </span>}
+                  {unansweredQuestions.length > 0 && (
+                    <span>{unansweredQuestions.length} unanswered</span>
                   )}
                 </div>
               )}
@@ -1393,7 +1407,7 @@ export function TakeTestClient({
               Are you sure you want to submit? You cannot change your answers after submitting.
             </DialogDescription>
           </DialogHeader>
-          {(markedForReview.size > 0 || getUnansweredQuestions().length > 0) && (
+          {(markedForReview.size > 0 || unansweredQuestions.length > 0) && (
             <div className="space-y-2 py-2">
               {markedForReview.size > 0 && (
                 <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
@@ -1408,12 +1422,12 @@ export function TakeTestClient({
                   </div>
                 </div>
               )}
-              {getUnansweredQuestions().length > 0 && (
+              {unansweredQuestions.length > 0 && (
                 <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                   <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
                     <p className="font-medium text-amber-900 dark:text-amber-100">
-                      You have {getUnansweredQuestions().length} unanswered question{getUnansweredQuestions().length !== 1 ? 's' : ''}.
+                      You have {unansweredQuestions.length} unanswered question{unansweredQuestions.length !== 1 ? 's' : ''}.
                     </p>
                     <p className="text-amber-700 dark:text-amber-300 mt-1">
                       You can still submit, but these questions will receive no points.

@@ -59,6 +59,7 @@ interface TodoTabProps {
     image?: string | null
   }
   isAdmin: boolean
+  initialTodos?: Todo[]
 }
 
 interface Todo {
@@ -109,12 +110,12 @@ const PRIORITY_CONFIG = {
   URGENT: { label: 'Urgent', color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300', icon: AlertTriangle },
 }
 
-export function TodoTab({ clubId, currentMembershipId, user, isAdmin }: TodoTabProps) {
+export function TodoTab({ clubId, currentMembershipId, user, isAdmin, initialTodos }: TodoTabProps) {
   const { toast } = useToast()
-  const [todos, setTodos] = useState<Todo[]>([])
+  const [todos, setTodos] = useState<Todo[]>(initialTodos || [])
   const [allTodos, setAllTodos] = useState<Todo[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialTodos)
   const [submitting, setSubmitting] = useState(false)
   
   // Filter state
@@ -187,14 +188,20 @@ export function TodoTab({ clubId, currentMembershipId, user, isAdmin }: TodoTabP
   }, [clubId, isAdmin])
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchTodos()
+    // If we have initial todos and are in 'my' view mode, skip fetching
+    if (initialTodos && viewMode === 'my' && !isAdmin) {
+      setLoading(false)
       if (isAdmin) {
         fetchTeamMembers()
       }
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [fetchTodos, fetchTeamMembers, isAdmin])
+      return
+    }
+    // Fetch todos and team members in parallel
+    Promise.all([
+      fetchTodos(),
+      isAdmin ? fetchTeamMembers() : Promise.resolve()
+    ])
+  }, [fetchTodos, fetchTeamMembers, isAdmin, initialTodos, viewMode])
 
   const handleCreateTodo = async () => {
     if (!formData.title.trim()) {

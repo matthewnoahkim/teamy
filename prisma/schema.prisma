@@ -1129,6 +1129,19 @@ model Tournament {
   registrationStartDate   DateTime?
   published               Boolean                   @default(false)
   trialEvents             String?
+  // Default test creation settings
+  defaultDurationMinutes  Int?
+  defaultStartAt          DateTime?
+  defaultEndAt            DateTime?
+  defaultReleaseScoresAt  DateTime?
+  defaultScoreReleaseMode ScoreReleaseMode?
+  defaultRequireFullscreen Boolean?
+  defaultAllowCalculator  Boolean?
+  defaultCalculatorType   CalculatorType?
+  defaultAllowNoteSheet   Boolean?
+  defaultAutoApproveNoteSheet Boolean?
+  defaultRequireOneSitting Boolean?
+  defaultMaxAttempts      Int?
   esTests                 ESTest[]
   createdBy               User                      @relation("TournamentCreator", fields: [createdById], references: [id], onDelete: Cascade)
   hostingRequest          TournamentHostingRequest? @relation("TournamentFromRequest", fields: [hostingRequestId], references: [id])

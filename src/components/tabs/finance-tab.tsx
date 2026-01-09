@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -309,8 +309,55 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
   }, [clubId, division, toast])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    // Skip initial fetch if we already have data from server
+    if (!initialExpenses && !initialPurchaseRequests && !initialBudgets && !initialTeams) {
+      fetchData()
+    } else {
+      // We have initial data, but may need to fetch missing pieces (events, teams if not provided)
+      const loadMissingData = async () => {
+        try {
+          const requests: Promise<Response | null>[] = []
+          
+          // Only fetch what's missing
+          if (!initialTeams) {
+            requests.push(fetch(`/api/clubs/${clubId}/teams`))
+          } else {
+            requests.push(Promise.resolve(null))
+          }
+          
+          if (division && events.length === 0) {
+            requests.push(fetch(`/api/events?division=${division}`))
+          } else {
+            requests.push(Promise.resolve(null))
+          }
+          
+          const [teamsRes, eventsRes] = await Promise.all(requests)
+          
+          if (teamsRes?.ok) {
+            const data = await teamsRes.json()
+            setTeams(data.teams || [])
+          }
+          
+          if (eventsRes?.ok) {
+            const data = await eventsRes.json()
+            setEvents(data.events || [])
+          }
+        } catch (error) {
+          console.error('Failed to fetch missing finance data:', error)
+        } finally {
+          setLoading(false)
+        }
+      }
+      
+      // Set initial data
+      if (initialExpenses) setExpenses(initialExpenses)
+      if (initialPurchaseRequests) setPurchaseRequests(initialPurchaseRequests)
+      if (initialBudgets) setBudgets(initialBudgets)
+      if (initialTeams) setTeams(initialTeams)
+      
+      loadMissingData()
+    }
+  }, [fetchData, initialExpenses, initialPurchaseRequests, initialBudgets, initialTeams, clubId, division, events.length])
 
   useBackgroundRefresh(
     () => fetchData({ silent: true }),
@@ -764,16 +811,23 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
     setBudgetDialogOpen(true)
   }
 
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0)
+  // Memoize expensive computations to avoid recalculating on every render
+  const totalExpenses = useMemo(() => 
+    expenses.reduce((sum, exp) => sum + exp.amount, 0),
+    [expenses]
+  )
   
   // Calculate account balance
   // Since we only track expenses (no income), balance starts at 0 and goes negative
   // In a real system with income tracking, this would be: startingBalance + income - expenses
-  const accountBalance = -totalExpenses
-  const displayBalance = Math.abs(accountBalance)
+  const accountBalance = useMemo(() => -totalExpenses, [totalExpenses])
+  const displayBalance = useMemo(() => Math.abs(accountBalance), [accountBalance])
   
   // Get current date for display
-  const currentDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const currentDate = useMemo(() => 
+    new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    []
+  )
   
   // Keyboard shortcut for search
   useEffect(() => {
@@ -818,7 +872,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
     } | null
   }
   
-  const transactions: Transaction[] = [
+  const transactions = useMemo<Transaction[]>(() => [
     ...expenses.map(exp => ({
       id: exp.id,
       type: 'expense' as const,
@@ -851,10 +905,10 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
           user: req.requester,
         } : null,
       })),
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [expenses, purchaseRequests])
   
   // Filter transactions based on search and filters
-  const filteredTransactions = transactions.filter(transaction => {
+  const filteredTransactions = useMemo(() => transactions.filter(transaction => {
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -886,38 +940,38 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
     }
     
     return true
-  })
+  }), [transactions, searchQuery, filterCategory, filterEvent, filterStatus])
   
   // Get unique categories and events for filter dropdown
-  const uniqueCategories = Array.from(new Set(
+  const uniqueCategories = useMemo(() => Array.from(new Set(
     transactions
       .map(t => t.category)
       .filter((c): c is string => c !== null)
-  )).sort()
+  )).sort(), [transactions])
   
-  const uniqueEvents = Array.from(new Set(
+  const uniqueEvents = useMemo(() => Array.from(new Set(
     transactions
       .map(t => t.event?.id)
       .filter((id): id is string => id !== undefined)
-  ))
+  )), [transactions])
   
-  const eventMap = new Map(events.map(e => [e.id, e]))
+  const eventMap = useMemo(() => new Map(events.map(e => [e.id, e])), [events])
   
   // Calculate expense history for simple trend visualization
-  const expenseHistory = expenses
+  const expenseHistory = useMemo(() => expenses
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .reduce((acc, exp) => {
       const date = new Date(exp.date).toISOString().split('T')[0]
       const lastTotal = acc.length > 0 ? acc[acc.length - 1].total : 0
       acc.push({ date, total: lastTotal + exp.amount })
       return acc
-    }, [] as { date: string; total: number }[])
+    }, [] as { date: string; total: number }[]), [expenses])
   
   // Get last 7 data points for trend
-  const recentExpenseHistory = expenseHistory.slice(-7)
-  const minExpense = Math.min(...recentExpenseHistory.map(h => h.total), 0)
-  const maxExpense = Math.max(...recentExpenseHistory.map(h => h.total), 0)
-  const expenseRange = maxExpense - minExpense || 1
+  const recentExpenseHistory = useMemo(() => expenseHistory.slice(-7), [expenseHistory])
+  const minExpense = useMemo(() => Math.min(...recentExpenseHistory.map(h => h.total), 0), [recentExpenseHistory])
+  const maxExpense = useMemo(() => Math.max(...recentExpenseHistory.map(h => h.total), 0), [recentExpenseHistory])
+  const expenseRange = useMemo(() => maxExpense - minExpense || 1, [minExpense, maxExpense])
   
   // Get transaction icon
   const getTransactionIcon = (transaction: Transaction) => {
@@ -960,7 +1014,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
   }
 
   // Calculate team expenses based on purchaser's team
-  const teamExpenses = expenses.reduce((acc, exp) => {
+  const teamExpenses = useMemo(() => expenses.reduce((acc, exp) => {
     const purchaserTeam = exp.addedBy?.team
     const subclubId = purchaserTeam?.id || 'club-wide'
     const teamName = purchaserTeam?.name || 'Club-wide'
@@ -974,14 +1028,14 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
     }
     acc[subclubId].total += exp.amount
     return acc
-  }, {} as Record<string, { id: string; name: string; total: number }>)
+  }, {} as Record<string, { id: string; name: string; total: number }>), [expenses])
 
-  const teamExpensesList = Object.values(teamExpenses).sort((a, b) => {
+  const teamExpensesList = useMemo(() => Object.values(teamExpenses).sort((a, b) => {
     // Put "Club-wide" at the end
     if (a.id === 'club-wide') return 1
     if (b.id === 'club-wide') return -1
     return a.name.localeCompare(b.name)
-  })
+  }), [teamExpenses])
 
   const handleExportCSV = () => {
     // Helper function to escape CSV values
@@ -1131,6 +1185,18 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
     })
   }
 
+  // Calculate pending purchase requests count
+  const pendingRequestsCount = useMemo(() => 
+    purchaseRequests.filter(req => req.status === 'PENDING').length,
+    [purchaseRequests]
+  )
+  const userPendingRequests = useMemo(() => 
+    purchaseRequests.filter(req => 
+      req.requesterId === currentMembershipId && req.status === 'PENDING'
+    ).length,
+    [purchaseRequests, currentMembershipId]
+  )
+
   if (loading) {
     return (
       <PageLoading
@@ -1140,12 +1206,6 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
       />
     )
   }
-
-  // Calculate pending purchase requests count
-  const pendingRequestsCount = purchaseRequests.filter(req => req.status === 'PENDING').length
-  const userPendingRequests = purchaseRequests.filter(req => 
-    req.requesterId === currentMembershipId && req.status === 'PENDING'
-  ).length
 
   return (
     <div className="space-y-6">

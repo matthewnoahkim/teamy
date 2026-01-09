@@ -77,7 +77,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
       const button = buttonRefs.current[openDropdown]
       const rect = button.getBoundingClientRect()
       setDropdownPosition({
-        top: rect.bottom + 8,
+        top: rect.bottom,
         left: rect.left,
       })
     }
@@ -170,7 +170,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
       {/* Dropdown Portal - Rendered outside container */}
       {openDropdown && (
         <div
-          className="fixed z-[9999]"
+          className="fixed z-[9999] mt-1.5"
           style={{
             top: `${dropdownPosition.top}px`,
             left: `${dropdownPosition.left}px`,
@@ -190,10 +190,10 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
           <div className={cn(
             "w-64 rounded-xl shadow-xl border backdrop-blur-xl",
             isLight
-              ? "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+              ? "bg-popover border-border"
               : "bg-background border-border"
           )}>
-            <div className="p-1.5">
+            <div className="p-2 space-y-2">
               {navItems
                 .find(item => item.label === openDropdown)
                 ?.items?.map((subItem) => {
@@ -203,10 +203,10 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                       key={subItem.href}
                       href={subItem.href}
                       className={cn(
-                        "block px-4 py-2 rounded-lg transition-colors text-sm font-medium",
+                        "block px-4 py-3 rounded-lg transition-colors text-base leading-tight font-sans font-medium",
                         active
                           ? "bg-teamy-primary/10 text-teamy-primary"
-                          : "text-foreground hover:bg-slate-100 dark:hover:bg-slate-700"
+                          : "text-foreground hover:bg-secondary"
                       )}
                     >
                       {subItem.label}
@@ -241,7 +241,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
           <div className={cn(
             "absolute top-full left-0 right-0 border-b backdrop-blur-xl max-h-[80vh] overflow-y-auto",
             isLight 
-              ? "bg-teamy-primary/95 dark:bg-slate-900/95 border-white/10" 
+              ? "bg-teamy-primary/95 dark:bg-popover/95 border-white/10" 
               : "bg-background/95 border-border"
           )}>
             <nav className="container mx-auto px-6 py-4 flex flex-col gap-1">
@@ -262,7 +262,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                             : "text-white/80 hover:text-white hover:bg-white/5"
                           : active
                             ? "text-foreground bg-teamy-primary/10"
-                            : "text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                       )}
                     >
                       {item.label}
@@ -294,7 +294,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                                     : "text-white/80 hover:text-white hover:bg-white/5"
                                   : active
                                     ? "text-foreground bg-teamy-primary/10"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                               )}
                             >
                               {subItem.label}

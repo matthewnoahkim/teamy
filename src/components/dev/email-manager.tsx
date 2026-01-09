@@ -426,7 +426,7 @@ export function EmailManager() {
             </TabsContent>
 
             <TabsContent value="preview">
-              <div className="border rounded-lg p-4 bg-white dark:bg-slate-900 min-h-[300px]">
+              <div className="border rounded-lg p-4 bg-card min-h-[300px]">
                 <div className="mb-4 pb-4 border-b">
                   <p className="text-sm text-muted-foreground">Subject:</p>
                   <p className="font-semibold">{subject || '(No subject)'}</p>
@@ -450,7 +450,7 @@ export function EmailManager() {
               This is how your email will appear to recipients
             </DialogDescription>
           </DialogHeader>
-          <div className="border rounded-lg p-6 bg-white dark:bg-slate-900">
+          <div className="border rounded-lg p-6 bg-card">
             <div className="mb-4 pb-4 border-b">
               <p className="text-sm text-muted-foreground">From: Teamy &lt;no-reply@teamy.site&gt;</p>
               <p className="text-sm text-muted-foreground">To: {filterStats?.matchingUsers || 0} recipients</p>

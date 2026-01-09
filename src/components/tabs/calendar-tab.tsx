@@ -208,12 +208,20 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
   }, [clubId])
 
   useEffect(() => {
+    // Fetch missing data in parallel
+    const promises: Promise<void>[] = []
+    
     // Skip initial fetch if we already have data from server
     if (!initialEvents) {
-      fetchEvents()
+      promises.push(fetchEvents())
     }
-    fetchTeams()
-    fetchAvailableEvents()
+    
+    promises.push(
+      fetchTeams(),
+      fetchAvailableEvents()
+    )
+    
+    Promise.all(promises)
   }, [fetchEvents, fetchTeams, fetchAvailableEvents, initialEvents])
 
   useBackgroundRefresh(
@@ -979,7 +987,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     // Empty cells for days before month starts
     for (let i = 0; i < firstDay; i++) {
       days.push(
-        <div key={`empty-${i}`} className="min-h-[120px] border border-border bg-muted/20" />
+        <div key={`empty-${i}`} className="min-h-[120px] border border-border bg-card" />
       )
     }
 
@@ -992,7 +1000,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
       days.push(
         <div
           key={day}
-          className="min-h-[120px] border border-border bg-background hover:bg-muted/50 cursor-pointer transition-colors p-2"
+          className="min-h-[120px] border border-border bg-card hover:bg-muted/50 cursor-pointer transition-colors p-2"
           onClick={() => handleDayClick(date)}
         >
           <div className="text-sm font-semibold mb-1">
@@ -1103,7 +1111,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     return (
       <div className="grid grid-cols-7 gap-0 border rounded-lg overflow-hidden">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-          <div key={day} className="bg-muted p-2 text-center font-semibold text-sm border-b border-border">
+          <div key={day} className="bg-card p-2 text-center font-semibold text-sm border-b border-border">
             {day}
           </div>
         ))}
@@ -1207,13 +1215,13 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
       <div className="border rounded-lg overflow-hidden">
         {/* Header */}
         <div className="grid grid-cols-8 gap-0">
-          <div className="bg-muted py-1 px-1 border-b border-r border-border" />
+          <div className="bg-card py-1 px-1 border-b border-r border-border" />
           {weekDates.map((date) => {
             const isToday = isSameDay(date, today)
             return (
               <div
                 key={date.toISOString()}
-                className={`bg-muted py-1 px-2 text-center border-b border-border ${isToday ? 'bg-primary/10' : ''}`}
+                className={`bg-card py-1 px-2 text-center border-b border-border ${isToday ? 'bg-primary/10' : ''}`}
               >
                 <div className="text-xs font-medium text-muted-foreground">
                   {date.toLocaleDateString('en-US', { weekday: 'short' })}
@@ -1227,8 +1235,8 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
         </div>
 
         {/* All-day events section */}
-        <div className="grid grid-cols-8 gap-0 border-b border-border">
-          <div className="py-1 px-1 text-xs text-muted-foreground text-right border-r border-border leading-tight flex items-center justify-end">
+        <div className="grid grid-cols-8 gap-0 border-b border-border bg-card">
+          <div className="py-1 px-1 text-xs text-muted-foreground text-right border-r border-border leading-tight flex items-center justify-end bg-card">
             All Day
           </div>
           {weekDates.map((date) => {
@@ -1284,7 +1292,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
             return (
               <div
                 key={date.toISOString()}
-                className="min-h-[40px] border-r border-border bg-background hover:bg-muted/50 cursor-pointer transition-colors p-1"
+                className="min-h-[40px] border-r border-border bg-card hover:bg-muted/50 cursor-pointer transition-colors p-1"
                 onClick={() => {
                   const allDayDate = new Date(date)
                   allDayDate.setHours(0, 0, 0, 0)
@@ -1338,7 +1346,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
         <div>
           {hours.map((hour) => (
             <div key={hour} className="grid grid-cols-8 gap-0">
-              <div className="py-1 px-1 text-xs text-muted-foreground text-right border-r border-border leading-tight flex items-center justify-end">
+              <div className="py-1 px-1 text-xs text-muted-foreground text-right border-r border-border leading-tight flex items-center justify-end bg-card">
                 {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
               </div>
               {weekDates.map((date) => {
@@ -1407,7 +1415,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
                 return (
                   <div
                     key={`${date.toISOString()}-${hour}`}
-                    className="min-h-[35px] border-b border-r border-border bg-background hover:bg-muted/50 cursor-pointer transition-colors relative"
+                    className="min-h-[35px] border-b border-r border-border bg-card hover:bg-muted/50 cursor-pointer transition-colors relative"
                     style={{ padding: 0 }}
                     onClick={() => handleDayClick(slotDate)}
                   >

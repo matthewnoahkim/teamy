@@ -43,12 +43,12 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
   const bannerSettings = await getBannerSettings()
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="min-h-screen flex flex-col bg-background grid-pattern text-foreground">
       {/* Discord Banner */}
       <DiscordBanner initialSettings={bannerSettings} />
       
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav" suppressHydrationWarning>
+      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl" suppressHydrationWarning>
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 overflow-x-auto">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">
@@ -72,7 +72,7 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 bg-slate-50 dark:bg-slate-900 grid-pattern">
+      <main className="flex-1 bg-background grid-pattern">
         {children}
       </main>
 
@@ -84,6 +84,7 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
               <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
                 <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
                 <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+                <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
               </div>
               <p className="text-xs sm:text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
             </div>

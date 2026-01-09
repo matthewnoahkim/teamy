@@ -55,7 +55,7 @@ export default async function NewTestPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+    <div className="min-h-screen bg-background grid-pattern">
       <div className="px-4 py-8 lg:px-8">
         <NewTestBuilder clubId={club.id} clubName={club.name} clubDivision={club.division} teams={club.teams} />
       </div>

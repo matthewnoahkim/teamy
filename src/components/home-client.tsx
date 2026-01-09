@@ -92,18 +92,32 @@ export function HomeClient({ memberships: initialMemberships, user }: HomeClient
   }
 
   useEffect(() => {
+    let isMounted = true
+    
     const checkForNewContent = async () => {
+      if (!isMounted) return
+      
       const notifications: Record<string, boolean> = {}
       let totalUnreadItems = 0
 
-      for (const membership of memberships) {
+      // Process clubs in parallel but batch API calls per club
+      const clubChecks = memberships.map(async (membership) => {
         const clubId = membership.club.id
         const lastCleared = getLastClearedTime(clubId)
         let hasNew = false
         let clubUnreadCount = 0
 
         try {
-          const streamResponse = await fetch(`/api/announcements?clubId=${clubId}`)
+          // Batch all API calls for this club in parallel
+          const [streamResponse, calendarResponse, financeResponse, expensesResponse, testsResponse] = await Promise.all([
+            fetch(`/api/announcements?clubId=${clubId}`),
+            fetch(`/api/calendar?clubId=${clubId}`),
+            fetch(`/api/purchase-requests?clubId=${clubId}`),
+            fetch(`/api/expenses?clubId=${clubId}`),
+            fetch(`/api/tests?clubId=${clubId}`)
+          ])
+
+          // Process stream/announcements
           if (streamResponse.ok) {
             const streamData = await streamResponse.json()
             const newAnnouncements = streamData.announcements?.filter((announcement: any) => {
@@ -117,7 +131,7 @@ export function HomeClient({ memberships: initialMemberships, user }: HomeClient
             }
           }
 
-          const calendarResponse = await fetch(`/api/calendar?clubId=${clubId}`)
+          // Process calendar
           if (calendarResponse.ok) {
             const calendarData = await calendarResponse.json()
             const events = calendarData.events || []
@@ -132,7 +146,7 @@ export function HomeClient({ memberships: initialMemberships, user }: HomeClient
             }
           }
 
-          const financeResponse = await fetch(`/api/purchase-requests?clubId=${clubId}`)
+          // Process finance (purchase requests)
           if (financeResponse.ok) {
             const financeData = await financeResponse.json()
             const purchaseRequests = financeData.purchaseRequests || []
@@ -147,7 +161,7 @@ export function HomeClient({ memberships: initialMemberships, user }: HomeClient
             }
           }
 
-          const expensesResponse = await fetch(`/api/expenses?clubId=${clubId}`)
+          // Process expenses
           if (expensesResponse.ok) {
             const expensesData = await expensesResponse.json()
             const expenses = expensesData.expenses || []
@@ -162,7 +176,7 @@ export function HomeClient({ memberships: initialMemberships, user }: HomeClient
             }
           }
 
-          const testsResponse = await fetch(`/api/tests?clubId=${clubId}`)
+          // Process tests
           if (testsResponse.ok) {
             const testsData = await testsResponse.json()
             const newTests = testsData.tests?.filter((test: any) => {
@@ -176,12 +190,23 @@ export function HomeClient({ memberships: initialMemberships, user }: HomeClient
             }
           }
 
-          notifications[clubId] = hasNew
-          totalUnreadItems += clubUnreadCount
+          return { clubId, hasNew, clubUnreadCount }
         } catch (error) {
           console.error(`Failed to check notifications for club ${clubId}:`, error)
+          return { clubId, hasNew: false, clubUnreadCount: 0 }
         }
-      }
+      })
+
+      // Wait for all club checks to complete
+      const results = await Promise.all(clubChecks)
+      
+      if (!isMounted) return
+      
+      // Aggregate results
+      results.forEach(({ clubId, hasNew, clubUnreadCount }) => {
+        notifications[clubId] = hasNew
+        totalUnreadItems += clubUnreadCount
+      })
 
       setClubNotifications(notifications)
       setTotalUnreadCount(totalUnreadItems)
@@ -189,11 +214,15 @@ export function HomeClient({ memberships: initialMemberships, user }: HomeClient
 
     checkForNewContent()
     const interval = setInterval(checkForNewContent, 30000)
-    return () => clearInterval(interval)
+    
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+    }
   }, [memberships, user.id])
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+    <div className="min-h-screen bg-background grid-pattern">
       <AppHeader user={user} />
 
       <main className="container mx-auto px-4 py-8 md:py-12">

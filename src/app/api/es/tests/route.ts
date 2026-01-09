@@ -325,6 +325,8 @@ export async function PUT(request: NextRequest) {
       autoApproveNoteSheet,
       requireOneSitting,
       maxAttempts,
+      releaseScoresAt,
+      scoreReleaseMode,
       questions 
     } = body as {
       testId: string
@@ -345,6 +347,8 @@ export async function PUT(request: NextRequest) {
       autoApproveNoteSheet?: boolean
       requireOneSitting?: boolean
       maxAttempts?: number
+      releaseScoresAt?: string
+      scoreReleaseMode?: 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST'
       questions?: Array<{
         id?: string
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
@@ -508,20 +512,41 @@ export async function PUT(request: NextRequest) {
     if (maxAttempts !== undefined && maxAttempts !== (existingTest as any).maxAttempts) changedFields.push('maxAttempts')
     if (questions) changedFields.push('questions')
 
+    // If publishing, fetch tournament default settings to apply
+    let tournamentDefaults: any = null
+    if (status === 'PUBLISHED') {
+      const tournament = await prisma.tournament.findUnique({
+        where: { id: existingTest.tournamentId },
+        select: {
+          defaultDurationMinutes: true,
+          defaultStartAt: true,
+          defaultEndAt: true,
+          defaultReleaseScoresAt: true,
+          defaultScoreReleaseMode: true,
+          defaultRequireFullscreen: true,
+          defaultAllowCalculator: true,
+          defaultCalculatorType: true,
+          defaultAllowNoteSheet: true,
+          defaultAutoApproveNoteSheet: true,
+          defaultRequireOneSitting: true,
+          defaultMaxAttempts: true,
+        },
+      })
+      tournamentDefaults = tournament
+    }
+
     // Use a transaction to update test and questions
     const updatedTest = await prisma.$transaction(async (tx) => {
-      // Update the test
-      const test = await tx.eSTest.update({
-        where: { id: testId },
-        data: {
-          ...(name && { name }),
-          ...(description !== undefined && { description }),
-          ...(instructions !== undefined && { instructions }),
-          ...(durationMinutes && { durationMinutes }),
-          ...(status && { status }),
-          ...(eventId !== undefined && { eventId }),
-          ...(startAt !== undefined && { startAt: newStartAt }),
-          ...(endAt !== undefined && { endAt: newEndAt }),
+      // Build update data
+      const updateData: any = {
+        ...(name && { name }),
+        ...(description !== undefined && { description }),
+        ...(instructions !== undefined && { instructions }),
+        ...(durationMinutes && { durationMinutes }),
+        ...(status && { status }),
+        ...(eventId !== undefined && { eventId }),
+        ...(startAt !== undefined && { startAt: newStartAt }),
+        ...(endAt !== undefined && { endAt: newEndAt }),
           ...(allowLateUntil !== undefined && { allowLateUntil: allowLateUntil ? new Date(allowLateUntil) : null }),
           ...(requireFullscreen !== undefined && { requireFullscreen }),
           ...(allowCalculator !== undefined && { allowCalculator }),
@@ -529,11 +554,21 @@ export async function PUT(request: NextRequest) {
           ...(calculatorType !== undefined && { calculatorType: allowCalculator && calculatorType ? calculatorType as 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' : null }),
           ...(noteSheetInstructions !== undefined && { noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null }),
           ...(autoApproveNoteSheet !== undefined && { autoApproveNoteSheet: allowNoteSheet ? (autoApproveNoteSheet ?? true) : true }),
+          ...(releaseScoresAt !== undefined && { releaseScoresAt: releaseScoresAt ? new Date(releaseScoresAt) : null }),
+          ...(scoreReleaseMode !== undefined && { scoreReleaseMode: scoreReleaseMode as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST' | null }),
           // Only include requireOneSitting if provided (will be skipped if column doesn't exist)
           ...(requireOneSitting !== undefined ? { requireOneSitting } : {}),
           // Only include maxAttempts if provided (will be skipped if column doesn't exist)
           ...(maxAttempts !== undefined ? { maxAttempts: maxAttempts ?? null } : {}),
-        },
+      }
+
+      // Note: Tournament defaults are no longer automatically applied on publish.
+      // Users must explicitly click "Apply Defaults" button in the UI to apply them.
+
+      // Update the test
+      const test = await tx.eSTest.update({
+        where: { id: testId },
+        data: updateData,
       })
 
       // Get event name - either from the updated event relation or from existing test

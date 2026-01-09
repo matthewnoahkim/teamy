@@ -660,7 +660,7 @@ export function CustomizationClient({ user, preferences }: CustomizationClientPr
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+    <div className="min-h-screen bg-background grid-pattern">
       <AppHeader user={user} />
       
       <main className="max-w-4xl mx-auto px-4 py-8">

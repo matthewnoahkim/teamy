@@ -81,7 +81,7 @@ export function JoinClubPage({ initialCode = '', autoJoin = false }: JoinClubPag
   }, [autoJoin, handleJoin, initialCode])
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern py-8 sm:py-10 md:py-12 px-3 sm:px-4">
+    <div className="min-h-screen bg-background grid-pattern py-8 sm:py-10 md:py-12 px-3 sm:px-4">
       <div className="mx-auto max-w-xl space-y-6 sm:space-y-8">
         <div className="text-center space-y-2.5 sm:space-y-3">
           <div className="mx-auto flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-300">

@@ -85,15 +85,20 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
     }
   }
   
+  // Split text using regex - alternate parts will be matches
   const parts = text.split(regex)
   
-  return parts.map((part, index) => 
-    regex.test(part) ? (
+  // Check if part matches by comparing with original query (case-insensitive)
+  // This avoids regex.test() which modifies lastIndex
+  return parts.map((part, index) => {
+    // Even indices are non-matches, odd indices are matches (due to capture group)
+    const isMatch = index % 2 === 1
+    return isMatch ? (
       <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-foreground px-0.5 rounded">
         {part}
       </mark>
     ) : part
-  )
+  })
 }
 
 export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProps) {
@@ -110,7 +115,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     })) || []
   }, [initialTests])
   const [tests, setTests] = useState<Test[]>(normalizedInitialTests)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialTests) // Only show loading if we don't have initial data
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'opened' | 'completed'>('all')
   const [userAttempts, setUserAttempts] = useState<Map<string, UserAttemptInfo>>(new Map())
@@ -207,26 +212,31 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
       fetchTests()
     } else {
       // With initialTests, we still need to fetch user attempts and note sheets
-      // But we can do this in a single API call instead of N calls
-      const loadInitialData = async () => {
-        try {
-          const response = await fetch(`/api/tests?clubId=${clubId}`)
-          if (response.ok) {
-            const data = await response.json()
-            updateUserAttemptsAndNoteSheets(
-              data.userAttempts || {},
-              data.noteSheets || {}
-            )
+      // Only fetch if we don't already have this data (avoid duplicate calls)
+      if (userAttempts.size === 0 && noteSheets.size === 0) {
+        const loadInitialData = async () => {
+          try {
+            const response = await fetch(`/api/tests?clubId=${clubId}`)
+            if (response.ok) {
+              const data = await response.json()
+              updateUserAttemptsAndNoteSheets(
+                data.userAttempts || {},
+                data.noteSheets || {}
+              )
+            }
+          } catch (error) {
+            console.error('Failed to fetch user attempts and note sheets:', error)
+          } finally {
+            setLoading(false)
           }
-        } catch (error) {
-          console.error('Failed to fetch user attempts and note sheets:', error)
-        } finally {
-          setLoading(false)
         }
+        loadInitialData()
+      } else {
+        // Already have data, just set loading to false
+        setLoading(false)
       }
-      loadInitialData()
     }
-  }, [fetchTests, initialTests, clubId, updateUserAttemptsAndNoteSheets])
+  }, [fetchTests, initialTests, clubId, updateUserAttemptsAndNoteSheets, userAttempts.size, noteSheets.size])
 
   useBackgroundRefresh(
     () => fetchTests({ silent: true }),

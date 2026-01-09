@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -82,6 +82,11 @@ interface ClubPageProps {
     calendarEvents?: any[]
     tests?: any[]
     announcements?: any[]
+    mediaItems?: any[]
+    albums?: any[]
+    forms?: any[]
+    todos?: any[]
+    stats?: any
   }
 }
 
@@ -137,76 +142,88 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
   }
 
   // Check for new content in each tab (from anyone, not just other users)
+  // Optimized: Only check tabs that aren't active, batch API calls, and cache announcements/calendar data
   useEffect(() => {
+    let isMounted = true
+    let timeoutId: NodeJS.Timeout | null = null
+    
     const checkForNewContent = async () => {
+      if (!isMounted) return
+      
       const notifications: Record<string, boolean> = {}
+      const tabsToCheck = ['stream', 'calendar', 'attendance', 'finance', 'tests', 'people'].filter(tab => tab !== activeTab)
+      
+      // Batch fetch shared data once (announcements and calendar are used by multiple tabs)
+      let announcementsData: any = null
+      let calendarData: any = null
+      
+      if (tabsToCheck.includes('stream') || tabsToCheck.includes('calendar') || tabsToCheck.includes('attendance')) {
+        try {
+          const [announcementsResponse, calendarResponse] = await Promise.all([
+            fetch(`/api/announcements?clubId=${club.id}`),
+            fetch(`/api/calendar?clubId=${club.id}`)
+          ])
+          
+          if (announcementsResponse.ok) {
+            announcementsData = await announcementsResponse.json()
+          }
+          if (calendarResponse.ok) {
+            calendarData = await calendarResponse.json()
+          }
+        } catch (error) {
+          console.error('Failed to fetch shared data:', error)
+        }
+      }
 
       // Stream: Check for new announcements
-      if (activeTab !== 'stream') {
+      if (tabsToCheck.includes('stream') && announcementsData) {
         try {
-          const streamResponse = await fetch(`/api/announcements?clubId=${club.id}`)
-          if (streamResponse.ok) {
-            const streamData = await streamResponse.json()
-            const lastCleared = getLastClearedTime('stream')
-            const hasNewAnnouncement = streamData.announcements?.some((announcement: any) => {
-              const isNew = new Date(announcement.createdAt) > lastCleared
-              const isFromOtherUser = announcement.author?.user?.id !== user.id
-              return isNew && isFromOtherUser
-            })
-            
-            const hasNewCalendarPost = streamData.announcements?.some((announcement: any) => {
-              const announcementCreated = new Date(announcement.createdAt)
-              const isNew = announcementCreated > lastCleared
-              const isFromOtherUser = announcement.author?.user?.id !== user.id
-              return isNew && announcement.calendarEventId && isFromOtherUser
-            })
-            
-            notifications.stream = !!(hasNewAnnouncement || hasNewCalendarPost)
-          }
+          const lastCleared = getLastClearedTime('stream')
+          const hasNewAnnouncement = announcementsData.announcements?.some((announcement: any) => {
+            const isNew = new Date(announcement.createdAt) > lastCleared
+            const isFromOtherUser = announcement.author?.user?.id !== user.id
+            return isNew && isFromOtherUser
+          })
+          
+          const hasNewCalendarPost = announcementsData.announcements?.some((announcement: any) => {
+            const announcementCreated = new Date(announcement.createdAt)
+            const isNew = announcementCreated > lastCleared
+            const isFromOtherUser = announcement.author?.user?.id !== user.id
+            return isNew && announcement.calendarEventId && isFromOtherUser
+          })
+          
+          notifications.stream = !!(hasNewAnnouncement || hasNewCalendarPost)
         } catch (error) {
           console.error('Failed to check stream notifications:', error)
         }
       }
 
       // Calendar: Check for new events
-      if (activeTab !== 'calendar') {
+      if (tabsToCheck.includes('calendar') && calendarData) {
         try {
-          const calendarResponse = await fetch(`/api/calendar?clubId=${club.id}`)
-          if (calendarResponse.ok) {
-            const calendarData = await calendarResponse.json()
-            const lastCleared = getLastClearedTime('calendar')
-            const events = calendarData.events || []
-            const hasNewEvent = events.some((event: any) => {
-              const isNew = new Date(event.createdAt) > lastCleared
-              const isFromOtherUser = event.creator?.user?.id !== user.id
-              return isNew && isFromOtherUser
-            })
-            
-            let hasNewEventFromAnnouncement = false
-            try {
-              const announcementsResponse = await fetch(`/api/announcements?clubId=${club.id}`)
-              if (announcementsResponse.ok) {
-                const announcementsData = await announcementsResponse.json()
-                hasNewEventFromAnnouncement = announcementsData.announcements?.some((announcement: any) => {
-                  const announcementCreated = new Date(announcement.createdAt)
-                  const isNew = announcementCreated > lastCleared
-                  const isFromOtherUser = announcement.author?.user?.id !== user.id
-                  return isNew && announcement.calendarEventId && isFromOtherUser
-                })
-              }
-            } catch (error) {
-              // Ignore announcement check errors for calendar
-            }
-            
-            notifications.calendar = !!(hasNewEvent || hasNewEventFromAnnouncement)
-          }
+          const lastCleared = getLastClearedTime('calendar')
+          const events = calendarData.events || []
+          const hasNewEvent = events.some((event: any) => {
+            const isNew = new Date(event.createdAt) > lastCleared
+            const isFromOtherUser = event.creator?.user?.id !== user.id
+            return isNew && isFromOtherUser
+          })
+          
+          const hasNewEventFromAnnouncement = announcementsData?.announcements?.some((announcement: any) => {
+            const announcementCreated = new Date(announcement.createdAt)
+            const isNew = announcementCreated > lastCleared
+            const isFromOtherUser = announcement.author?.user?.id !== user.id
+            return isNew && announcement.calendarEventId && isFromOtherUser
+          })
+          
+          notifications.calendar = !!(hasNewEvent || hasNewEventFromAnnouncement)
         } catch (error) {
           console.error('Failed to check calendar notifications:', error)
         }
       }
 
       // Attendance: Check for new attendance records
-      if (activeTab !== 'attendance') {
+      if (tabsToCheck.includes('attendance')) {
         try {
           const attendanceResponse = await fetch(`/api/attendance?clubId=${club.id}`)
           if (attendanceResponse.ok) {
@@ -218,21 +235,11 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
               return isNew && isFromOtherUser
             })
             
-            let hasNewCalendarEvent = false
-            try {
-              const calendarResponse = await fetch(`/api/calendar?clubId=${club.id}`)
-              if (calendarResponse.ok) {
-                const calendarData = await calendarResponse.json()
-                const events = calendarData.events || []
-                hasNewCalendarEvent = events.some((event: any) => {
-                  const isNew = new Date(event.createdAt) > lastCleared
-                  const isFromOtherUser = event.creator?.user?.id !== user.id
-                  return isNew && isFromOtherUser
-                })
-              }
-            } catch (error) {
-              // Ignore calendar check errors for attendance
-            }
+            const hasNewCalendarEvent = calendarData?.events?.some((event: any) => {
+              const isNew = new Date(event.createdAt) > lastCleared
+              const isFromOtherUser = event.creator?.user?.id !== user.id
+              return isNew && isFromOtherUser
+            })
             
             notifications.attendance = !!(hasNewAttendance || hasNewCalendarEvent)
           }
@@ -242,12 +249,19 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
       }
 
       // Finance: Check for new purchase requests or expenses
-      if (activeTab !== 'finance') {
+      if (tabsToCheck.includes('finance')) {
         try {
           const lastCleared = getLastClearedTime('finance')
           
-          const financeResponse = await fetch(`/api/purchase-requests?clubId=${club.id}`)
+          const [financeResponse, expensesResponse] = await Promise.all([
+            fetch(`/api/purchase-requests?clubId=${club.id}`),
+            fetch(`/api/expenses?clubId=${club.id}`)
+          ])
+          
           let hasNewRequest = false
+          let hasNewExpense = false
+          let hasNewApproval = false
+          
           if (financeResponse.ok) {
             const financeData = await financeResponse.json()
             const purchaseRequests = financeData.purchaseRequests || []
@@ -256,24 +270,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
               const isFromOtherUser = item.requesterId !== currentMembership.id
               return isNew && isFromOtherUser
             })
-          }
-          
-          const expensesResponse = await fetch(`/api/expenses?clubId=${club.id}`)
-          let hasNewExpense = false
-          if (expensesResponse.ok) {
-            const expensesData = await expensesResponse.json()
-            const expenses = expensesData.expenses || []
-            hasNewExpense = expenses.some((item: any) => {
-              const isNew = new Date(item.createdAt) > lastCleared
-              const isFromOtherUser = item.addedById !== currentMembership.id
-              return isNew && isFromOtherUser
-            })
-          }
-          
-          let hasNewApproval = false
-          if (financeResponse.ok) {
-            const financeData = await financeResponse.json()
-            const purchaseRequests = financeData.purchaseRequests || []
+            
             hasNewApproval = purchaseRequests.some((request: any) => {
               if (request.status === 'APPROVED' && request.reviewedAt) {
                 const isNew = new Date(request.reviewedAt) > lastCleared
@@ -284,6 +281,16 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
             })
           }
           
+          if (expensesResponse.ok) {
+            const expensesData = await expensesResponse.json()
+            const expenses = expensesData.expenses || []
+            hasNewExpense = expenses.some((item: any) => {
+              const isNew = new Date(item.createdAt) > lastCleared
+              const isFromOtherUser = item.addedById !== currentMembership.id
+              return isNew && isFromOtherUser
+            })
+          }
+          
           notifications.finance = !!(hasNewRequest || hasNewExpense || hasNewApproval)
         } catch (error) {
           console.error('Failed to check finance notifications:', error)
@@ -291,7 +298,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
       }
 
       // Tests: Check for new tests
-      if (activeTab !== 'tests') {
+      if (tabsToCheck.includes('tests')) {
         try {
           const testsResponse = await fetch(`/api/tests?clubId=${club.id}`)
           if (testsResponse.ok) {
@@ -309,8 +316,8 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
         }
       }
 
-      // People: Check for new members
-      if (activeTab !== 'people') {
+      // People: Check for new members (no API call needed - uses existing club.memberships)
+      if (tabsToCheck.includes('people')) {
         try {
           const lastCleared = getLastClearedTime('people')
           const hasNew = club.memberships?.some((membership: any) => {
@@ -323,17 +330,28 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
         }
       }
 
-      setTabNotifications(prev => {
-        const updated = { ...prev, ...notifications }
-        const totalCount = Object.values(updated).filter(Boolean).length
-        setTotalUnreadCount(totalCount)
-        return updated
-      })
+      if (isMounted) {
+        setTabNotifications(prev => {
+          const updated = { ...prev, ...notifications }
+          const totalCount = Object.values(updated).filter(Boolean).length
+          setTotalUnreadCount(totalCount)
+          return updated
+        })
+      }
     }
 
-    checkForNewContent()
+    // Debounce initial check slightly to avoid running on every activeTab change
+    timeoutId = setTimeout(() => {
+      checkForNewContent()
+    }, 100)
+    
     const interval = setInterval(checkForNewContent, 30000)
-    return () => clearInterval(interval)
+    
+    return () => {
+      isMounted = false
+      if (timeoutId) clearTimeout(timeoutId)
+      clearInterval(interval)
+    }
   }, [club.id, club.memberships, user.id, currentMembership.id, activeTab])
 
   // Clear notification when tab is opened
@@ -410,7 +428,8 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
   const resolvedBackgroundSource =
     personalBackground?.backgroundType ? personalBackground : DEFAULT_BACKGROUND
 
-  const getBackgroundStyle = () => {
+  // Memoize background style calculation to avoid recomputing on every render
+  const backgroundStyle = useMemo(() => {
     const bgType = resolvedBackgroundSource.backgroundType || 'grid'
     
     if (bgType === 'solid' && resolvedBackgroundSource.backgroundColor) {
@@ -447,13 +466,13 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
     }
     
     return {}
-  }
+  }, [resolvedBackgroundSource])
 
   const effectiveBgType = resolvedBackgroundSource.backgroundType || 'grid'
   const showGridPattern = effectiveBgType === 'grid'
-  const showAnimatedBlobs = effectiveBgType === 'grid'
 
-  const renderNavigationButtons = () => (
+  // Memoize navigation buttons to prevent recreation on every render
+  const renderNavigationButtons = useCallback(() => (
     <>
       <Button
         variant={activeTab === 'home' ? 'default' : 'ghost'}
@@ -619,31 +638,21 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
         Settings
       </Button>
     </>
-  )
+  ), [activeTab, tabNotifications, handleTabChange, isAdmin])
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern" style={getBackgroundStyle()}>
-      {showAnimatedBlobs && (
-        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400/20 to-cyan-400/20 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-3xl opacity-40 animate-blob"></div>
-          <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-3xl opacity-40 animate-blob animation-delay-2000"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-indigo-400/20 to-blue-400/20 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-3xl opacity-40 animate-blob animation-delay-4000"></div>
-        </div>
-      )}
-      
-      {showGridPattern && (
-        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] dark:bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)]"></div>
-        </div>
-      )}
-
+    <div 
+      id="club-page-container"
+      className="min-h-screen bg-background grid-pattern"
+      style={backgroundStyle}
+    >
       <AppHeader user={user} showBackButton={true} backHref="/dashboard" title={currentClubName} />
 
       <main className="relative z-10 container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-full overflow-x-hidden">
         <div className="flex gap-4 sm:gap-6 lg:gap-8 items-start">
           <aside className="w-48 lg:w-52 flex-shrink-0 hidden md:block self-start">
             <div className="sticky top-24 will-change-transform">
-              <nav className="space-y-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-800/50 p-3 rounded-2xl shadow-lg">
+              <nav className="space-y-2 bg-card/80 backdrop-blur-sm border border-border/50 p-3 rounded-2xl shadow-lg">
                 {renderNavigationButtons()}
               </nav>
             </div>
@@ -654,7 +663,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
               variant="outline"
               size="sm"
               onClick={() => setMobileMenuOpen(true)}
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200/50 dark:border-gray-800/50 shadow-lg hover:bg-white dark:hover:bg-gray-900"
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0 bg-card/90 backdrop-blur-sm border border-border/50 shadow-lg hover:bg-card"
             >
               <Menu className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="sr-only">Open menu</span>
@@ -662,8 +671,8 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
           </div>
 
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetContent side="left" className="w-[260px] sm:w-[280px] p-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
-              <SheetHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-gray-200/50 dark:border-gray-800/50">
+            <SheetContent side="left" className="w-[260px] sm:w-[280px] p-0 bg-card/95 backdrop-blur-sm">
+              <SheetHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-border/50">
                 <SheetTitle className="text-base sm:text-lg font-semibold">Navigation</SheetTitle>
               </SheetHeader>
               <nav className="p-3 sm:p-4 space-y-1.5 sm:space-y-2 overflow-y-auto max-h-[calc(100vh-100px)]">
@@ -674,11 +683,11 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
 
           <div className="flex-1 min-w-0 md:pl-0 pl-9 sm:pl-10 flex flex-col min-h-0">
             {activeTab === 'settings' && (
-              <div className="mb-4 sm:mb-5 md:mb-6 p-4 sm:p-5 md:p-6 rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-800/50">
+              <div className="mb-4 sm:mb-5 md:mb-6 p-4 sm:p-5 md:p-6 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50">
                 <div className="flex items-center justify-between flex-wrap gap-3 sm:gap-4">
                   <div>
                     <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
-                      <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white break-words">{currentClubName}</h2>
+                      <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground break-words">{currentClubName}</h2>
                       {isAdmin && (
                         <Button
                           variant="ghost"
@@ -687,7 +696,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
                             setNewClubName(currentClubName)
                             setEditClubNameOpen(true)
                           }}
-                          className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 flex-shrink-0"
+                          className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-muted flex-shrink-0"
                         >
                           <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
@@ -696,7 +705,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
                         Division {club.division}
                       </Badge>
                     </div>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-2">
                       <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       {club.memberships.length} member{club.memberships.length !== 1 ? 's' : ''}
                     </p>
@@ -724,6 +733,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
                 teams={club.teams}
                 isAdmin={isAdmin}
                 user={user}
+                initialAnnouncements={initialData?.announcements}
               />
             )}
 
@@ -781,6 +791,8 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
                 clubId={club.id}
                 user={user}
                 isAdmin={isAdmin}
+                initialMediaItems={initialData?.mediaItems}
+                initialAlbums={initialData?.albums}
               />
             )}
 
@@ -789,6 +801,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
                 clubId={club.id}
                 user={user}
                 isAdmin={isAdmin}
+                initialForms={initialData?.forms}
               />
             )}
 
@@ -798,6 +811,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
                 currentMembershipId={currentMembership.id}
                 user={user}
                 isAdmin={isAdmin}
+                initialTodos={initialData?.todos}
               />
             )}
 
@@ -814,6 +828,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
               <StatsTab
                 clubId={club.id}
                 division={club.division}
+                initialStats={initialData?.stats}
               />
             )}
 

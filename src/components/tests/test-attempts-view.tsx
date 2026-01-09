@@ -872,7 +872,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                       {selectedAttempt.proctorEvents.map((event, idx) => (
                         <div
                           key={event.id}
-                          className="flex items-start gap-3 p-2 rounded bg-white dark:bg-slate-900 border border-orange-200 dark:border-orange-800"
+                          className="flex items-start gap-3 p-2 rounded bg-card border border-orange-200 dark:border-orange-800"
                         >
                           <div className="flex-shrink-0 w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center text-xs font-semibold text-orange-700 dark:text-orange-300">
                             {idx + 1}

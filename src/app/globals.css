@@ -133,11 +133,11 @@
 
   /* App shell backgrounds */
   .app-shell-light {
-    @apply bg-slate-50;
+    @apply bg-background;
   }
   
   .app-shell-dark {
-    @apply bg-slate-900;
+    @apply bg-background;
   }
   
   /* Sidebar styles */
@@ -169,12 +169,12 @@
   }
   
   .bg-gradient-card-light {
-    @apply bg-white;
+    @apply bg-card;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   }
   
   .bg-gradient-card-dark {
-    @apply bg-slate-800;
+    @apply bg-card;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   }
 
@@ -450,6 +450,11 @@
   .dark .glass-modern {
     background: rgba(30, 41, 59, 0.7);
     border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Dark mode card glow effect */
+  .dark .shadow-card {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(111, 214, 255, 0.1);
   }
 
   /* Elegant gradient animations */
