@@ -1,53 +1,55 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { withRateLimit } from '@/lib/rate-limit-api'
+import { grantApplicationSchema, validateRequestBody } from '@/lib/validation-schemas'
+import { getValidatedWebhook } from '@/lib/security-config'
 
-const GRANTS_DISCORD_WEBHOOK_URL = process.env.GRANTS_DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1457414413459128494/DH2L77mREnKKf2CGDCfiFRFP0iNfV5iBC-SmSVoWvwjrhaoQwGiF3aBJLXq4xF3y-_XI'
+/**
+ * Grant Application API Endpoint
+ * 
+ * SECURITY MEASURES:
+ * - Rate limited to 3 requests per hour per IP (prevents abuse)
+ * - Comprehensive input validation with Zod schemas
+ * - Input sanitization to prevent injection attacks
+ * - Webhook URL stored in environment variables
+ * - Email confirmation validation
+ * - Role-based field requirements (coach info for officers)
+ * 
+ * IMPORTANT: Grant applications contain sensitive financial information
+ */
 
-export async function POST(request: Request) {
+async function handlePOST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    const {
-      clubName,
-      schoolName,
-      schoolAddress,
-      clubDivision,
-      numberOfTeams,
-      yearsParticipating,
-      grantAmount,
-      clubDescription,
-      grantBenefit,
-      suggestions,
-      contactRole,
-      applicantName,
-      applicantEmail,
-      coachName,
-      coachEmail,
-    } = body
-
-    // Validate required fields
-    if (!clubName || !schoolName || !schoolAddress || !clubDivision || 
-        !numberOfTeams || !yearsParticipating || !grantAmount ||
-        !clubDescription || !grantBenefit || !contactRole || 
-        !applicantName || !applicantEmail) {
+    // Validate and sanitize all input fields
+    const validation = validateRequestBody(body, grantApplicationSchema)
+    
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: validation.error, details: validation.details },
         { status: 400 }
       )
     }
 
-    // If officer, coach info is required
-    if (contactRole === 'officer' && (!coachName || !coachEmail)) {
-      return NextResponse.json(
-        { error: 'Coach information required for officer/captain applications' },
-        { status: 400 }
-      )
+    const data = validation.data
+    
+    // Get validated webhook URL from environment
+    const webhookUrl = getValidatedWebhook('GRANTS')
+    
+    if (!webhookUrl) {
+      console.error('Grants webhook URL not configured or invalid')
+      // Still return success - don't expose configuration issues
+      return NextResponse.json({ 
+        success: true,
+        message: 'Your grant application has been received. We will review it and get back to you soon.' 
+      })
     }
 
     // Send Discord webhook notification
-    if (GRANTS_DISCORD_WEBHOOK_URL) {
-      const contactInfo = contactRole === 'coach' 
-        ? `Coach: ${applicantName} (${applicantEmail})`
-        : `Officer/Captain: ${applicantName} (${applicantEmail})\nCoach: ${coachName} (${coachEmail})`
+    if (webhookUrl) {
+      const contactInfo = data.contactRole === 'coach' 
+        ? `Coach: ${data.applicantName} (${data.applicantEmail})`
+        : `Officer/Captain: ${data.applicantName} (${data.applicantEmail})\nCoach: ${data.coachName} (${data.coachEmail})`
 
       const embed = {
         title: 'New Grant Application',
@@ -55,42 +57,42 @@ export async function POST(request: Request) {
         fields: [
           {
             name: 'Club Information',
-            value: `Club: ${clubName}\nSchool: ${schoolName}\nAddress: ${schoolAddress}`,
+            value: `Club: ${data.clubName}\nSchool: ${data.schoolName}\nAddress: ${data.schoolAddress}`,
             inline: false,
           },
           {
             name: 'Division',
-            value: clubDivision,
+            value: data.clubDivision,
             inline: true,
           },
           {
             name: 'Number of Teams',
-            value: numberOfTeams,
+            value: String(data.numberOfTeams),
             inline: true,
           },
           {
             name: 'Years in Science Olympiad',
-            value: yearsParticipating,
+            value: String(data.yearsParticipating),
             inline: true,
           },
           {
             name: 'Requested Amount',
-            value: `$${grantAmount}`,
+            value: `$${data.grantAmount}`,
             inline: true,
           },
           {
             name: 'Club Description',
-            value: clubDescription.substring(0, 1000) + (clubDescription.length > 1000 ? '...' : ''),
+            value: data.clubDescription.substring(0, 1000) + (data.clubDescription.length > 1000 ? '...' : ''),
             inline: false,
           },
           {
             name: 'How Grant Would Benefit Team',
-            value: grantBenefit.substring(0, 1000) + (grantBenefit.length > 1000 ? '...' : ''),
+            value: data.grantBenefit.substring(0, 1000) + (data.grantBenefit.length > 1000 ? '...' : ''),
             inline: false,
           },
-          ...(suggestions ? [{
+          ...(data.suggestions ? [{
             name: 'Suggestions for Teamy',
-            value: suggestions.substring(0, 500) + (suggestions.length > 500 ? '...' : ''),
+            value: data.suggestions.substring(0, 500) + (data.suggestions.length > 500 ? '...' : ''),
             inline: false,
           }] : []),
           {
@@ -103,7 +105,7 @@ export async function POST(request: Request) {
       }
 
       try {
-        await fetch(GRANTS_DISCORD_WEBHOOK_URL, {
+        await fetch(webhookUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -118,13 +120,22 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true,
+      message: 'Your grant application has been received. We will review it and get back to you soon.' 
+    })
   } catch (error) {
     console.error('Grant application error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'An error occurred while processing your application. Please try again later.' },
       { status: 500 }
     )
   }
 }
 
+// Apply rate limiting: 3 requests per hour to prevent spam (grants are infrequent)
+export const POST = withRateLimit(handlePOST, {
+  limit: 3,
+  window: 3600, // 1 hour
+  identifier: 'grant application',
+})

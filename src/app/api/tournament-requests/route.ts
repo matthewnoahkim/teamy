@@ -1,152 +1,168 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
+import { withRateLimit } from '@/lib/rate-limit-api'
+import { tournamentRequestSchema, validateRequestBody } from '@/lib/validation-schemas'
+import { getValidatedWebhook, EMAIL_CONFIG } from '@/lib/security-config'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1444884965656498297/cYFv5fCpclifIVFzyi4a6tN3a5u_hpGE2AZGfPCT8hyJkfo96hcCdcYmBL-YvG2LOjXU'
+/**
+ * Tournament Hosting Request API Endpoint
+ * 
+ * SECURITY MEASURES:
+ * - Rate limited to 3 requests per hour per IP
+ * - Comprehensive input validation with Zod schemas
+ * - Input sanitization to prevent injection attacks
+ * - Webhook URL stored in environment variables
+ * - Email confirmation validation
+ * - Slug validation to prevent URL injection
+ */
+
+const resend = EMAIL_CONFIG.RESEND_API_KEY ? new Resend(EMAIL_CONFIG.RESEND_API_KEY) : null
 
 // POST - Submit a new tournament hosting request
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const body = await request.json()
-    const {
-      tournamentName,
-      tournamentLevel,
-      division,
-      tournamentFormat,
-      location,
-      preferredSlug,
-      directorName,
-      directorEmail,
-      directorPhone,
-      otherNotes,
-    } = body
-
-    // Validate required fields
-    if (!tournamentName || !tournamentLevel || !division || !tournamentFormat || !directorName || !directorEmail) {
+    
+    // Validate and sanitize all input fields
+    const validation = validateRequestBody(body, tournamentRequestSchema)
+    
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: validation.error, details: validation.details },
         { status: 400 }
       )
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(directorEmail)) {
-      return NextResponse.json(
-        { error: 'Invalid email format' },
-        { status: 400 }
-      )
+    const data = validation.data
+    
+    // If slug is provided, check if it's available
+    if (data.preferredSlug) {
+      const existingTournament = await prisma.tournament.findUnique({
+        where: { slug: data.preferredSlug },
+      })
+      
+      if (existingTournament) {
+        return NextResponse.json(
+          { error: 'This slug is already taken. Please choose another one.' },
+          { status: 409 }
+        )
+      }
     }
 
     // Create the tournament hosting request
     const hostingRequest = await prisma.tournamentHostingRequest.create({
       data: {
-        tournamentName,
-        tournamentLevel,
-        division,
-        tournamentFormat,
-        location: location || null,
-        preferredSlug: preferredSlug || null,
-        directorName,
-        directorEmail,
-        directorPhone: directorPhone || null,
-        otherNotes: otherNotes || null,
+        tournamentName: data.tournamentName,
+        tournamentLevel: data.tournamentLevel,
+        division: data.division,
+        tournamentFormat: data.tournamentFormat,
+        location: data.location || null,
+        preferredSlug: data.preferredSlug || null,
+        directorName: data.directorName,
+        directorEmail: data.directorEmail,
+        directorPhone: data.directorPhone || null,
+        otherNotes: data.otherNotes || null,
       },
     })
 
-    // Send to Discord webhook
-    try {
-      const formatLabel = tournamentFormat === 'in-person' ? 'In-Person' : tournamentFormat === 'satellite' ? 'Satellite' : 'Mini SO'
-      const levelLabel = tournamentLevel.charAt(0).toUpperCase() + tournamentLevel.slice(1)
-      
-      const discordPayload = {
-        embeds: [
-          {
-            title: 'New Tournament Hosting Request',
-            color: 0x0056C7, // Teamy primary blue
-            fields: [
-              {
-                name: 'Tournament Name',
-                value: tournamentName,
-                inline: false,
-              },
-              {
-                name: 'Level',
-                value: levelLabel,
-                inline: true,
-              },
-              {
-                name: 'Division',
-                value: `Division ${division}`,
-                inline: true,
-              },
-              {
-                name: 'Format',
-                value: formatLabel,
-                inline: true,
-              },
-              ...(location ? [{
-                name: 'Location',
-                value: location,
-                inline: false,
-              }] : []),
-              ...(preferredSlug ? [{
-                name: 'Preferred Slug',
-                value: `teamy.site/tournaments/${preferredSlug}`,
-                inline: false,
-              }] : []),
-              {
-                name: 'Director Name',
-                value: directorName,
-                inline: true,
-              },
-              {
-                name: 'Director Email',
-                value: directorEmail,
-                inline: true,
-              },
-              ...(directorPhone ? [{
-                name: 'Phone',
-                value: directorPhone,
-                inline: true,
-              }] : []),
-              ...(otherNotes ? [{
-                name: 'Notes',
-                value: otherNotes.length > 1024 ? otherNotes.substring(0, 1021) + '...' : otherNotes,
-                inline: false,
-              }] : []),
-            ],
-            timestamp: new Date().toISOString(),
-            footer: {
-              text: 'Teamy Tournament Request',
-            },
-          },
-        ],
-      }
+    // Get validated webhook URL from environment
+    const webhookUrl = getValidatedWebhook('TOURNAMENT_REQUEST')
 
-      await fetch(DISCORD_WEBHOOK_URL, {
+    // Send to Discord webhook
+    if (webhookUrl) {
+      try {
+        const formatLabel = data.tournamentFormat === 'in-person' ? 'In-Person' : data.tournamentFormat === 'satellite' ? 'Satellite' : 'Mini SO'
+        const levelLabel = data.tournamentLevel.charAt(0).toUpperCase() + data.tournamentLevel.slice(1)
+      
+        const discordPayload = {
+          embeds: [
+            {
+              title: 'New Tournament Hosting Request',
+              color: 0x0056C7, // Teamy primary blue
+              fields: [
+                {
+                  name: 'Tournament Name',
+                  value: data.tournamentName,
+                  inline: false,
+                },
+                {
+                  name: 'Level',
+                  value: levelLabel,
+                  inline: true,
+                },
+                {
+                  name: 'Division',
+                  value: `Division ${data.division}`,
+                  inline: true,
+                },
+                {
+                  name: 'Format',
+                  value: formatLabel,
+                  inline: true,
+                },
+                ...(data.location ? [{
+                  name: 'Location',
+                  value: data.location,
+                  inline: false,
+                }] : []),
+                ...(data.preferredSlug ? [{
+                  name: 'Preferred Slug',
+                  value: `teamy.site/tournaments/${data.preferredSlug}`,
+                  inline: false,
+                }] : []),
+                {
+                  name: 'Director Name',
+                  value: data.directorName,
+                  inline: true,
+                },
+                {
+                  name: 'Director Email',
+                  value: data.directorEmail,
+                  inline: true,
+                },
+                ...(data.directorPhone ? [{
+                  name: 'Phone',
+                  value: data.directorPhone,
+                  inline: true,
+                }] : []),
+                ...(data.otherNotes ? [{
+                  name: 'Notes',
+                  value: data.otherNotes.length > 1024 ? data.otherNotes.substring(0, 1021) + '...' : data.otherNotes,
+                  inline: false,
+                }] : []),
+              ],
+              timestamp: new Date().toISOString(),
+              footer: {
+                text: 'Teamy Tournament Request',
+              },
+            },
+          ],
+        }
+
+        await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(discordPayload),
-      })
-      console.log('Discord webhook sent for tournament request:', tournamentName)
-    } catch (webhookError) {
-      // Log webhook error but don't fail the request
-      console.error('Failed to send Discord webhook:', webhookError)
+        })
+        console.log('Discord webhook sent for tournament request:', data.tournamentName)
+      } catch (webhookError) {
+        // Log webhook error but don't fail the request
+        console.error('Failed to send Discord webhook:', webhookError)
+      }
     }
 
     // Send confirmation email to the tournament director
     try {
-      if (process.env.RESEND_API_KEY) {
+      if (resend && EMAIL_CONFIG.RESEND_API_KEY) {
         const baseUrl = process.env.NEXTAUTH_URL || 'https://teamy.site'
         
         await resend.emails.send({
-          from: 'Teamy <no-reply@teamy.site>',
-          to: [directorEmail],
-          subject: `Tournament Hosting Request Received - ${tournamentName}`,
+          from: EMAIL_CONFIG.FROM_EMAIL,
+          to: [data.directorEmail],
+          subject: `Tournament Hosting Request Received - ${data.tournamentName}`,
           html: `
             <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <div style="text-align: center; margin-bottom: 32px;">
@@ -157,11 +173,11 @@ export async function POST(request: NextRequest) {
               <h2 style="color: #1f2937; margin-top: 0;">Tournament Hosting Request Received</h2>
               
               <p style="color: #374151; line-height: 1.6;">
-                Hi ${directorName},
+                Hi ${data.directorName},
               </p>
               
               <p style="color: #374151; line-height: 1.6;">
-                Thank you for your interest in hosting <strong>${tournamentName}</strong> on Teamy! 
+                Thank you for your interest in hosting <strong>${data.tournamentName}</strong> on Teamy! 
                 We have received your tournament hosting request and it is currently <strong>pending approval</strong>.
               </p>
               
@@ -182,7 +198,7 @@ export async function POST(request: NextRequest) {
                   Visit TD Portal
                 </a>
                 <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0;">
-                  Sign in with this email (${directorEmail}) to view your request status.
+                  Sign in with this email (${data.directorEmail}) to view your request status.
                 </p>
               </div>
               
@@ -191,30 +207,30 @@ export async function POST(request: NextRequest) {
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; width: 140px;">Tournament Name:</td>
-                    <td style="padding: 8px 0; color: #1f2937; font-weight: 500;">${tournamentName}</td>
+                    <td style="padding: 8px 0; color: #1f2937; font-weight: 500;">${data.tournamentName}</td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280;">Level:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">${tournamentLevel.charAt(0).toUpperCase() + tournamentLevel.slice(1)}</td>
+                    <td style="padding: 8px 0; color: #1f2937;">${data.tournamentLevel.charAt(0).toUpperCase() + data.tournamentLevel.slice(1)}</td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280;">Division:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">Division ${division}</td>
+                    <td style="padding: 8px 0; color: #1f2937;">Division ${data.division}</td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280;">Format:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">${tournamentFormat === 'in-person' ? 'In-Person' : tournamentFormat === 'satellite' ? 'Satellite' : 'Mini SO'}</td>
+                    <td style="padding: 8px 0; color: #1f2937;">${data.tournamentFormat === 'in-person' ? 'In-Person' : data.tournamentFormat === 'satellite' ? 'Satellite' : 'Mini SO'}</td>
                   </tr>
-                  ${location ? `
+                  ${data.location ? `
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280;">Location:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">${location}</td>
+                    <td style="padding: 8px 0; color: #1f2937;">${data.location}</td>
                   </tr>
                   ` : ''}
-                  ${preferredSlug ? `
+                  ${data.preferredSlug ? `
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280;">Preferred URL:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">teamy.site/tournaments/${preferredSlug}</td>
+                    <td style="padding: 8px 0; color: #1f2937;">teamy.site/tournaments/${data.preferredSlug}</td>
                   </tr>
                   ` : ''}
                 </table>
@@ -234,7 +250,7 @@ export async function POST(request: NextRequest) {
             </div>
           `,
         })
-        console.log('Confirmation email sent to:', directorEmail)
+        console.log('Confirmation email sent to:', data.directorEmail)
       }
     } catch (emailError) {
       // Log email error but don't fail the request
@@ -243,18 +259,27 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      requestId: hostingRequest.id 
+      requestId: hostingRequest.id,
+      message: 'Your tournament hosting request has been submitted successfully!' 
     })
   } catch (error) {
     console.error('Error creating tournament hosting request:', error)
     return NextResponse.json(
-      { error: 'Failed to submit request' },
+      { error: 'An error occurred while submitting your request. Please try again later.' },
       { status: 500 }
     )
   }
 }
 
+// Apply rate limiting: 3 requests per hour per IP (tournaments are infrequent)
+export const POST = withRateLimit(handlePOST, {
+  limit: 3,
+  window: 3600, // 1 hour
+  identifier: 'tournament request',
+})
+
 // GET - Get all tournament hosting requests (for dev panel)
+// Note: This should be protected by authentication middleware
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)

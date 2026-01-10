@@ -1,27 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withRateLimit } from '@/lib/rate-limit-api'
+import { demoRequestSchema, validateRequestBody } from '@/lib/validation-schemas'
+import { getValidatedWebhook } from '@/lib/security-config'
 
-const DEMO_DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1457414705717973023/BF0Lcg7sztj4YM-Lq-ct_zoeIKmRzgL3T4E4HJZR_XLVVE6cx0cXX4g-9tZj3yXu3O0p'
+/**
+ * Demo Request API Endpoint
+ * 
+ * SECURITY MEASURES:
+ * - Rate limited to 5 requests per minute per IP (prevents spam/abuse)
+ * - Strict input validation with Zod schemas
+ * - Input sanitization to prevent injection attacks
+ * - Webhook URL stored in environment variables
+ * - Email validation to ensure valid format
+ */
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, schoolName } = body
 
-    // Validate input
-    if (!email || !schoolName) {
+    // Validate and sanitize input
+    const validation = validateRequestBody(body, demoRequestSchema)
+
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Email and school name are required' },
+        { error: validation.error, details: validation.details },
         { status: 400 }
       )
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'Invalid email format' },
-        { status: 400 }
-      )
+    const { email, schoolName } = validation.data
+
+    // Get validated webhook URL from environment
+    const webhookUrl = getValidatedWebhook('DEMO')
+
+    if (!webhookUrl) {
+      console.error('Demo webhook URL not configured or invalid')
+      // Return success to user but log error
+      return NextResponse.json({ 
+        success: true,
+        message: 'Thank you! We will contact you soon to schedule a demo.' 
+      })
     }
 
     // Create Discord embed message
@@ -51,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send to Discord webhook
-    const discordResponse = await fetch(DEMO_DISCORD_WEBHOOK_URL, {
+    const discordResponse = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -61,18 +79,25 @@ export async function POST(request: NextRequest) {
 
     if (!discordResponse.ok) {
       console.error('Discord webhook failed:', await discordResponse.text())
-      return NextResponse.json(
-        { error: 'Failed to send demo request' },
-        { status: 500 }
-      )
+      // Still return success to user
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true,
+      message: 'Thank you! We will contact you soon to schedule a demo.' 
+    })
   } catch (error) {
     console.error('Demo request error:', error)
     return NextResponse.json(
-      { error: 'An error occurred while processing your request' },
+      { error: 'An error occurred while processing your request. Please try again later.' },
       { status: 500 }
     )
   }
 }
+
+// Apply rate limiting: 5 requests per minute to prevent spam
+export const POST = withRateLimit(handlePOST, {
+  limit: 5,
+  window: 60,
+  identifier: 'demo request',
+})

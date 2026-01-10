@@ -170,7 +170,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
       {/* Dropdown Portal - Rendered outside container */}
       {openDropdown && (
         <div
-          className="fixed z-[9999] mt-1.5"
+          className="fixed z-[9999] -mt-2"
           style={{
             top: `${dropdownPosition.top}px`,
             left: `${dropdownPosition.left}px`,
@@ -188,12 +188,12 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
           }}
         >
           <div className={cn(
-            "w-64 rounded-xl shadow-xl border backdrop-blur-xl",
+            "w-60 rounded-lg shadow-xl border backdrop-blur-xl",
             isLight
               ? "bg-popover border-border"
               : "bg-background border-border"
           )}>
-            <div className="p-2 space-y-2">
+            <div className="p-1.5">
               {navItems
                 .find(item => item.label === openDropdown)
                 ?.items?.map((subItem) => {
@@ -203,7 +203,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                       key={subItem.href}
                       href={subItem.href}
                       className={cn(
-                        "block px-4 py-3 rounded-lg transition-colors text-base leading-tight font-sans font-medium",
+                        "block px-3 py-2 rounded-md transition-colors text-base leading-tight font-sans font-medium",
                         active
                           ? "bg-teamy-primary/10 text-teamy-primary"
                           : "text-foreground hover:bg-secondary"

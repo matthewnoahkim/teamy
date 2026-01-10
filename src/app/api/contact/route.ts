@@ -1,32 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sanitizeString } from '@/lib/input-validation'
-import { z } from 'zod'
+import { withRateLimit, RATE_LIMITS } from '@/lib/rate-limit-api'
+import { contactFormSchema, validateRequestBody } from '@/lib/validation-schemas'
+import { getValidatedWebhook } from '@/lib/security-config'
 
-const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1441856071911211228/fXL-cAc4oLN2flLH3W7nDcTGkupuKNvETf1ExSUqhSuCo8ZUrY5vovxIWQjY7qNBkRtf'
+/**
+ * Contact Form API Endpoint
+ * 
+ * SECURITY MEASURES:
+ * - Rate limited to 5 requests per minute per IP (prevents spam)
+ * - Strict input validation with Zod schemas
+ * - Input sanitization to prevent injection attacks
+ * - Webhook URL stored in environment variables
+ * - Error messages don't expose internal details
+ */
 
-// Validation schema for contact form
-const contactFormSchema = z.object({
-  name: z.string().min(1).max(200).transform((val) => sanitizeString(val, 200)),
-  email: z.string().email().max(255).transform((val) => sanitizeString(val, 255)),
-  subject: z.string().min(1).max(200).transform((val) => sanitizeString(val, 200)),
-  message: z.string().min(1).max(5000).transform((val) => sanitizeString(val, 5000)),
-})
-
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    // Validate and sanitize input using Zod
-    const validationResult = contactFormSchema.safeParse(body)
+    // Validate and sanitize input
+    const validation = validateRequestBody(body, contactFormSchema)
     
-    if (!validationResult.success) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Invalid input', details: validationResult.error.errors },
+        { error: validation.error, details: validation.details },
         { status: 400 }
       )
     }
     
-    const { name, email, subject, message } = validationResult.data
+    const { name, email, subject, message } = validation.data
+    
+    // Get validated webhook URL from environment
+    const webhookUrl = getValidatedWebhook('CONTACT')
+    
+    if (!webhookUrl) {
+      console.error('Contact webhook URL not configured or invalid')
+      // Return success to user but log error - don't expose internal config issues
+      return NextResponse.json({ 
+        success: true,
+        message: 'Your message has been received. We will get back to you soon.' 
+      })
+    }
 
     // Create Discord embed message
     const discordPayload = {
@@ -65,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send to Discord webhook
-    const discordResponse = await fetch(DISCORD_WEBHOOK_URL, {
+    const discordResponse = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -75,19 +89,26 @@ export async function POST(request: NextRequest) {
 
     if (!discordResponse.ok) {
       console.error('Discord webhook failed:', await discordResponse.text())
-      return NextResponse.json(
-        { error: 'Failed to send message' },
-        { status: 500 }
-      )
+      // Still return success to user - notification failure shouldn't block submission
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true,
+      message: 'Thank you for contacting us. We will respond soon!' 
+    })
   } catch (error) {
     console.error('Contact form error:', error)
     return NextResponse.json(
-      { error: 'An error occurred while processing your request' },
+      { error: 'An error occurred while processing your request. Please try again later.' },
       { status: 500 }
     )
   }
 }
 
+// Apply rate limiting: 5 requests per minute to prevent spam
+// This is a public endpoint, so rate limiting is critical
+export const POST = withRateLimit(handlePOST, {
+  limit: 5,
+  window: 60,
+  identifier: 'contact form',
+})

@@ -1,4 +1,4 @@
-// API logging and rate limiting middleware
+// API logging, rate limiting, and security middleware
 
 import { NextRequest, NextResponse } from 'next/server'
 import {
@@ -7,6 +7,17 @@ import {
   checkRateLimit,
   getRateLimitHeaders,
 } from '@/lib/rate-limit'
+import { getSecurityHeaders } from '@/lib/security-config'
+
+/**
+ * Middleware for API protection and security hardening
+ * 
+ * SECURITY FEATURES:
+ * 1. Rate limiting (IP + user-based)
+ * 2. Security headers (OWASP best practices)
+ * 3. CORS protection
+ * 4. Request validation
+ */
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -63,6 +74,12 @@ export async function middleware(request: NextRequest) {
     
     Object.entries(rateLimitHeaders).forEach(([key, value]) => {
       response.headers.set(key, String(value))
+    })
+
+    // Add security headers to all responses (OWASP best practices)
+    const securityHeaders = getSecurityHeaders()
+    Object.entries(securityHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value)
     })
 
     return response
