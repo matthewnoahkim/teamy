@@ -6,6 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { signOut } from 'next-auth/react'
+import { EditUsernameDialog } from '@/components/edit-username-dialog'
+import { Pencil, LogOut, ChevronDown } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -101,6 +112,8 @@ export function TournamentRegistrationClient({
   userClubs,
 }: TournamentRegistrationClientProps) {
   const { toast } = useToast()
+  const [editUsernameOpen, setEditUsernameOpen] = useState(false)
+  const [currentUserName, setCurrentUserName] = useState(user?.name ?? null)
   
   // Registration state
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false)
@@ -215,30 +228,74 @@ export function TournamentRegistrationClient({
 
   const tournamentSlug = tournament.slug || tournament.id
 
+  const handleSignOut = async () => {
+    try {
+      await signOut({ callbackUrl: '/' })
+    } catch (error) {
+      console.error('Sign out error', error)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+    <div className="min-h-screen bg-background grid-pattern flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-4">
-            <ThemeToggle variant="header" />
-            {user ? (
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/10 transition-colors">
-                  Dashboard
-                </Button>
-              </Link>
+            {user && user.id ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 sm:gap-3 outline-none">
+                    <Avatar 
+                      className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all"
+                    >
+                      <AvatarImage src={undefined} />
+                      <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
+                        {currentUserName?.charAt(0) || (user.email || '').charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="hidden sm:block text-left max-w-[120px] md:max-w-none">
+                      <p className="text-xs sm:text-sm font-medium text-white truncate">
+                        {currentUserName || user.email}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-white/60 truncate">{user.email}</p>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-white/60 hidden sm:block" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Username
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
-              <Link href={`/login?callbackUrl=${encodeURIComponent(`/tournaments/${tournamentSlug}/register`)}`}>
-                <Button variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/10 transition-colors">
+              <Link href={`/login?callbackUrl=${encodeURIComponent(`/tournaments/${tournamentSlug}/register`)}`} className="hidden md:block">
+                <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm">
                   Sign In
-                </Button>
+                </button>
               </Link>
             )}
+            <ThemeToggle variant="header" />
           </div>
         </div>
       </header>
+      
+      {user && user.id && (
+        <EditUsernameDialog
+          open={editUsernameOpen}
+          onOpenChange={setEditUsernameOpen}
+          currentName={currentUserName}
+          onNameUpdated={setCurrentUserName}
+        />
+      )}
 
       <main className="container mx-auto px-4 py-8 max-w-6xl flex-1">
         {/* Back link */}
@@ -653,16 +710,17 @@ export function TournamentRegistrationClient({
       </main>
 
       {/* Footer */}
-      <footer className="border-t mt-auto">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <Link href="/terms" className="hover:text-foreground">Terms</Link>
-              <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+      <footer className="border-t border-border bg-card py-4 mt-auto">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-center md:text-left">
+            <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
+              <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
             </div>
-            <span className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               © {new Date().getFullYear()} Teamy. All rights reserved.
-            </span>
+            </p>
           </div>
         </div>
       </footer>

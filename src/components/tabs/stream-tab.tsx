@@ -31,6 +31,7 @@ interface StreamTabProps {
     email: string
     image?: string | null
   }
+  initialAnnouncements?: any[]
 }
 
 type AnnouncementsResponse = {
@@ -52,10 +53,10 @@ async function performRequest(url: string, options: RequestInit = {}, fallbackMe
   return response
 }
 
-export function StreamTab({ clubId, currentMembership, teams, isAdmin, user }: StreamTabProps) {
+export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, initialAnnouncements }: StreamTabProps) {
   const { toast } = useToast()
-  const [announcements, setAnnouncements] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+  const [announcements, setAnnouncements] = useState<any[]>(initialAnnouncements || [])
+  const [loading, setLoading] = useState(!initialAnnouncements)
   const [posting, setPosting] = useState(false)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -133,8 +134,11 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user }: S
   }, [clubId])
 
   useEffect(() => {
-    fetchAnnouncements()
-  }, [fetchAnnouncements])
+    // Skip initial fetch if we already have data from server
+    if (!initialAnnouncements) {
+      fetchAnnouncements()
+    }
+  }, [fetchAnnouncements, initialAnnouncements])
 
   useBackgroundRefresh(
     () => fetchAnnouncements({ silent: true }),
@@ -144,30 +148,35 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user }: S
     },
   )
 
-  // Fetch events for the team's division
+  // Fetch events for the team's division - defer to not block initial render
   useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        // Get team's division from first membership
-        const teamResponse = await fetch(`/api/clubs/${clubId}`)
-        if (teamResponse.ok) {
-          const teamData = await teamResponse.json()
-          const division = teamData.team?.division
-          
-          if (division) {
-            const eventsResponse = await fetch(`/api/events?division=${division}`)
-            if (eventsResponse.ok) {
-              const eventsData = await eventsResponse.json()
-              setAvailableEvents(eventsData.events || [])
+    // Defer this fetch slightly to prioritize announcements
+    const timer = setTimeout(() => {
+      const fetchEvents = async () => {
+        try {
+          // Get team's division from first membership
+          const teamResponse = await fetch(`/api/clubs/${clubId}`)
+          if (teamResponse.ok) {
+            const teamData = await teamResponse.json()
+            const division = teamData.team?.division
+            
+            if (division) {
+              const eventsResponse = await fetch(`/api/events?division=${division}`)
+              if (eventsResponse.ok) {
+                const eventsData = await eventsResponse.json()
+                setAvailableEvents(eventsData.events || [])
+              }
             }
           }
+        } catch (error) {
+          console.error('Failed to fetch events:', error)
         }
-      } catch (error) {
-        console.error('Failed to fetch events:', error)
       }
-    }
+      
+      fetchEvents()
+    }, 200) // Small delay to not block initial render
     
-    fetchEvents()
+    return () => clearTimeout(timer)
   }, [clubId])
 
   const handlePost = async (e: React.FormEvent) => {

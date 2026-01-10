@@ -62,6 +62,13 @@ import { Checkbox } from '@/components/ui/checkbox'
 interface StatsTabProps {
   clubId: string
   division: 'B' | 'C'
+  initialStats?: {
+    clubId: string
+    division: 'B' | 'C'
+    events: Event[]
+    teams: { id: string; name: string }[]
+    members: MemberStats[]
+  } | null
 }
 
 interface MemberStats {
@@ -127,12 +134,12 @@ interface AIRoster {
   recommendations: string[]
 }
 
-export function StatsTab({ clubId, division }: StatsTabProps) {
+export function StatsTab({ clubId, division, initialStats }: StatsTabProps) {
   const { toast } = useToast()
-  const [loading, setLoading] = useState(true)
-  const [members, setMembers] = useState<MemberStats[]>([])
-  const [events, setEvents] = useState<Event[]>([])
-  const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
+  const [loading, setLoading] = useState(!initialStats)
+  const [members, setMembers] = useState<MemberStats[]>(initialStats?.members || [])
+  const [events, setEvents] = useState<Event[]>(initialStats?.events || [])
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>(initialStats?.teams || [])
   
   // Filter state
   const [selectedTeam, setSelectedTeam] = useState<string>('all')
@@ -180,8 +187,10 @@ export function StatsTab({ clubId, division }: StatsTabProps) {
   }, [clubId, toast])
 
   useEffect(() => {
-    fetchStats()
-  }, [fetchStats])
+    if (!initialStats) {
+      fetchStats()
+    }
+  }, [fetchStats, initialStats])
 
   const handleEditMember = (member: MemberStats) => {
     setEditingMember(member.membershipId)

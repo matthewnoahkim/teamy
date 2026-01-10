@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  sanitizeSearchQuery,
+  validateEnum,
+} from '@/lib/input-validation'
 
 // Create a resource request (also creates club-visible resource immediately)
 export async function POST(req: NextRequest) {
@@ -115,14 +119,17 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status') as 'PENDING' | 'APPROVED' | 'REJECTED' | null
-    const search = searchParams.get('search')
+    
+    // Validate and sanitize inputs
+    const status = validateEnum(searchParams.get('status'), ['PENDING', 'APPROVED', 'REJECTED'] as const)
+    const search = sanitizeSearchQuery(searchParams.get('search'), 200)
 
     const where: any = {}
     if (status) {
       where.status = status
     }
     if (search) {
+      // All search values are sanitized
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { tag: { contains: search, mode: 'insensitive' } },

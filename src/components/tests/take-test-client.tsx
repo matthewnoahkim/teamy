@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -69,6 +69,11 @@ export function TakeTestClient({
   const pausedAtRef = useRef<number | null>(null) // Timestamp when user saved and exited
   const totalPausedSecondsRef = useRef<number>(0) // Total seconds paused (accumulated)
   const attemptRef = useRef(attempt) // Keep ref to latest attempt for back button handler
+  const tabSwitchCountRef = useRef(tabSwitchCount) // Ref for tab switch count to avoid dependency
+  const timeOffPageSecondsRef = useRef(timeOffPageSeconds) // Ref for time off page to avoid dependency
+  const offPageStartTimeRef = useRef(offPageStartTime) // Ref for off page start time to avoid dependency
+  const testIdRef = useRef(test.id) // Ref for test ID to avoid dependency
+  const tournamentIdRef = useRef(tournamentId) // Ref for tournament ID to avoid dependency
 
   // Load existing answers
   useEffect(() => {
@@ -159,22 +164,38 @@ export function TakeTestClient({
     }
   }
 
-  // Keep attempt ref updated for back button handler
+  // Keep refs updated
   useEffect(() => {
     attemptRef.current = attempt
-  }, [attempt])
+    tabSwitchCountRef.current = tabSwitchCount
+    timeOffPageSecondsRef.current = timeOffPageSeconds
+    offPageStartTimeRef.current = offPageStartTime
+    testIdRef.current = test.id
+    tournamentIdRef.current = tournamentId
+  }, [attempt, tabSwitchCount, timeOffPageSeconds, offPageStartTime, test.id, tournamentId])
 
   // Track page visibility and tab switching
   useEffect(() => {
     const recordProctorEvent = async (kind: string, meta?: any) => {
-      if (!attempt || attempt.status !== 'IN_PROGRESS') return
+      const currentAttempt = attemptRef.current
+      if (!currentAttempt || currentAttempt.status !== 'IN_PROGRESS') return
       
       try {
-        await fetch(`/api/tests/${test.id}/attempts/${attempt.id}/proctor-events`, {
+        // Use ES endpoint if tournamentId is present (ES test), otherwise use regular endpoint
+        const endpoint = tournamentIdRef.current 
+          ? `/api/es/tests/${testIdRef.current}/attempts/${currentAttempt.id}/proctor-events`
+          : `/api/tests/${testIdRef.current}/attempts/${currentAttempt.id}/proctor-events`
+        
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ kind, meta }),
         })
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('Failed to record proctor event:', response.status, errorData)
+        }
       } catch (error) {
         console.error('Failed to record proctor event:', error)
       }
@@ -185,13 +206,21 @@ export function TakeTestClient({
       setIsPageVisible(isVisible)
 
       if (!isVisible) {
-        setOffPageStartTime(Date.now())
+        // User switched away - record when they left
+        const leftAt = Date.now()
+        setOffPageStartTime(leftAt)
         setTabSwitchCount((prev: number) => prev + 1)
-        recordProctorEvent('TAB_SWITCH')
       } else {
-        if (offPageStartTime) {
-          const timeOff = Math.floor((Date.now() - offPageStartTime) / 1000)
+        // User returned - record TAB_SWITCH with time off site
+        const currentOffPageStartTime = offPageStartTimeRef.current
+        if (currentOffPageStartTime) {
+          const timeOff = Math.floor((Date.now() - currentOffPageStartTime) / 1000)
           setTimeOffPageSeconds((prev: number) => prev + timeOff)
+          recordProctorEvent('TAB_SWITCH', { 
+            timeOffSeconds: timeOff,
+            leftAt: new Date(currentOffPageStartTime).toISOString(),
+            returnedAt: new Date().toISOString()
+          })
           setOffPageStartTime(null)
         }
       }
@@ -199,16 +228,24 @@ export function TakeTestClient({
 
     const handleBlur = () => {
       if (document.hidden) {
-        setOffPageStartTime(Date.now())
+        // User switched away - record when they left
+        const leftAt = Date.now()
+        setOffPageStartTime(leftAt)
         setTabSwitchCount((prev: number) => prev + 1)
-        recordProctorEvent('BLUR')
       }
     }
 
     const handleFocus = () => {
-      if (offPageStartTime) {
-        const timeOff = Math.floor((Date.now() - offPageStartTime) / 1000)
+      const currentOffPageStartTime = offPageStartTimeRef.current
+      if (currentOffPageStartTime) {
+        const timeOff = Math.floor((Date.now() - currentOffPageStartTime) / 1000)
         setTimeOffPageSeconds((prev: number) => prev + timeOff)
+        // Record the time off site in the meta when returning
+        recordProctorEvent('TAB_SWITCH', { 
+          timeOffSeconds: timeOff,
+          leftAt: new Date(currentOffPageStartTime).toISOString(),
+          returnedAt: new Date().toISOString()
+        })
         setOffPageStartTime(null)
       }
     }
@@ -220,14 +257,59 @@ export function TakeTestClient({
         return
       }
       
-      // If user manually exited fullscreen while test is active, show the prompt
+      // If user manually exited fullscreen while test is active, show the prompt and record event
       if (test.requireFullscreen && started && attempt && !document.fullscreenElement) {
         // User manually exited fullscreen (e.g., pressed Escape) - show prompt
         setNeedsFullscreenPrompt(true)
+        recordProctorEvent('EXIT_FULLSCREEN', { timestamp: Date.now() })
       } else if (document.fullscreenElement && needsFullscreenPrompt) {
         // Fullscreen was entered - hide the prompt
         setNeedsFullscreenPrompt(false)
       }
+    }
+
+    // Detect DevTools opening/closing
+    const detectDevTools = () => {
+      let devtools = { open: false, orientation: null as string | null }
+      const threshold = 160
+      
+      const checkDevTools = () => {
+        if (window.outerHeight - window.innerHeight > threshold || 
+            window.outerWidth - window.innerWidth > threshold) {
+          if (!devtools.open) {
+            devtools.open = true
+            recordProctorEvent('DEVTOOLS_OPEN', { timestamp: Date.now() })
+          }
+        } else {
+          devtools.open = false
+        }
+      }
+      
+      // Check periodically
+      const devtoolsInterval = setInterval(checkDevTools, 500)
+      
+      return () => clearInterval(devtoolsInterval)
+    }
+
+    // Handle paste events
+    const handlePaste = (e: ClipboardEvent) => {
+      recordProctorEvent('PASTE', { 
+        timestamp: Date.now(),
+        dataLength: e.clipboardData?.getData('text').length || 0
+      })
+    }
+
+    // Handle copy events
+    const handleCopy = (e: ClipboardEvent) => {
+      recordProctorEvent('COPY', { 
+        timestamp: Date.now(),
+        dataLength: window.getSelection()?.toString().length || 0
+      })
+    }
+
+    // Handle context menu (right-click)
+    const handleContextMenu = (e: MouseEvent) => {
+      recordProctorEvent('CONTEXTMENU', { timestamp: Date.now() })
     }
 
     if (started && attempt) {
@@ -235,36 +317,61 @@ export function TakeTestClient({
       window.addEventListener('blur', handleBlur)
       window.addEventListener('focus', handleFocus)
       document.addEventListener('fullscreenchange', handleFullscreenChange)
+      document.addEventListener('paste', handlePaste)
+      document.addEventListener('copy', handleCopy)
+      document.addEventListener('contextmenu', handleContextMenu)
+
+      // Start DevTools detection
+      const devtoolsCleanup = detectDevTools()
 
       // Periodically update tab tracking on server
       trackingIntervalRef.current = setInterval(async () => {
-        if (attempt && attempt.status === 'IN_PROGRESS') {
+        const currentAttempt = attemptRef.current
+        if (currentAttempt && currentAttempt.status === 'IN_PROGRESS') {
           try {
-            await fetch(`/api/tests/${test.id}/attempts/${attempt.id}/tab-tracking`, {
+            // Use ES endpoint if tournamentId is present (ES test), otherwise use regular endpoint
+            const endpoint = tournamentIdRef.current 
+              ? `/api/es/tests/${testIdRef.current}/attempts/${currentAttempt.id}/tab-tracking`
+              : `/api/tests/${testIdRef.current}/attempts/${currentAttempt.id}/tab-tracking`
+            
+            const response = await fetch(endpoint, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                tabSwitchCount,
-                timeOffPageSeconds,
+                tabSwitchCount: tabSwitchCountRef.current,
+                timeOffPageSeconds: timeOffPageSecondsRef.current,
               }),
             })
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}))
+              console.error('Failed to update tab tracking:', response.status, errorData)
+            }
           } catch (error) {
             console.error('Failed to update tab tracking:', error)
           }
         }
       }, 10000) // Update every 10 seconds
+
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        window.removeEventListener('blur', handleBlur)
+        window.removeEventListener('focus', handleFocus)
+        document.removeEventListener('fullscreenchange', handleFullscreenChange)
+        document.removeEventListener('paste', handlePaste)
+        document.removeEventListener('copy', handleCopy)
+        document.removeEventListener('contextmenu', handleContextMenu)
+        devtoolsCleanup()
+        if (trackingIntervalRef.current) {
+          clearInterval(trackingIntervalRef.current)
+        }
+      }
     }
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('blur', handleBlur)
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('fullscreenchange', handleFullscreenChange)
-      if (trackingIntervalRef.current) {
-        clearInterval(trackingIntervalRef.current)
-      }
+      // Cleanup if not started
     }
-  }, [started, attempt, tabSwitchCount, timeOffPageSeconds, test.id, test.requireFullscreen, offPageStartTime, toast])
+  }, [started, attempt, test.requireFullscreen]) // Reduced dependencies - using refs for values only read in callbacks
 
   const handleStartTest = async () => {
     if (test.testPasswordHash && !isAdmin && !password) {
@@ -412,8 +519,8 @@ export function TakeTestClient({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Check if there are unanswered questions
-  const getUnansweredQuestions = () => {
+  // Check if there are unanswered questions - memoized to avoid recalculating on every render
+  const unansweredQuestions = useMemo(() => {
     return test.questions.filter((question: any) => {
       // TEXT_BLOCK questions are stored as SHORT_TEXT with 0 points - they don't require answers
       const isTextBlock = question.type === 'SHORT_TEXT' && Number(question.points) === 0
@@ -431,7 +538,7 @@ export function TakeTestClient({
         return !answer.answerText || answer.answerText.trim() === ''
       }
     })
-  }
+  }, [test.questions, answers])
 
   const handleSubmit = useCallback(async () => {
     if (!attempt) return
@@ -724,7 +831,7 @@ export function TakeTestClient({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 grid-pattern">
+    <div className="min-h-screen flex flex-col bg-background grid-pattern">
       {/* Sticky header with test info and timer */}
       <div className="sticky top-0 z-40 bg-background border-b backdrop-blur-sm bg-background/95">
         <div className="container mx-auto max-w-6xl px-4 py-3">
@@ -1169,14 +1276,14 @@ export function TakeTestClient({
         <div className="container mx-auto max-w-6xl px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              {(markedForReview.size > 0 || getUnansweredQuestions().length > 0) && (
+              {(markedForReview.size > 0 || unansweredQuestions.length > 0) && (
                 <div className="text-sm text-amber-600 dark:text-amber-400">
                   {markedForReview.size > 0 && (
                     <span>{markedForReview.size} marked for review</span>
                   )}
-                  {markedForReview.size > 0 && getUnansweredQuestions().length > 0 && <span> • </span>}
-                  {getUnansweredQuestions().length > 0 && (
-                    <span>{getUnansweredQuestions().length} unanswered</span>
+                  {markedForReview.size > 0 && unansweredQuestions.length > 0 && <span> • </span>}
+                  {unansweredQuestions.length > 0 && (
+                    <span>{unansweredQuestions.length} unanswered</span>
                   )}
                 </div>
               )}
@@ -1300,7 +1407,7 @@ export function TakeTestClient({
               Are you sure you want to submit? You cannot change your answers after submitting.
             </DialogDescription>
           </DialogHeader>
-          {(markedForReview.size > 0 || getUnansweredQuestions().length > 0) && (
+          {(markedForReview.size > 0 || unansweredQuestions.length > 0) && (
             <div className="space-y-2 py-2">
               {markedForReview.size > 0 && (
                 <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
@@ -1315,12 +1422,12 @@ export function TakeTestClient({
                   </div>
                 </div>
               )}
-              {getUnansweredQuestions().length > 0 && (
+              {unansweredQuestions.length > 0 && (
                 <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                   <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
                     <p className="font-medium text-amber-900 dark:text-amber-100">
-                      You have {getUnansweredQuestions().length} unanswered question{getUnansweredQuestions().length !== 1 ? 's' : ''}.
+                      You have {unansweredQuestions.length} unanswered question{unansweredQuestions.length !== 1 ? 's' : ''}.
                     </p>
                     <p className="text-amber-700 dark:text-amber-300 mt-1">
                       You can still submit, but these questions will receive no points.

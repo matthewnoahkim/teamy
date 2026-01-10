@@ -55,7 +55,8 @@ function generateBackgroundStyles(preferences: Record<string, unknown> | null): 
         background-image: none !important;
         background-attachment: fixed !important;
       }
-      body.grid-pattern, html.grid-pattern, .grid-pattern {
+      body.grid-pattern, html.grid-pattern, .grid-pattern,
+      *[class*="grid-pattern"] {
         background: ${safeColor} !important;
         background-image: none !important;
       }
@@ -84,7 +85,8 @@ function generateBackgroundStyles(preferences: Record<string, unknown> | null): 
           background-image: ${gradient} !important;
           background-attachment: fixed !important;
         }
-        body.grid-pattern, html.grid-pattern, .grid-pattern {
+        body.grid-pattern, html.grid-pattern, .grid-pattern,
+        *[class*="grid-pattern"] {
           background: ${gradient} !important;
           background-image: ${gradient} !important;
         }
@@ -120,7 +122,8 @@ function generateBackgroundStyles(preferences: Record<string, unknown> | null): 
         background-repeat: no-repeat !important;
         background-attachment: fixed !important;
       }
-      body.grid-pattern, html.grid-pattern, .grid-pattern {
+      body.grid-pattern, html.grid-pattern, .grid-pattern,
+      *[class*="grid-pattern"] {
         background-image: url("${imageUrl}") !important;
         background-color: transparent !important;
       }
@@ -146,22 +149,10 @@ function generateBackgroundStyles(preferences: Record<string, unknown> | null): 
     `
   }
   
-  // Header always has static background
-  const headerCss = `
-    header, header.bg-teamy-primary, header[class*="bg-teamy-primary"] {
-      background-color: #0056C7 !important;
-      background-image: none !important;
-      background: #0056C7 !important;
-    }
-    .dark header, .dark header.bg-teamy-primary, .dark header[class*="bg-teamy-primary"],
-    html.dark header, html.dark header.bg-teamy-primary {
-      background-color: rgb(15 23 42) !important;
-      background-image: none !important;
-      background: rgb(15 23 42) !important;
-    }
-  `
+  // Headers now use floating bar styling with Tailwind classes
+  // No need to override with CSS since we're using bg-teamy-primary/90 with backdrop-blur
   
-  return headerCss + backgroundCss
+  return backgroundCss
 }
 
 function generateBodyClass(preferences: Record<string, unknown> | null): string {
@@ -195,7 +186,7 @@ export default async function RootLayout({
   const bodyClass = generateBodyClass(preferences)
   
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="font-sans" suppressHydrationWarning>
       <body className={`font-sans antialiased ${bodyClass}`} suppressHydrationWarning>
         {/* Critical blocking script: Apply styles immediately before any rendering */}
         <script

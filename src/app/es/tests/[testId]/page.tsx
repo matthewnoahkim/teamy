@@ -93,71 +93,25 @@ export default async function ESEditTestPage({ params }: Props) {
     },
   })
 
-  // Check if user is a tournament director for this tournament
-  const isTournamentDirector = await (async () => {
-    // Check tournament admin table
-    const admin = await prisma.tournamentAdmin.findUnique({
-      where: {
-        tournamentId_userId: {
-          tournamentId: esTest.tournamentId,
-          userId: session.user.id,
-        },
-      },
-    })
-    if (admin) return true
+  // Check if user has access to this specific test
+  // TDs have full access, ES only for their assigned events
+  const { hasESTestAccess } = await import('@/lib/rbac')
+  const hasAccess = await hasESTestAccess(session.user.id, session.user.email, testId)
 
-    // Check if user created the tournament
-    const tournament = await prisma.tournament.findUnique({
-      where: { id: esTest.tournamentId },
-      select: { createdById: true },
-    })
-    if (tournament?.createdById === session.user.id) return true
-
-    // Check if user is director on hosting request
-    const hostingRequest = await prisma.tournamentHostingRequest.findFirst({
-      where: {
-        tournament: {
-          id: esTest.tournamentId,
-        },
-        directorEmail: {
-          equals: session.user.email,
-          mode: 'insensitive',
-        },
-        status: 'APPROVED',
-      },
-    })
-    return !!hostingRequest
-  })()
-
-  // Find a staff membership where user is assigned to the event AND tournament matches
-  const userStaff = userStaffMemberships.find(staff => 
-    staff.tournament.id === esTest.tournamentId &&
-    staff.events.some(e => e.eventId === esTest.event?.id)
-  )
-
-  // If no exact match, find any staff membership where user is assigned to the event
-  // (allows cross-tournament collaboration if needed)
-  const userStaffFallback = userStaff || userStaffMemberships.find(staff => 
-    staff.events.some(e => e.eventId === esTest.event?.id)
-  )
-
-  // If user is TD, find their staff membership for this tournament (or create access)
-  const tdStaff = isTournamentDirector 
-    ? userStaffMemberships.find(staff => 
-        staff.tournament.id === esTest.tournamentId && 
-        staff.role === 'TOURNAMENT_DIRECTOR'
-      )
-    : null
-
-  if (!userStaffFallback && !tdStaff && !isTournamentDirector) {
+  if (!hasAccess) {
     redirect('/es')
   }
+
+  // Find a staff membership for this tournament
+  const userStaff = userStaffMemberships.find(staff => 
+    staff.tournament.id === esTest.tournamentId
+  )
 
   // If TD, allow access even without staff membership
   // Use the staff membership that matches the test's tournament, or fallback to any matching membership
   // If TD, prefer TD staff membership, otherwise use event-based one
   // For TDs without staff membership, use the test's current staffId
-  const staffToUse = tdStaff || userStaff || userStaffFallback || userStaffMemberships.find(staff => 
+  const staffToUse = userStaff || userStaffMemberships.find(staff => 
     staff.tournament.id === esTest.tournamentId
   )
 

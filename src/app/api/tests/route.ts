@@ -122,6 +122,7 @@ export async function GET(req: NextRequest) {
         scoreReleaseMode: true,
         createdAt: true,
         updatedAt: true,
+        createdByMembershipId: true,
         assignments: {
           select: {
             assignedScope: true,
@@ -140,11 +141,35 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
+    // Fetch createdBy memberships for all tests
+    const membershipIds = [...new Set(allTests.map(t => t.createdByMembershipId).filter(Boolean))]
+    const memberships = membershipIds.length > 0 ? await prisma.membership.findMany({
+      where: { id: { in: membershipIds } },
+      select: {
+        id: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    }) : []
+    const membershipMap = new Map(memberships.map(m => [m.id, m]))
+
     // Admins see everything
     if (isAdminUser) {
-      // Remove assignments from response (not needed by client)
-      const tests = allTests.map(({ assignments, ...test }) => test)
-      return NextResponse.json({ tests })
+      // Remove assignments from response and add createdByMembership
+      const tests = allTests.map(({ assignments, ...test }) => ({
+        ...test,
+        createdByMembership: test.createdByMembershipId ? membershipMap.get(test.createdByMembershipId) : undefined,
+      }))
+      return NextResponse.json({ 
+        tests,
+        userAttempts: {},
+        noteSheets: {},
+      })
     }
 
     // For non-admins, filter tests based on assignments
@@ -187,10 +212,77 @@ export async function GET(req: NextRequest) {
       })
     })
 
-    // Remove assignments from response (not needed by client)
-    const tests = filteredTests.map(({ assignments, ...test }) => test)
+    // Remove assignments from response and add createdByMembership
+    const tests = filteredTests.map(({ assignments, ...test }) => ({
+      ...test,
+      createdByMembership: test.createdByMembershipId ? membershipMap.get(test.createdByMembershipId) : undefined,
+    }))
 
-    return NextResponse.json({ tests })
+    // Batch fetch user attempts for all tests (non-admins only, admins don't need this)
+    const testIds = tests.map(t => t.id)
+    let userAttemptsMap = new Map<string, { attemptsUsed: number; maxAttempts: number | null; hasReachedLimit: boolean }>()
+    let noteSheetsMap = new Map<string, { status: string; rejectionReason: string | null }>()
+
+    if (!isAdminUser && testIds.length > 0) {
+      // Batch fetch all user attempts in one query
+      const attempts = await prisma.testAttempt.groupBy({
+        by: ['testId'],
+        where: {
+          membershipId: membership.id,
+          testId: { in: testIds },
+          status: {
+            in: ['SUBMITTED', 'GRADED'],
+          },
+        },
+        _count: {
+          id: true,
+        },
+      })
+
+      // Create map of testId -> attempt count
+      const attemptCounts = new Map(attempts.map(a => [a.testId, a._count.id]))
+
+      // Build userAttemptsMap with maxAttempts from tests
+      tests.forEach(test => {
+        const attemptsUsed = attemptCounts.get(test.id) || 0
+        userAttemptsMap.set(test.id, {
+          attemptsUsed,
+          maxAttempts: test.maxAttempts,
+          hasReachedLimit: test.maxAttempts !== null && attemptsUsed >= test.maxAttempts,
+        })
+      })
+
+      // Batch fetch note sheets for tests that allow them and have startAt
+      const testsWithNoteSheets = tests.filter(t => t.allowNoteSheet && t.startAt)
+      if (testsWithNoteSheets.length > 0) {
+        const noteSheets = await prisma.noteSheet.findMany({
+          where: {
+            membershipId: membership.id,
+            testId: { in: testsWithNoteSheets.map(t => t.id) },
+          },
+          select: {
+            testId: true,
+            status: true,
+            rejectionReason: true,
+          },
+        })
+
+        noteSheets.forEach(ns => {
+          if (ns.testId) {
+            noteSheetsMap.set(ns.testId, {
+              status: ns.status,
+              rejectionReason: ns.rejectionReason,
+            })
+          }
+        })
+      }
+    }
+
+    return NextResponse.json({ 
+      tests,
+      userAttempts: Object.fromEntries(userAttemptsMap),
+      noteSheets: Object.fromEntries(noteSheetsMap),
+    })
   } catch (error) {
     console.error('Get tests error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

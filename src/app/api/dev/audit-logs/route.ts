@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  sanitizeSearchQuery,
+  validateInteger,
+  validateEnum,
+} from '@/lib/input-validation'
 
 // Helper function to check dev panel access
 async function checkDevAccess(email?: string | null) {
@@ -48,10 +53,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '100')
-    const offset = parseInt(searchParams.get('offset') || '0')
-    const action = searchParams.get('action')
-    const userEmail = searchParams.get('userEmail')
+    
+    // Validate and sanitize all inputs
+    const limit = validateInteger(searchParams.get('limit'), 1, 1000, 100) ?? 100
+    const offset = validateInteger(searchParams.get('offset'), 0, 100000, 0) ?? 0
+    const action = validateEnum(searchParams.get('action'), ['CREATE', 'UPDATE', 'DELETE', 'READ'] as const)
+    const userEmail = sanitizeSearchQuery(searchParams.get('userEmail'), 200)
 
     const where: any = {}
     if (action) where.action = action

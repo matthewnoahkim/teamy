@@ -48,13 +48,15 @@ interface GalleryTabProps {
   clubId: string
   user: any
   isAdmin: boolean
+  initialMediaItems?: any[]
+  initialAlbums?: any[]
 }
 
-export function GalleryTab({ clubId, user, isAdmin }: GalleryTabProps) {
+export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAlbums }: GalleryTabProps) {
   const { toast } = useToast()
-  const [mediaItems, setMediaItems] = useState<any[]>([])
-  const [albums, setAlbums] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [mediaItems, setMediaItems] = useState<any[]>(initialMediaItems || [])
+  const [albums, setAlbums] = useState<any[]>(initialAlbums || [])
+  const [loading, setLoading] = useState(!(initialMediaItems && initialAlbums))
   const [uploading, setUploading] = useState(false)
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -75,9 +77,17 @@ export function GalleryTab({ clubId, user, isAdmin }: GalleryTabProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetchMedia()
-    fetchAlbums()
-  }, [clubId, selectedAlbum, filterType])
+    // Only fetch if we don't have initial data, or if filters changed
+    if (!initialMediaItems || !initialAlbums || selectedAlbum || filterType !== 'all') {
+      setLoading(true)
+      // Batch fetch both in parallel
+      Promise.all([fetchMedia(), fetchAlbums()]).finally(() => {
+        setLoading(false)
+      })
+    } else {
+      setLoading(false)
+    }
+  }, [clubId, selectedAlbum, filterType, initialMediaItems, initialAlbums])
 
   const fetchMedia = async () => {
     try {
@@ -102,8 +112,6 @@ export function GalleryTab({ clubId, user, isAdmin }: GalleryTabProps) {
         description: 'Failed to load media',
         variant: 'destructive',
       })
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -115,6 +123,8 @@ export function GalleryTab({ clubId, user, isAdmin }: GalleryTabProps) {
       setAlbums(data.albums || [])
     } catch (error) {
       console.error('Failed to fetch albums:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -287,7 +297,7 @@ export function GalleryTab({ clubId, user, isAdmin }: GalleryTabProps) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div className="flex-1">
           <h2 className="text-xl sm:text-2xl font-bold">Gallery</h2>
-          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Photos and videos from your team
           </p>
         </div>
@@ -416,8 +426,8 @@ export function GalleryTab({ clubId, user, isAdmin }: GalleryTabProps) {
       {mediaItems.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <ImageIcon className="h-16 w-16 text-gray-400 mb-4" />
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <ImageIcon className="h-16 w-16 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mb-4">
               No media yet. Start by uploading some photos or videos!
             </p>
             <Button onClick={() => fileInputRef.current?.click()}>
@@ -488,7 +498,7 @@ export function GalleryTab({ clubId, user, isAdmin }: GalleryTabProps) {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <Video className="h-8 w-8 text-gray-400" />
+                      <Video className="h-8 w-8 text-muted-foreground" />
                     </div>
                   )}
                 </div>
@@ -496,7 +506,7 @@ export function GalleryTab({ clubId, user, isAdmin }: GalleryTabProps) {
                   <p className="font-semibold truncate">
                     {media.originalFilename}
                   </p>
-                  <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <User className="h-3 w-3" />
                       {media.uploadedBy.name || media.uploadedBy.email}
@@ -659,7 +669,7 @@ function MediaViewerDialog({ open, onOpenChange, media, canDelete, onDelete }: a
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="max-h-[60vh] flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden">
+          <div className="max-h-[60vh] flex items-center justify-center bg-muted rounded-lg overflow-hidden">
             {media.mediaType === 'IMAGE' ? (
               <img
                 src={media.filePath}
@@ -676,22 +686,22 @@ function MediaViewerDialog({ open, onOpenChange, media, canDelete, onDelete }: a
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-gray-400" />
+              <User className="h-4 w-4 text-muted-foreground" />
               <span>
                 Uploaded by {media.uploadedBy.name || media.uploadedBy.email}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-400" />
+              <Calendar className="h-4 w-4 text-muted-foreground" />
               <span>{formatDateTime(media.createdAt)}</span>
             </div>
             {media.album && (
               <div className="flex items-center gap-2">
-                <Folder className="h-4 w-4 text-gray-400" />
+                <Folder className="h-4 w-4 text-muted-foreground" />
                 <span>Album: {media.album.name}</span>
               </div>
             )}
-            <div className="text-gray-500">
+            <div className="text-muted-foreground">
               Size: {(media.fileSize / 1024 / 1024).toFixed(2)} MB
             </div>
           </div>

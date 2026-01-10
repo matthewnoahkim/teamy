@@ -15,7 +15,7 @@ export default function NotFound() {
   }, [])
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden grid-pattern" style={{ backgroundColor: 'hsl(var(--card))' }}>
+    <div className="min-h-screen flex flex-col relative overflow-hidden grid-pattern bg-background">
       {/* Main content */}
       <div className="flex-1 flex items-center justify-center p-4 relative z-10">
         <div className="w-full max-w-2xl">
@@ -37,7 +37,7 @@ export default function NotFound() {
 
           {/* Content card with backdrop blur */}
           <div 
-            className={`backdrop-blur-xl bg-background/60 dark:bg-card dark:border-border/50 rounded-3xl p-8 md:p-12 shadow-2xl transition-all duration-1000 ${
+            className={`rounded-3xl border border-border bg-card p-8 md:p-12 shadow-card transition-all duration-1000 ${
               mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
             }`}
             style={{ 
@@ -89,6 +89,7 @@ export default function NotFound() {
             <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
               <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
               <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
           </div>

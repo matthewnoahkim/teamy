@@ -3,14 +3,17 @@
 import { useState, useEffect } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, BookOpen, Megaphone, Tag, History } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, BookOpen, Megaphone, Tag, History, Pencil } from 'lucide-react'
 import { SignInButton } from '@/components/signin-button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import {
   Dialog,
   DialogContent,
@@ -62,8 +65,17 @@ export default function DevPage() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
+  const [editUsernameOpen, setEditUsernameOpen] = useState(false)
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null)
 
   const { data: session, status } = useSession()
+
+  // Update currentUserName when session changes
+  useEffect(() => {
+    if (session?.user?.name) {
+      setCurrentUserName(session.user.name)
+    }
+  }, [session])
 
   // Check authentication status
   useEffect(() => {
@@ -135,7 +147,7 @@ export default function DevPage() {
     return (
       <div className="min-h-screen bg-background text-foreground grid-pattern">
         {/* Header */}
-        <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+        <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
           <div className="container mx-auto px-6 py-4 flex items-center justify-between">
             <Logo size="md" href="/" variant="light" />
           </div>
@@ -200,48 +212,37 @@ export default function DevPage() {
   return (
     <div className="min-h-screen bg-background text-foreground grid-pattern">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
             <Logo size="md" href="/" variant="light" />
             <span className="text-lg font-semibold text-white">Dev Panel</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 outline-none text-white hover:text-white/80 transition-colors">
-                  {session?.user?.image ? (
-                    <img
-                      src={session.user.image}
-                      alt={session.user.name || 'User'}
-                      className="h-8 w-8 rounded-full"
-                    />
-                  ) : (
-                    <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
-                      <span className="text-sm font-semibold">
-                        {session?.user?.name?.charAt(0).toUpperCase() || session?.user?.email?.charAt(0).toUpperCase() || 'D'}
-                      </span>
-                    </div>
-                  )}
-                  <span className="text-sm font-medium hidden sm:block">
-                    {session?.user?.name || session?.user?.email?.split('@')[0] || 'Developer'}
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-white/60" />
+                <button className="flex items-center gap-2 sm:gap-3 outline-none">
+                  <Avatar className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all">
+                    <AvatarImage src={session?.user?.image || ''} />
+                    <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
+                      {currentUserName?.charAt(0) || session?.user?.email?.charAt(0).toUpperCase() || 'D'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden sm:block text-left max-w-[120px] md:max-w-none">
+                    <p className="text-xs sm:text-sm font-medium text-white truncate">
+                      {currentUserName || session?.user?.email?.split('@')[0] || 'Developer'}
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-white/60 truncate">{session?.user?.email || ''}</p>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-white/60 hidden sm:block" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <div className="px-2 py-1.5 text-sm">
-                  <div className="font-medium">{session?.user?.name || 'Developer'}</div>
-                  <div className="text-xs text-muted-foreground truncate">{session?.user?.email}</div>
-                </div>
-                <DropdownMenuItem
-                  onClick={() => {
-                    signOut({ callbackUrl: '/' })
-                  }}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Switch Account
+                <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Username
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => {
                     signOut({ callbackUrl: '/dev' })
@@ -258,34 +259,37 @@ export default function DevPage() {
         </div>
       </header>
 
-      <div className="flex pt-[65px]">
-        {/* Sidebar */}
-        <aside className="fixed left-0 top-[65px] bottom-0 w-52 border-r bg-card p-4">
-          <nav className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = activeSection === item.id
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveSection(item.id)}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-sm transition-colors',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </button>
-              )
-            })}
-          </nav>
-        </aside>
+      <main className="relative z-10 container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-full overflow-x-hidden">
+        <div className="flex gap-4 sm:gap-6 lg:gap-8 items-start">
+          {/* Sidebar */}
+          <aside className="w-48 lg:w-52 flex-shrink-0 hidden md:block self-start">
+            <div className="sticky top-24 will-change-transform">
+              <nav className="space-y-2 bg-card/80 backdrop-blur-sm border border-border/50 p-3 rounded-2xl shadow-lg">
+                {navItems.map((item) => {
+                  const Icon = item.icon
+                  const isActive = activeSection === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className={cn(
+                        'w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left text-sm transition-colors',
+                        isActive
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </button>
+                  )
+                })}
+              </nav>
+            </div>
+          </aside>
 
-        {/* Main Content */}
-        <main className="ml-52 flex-1 p-6">
+          {/* Main Content */}
+          <div className="flex-1 min-w-0 md:pl-0 flex flex-col min-h-0">
           <div className="mb-6">
             <h1 className="text-2xl font-bold">
               {navItems.find(item => item.id === activeSection)?.label}
@@ -319,8 +323,16 @@ export default function DevPage() {
               </div>
             </div>
           )}
-        </main>
-      </div>
+          </div>
+        </div>
+      </main>
+
+      <EditUsernameDialog
+        open={editUsernameOpen}
+        onOpenChange={setEditUsernameOpen}
+        currentName={currentUserName}
+        onNameUpdated={setCurrentUserName}
+      />
     </div>
   )
 }

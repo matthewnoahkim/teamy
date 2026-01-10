@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { CalculatorType, Division } from '@prisma/client'
+import { CalculatorType } from '@prisma/client'
+import { hasESAccess, hasESTestAccess } from '@/lib/rbac'
+import { getESTestsForUser } from '@/lib/es-tests'
 
 // Helper to check if user is a tournament director for a tournament
 async function isTournamentDirector(userId: string, userEmail: string, tournamentId: string): Promise<boolean> {
@@ -51,635 +53,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Find staff memberships for this user
-    const staffMemberships = await prisma.tournamentStaff.findMany({
-      where: {
-        OR: [
-          { userId: session.user.id },
-          { email: { equals: session.user.email, mode: 'insensitive' } },
-        ],
-        status: 'ACCEPTED',
-      },
-      include: {
-        tournament: {
-          select: {
-            id: true,
-            name: true,
-            division: true,
-            startDate: true,
-            hostingRequestId: true,
-            slug: true,
-            trialEvents: true, // Include trial events from tournament
-            createdById: true,
-          },
-        },
-        events: {
-          include: {
-            event: {
-              select: {
-                id: true,
-                name: true,
-                division: true,
-              },
-            },
-          },
-          orderBy: {
-            event: {
-              name: 'asc',
-            },
-          },
-        },
-      },
-    })
+    // Check query parameter for including questions (default: true for backward compatibility)
+    const { searchParams } = new URL(request.url)
+    const includeQuestions = searchParams.get('includeQuestions') !== 'false'
 
-    // Also check for tournament directors via TournamentAdmin or createdById
-    const tournamentAdmins = await prisma.tournamentAdmin.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      include: {
-        tournament: {
-          select: {
-            id: true,
-            name: true,
-            division: true,
-            startDate: true,
-            hostingRequestId: true,
-            slug: true,
-            trialEvents: true,
-            createdById: true,
-          },
-        },
-      },
-    })
-
-    const createdTournaments = await prisma.tournament.findMany({
-      where: {
-        createdById: session.user.id,
-      },
-      select: {
-        id: true,
-        name: true,
-        division: true,
-        startDate: true,
-        hostingRequestId: true,
-        slug: true,
-        trialEvents: true,
-        createdById: true,
-      },
-    })
-
-    // Also check hosting requests where user is director
-    const directorHostingRequests = await prisma.tournamentHostingRequest.findMany({
-      where: {
-        directorEmail: {
-          equals: session.user.email,
-          mode: 'insensitive',
-        },
-        status: 'APPROVED',
-      },
-      include: {
-        tournament: {
-          select: {
-            id: true,
-            name: true,
-            division: true,
-            startDate: true,
-            hostingRequestId: true,
-            slug: true,
-            trialEvents: true,
-            createdById: true,
-          },
-        },
-      },
-    })
-
-    // Combine all tournament access and create TournamentStaff-like records for TDs
-    const tournamentIdsSet = new Set(staffMemberships.map(m => m.tournament.id))
-    
-    // Add tournaments where user is admin
-    for (const admin of tournamentAdmins) {
-      if (admin.tournament && !tournamentIdsSet.has(admin.tournament.id)) {
-        tournamentIdsSet.add(admin.tournament.id)
-        staffMemberships.push({
-          id: `admin-${admin.id}`,
-          userId: session.user.id,
-          email: session.user.email,
-          name: session.user.name,
-          role: 'TOURNAMENT_DIRECTOR' as const,
-          status: 'ACCEPTED' as const,
-          tournamentId: admin.tournament.id,
-          inviteToken: `admin-${admin.id}-${admin.tournament.id}`, // Required field
-          invitedAt: new Date(),
-          acceptedAt: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          trialEvents: null,
-          tournament: admin.tournament,
-          events: [],
-        } as any)
-      }
-    }
-
-    // Add tournaments created by user
-    for (const tournament of createdTournaments) {
-      if (!tournamentIdsSet.has(tournament.id)) {
-        tournamentIdsSet.add(tournament.id)
-        staffMemberships.push({
-          id: `creator-${tournament.id}`,
-          userId: session.user.id,
-          email: session.user.email,
-          name: session.user.name,
-          role: 'TOURNAMENT_DIRECTOR' as const,
-          status: 'ACCEPTED' as const,
-          tournamentId: tournament.id,
-          inviteToken: `creator-${tournament.id}`, // Required field
-          invitedAt: new Date(),
-          acceptedAt: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          trialEvents: null,
-          tournament: tournament,
-          events: [],
-        } as any)
-      }
-    }
-
-    // Add tournaments from hosting requests
-    for (const request of directorHostingRequests) {
-      if (request.tournament && !tournamentIdsSet.has(request.tournament.id)) {
-        tournamentIdsSet.add(request.tournament.id)
-        staffMemberships.push({
-          id: `hosting-${request.id}`,
-          userId: session.user.id,
-          email: session.user.email,
-          name: session.user.name,
-          role: 'TOURNAMENT_DIRECTOR' as const,
-          status: 'ACCEPTED' as const,
-          tournamentId: request.tournament.id,
-          inviteToken: `hosting-${request.id}`, // Required field
-          invitedAt: new Date(),
-          acceptedAt: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          trialEvents: null,
-          tournament: request.tournament,
-          events: [],
-        } as any)
-      }
-    }
-
-    // Get hosting request divisions for all tournaments (needed for TD event fetching)
-    const tournamentIds = staffMemberships.map(m => m.tournament.id)
-    const hostingRequests = await prisma.tournamentHostingRequest.findMany({
-      where: {
-        tournament: {
-          id: { in: tournamentIds },
-        },
-      },
-      select: {
-        id: true,
-        division: true,
-        tournament: {
-          select: {
-            id: true,
-          },
-        },
-      },
-    })
-    const hostingRequestMap = new Map(
-      hostingRequests
-        .filter(hr => hr.tournament !== null)
-        .map(hr => [hr.tournament!.id, hr.division])
+    const staffMembershipsWithTests = await getESTestsForUser(
+      session.user.id,
+      session.user.email,
+      { includeQuestions }
     )
 
-    // Track trial event names per tournament for ES members
-    // For TDs, they get all trial events from the tournament
-    const userTrialEventNamesByTournament = new Map<string, Set<string>>()
-    const tournamentTrialEventNamesByTournament = new Map<string, string[]>()
-    
-    // Get trial events from tournament configuration
-    for (const membership of staffMemberships) {
-      if (membership.tournament.trialEvents) {
-        try {
-          const parsed = JSON.parse(membership.tournament.trialEvents)
-          if (Array.isArray(parsed)) {
-            // Handle both old format (string[]) and new format ({ name, division }[])
-            if (parsed.length > 0 && typeof parsed[0] === 'string') {
-              // Old format
-              tournamentTrialEventNamesByTournament.set(membership.tournament.id, parsed)
-            } else {
-              // New format
-              tournamentTrialEventNamesByTournament.set(membership.tournament.id, parsed.map((e: any) => e.name))
-            }
-          }
-        } catch (e) {
-          console.error('Error parsing tournament trial events:', e)
-        }
-      }
-    }
-    
-    // Get all event IDs that the user is assigned to (for ES) or all events for tournament division (for TD)
-    const userEventIds = new Set<string>()
-    const tournamentDivisions = new Map<string, 'B' | 'C' | 'B&C'>()
-    
-    staffMemberships.forEach(membership => {
-      if (membership.role === 'TOURNAMENT_DIRECTOR') {
-        // For TDs, we'll fetch all events for the tournament's division
-        // TDs can see all trial events for their tournament
-        // Convert enum to string if needed
-        const divisionFromHosting = hostingRequestMap.get(membership.tournament.id)
-        const divisionFromTournament = membership.tournament.division
-        const division = divisionFromHosting || (divisionFromTournament === Division.B ? 'B' : divisionFromTournament === Division.C ? 'C' : String(divisionFromTournament))
-        tournamentDivisions.set(membership.tournament.id, division as 'B' | 'C' | 'B&C')
-      } else {
-        // For ES, use assigned events
-        membership.events.forEach(e => userEventIds.add(e.event.id))
-        
-        // Also get trial events assigned to this ES member
-        if (membership.trialEvents) {
-          try {
-            const parsed = JSON.parse(membership.trialEvents)
-            if (Array.isArray(parsed)) {
-              // Handle both old format (string[]) and new format ({ name, division }[])
-              const trialEventNames = parsed.length > 0 && typeof parsed[0] === 'string'
-                ? parsed
-                : parsed.map((e: any) => e.name)
-              
-              if (!userTrialEventNamesByTournament.has(membership.tournament.id)) {
-                userTrialEventNamesByTournament.set(membership.tournament.id, new Set())
-              }
-              trialEventNames.forEach((name: string) => {
-                userTrialEventNamesByTournament.get(membership.tournament.id)!.add(name)
-              })
-            }
-          } catch (e) {
-            console.error('Error parsing staff trial events:', e)
-          }
-        }
-      }
-    })
-
-    // Build event ID sets per tournament (NOT combined across tournaments)
-    // This prevents tests from leaking between tournaments
-    const eventIdsByTournament = new Map<string, Set<string>>()
-    
-    // For ES members, map their assigned events per tournament
-    staffMemberships.forEach(membership => {
-      if (membership.role !== 'TOURNAMENT_DIRECTOR') {
-        const tournamentId = membership.tournament.id
-        if (!eventIdsByTournament.has(tournamentId)) {
-          eventIdsByTournament.set(tournamentId, new Set())
-        }
-        membership.events.forEach(e => {
-          eventIdsByTournament.get(tournamentId)!.add(e.event.id)
-        })
-      }
-    })
-    
-    // For TDs, fetch all events for their tournament's division
-    for (const [tournamentId, division] of tournamentDivisions.entries()) {
-      if (!eventIdsByTournament.has(tournamentId)) {
-        eventIdsByTournament.set(tournamentId, new Set())
-      }
-      // Convert string division to enum properly
-      const divisionsToFetch: Division[] = division === 'B&C' 
-        ? [Division.B, Division.C] 
-        : division === 'B'
-          ? [Division.B]
-          : [Division.C]
-      const events = await prisma.event.findMany({
-        where: {
-          division: { in: divisionsToFetch },
+    return NextResponse.json(
+      { staffMemberships: staffMembershipsWithTests },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=30', // Cache for 30 seconds
         },
-        select: { id: true },
-      })
-      events.forEach(e => eventIdsByTournament.get(tournamentId)!.add(e.id))
-    }
-
-    console.log('Fetching ES tests for user:', session.user.email)
-    console.log('Event IDs by tournament:', Object.fromEntries(Array.from(eventIdsByTournament.entries()).map(([k, v]) => [k, Array.from(v)])))
-    console.log('User tournament IDs:', tournamentIds)
-
-    // Create a map to check if user has access to a trial event in a tournament
-    // For TDs: access to all trial events in their tournament
-    // For ES: access only to trial events they're assigned to
-    const userTrialEventAccess = new Map<string, Set<string>>() // tournamentId -> Set<trialEventName>
-    for (const membership of staffMemberships) {
-      const tournamentId = membership.tournament.id
-      if (!userTrialEventAccess.has(tournamentId)) {
-        userTrialEventAccess.set(tournamentId, new Set())
       }
-      const accessSet = userTrialEventAccess.get(tournamentId)!
-      
-      if (membership.role === 'TOURNAMENT_DIRECTOR') {
-        // TDs have access to all trial events in their tournament
-        const allTrialEvents = tournamentTrialEventNamesByTournament.get(tournamentId) || []
-        allTrialEvents.forEach(name => accessSet.add(name))
-      } else {
-        // ES members have access only to trial events they're assigned to
-        const assignedTrialEvents = userTrialEventNamesByTournament.get(tournamentId)
-        if (assignedTrialEvents) {
-          assignedTrialEvents.forEach(name => accessSet.add(name))
-        }
-      }
-    }
-
-    // CRITICAL FIX: Query and organize tests PER TOURNAMENT separately
-    // Never mix tests from different tournaments together
-    const testsByTournament = new Map<string, Map<string, any[]>>()
-    const testEventNameMap = new Map<string, string>()
-    
-    // Process each tournament completely independently
-    for (const tournamentId of tournamentIds) {
-      // Query ONLY tests for this tournament
-      // Use select to avoid fields that might not exist yet (if migration hasn't run)
-      const tournamentTests = await prisma.eSTest.findMany({
-        where: {
-          tournamentId: tournamentId, // EXPLICIT: Only this tournament
-        },
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          tournamentId: true,
-          eventId: true,
-          createdAt: true,
-          updatedAt: true,
-          event: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          staff: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          createdBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          questions: {
-            include: {
-              options: true,
-            },
-            orderBy: { order: 'asc' },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      })
-      
-      console.log(`Tournament ${tournamentId}: Found ${tournamentTests.length} tests`)
-      
-      // Fetch eventNames from CREATE audit logs for trial events in THIS tournament only
-      const testsWithNullEventId = tournamentTests.filter(t => !t.eventId)
-      if (testsWithNullEventId.length > 0) {
-        const testIds = testsWithNullEventId.map(t => t.id)
-        const createAudits = await prisma.eSTestAudit.findMany({
-          where: {
-            testId: { in: testIds },
-            action: 'CREATE',
-          },
-          select: {
-            testId: true,
-            details: true,
-          },
-        })
-        for (const audit of createAudits) {
-          if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
-            const eventName = (audit.details as any).eventName
-            if (eventName && typeof eventName === 'string') {
-              testEventNameMap.set(audit.testId, eventName)
-            }
-          }
-        }
-      }
-      
-      // Initialize tournament's test map
-      testsByTournament.set(tournamentId, new Map())
-      const testsByEvent = testsByTournament.get(tournamentId)!
-      
-      // Get allowed event IDs for THIS tournament only
-      const allowedEventIds = eventIdsByTournament.get(tournamentId) || new Set<string>()
-      const tournamentTrialEvents = tournamentTrialEventNamesByTournament.get(tournamentId) || []
-      const userAccess = userTrialEventAccess.get(tournamentId) || new Set<string>()
-      
-      // Organize tests for THIS tournament only
-      for (const test of tournamentTests) {
-        // VERIFY: Test belongs to this tournament (should always be true, but double-check)
-        if (test.tournamentId !== tournamentId) {
-          console.error(`CRITICAL ERROR: Test ${test.id} has tournamentId ${test.tournamentId} but we're organizing it for ${tournamentId}`)
-          continue
-        }
-        
-        let eventKey: string | null = null
-        
-        if (test.eventId) {
-          // Regular event - only include if user has access to this event in THIS tournament
-          if (allowedEventIds.has(test.eventId)) {
-            eventKey = test.eventId
-          } else {
-            continue // Skip - user doesn't have access
-          }
-        } else {
-          // Trial event - use eventName from audit log
-          const eventName = testEventNameMap.get(test.id)
-          if (eventName && userAccess.has(eventName) && tournamentTrialEvents.includes(eventName)) {
-            eventKey = `trial-${eventName}`
-          } else {
-            continue // Skip - no access or invalid trial event
-          }
-        }
-        
-        if (eventKey) {
-          if (!testsByEvent.has(eventKey)) {
-            testsByEvent.set(eventKey, [])
-          }
-          testsByEvent.get(eventKey)!.push(test)
-        }
-      }
-      
-      console.log(`Tournament ${tournamentId}: Organized into ${testsByEvent.size} events`)
-    }
-    
-    console.log('Tests organized by tournament:', Array.from(testsByTournament.keys()))
-    for (const [tournamentId, eventMap] of testsByTournament.entries()) {
-      console.log(`Tournament ${tournamentId} has tests for events:`, Array.from(eventMap.keys()))
-      for (const [eventId, tests] of eventMap.entries()) {
-        console.log(`  Event ${eventId} has ${tests.length} tests:`, tests.map((t: any) => t.name))
-      }
-    }
-
-    // For TDs, get all events for their tournament's division
-    const allEventsForTDs = new Map<string, Array<{ id: string; name: string; division: 'B' | 'C' }>>()
-    for (const [tournamentId, division] of tournamentDivisions.entries()) {
-      // Convert string division to enum properly
-      const divisionsToFetch: Division[] = division === 'B&C' 
-        ? [Division.B, Division.C] 
-        : division === 'B'
-          ? [Division.B]
-          : [Division.C]
-      const events = await prisma.event.findMany({
-        where: {
-          division: { in: divisionsToFetch },
-        },
-        select: {
-          id: true,
-          name: true,
-          division: true,
-        },
-        orderBy: { name: 'asc' },
-      })
-      allEventsForTDs.set(tournamentId, events)
-    }
-
-    // Map staff memberships with tests organized by event
-    // For each event assignment, look for tests in ANY tournament the user has access to
-    // (not just the membership's tournament) - this enables cross-tournament test visibility
-    const staffMembershipsWithTests = staffMemberships.map(membership => {
-      // Use hosting request division for display if available (supports "B&C")
-      // Convert enum to string if needed
-      const divisionFromHosting = hostingRequestMap.get(membership.tournament.id)
-      const divisionFromTournament = membership.tournament.division
-      const displayDivision = divisionFromHosting || (divisionFromTournament === Division.B ? 'B' : divisionFromTournament === Division.C ? 'C' : String(divisionFromTournament))
-      
-      // For TDs, use all events for the tournament's division; for ES, use assigned events
-      const eventsToShow = membership.role === 'TOURNAMENT_DIRECTOR'
-        ? (allEventsForTDs.get(membership.tournament.id) || []).map(event => ({
-            event: {
-              id: event.id,
-              name: event.name,
-              division: event.division,
-            },
-          }))
-        : membership.events
-
-      // Get trial events for this tournament that the user has access to
-      const trialEventNames = tournamentTrialEventNamesByTournament.get(membership.tournament.id) || []
-      const userHasAccessToTrialEvents = userTrialEventAccess.get(membership.tournament.id)
-      
-      // For TDs: show all trial events for their tournament
-      // For ES: show only trial events they're assigned to
-      const trialEventsToShow = trialEventNames
-        .filter(trialEventName => {
-          // TDs can see all trial events, ES can only see assigned ones
-          return membership.role === 'TOURNAMENT_DIRECTOR' || 
-                 (userHasAccessToTrialEvents && userHasAccessToTrialEvents.has(trialEventName))
-        })
-        .map(trialEventName => {
-          // Get division from tournament trial events if available
-          let division = membership.tournament.division as 'B' | 'C'
-          if (membership.tournament.trialEvents) {
-            try {
-              const parsed = JSON.parse(membership.tournament.trialEvents)
-              if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] !== 'string') {
-                const trialEvent = parsed.find((e: any) => e.name === trialEventName)
-                if (trialEvent && trialEvent.division) {
-                  division = trialEvent.division
-                }
-              }
-            } catch (e) {
-              // Use default division
-            }
-          }
-          return {
-            event: {
-              id: null, // Trial events don't have IDs
-              name: trialEventName,
-              division: division,
-            },
-          }
-        })
-      
-      const membershipData = {
-        id: membership.id,
-        email: membership.email,
-        name: membership.name,
-        role: membership.role,
-        status: membership.status,
-        invitedAt: membership.invitedAt.toISOString(),
-        acceptedAt: membership.acceptedAt?.toISOString() || null,
-        tournament: {
-          id: membership.tournament.id,
-          name: membership.tournament.name,
-          division: displayDivision,
-          startDate: membership.tournament.startDate.toISOString(),
-          slug: membership.tournament.slug,
-        },
-        events: [...eventsToShow, ...trialEventsToShow].sort((a, b) => a.event.name.localeCompare(b.event.name)).map(e => {
-          // Only look for tests for this event in THIS tournament (matches TD portal behavior)
-          // For regular events, use event.id; for trial events, use "trial-{eventName}"
-          const eventKey = e.event.id ? e.event.id : `trial-${e.event.name}`
-          const eventMap = testsByTournament.get(membership.tournament.id) || new Map()
-          const eventTests = eventMap.get(eventKey) || []
-          
-          // CRITICAL DEFENSIVE FILTER: Double-check that every test actually belongs to this tournament
-          // This catches any bugs in the organization logic
-          const filteredEventTests = eventTests.filter((test: any) => {
-            if (test.tournamentId !== membership.tournament.id) {
-              console.error(`CRITICAL ERROR: Test ${test.id} has tournamentId ${test.tournamentId} but is being shown for tournament ${membership.tournament.id}`)
-              return false
-            }
-            return true
-          })
-          
-          console.log(`Mapping tests for membership ${membership.id}, tournament ${membership.tournament.id}, event ${e.event.id || `trial-${e.event.name}`}:`, filteredEventTests.length, 'tests')
-          return {
-            event: {
-              id: e.event.id,
-              name: e.event.name,
-              division: e.event.division,
-            },
-            tests: filteredEventTests.map((test: any) => ({
-              id: test.id,
-              name: test.name,
-              status: test.status,
-              eventId: test.eventId,
-              createdAt: test.createdAt.toISOString(),
-              updatedAt: test.updatedAt.toISOString(),
-              event: test.event ? {
-                id: test.event.id,
-                name: test.event.name,
-              } : null,
-              staff: test.staff ? {
-                id: test.staff.id,
-                name: test.staff.name,
-                email: test.staff.email,
-              } : undefined,
-              createdBy: test.createdBy ? {
-                id: test.createdBy.id,
-                name: test.createdBy.name,
-                email: test.createdBy.email,
-              } : undefined,
-              questions: test.questions.map((q: any) => ({
-                id: q.id,
-                type: q.type,
-                promptMd: q.promptMd,
-                points: Number(q.points),
-                order: q.order,
-                options: q.options.map((o: any) => ({
-                  id: o.id,
-                  label: o.label,
-                  isCorrect: o.isCorrect,
-                  order: o.order,
-                })),
-              })),
-            })),
-          }
-        }),
-      }
-      console.log(`Membership ${membership.id} has ${membershipData.events.length} events with tests`)
-      return membershipData
-    })
-
-    return NextResponse.json({ staffMemberships: staffMembershipsWithTests })
+    )
   } catch (error) {
     console.error('Error fetching ES tests:', error)
     return NextResponse.json({ error: 'Failed to fetch tests' }, { status: 500 })
@@ -934,6 +325,8 @@ export async function PUT(request: NextRequest) {
       autoApproveNoteSheet,
       requireOneSitting,
       maxAttempts,
+      releaseScoresAt,
+      scoreReleaseMode,
       questions 
     } = body as {
       testId: string
@@ -954,6 +347,8 @@ export async function PUT(request: NextRequest) {
       autoApproveNoteSheet?: boolean
       requireOneSitting?: boolean
       maxAttempts?: number
+      releaseScoresAt?: string
+      scoreReleaseMode?: 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST'
       questions?: Array<{
         id?: string
         type: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'SHORT_TEXT' | 'LONG_TEXT' | 'NUMERIC'
@@ -1044,34 +439,23 @@ export async function PUT(request: NextRequest) {
       },
     })
 
-    // Check if user is a tournament director for this tournament first
-    // (TDs might not have staff memberships)
-    const isTD = await isTournamentDirector(session.user.id, session.user.email, existingTest.tournamentId)
+    // Check if user has ES access (TD or ES) for this tournament
+    const hasAccess = await hasESAccess(session.user.id, session.user.email, existingTest.tournamentId)
+    
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    }
 
     // Get the staff member who is making the edit
     let editingStaff: { id: string } | null = null
     
-    if (isTD) {
-      // For TDs, find or use the first staff membership, or use the test's current staff
-      editingStaff = existingTest.staffId ? { id: existingTest.staffId } : null
-    } else {
-      // For non-TDs, check staff membership and event access
-      if (!userStaffMemberships || userStaffMemberships.length === 0) {
-        return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
-      }
-
-      // Check if user is assigned to the same event as the test (collaborative access)
-      // User must be assigned to the event in at least one of their staff memberships
-      const hasEventAccess = existingTest.eventId && userStaffMemberships.some(staff => 
-        staff.events.some(e => e.eventId === existingTest.eventId)
-      )
-
-      if (!hasEventAccess) {
-        return NextResponse.json({ error: 'Not authorized to edit this test' }, { status: 403 })
-      }
-
+    // Find a staff membership for this user in this tournament
+    if (userStaffMemberships && userStaffMemberships.length > 0) {
       // Use the first matching staff membership
-      editingStaff = userStaffMemberships[0] ? { id: userStaffMemberships[0].id } : null
+      editingStaff = { id: userStaffMemberships[0].id }
+    } else {
+      // Fallback to test's current staff if no membership found
+      editingStaff = existingTest.staffId ? { id: existingTest.staffId } : null
     }
 
     if (!editingStaff) {
@@ -1128,20 +512,41 @@ export async function PUT(request: NextRequest) {
     if (maxAttempts !== undefined && maxAttempts !== (existingTest as any).maxAttempts) changedFields.push('maxAttempts')
     if (questions) changedFields.push('questions')
 
+    // If publishing, fetch tournament default settings to apply
+    let tournamentDefaults: any = null
+    if (status === 'PUBLISHED') {
+      const tournament = await prisma.tournament.findUnique({
+        where: { id: existingTest.tournamentId },
+        select: {
+          defaultDurationMinutes: true,
+          defaultStartAt: true,
+          defaultEndAt: true,
+          defaultReleaseScoresAt: true,
+          defaultScoreReleaseMode: true,
+          defaultRequireFullscreen: true,
+          defaultAllowCalculator: true,
+          defaultCalculatorType: true,
+          defaultAllowNoteSheet: true,
+          defaultAutoApproveNoteSheet: true,
+          defaultRequireOneSitting: true,
+          defaultMaxAttempts: true,
+        },
+      })
+      tournamentDefaults = tournament
+    }
+
     // Use a transaction to update test and questions
     const updatedTest = await prisma.$transaction(async (tx) => {
-      // Update the test
-      const test = await tx.eSTest.update({
-        where: { id: testId },
-        data: {
-          ...(name && { name }),
-          ...(description !== undefined && { description }),
-          ...(instructions !== undefined && { instructions }),
-          ...(durationMinutes && { durationMinutes }),
-          ...(status && { status }),
-          ...(eventId !== undefined && { eventId }),
-          ...(startAt !== undefined && { startAt: newStartAt }),
-          ...(endAt !== undefined && { endAt: newEndAt }),
+      // Build update data
+      const updateData: any = {
+        ...(name && { name }),
+        ...(description !== undefined && { description }),
+        ...(instructions !== undefined && { instructions }),
+        ...(durationMinutes && { durationMinutes }),
+        ...(status && { status }),
+        ...(eventId !== undefined && { eventId }),
+        ...(startAt !== undefined && { startAt: newStartAt }),
+        ...(endAt !== undefined && { endAt: newEndAt }),
           ...(allowLateUntil !== undefined && { allowLateUntil: allowLateUntil ? new Date(allowLateUntil) : null }),
           ...(requireFullscreen !== undefined && { requireFullscreen }),
           ...(allowCalculator !== undefined && { allowCalculator }),
@@ -1149,11 +554,21 @@ export async function PUT(request: NextRequest) {
           ...(calculatorType !== undefined && { calculatorType: allowCalculator && calculatorType ? calculatorType as 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' : null }),
           ...(noteSheetInstructions !== undefined && { noteSheetInstructions: allowNoteSheet ? (noteSheetInstructions || null) : null }),
           ...(autoApproveNoteSheet !== undefined && { autoApproveNoteSheet: allowNoteSheet ? (autoApproveNoteSheet ?? true) : true }),
+          ...(releaseScoresAt !== undefined && { releaseScoresAt: releaseScoresAt ? new Date(releaseScoresAt) : null }),
+          ...(scoreReleaseMode !== undefined && { scoreReleaseMode: scoreReleaseMode as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST' | null }),
           // Only include requireOneSitting if provided (will be skipped if column doesn't exist)
           ...(requireOneSitting !== undefined ? { requireOneSitting } : {}),
           // Only include maxAttempts if provided (will be skipped if column doesn't exist)
           ...(maxAttempts !== undefined ? { maxAttempts: maxAttempts ?? null } : {}),
-        },
+      }
+
+      // Note: Tournament defaults are no longer automatically applied on publish.
+      // Users must explicitly click "Apply Defaults" button in the UI to apply them.
+
+      // Update the test
+      const test = await tx.eSTest.update({
+        where: { id: testId },
+        data: updateData,
       })
 
       // Get event name - either from the updated event relation or from existing test
@@ -1419,59 +834,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
     }
 
-    // Check if user is assigned to the same event as the test (collaborative access)
-    // OR if user is a tournament director for this tournament
-    // User must be assigned to the event in at least one of their staff memberships
-    const hasEventAccess = existingTest.eventId && userStaffMemberships.some(staff => 
-      staff.events.some(e => e.eventId === existingTest.eventId)
-    )
+    // Check if user has access to this specific test
+    // TDs have full access, ES only for their assigned events
+    const hasAccess = await hasESTestAccess(session.user.id, session.user.email, testId)
 
-    // Check if user is a tournament director for this tournament
-    const isTournamentDirector = await (async () => {
-      // Check tournament admin table
-      const admin = await prisma.tournamentAdmin.findUnique({
-        where: {
-          tournamentId_userId: {
-            tournamentId: existingTest.tournamentId,
-            userId: session.user.id,
-          },
-        },
-      })
-      if (admin) return true
-
-      // Check if user created the tournament
-      const tournament = await prisma.tournament.findUnique({
-        where: { id: existingTest.tournamentId },
-        select: { createdById: true },
-      })
-      if (tournament?.createdById === session.user.id) return true
-
-      // Check if user is director on hosting request
-      const hostingRequest = await prisma.tournamentHostingRequest.findFirst({
-        where: {
-          tournament: {
-            id: existingTest.tournamentId,
-          },
-          directorEmail: {
-            equals: session.user.email,
-            mode: 'insensitive',
-          },
-          status: 'APPROVED',
-        },
-      })
-      return !!hostingRequest
-    })()
-
-    if (!hasEventAccess && !isTournamentDirector) {
+    if (!hasAccess) {
       return NextResponse.json({ error: 'Not authorized to delete this test' }, { status: 403 })
     }
 
     // Get staff member for audit log
     let deletingStaff: { id: string } | null = null
-    if (isTournamentDirector) {
-      deletingStaff = existingTest.staffId ? { id: existingTest.staffId } : null
-    } else if (userStaffMemberships && userStaffMemberships.length > 0) {
+    if (userStaffMemberships && userStaffMemberships.length > 0) {
       deletingStaff = { id: userStaffMemberships[0].id }
+    } else {
+      deletingStaff = existingTest.staffId ? { id: existingTest.staffId } : null
     }
 
     if (!deletingStaff) {

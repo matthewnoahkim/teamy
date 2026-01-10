@@ -162,7 +162,7 @@ export default async function TakeTestPage({
     // Check if test is published
     if (test.status !== 'PUBLISHED') {
       return (
-        <div className="min-h-screen flex items-center justify-center p-4 grid-pattern" style={{ backgroundColor: 'hsl(var(--card))' }}>
+        <div className="min-h-screen flex items-center justify-center p-4 grid-pattern bg-background">
           <div className="container mx-auto max-w-4xl px-4 py-8">
             <div className="rounded-lg border border-destructive bg-destructive/10 dark:bg-background p-6">
               <h1 className="text-2xl font-bold text-destructive mb-2">Test Not Available</h1>
@@ -185,7 +185,7 @@ export default async function TakeTestPage({
     const availability = isTestAvailable(test)
     if (!availability.available) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-4 grid-pattern" style={{ backgroundColor: 'hsl(var(--card))' }}>
+        <div className="min-h-screen flex items-center justify-center p-4 grid-pattern bg-background">
           <div className="container mx-auto max-w-4xl px-4 py-8">
             <div className="rounded-lg border border-destructive bg-destructive/10 dark:bg-background p-6">
               <h1 className="text-2xl font-bold text-destructive mb-2">Test Not Available</h1>

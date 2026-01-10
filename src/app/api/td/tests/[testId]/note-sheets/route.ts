@@ -2,27 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-// Helper to check if user is tournament admin
-async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
-  const admin = await prisma.tournamentAdmin.findUnique({
-    where: {
-      tournamentId_userId: {
-        tournamentId,
-        userId,
-      },
-    },
-  })
-  
-  if (admin) return true
-  
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    select: { createdById: true },
-  })
-  
-  return tournament?.createdById === userId
-}
+import { hasESTestAccess, isTournamentAdmin } from '@/lib/rbac'
 
 // GET - Get all note sheets for a test (tournament admin view)
 export async function GET(
@@ -83,13 +63,27 @@ export async function GET(
       return NextResponse.json({ error: 'Test not found' }, { status: 404 })
     }
 
-    // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, tournamentId)
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Only tournament admins can view note sheets' },
-        { status: 403 }
-      )
+    // Check if user has access to this test
+    // For ES tests, use hasESTestAccess (TDs have full access, ES only for their assigned events)
+    // For regular tests, check tournament admin
+    if (isESTest) {
+      const hasAccess = await hasESTestAccess(session.user.id, session.user.email || '', testId)
+      const isAdmin = await isTournamentAdmin(session.user.id, tournamentId)
+      if (!hasAccess && !isAdmin) {
+        return NextResponse.json(
+          { error: 'Not authorized to view note sheets for this test' },
+          { status: 403 }
+        )
+      }
+    } else {
+      // For regular tests, check tournament admin
+      const isAdmin = await isTournamentAdmin(session.user.id, tournamentId)
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: 'Only tournament admins can view note sheets' },
+          { status: 403 }
+        )
+      }
     }
 
     // Get all note sheets for this test (handle both Test and ESTest)

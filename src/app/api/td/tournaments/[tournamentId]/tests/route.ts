@@ -2,65 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-// Helper to check if user is a tournament director for a tournament
-async function isTournamentDirector(userId: string, userEmail: string, tournamentId: string): Promise<boolean> {
-  // Check if user is tournament admin
-  const admin = await prisma.tournamentAdmin.findUnique({
-    where: {
-      tournamentId_userId: {
-        tournamentId,
-        userId,
-      },
-    },
-  })
-  
-  if (admin) return true
-  
-  // Check if user created the tournament
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    select: { createdById: true },
-  })
-  
-  if (tournament?.createdById === userId) return true
-  
-  // Check if user is the director on the hosting request
-  const hostingRequest = await prisma.tournamentHostingRequest.findFirst({
-    where: {
-      tournament: {
-        id: tournamentId,
-      },
-      directorEmail: {
-        equals: userEmail,
-        mode: 'insensitive',
-      },
-      status: 'APPROVED',
-    },
-  })
-  
-  if (hostingRequest) return true
-  
-  // Also check if user is a TD via TournamentStaff
-  const staffRecord = await prisma.tournamentStaff.findFirst({
-    where: {
-      tournamentId,
-      role: 'TOURNAMENT_DIRECTOR',
-      status: 'ACCEPTED',
-      OR: [
-        { userId },
-        {
-          email: {
-            equals: userEmail,
-            mode: 'insensitive',
-          },
-        },
-      ],
-    },
-  })
-  
-  return !!staffRecord
-}
+import { hasESAccess } from '@/lib/rbac'
 
 // GET /api/td/tournaments/[tournamentId]/tests
 // Get all ES tests for a tournament, organized by event
@@ -84,10 +26,10 @@ export async function GET(
       return NextResponse.json({ error: 'Tournament ID is required' }, { status: 400 })
     }
 
-    // Check if user is tournament director
-    const isTD = await isTournamentDirector(session.user.id, session.user.email, tournamentId)
-    if (!isTD) {
-      return NextResponse.json({ error: 'Only tournament directors can view tests' }, { status: 403 })
+    // Check if user is tournament director or event supervisor
+    const hasAccess = await hasESAccess(session.user.id, session.user.email, tournamentId)
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Only tournament directors and event supervisors can view tests' }, { status: 403 })
     }
 
     // Get tournament info to get division, eventsRun, and trialEvents

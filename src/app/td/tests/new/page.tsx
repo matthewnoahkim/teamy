@@ -4,68 +4,10 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { NewTestBuilder } from '@/components/tests/new-test-builder'
 import { nanoid } from 'nanoid'
+import { hasESAccess } from '@/lib/rbac'
 
 interface Props {
   searchParams: Promise<{ eventId?: string; tournamentId?: string; trialEventName?: string; trialEventDivision?: string }>
-}
-
-// Helper to check if user is a tournament director for a tournament
-async function isTournamentDirector(userId: string, userEmail: string, tournamentId: string): Promise<boolean> {
-  // Check if user is tournament admin
-  const admin = await prisma.tournamentAdmin.findUnique({
-    where: {
-      tournamentId_userId: {
-        tournamentId,
-        userId,
-      },
-    },
-  })
-  
-  if (admin) return true
-  
-  // Check if user created the tournament
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    select: { createdById: true },
-  })
-  
-  if (tournament?.createdById === userId) return true
-  
-  // Check if user is the director on the hosting request
-  const hostingRequest = await prisma.tournamentHostingRequest.findFirst({
-    where: {
-      tournament: {
-        id: tournamentId,
-      },
-      directorEmail: {
-        equals: userEmail,
-        mode: 'insensitive',
-      },
-      status: 'APPROVED',
-    },
-  })
-  
-  if (hostingRequest) return true
-  
-  // Also check if user is a TD via TournamentStaff
-  const staffRecord = await prisma.tournamentStaff.findFirst({
-    where: {
-      tournamentId,
-      role: 'TOURNAMENT_DIRECTOR',
-      status: 'ACCEPTED',
-      OR: [
-        { userId },
-        {
-          email: {
-            equals: userEmail,
-            mode: 'insensitive',
-          },
-        },
-      ],
-    },
-  })
-  
-  return !!staffRecord
 }
 
 export default async function TDNewTestPage({ searchParams }: Props) {
@@ -81,10 +23,10 @@ export default async function TDNewTestPage({ searchParams }: Props) {
     redirect('/td')
   }
 
-  // Verify user is a tournament director for this tournament
-  const isTD = await isTournamentDirector(session.user.id, session.user.email, tournamentId)
+  // Verify user is a tournament director or event supervisor for this tournament
+  const hasAccess = await hasESAccess(session.user.id, session.user.email, tournamentId)
   
-  if (!isTD) {
+  if (!hasAccess) {
     redirect('/td')
   }
 

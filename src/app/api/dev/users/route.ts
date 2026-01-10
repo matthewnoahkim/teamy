@@ -1,28 +1,33 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { subDays } from 'date-fns'
+import {
+  validateInteger,
+  validateBoolean,
+} from '@/lib/input-validation'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     
-    const minMemberDays = searchParams.get('minMemberDays')
-    const maxMemberDays = searchParams.get('maxMemberDays')
-    const minClubs = searchParams.get('minClubs')
-    const isClubAdmin = searchParams.get('isClubAdmin')
-    const isTournamentDirector = searchParams.get('isTournamentDirector')
-    const isEventSupervisor = searchParams.get('isEventSupervisor')
+    // Validate and sanitize all inputs
+    const minMemberDays = validateInteger(searchParams.get('minMemberDays'), 0, 36500) // Max 100 years
+    const maxMemberDays = validateInteger(searchParams.get('maxMemberDays'), 0, 36500)
+    const minClubs = validateInteger(searchParams.get('minClubs'), 0, 1000)
+    const isClubAdmin = validateBoolean(searchParams.get('isClubAdmin'))
+    const isTournamentDirector = validateBoolean(searchParams.get('isTournamentDirector'))
+    const isEventSupervisor = validateBoolean(searchParams.get('isEventSupervisor'))
 
     // Build the where clause for filtering
     const where: any = {}
     
-    // Member duration filters
-    if (minMemberDays) {
-      const minDate = subDays(new Date(), parseInt(minMemberDays))
+    // Member duration filters - only use if validation passed
+    if (minMemberDays !== null) {
+      const minDate = subDays(new Date(), minMemberDays)
       where.createdAt = { ...where.createdAt, lte: minDate }
     }
-    if (maxMemberDays) {
-      const maxDate = subDays(new Date(), parseInt(maxMemberDays))
+    if (maxMemberDays !== null) {
+      const maxDate = subDays(new Date(), maxMemberDays)
       where.createdAt = { ...where.createdAt, gte: maxDate }
     }
 
@@ -71,23 +76,23 @@ export async function GET(request: Request) {
       }
     })
 
-    // Apply additional filters
-    if (minClubs) {
-      filteredUsers = filteredUsers.filter(u => u.clubCount >= parseInt(minClubs))
+    // Apply additional filters - using validated values
+    if (minClubs !== null) {
+      filteredUsers = filteredUsers.filter(u => u.clubCount >= minClubs)
     }
-    if (isClubAdmin === 'true') {
+    if (isClubAdmin === true) {
       filteredUsers = filteredUsers.filter(u => u.isClubAdmin)
-    } else if (isClubAdmin === 'false') {
+    } else if (isClubAdmin === false) {
       filteredUsers = filteredUsers.filter(u => !u.isClubAdmin)
     }
-    if (isTournamentDirector === 'true') {
+    if (isTournamentDirector === true) {
       filteredUsers = filteredUsers.filter(u => u.isTournamentDirector)
-    } else if (isTournamentDirector === 'false') {
+    } else if (isTournamentDirector === false) {
       filteredUsers = filteredUsers.filter(u => !u.isTournamentDirector)
     }
-    if (isEventSupervisor === 'true') {
+    if (isEventSupervisor === true) {
       filteredUsers = filteredUsers.filter(u => u.isEventSupervisor)
-    } else if (isEventSupervisor === 'false') {
+    } else if (isEventSupervisor === false) {
       filteredUsers = filteredUsers.filter(u => !u.isEventSupervisor)
     }
 

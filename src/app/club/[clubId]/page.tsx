@@ -86,8 +86,12 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
     redirect('/dashboard')
   }
 
-  // Fetch all tab data in parallel for instant loading
-  // NOTE: Tests and CalendarEvents are NOT prefetched here - they go through the API which has proper assignment filtering
+  // Check if user is admin (needed for filtering)
+  const isAdminUser = await isAdmin(session.user.id, params.clubId)
+
+  // Fetch only critical data for initial page render (homepage tab + finance tab)
+  // Other tab data (gallery, paperwork, todos, stats) is fetched on-demand when tabs are clicked for faster initial load
+  // This significantly reduces initial page load time
   const [attendances, expenses, purchaseRequests, eventBudgets] = await Promise.all([
     // Attendance data
     prisma.attendance.findMany({
@@ -248,8 +252,6 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   )
 
   // Fetch calendar events for homepage (with proper filtering)
-  const isAdminUser = await isAdmin(session.user.id, params.clubId)
-  
   // Get user's event assignments from roster (for filtering targeted events)
   const userRosterAssignments = await prisma.rosterAssignment.findMany({
     where: {
@@ -592,6 +594,8 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
           calendarEvents: filteredEvents,
           announcements,
           tests,
+          // Gallery, paperwork, todos, and stats are fetched on-demand when tabs are clicked
+          // This significantly improves initial page load time
         }}
       />
     </Suspense>

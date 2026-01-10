@@ -1,23 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import {
+  sanitizeSearchQuery,
+  validateId,
+  validateInteger,
+  validateDate,
+  validateBoolean,
+  validateEnum,
+} from '@/lib/input-validation'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     
-    // Filter parameters
-    const errorType = searchParams.get('errorType')
-    const severity = searchParams.get('severity')
-    const route = searchParams.get('route')
-    const userId = searchParams.get('userId')
-    const resolved = searchParams.get('resolved')
-    const startDate = searchParams.get('startDate')
-    const endDate = searchParams.get('endDate')
-    const page = parseInt(searchParams.get('page') || '1', 10)
-    const limit = parseInt(searchParams.get('limit') || '100', 10)
+    // Filter parameters - all validated and sanitized
+    const errorType = sanitizeSearchQuery(searchParams.get('errorType'), 100)
+    const severity = validateEnum(searchParams.get('severity'), ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const)
+    const route = sanitizeSearchQuery(searchParams.get('route'), 200)
+    const userId = validateId(searchParams.get('userId'))
+    const resolved = validateBoolean(searchParams.get('resolved'))
+    const startDate = validateDate(searchParams.get('startDate'))
+    const endDate = validateDate(searchParams.get('endDate'))
+    const page = validateInteger(searchParams.get('page'), 1, 1000, 1) ?? 1
+    const limit = validateInteger(searchParams.get('limit'), 1, 100, 20) ?? 20
     const skip = (page - 1) * limit
 
-    // Build where clause
+    // Build where clause - all inputs are now validated
     const where: any = {}
     
     if (errorType) {
@@ -37,16 +45,16 @@ export async function GET(request: NextRequest) {
     }
     
     if (resolved !== null && resolved !== undefined) {
-      where.resolved = resolved === 'true'
+      where.resolved = resolved
     }
     
     if (startDate || endDate) {
       where.timestamp = {}
       if (startDate) {
-        where.timestamp.gte = new Date(startDate)
+        where.timestamp.gte = startDate
       }
       if (endDate) {
-        where.timestamp.lte = new Date(endDate)
+        where.timestamp.lte = endDate
       }
     }
 

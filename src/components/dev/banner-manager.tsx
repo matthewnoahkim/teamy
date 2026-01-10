@@ -23,7 +23,7 @@ export function BannerManager() {
     enabled: true,
     text: 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
     link: '',
-    backgroundColor: '#5865F2',
+    backgroundColor: '#8B5CF6',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -47,7 +47,7 @@ export function BannerManager() {
         enabled: enabledData.setting?.value === 'true',
         text: textData.setting?.value || 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
         link: linkData.setting?.value || '',
-        backgroundColor: bgData.setting?.value || '#5865F2',
+        backgroundColor: bgData.setting?.value || '#8B5CF6',
       })
     } catch (error) {
       console.error('Failed to fetch banner settings:', error)

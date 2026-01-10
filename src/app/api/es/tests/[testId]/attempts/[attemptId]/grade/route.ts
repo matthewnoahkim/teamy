@@ -15,67 +15,11 @@ const gradeAttemptSchema = z.object({
   grades: z.array(gradeAnswerSchema),
 })
 
+import { hasESTestAccess } from '@/lib/rbac'
+
 // Helper to check if user has access to grade an ES test
 async function hasESGradingAccess(userId: string, userEmail: string, testId: string): Promise<boolean> {
-  const test = await prisma.eSTest.findUnique({
-    where: { id: testId },
-    select: { tournamentId: true, eventId: true },
-  })
-
-  if (!test) return false
-
-  // Check if user is a tournament director
-  const isTD = await (async () => {
-    const admin = await prisma.tournamentAdmin.findUnique({
-      where: {
-        tournamentId_userId: {
-          tournamentId: test.tournamentId,
-          userId,
-        },
-      },
-    })
-    if (admin) return true
-
-    const tournament = await prisma.tournament.findUnique({
-      where: { id: test.tournamentId },
-      select: { createdById: true },
-    })
-    if (tournament?.createdById === userId) return true
-
-    const hostingRequest = await prisma.tournamentHostingRequest.findFirst({
-      where: {
-        tournament: { id: test.tournamentId },
-        directorEmail: { equals: userEmail, mode: 'insensitive' },
-        status: 'APPROVED',
-      },
-    })
-    return !!hostingRequest
-  })()
-
-  if (isTD) return true
-
-  // Check if user is ES assigned to this event
-  const staffMemberships = await prisma.tournamentStaff.findMany({
-    where: {
-      OR: [{ userId }, { email: { equals: userEmail, mode: 'insensitive' } }],
-      status: 'ACCEPTED',
-      tournamentId: test.tournamentId,
-    },
-    include: {
-      events: {
-        select: { eventId: true },
-      },
-    },
-  })
-
-  if (test.eventId) {
-    return staffMemberships.some(staff => 
-      staff.events.some(e => e.eventId === test.eventId)
-    )
-  }
-
-  // For trial events, any ES staff member with access to tournament can grade
-  return staffMemberships.length > 0
+  return hasESTestAccess(userId, userEmail, testId)
 }
 
 // PATCH /api/es/tests/[testId]/attempts/[attemptId]/grade
@@ -215,5 +159,8 @@ export async function PATCH(
     )
   }
 }
+
+
+
 
 

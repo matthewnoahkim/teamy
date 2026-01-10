@@ -355,6 +355,8 @@ export function NewTestBuilder({
   const [addToCalendar, setAddToCalendar] = useState(false)
   const [events, setEvents] = useState<Array<{ id: string; name: string }>>([])
   const [loadingEvents, setLoadingEvents] = useState(false)
+  const [defaultTestSettings, setDefaultTestSettings] = useState<any>(null)
+  const [loadingDefaults, setLoadingDefaults] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importStartTime, setImportStartTime] = useState<number | null>(null)
   const [estimatedTimeSeconds, setEstimatedTimeSeconds] = useState<number>(30)
@@ -381,7 +383,9 @@ export function NewTestBuilder({
     releaseScoresAt: '',
     maxAttempts: test?.maxAttempts?.toString() || '',
     scoreReleaseMode: (test?.scoreReleaseMode || 'FULL_TEST') as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',
-    requireFullscreen: test?.requireFullscreen !== undefined ? test.requireFullscreen : true,
+    requireFullscreen: test?.requireFullscreen !== undefined && test?.requireFullscreen !== null 
+      ? Boolean(test.requireFullscreen)
+      : Boolean(tournamentId),
   })
   const [hasFixedWindow, setHasFixedWindow] = useState((test as any)?.startAt !== null && (test as any)?.startAt !== undefined && (test as any)?.endAt !== null && (test as any)?.endAt !== undefined)
   const [dateTimeErrors, setDateTimeErrors] = useState<{ startAt?: string; endAt?: string }>({})
@@ -421,7 +425,9 @@ export function NewTestBuilder({
     allowNoteSheet: test?.allowNoteSheet || false,
     noteSheetInstructions: test?.noteSheetInstructions || '',
     autoApproveNoteSheet: (test as any)?.autoApproveNoteSheet ?? true,
-    requireOneSitting: (test as any)?.requireOneSitting ?? true,
+    requireOneSitting: (test as any)?.requireOneSitting !== undefined && (test as any).requireOneSitting !== null 
+      ? (test as any).requireOneSitting 
+      : (tournamentId ? true : false),
   })
 
   const [questions, setQuestions] = useState<QuestionDraft[]>(() => {
@@ -826,6 +832,102 @@ export function NewTestBuilder({
     }
   }, [publishDialogOpen, clubDivision, events.length, loadingEvents, toast])
 
+  // Fetch default test settings when publish dialog opens (for tournament tests)
+  useEffect(() => {
+    if (publishDialogOpen && tournamentId && !defaultTestSettings && !loadingDefaults) {
+      setLoadingDefaults(true)
+      fetch(`/api/td/tournaments/${tournamentId}/default-test-settings`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.defaultTestSettings) {
+            setDefaultTestSettings(data.defaultTestSettings)
+          }
+        })
+        .catch(error => {
+          console.error('Failed to fetch default test settings:', error)
+          // Don't show error toast - defaults are optional
+        })
+        .finally(() => setLoadingDefaults(false))
+    }
+  }, [publishDialogOpen, tournamentId, defaultTestSettings, loadingDefaults])
+
+  // Apply default test settings to publish form
+  const handleApplyDefaults = () => {
+    if (!defaultTestSettings) return
+    
+    const formatDateTimeLocal = (dateStr: string | null): string => {
+      if (!dateStr) return ''
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return ''
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      const hours = String(d.getHours()).padStart(2, '0')
+      const minutes = String(d.getMinutes()).padStart(2, '0')
+      return `${year}-${month}-${day}T${hours}:${minutes}`
+    }
+
+    setPublishFormData(prev => ({
+      ...prev,
+      startAt: defaultTestSettings.defaultStartAt ? formatDateTimeLocal(defaultTestSettings.defaultStartAt) : prev.startAt,
+      endAt: defaultTestSettings.defaultEndAt ? formatDateTimeLocal(defaultTestSettings.defaultEndAt) : prev.endAt,
+      releaseScoresAt: defaultTestSettings.defaultReleaseScoresAt ? formatDateTimeLocal(defaultTestSettings.defaultReleaseScoresAt) : prev.releaseScoresAt,
+      maxAttempts: defaultTestSettings.defaultMaxAttempts?.toString() || prev.maxAttempts,
+      scoreReleaseMode: defaultTestSettings.defaultScoreReleaseMode || prev.scoreReleaseMode,
+      requireFullscreen: defaultTestSettings.defaultRequireFullscreen !== undefined && defaultTestSettings.defaultRequireFullscreen !== null 
+        ? defaultTestSettings.defaultRequireFullscreen 
+        : prev.requireFullscreen,
+    }))
+
+    // Update test details with defaults
+    setDetails(prev => {
+      const updates: any = {}
+      
+      // Duration
+      if (defaultTestSettings.defaultDurationMinutes && (!prev.durationMinutes || prev.durationMinutes === 60)) {
+        updates.durationMinutes = defaultTestSettings.defaultDurationMinutes
+      }
+      
+      // Require One Sitting - apply if explicitly set (including false)
+      if (defaultTestSettings.defaultRequireOneSitting !== undefined && defaultTestSettings.defaultRequireOneSitting !== null) {
+        updates.requireOneSitting = defaultTestSettings.defaultRequireOneSitting
+      }
+      
+      // Allow Calculator - apply if explicitly set (including false)
+      if (defaultTestSettings.defaultAllowCalculator !== undefined && defaultTestSettings.defaultAllowCalculator !== null) {
+        updates.allowCalculator = defaultTestSettings.defaultAllowCalculator
+        // Only set calculator type if calculator is allowed
+        if (defaultTestSettings.defaultAllowCalculator && defaultTestSettings.defaultCalculatorType) {
+          updates.calculatorType = defaultTestSettings.defaultCalculatorType
+        } else if (!defaultTestSettings.defaultAllowCalculator) {
+          updates.calculatorType = null
+        }
+      }
+      
+      // Allow Note Sheet - apply if explicitly set (including false)
+      if (defaultTestSettings.defaultAllowNoteSheet !== undefined && defaultTestSettings.defaultAllowNoteSheet !== null) {
+        updates.allowNoteSheet = defaultTestSettings.defaultAllowNoteSheet
+        // Only set auto-approve if note sheet is allowed
+        if (defaultTestSettings.defaultAllowNoteSheet && defaultTestSettings.defaultAutoApproveNoteSheet !== undefined && defaultTestSettings.defaultAutoApproveNoteSheet !== null) {
+          updates.autoApproveNoteSheet = defaultTestSettings.defaultAutoApproveNoteSheet
+        } else if (!defaultTestSettings.defaultAllowNoteSheet) {
+          updates.autoApproveNoteSheet = true // Default when note sheet is disabled
+        }
+      }
+      
+      return { ...prev, ...updates }
+    })
+
+    if (defaultTestSettings.defaultStartAt || defaultTestSettings.defaultEndAt) {
+      setHasFixedWindow(true)
+    }
+
+    toast({
+      title: 'Defaults applied',
+      description: 'Tournament default settings have been applied to this test.',
+    })
+  }
+
   // Track elapsed time during import
   useEffect(() => {
     if (!importing || !importStartTime) {
@@ -1009,7 +1111,7 @@ export function NewTestBuilder({
       allowNoteSheet: details.allowNoteSheet,
       noteSheetInstructions: details.allowNoteSheet ? details.noteSheetInstructions.trim() || undefined : undefined,
       autoApproveNoteSheet: details.allowNoteSheet ? (details.autoApproveNoteSheet ?? true) : undefined,
-      requireOneSitting: details.requireOneSitting ?? true,
+      requireOneSitting: details.requireOneSitting,
       assignments,
       questions: questions.map((question, index) => {
         // Map frontend types to backend types
@@ -1079,17 +1181,17 @@ export function NewTestBuilder({
           const existingQuestionIds = new Set(test.questions.map(q => q.id))
           
           // Build questions array for ES API
-          // Include startAt/endAt if they exist in publishFormData (when publishing) or test data (when updating)
+          // When andPublish is true, don't set dates yet - they'll be set when the publish dialog's "Publish" button is clicked
+          // When andPublish is false, preserve existing dates from the test
           const testWithDates = test as any
-          const publishFormDataWithDates = publishFormData as any
-          const startAtISO = andPublish && publishFormData.startAt 
-            ? new Date(publishFormData.startAt).toISOString() 
+          const startAtISO = andPublish 
+            ? undefined // Don't set dates when opening publish dialog - wait for actual publish
             : (testWithDates.startAt ? new Date(testWithDates.startAt).toISOString() : undefined)
-          const endAtISO = andPublish && publishFormData.endAt 
-            ? new Date(publishFormData.endAt).toISOString() 
+          const endAtISO = andPublish 
+            ? undefined // Don't set dates when opening publish dialog - wait for actual publish
             : (testWithDates.endAt ? new Date(testWithDates.endAt).toISOString() : undefined)
-          const allowLateUntilISO = andPublish && publishFormDataWithDates.allowLateUntil && publishFormDataWithDates.allowLateUntil.trim()
-            ? new Date(publishFormDataWithDates.allowLateUntil).toISOString()
+          const allowLateUntilISO = andPublish 
+            ? undefined // Don't set dates when opening publish dialog - wait for actual publish
             : (testWithDates.allowLateUntil ? new Date(testWithDates.allowLateUntil).toISOString() : undefined)
 
           updatePayload = {
@@ -1098,7 +1200,7 @@ export function NewTestBuilder({
             description: payload.description,
             instructions: payload.instructions,
             durationMinutes: payload.durationMinutes,
-            status: andPublish ? 'PUBLISHED' : test.status,
+            status: test.status, // Don't publish here - only publish when dialog's "Publish" button is clicked
             eventId: initialEventId || undefined,
             startAt: startAtISO,
             endAt: endAtISO,
@@ -1109,7 +1211,7 @@ export function NewTestBuilder({
             allowNoteSheet: payload.allowNoteSheet,
             noteSheetInstructions: payload.allowNoteSheet ? payload.noteSheetInstructions : undefined,
             autoApproveNoteSheet: payload.allowNoteSheet ? ((payload as any).autoApproveNoteSheet ?? true) : undefined,
-            requireOneSitting: (payload as any).requireOneSitting ?? true,
+            requireOneSitting: (payload as any).requireOneSitting,
             questions: questions.map((question, index) => {
               // For fill-in-the-blank, store blankAnswers and blankPoints in explanation field as JSON
               let explanationValue: string | undefined = undefined
@@ -1342,7 +1444,7 @@ export function NewTestBuilder({
             allowNoteSheet: payload.allowNoteSheet,
             noteSheetInstructions: payload.allowNoteSheet ? payload.noteSheetInstructions : undefined,
             autoApproveNoteSheet: payload.allowNoteSheet ? ((payload as any).autoApproveNoteSheet ?? true) : undefined,
-            requireOneSitting: (payload as any).requireOneSitting ?? true,
+            requireOneSitting: (payload as any).requireOneSitting,
             ...(maxAttempts && !isNaN(maxAttempts) ? { maxAttempts } : {}),
             questions: payload.questions.map((q: any) => {
               const questionPayload: any = {
@@ -1536,7 +1638,7 @@ export function NewTestBuilder({
             allowNoteSheet: details.allowNoteSheet,
             noteSheetInstructions: details.allowNoteSheet ? details.noteSheetInstructions : undefined,
             autoApproveNoteSheet: details.allowNoteSheet ? (details.autoApproveNoteSheet ?? true) : undefined,
-            requireOneSitting: details.requireOneSitting ?? true,
+            requireOneSitting: details.requireOneSitting,
             ...(maxAttempts && !isNaN(maxAttempts) ? { maxAttempts } : {}),
           }),
         })
@@ -2102,6 +2204,43 @@ export function NewTestBuilder({
           </DialogHeader>
 
           <div className="space-y-4 pt-2 pb-4">
+            {/* Default Settings Info for Tournament Tests */}
+            {tournamentId && defaultTestSettings && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-medium">Tournament Default Settings Available</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleApplyDefaults}
+                    className="h-7 text-xs"
+                  >
+                    Apply Defaults
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Click &quot;Apply Defaults&quot; to fill in the form fields with tournament default settings.
+                </p>
+                <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                  {defaultTestSettings.defaultDurationMinutes && (
+                    <p>• Time limit: {defaultTestSettings.defaultDurationMinutes} minutes</p>
+                  )}
+                  {(defaultTestSettings.defaultStartAt || defaultTestSettings.defaultEndAt) && (
+                    <p>• Test window: {defaultTestSettings.defaultStartAt ? 'Set' : 'Not set'} - {defaultTestSettings.defaultEndAt ? 'Set' : 'Not set'}</p>
+                  )}
+                  {defaultTestSettings.defaultScoreReleaseMode && (
+                    <p>• Score release: {defaultTestSettings.defaultScoreReleaseMode.replace(/_/g, ' ')}</p>
+                  )}
+                  {defaultTestSettings.defaultMaxAttempts && (
+                    <p>• Max attempts: {defaultTestSettings.defaultMaxAttempts}</p>
+                  )}
+                </div>
+              </div>
+            )}
             {!tournamentId && (
               <div className="space-y-3">
                 <div>
@@ -2350,7 +2489,7 @@ export function NewTestBuilder({
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="require-fullscreen"
-                  checked={publishFormData.requireFullscreen}
+                  checked={publishFormData.requireFullscreen ?? false}
                   onCheckedChange={(checked) => {
                     const value = checked === true
                     setPublishFormData((prev) => ({ ...prev, requireFullscreen: value }))

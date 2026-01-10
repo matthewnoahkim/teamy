@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { isTournamentAdmin, isTournamentDirector } from '@/lib/rbac'
+import { isTournamentAdmin, hasESTestAccess } from '@/lib/rbac'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -30,13 +30,14 @@ export async function POST(
       return NextResponse.json({ error: 'Test not found' }, { status: 404 })
     }
 
-    // Check if user is tournament director or admin
+    // Check if user is tournament admin or has access to this specific test
+    // TDs have full access, ES only for their assigned events
     const isAdmin = await isTournamentAdmin(session.user.id, test.tournamentId)
-    const isTD = await isTournamentDirector(session.user.id, session.user.email || '', test.tournamentId)
+    const hasAccess = await hasESTestAccess(session.user.id, session.user.email || '', resolvedParams.testId)
     
-    if (!isAdmin && !isTD) {
+    if (!isAdmin && !hasAccess) {
       return NextResponse.json(
-        { error: 'Only tournament directors and admins can release scores' },
+        { error: 'Only tournament directors, event supervisors, and admins can release scores' },
         { status: 403 }
       )
     }

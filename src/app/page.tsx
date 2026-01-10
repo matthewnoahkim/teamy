@@ -22,7 +22,7 @@ async function getBannerSettings() {
       enabled: enabledSetting?.value === 'true',
       text: textSetting?.value || 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
       link: linkSetting?.value || '',
-      backgroundColor: bgSetting?.value || '#5865F2',
+      backgroundColor: bgSetting?.value || '#8B5CF6',
     }
   } catch (error) {
     console.error('Failed to fetch banner settings:', error)
@@ -30,7 +30,7 @@ async function getBannerSettings() {
       enabled: true,
       text: 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
       link: '',
-      backgroundColor: '#5865F2',
+      backgroundColor: '#8B5CF6',
     }
   }
 }
@@ -41,12 +41,12 @@ export default async function HomePage() {
   const bannerSettings = await getBannerSettings()
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="min-h-screen flex flex-col bg-background grid-pattern text-foreground">
       {/* Discord Banner */}
       <DiscordBanner initialSettings={bannerSettings} />
       
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 overflow-x-auto">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">
@@ -79,6 +79,7 @@ export default async function HomePage() {
             <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
               <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
               <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
           </div>

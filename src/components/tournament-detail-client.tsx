@@ -376,7 +376,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+      <div className="min-h-screen bg-background grid-pattern">
         <AppHeader user={user} />
         <PageLoading title="Loading tournament" description="Fetching tournament details..." />
       </div>
@@ -385,7 +385,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
 
   if (!tournament) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+      <div className="min-h-screen bg-background grid-pattern">
         <AppHeader user={user} />
         <div className="container mx-auto px-4 py-8">
           <Card>

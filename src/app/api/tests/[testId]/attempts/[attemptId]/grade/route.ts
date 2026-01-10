@@ -9,7 +9,7 @@ import { AiSuggestionStatus } from '@prisma/client'
 
 const gradeAnswerSchema = z.object({
   answerId: z.string(),
-  pointsAwarded: z.number().min(0),
+  pointsAwarded: z.number().min(0).nullable(), // null means ungrade
   graderNote: z.string().optional(),
   aiSuggestionId: z.string().optional().nullable(),
 })
@@ -89,53 +89,66 @@ export async function PATCH(
           throw new Error(`Answer ${grade.answerId} not found in this attempt`)
         }
 
-        // Validate points don't exceed question points
-        const questionPoints = Number(answer.question.points)
-        if (grade.pointsAwarded > questionPoints) {
-          throw new Error(
-            `Points awarded (${grade.pointsAwarded}) cannot exceed question points (${questionPoints})`
-          )
-        }
-
-        // Update the answer
-        await tx.attemptAnswer.update({
-          where: { id: grade.answerId },
-          data: {
-            pointsAwarded: new Decimal(grade.pointsAwarded),
-            graderNote: grade.graderNote || null,
-            gradedAt: new Date(),
-          },
-        })
-
-        if (grade.aiSuggestionId) {
-          const suggestion = await tx.aiGradingSuggestion.findUnique({
-            where: { id: grade.aiSuggestionId },
-          })
-
-          if (!suggestion) {
-            throw new Error('AI suggestion reference not found')
-          }
-
-          if (suggestion.answerId !== grade.answerId || suggestion.attemptId !== resolvedParams.attemptId) {
-            throw new Error('AI suggestion does not match this answer')
-          }
-
-          const suggestedPoints = Number(suggestion.suggestedPoints)
-          const acceptedStatus =
-            Math.abs(grade.pointsAwarded - suggestedPoints) < 0.01
-              ? AiSuggestionStatus.ACCEPTED
-              : AiSuggestionStatus.OVERRIDDEN
-
-          await tx.aiGradingSuggestion.update({
-            where: { id: suggestion.id },
+        // If pointsAwarded is null, this means "ungrade" - clear the grade
+        if (grade.pointsAwarded === null) {
+          await tx.attemptAnswer.update({
+            where: { id: grade.answerId },
             data: {
-              status: acceptedStatus,
-              acceptedPoints: new Decimal(grade.pointsAwarded),
-              acceptedAt: new Date(),
-              acceptedByUserId: session.user.id,
-              acceptedByMembershipId: adminMembership.id,
+              pointsAwarded: null,
+              graderNote: null,
+              gradedAt: null, // Clear gradedAt to mark as ungraded
             },
           })
+        } else {
+          // Validate points don't exceed question points
+          const questionPoints = Number(answer.question.points)
+          if (grade.pointsAwarded > questionPoints) {
+            throw new Error(
+              `Points awarded (${grade.pointsAwarded}) cannot exceed question points (${questionPoints})`
+            )
+          }
+
+          // Update the answer with a grade
+          // pointsAwarded of 0 is still a valid grade (explicitly graded as 0)
+          await tx.attemptAnswer.update({
+            where: { id: grade.answerId },
+            data: {
+              pointsAwarded: new Decimal(grade.pointsAwarded),
+              graderNote: grade.graderNote || null,
+              gradedAt: new Date(), // Set gradedAt when saving a grade
+            },
+          })
+
+          if (grade.aiSuggestionId) {
+            const suggestion = await tx.aiGradingSuggestion.findUnique({
+              where: { id: grade.aiSuggestionId },
+            })
+
+            if (!suggestion) {
+              throw new Error('AI suggestion reference not found')
+            }
+
+            if (suggestion.answerId !== grade.answerId || suggestion.attemptId !== resolvedParams.attemptId) {
+              throw new Error('AI suggestion does not match this answer')
+            }
+
+            const suggestedPoints = Number(suggestion.suggestedPoints)
+            const acceptedStatus =
+              Math.abs(grade.pointsAwarded - suggestedPoints) < 0.01
+                ? AiSuggestionStatus.ACCEPTED
+                : AiSuggestionStatus.OVERRIDDEN
+
+            await tx.aiGradingSuggestion.update({
+              where: { id: suggestion.id },
+              data: {
+                status: acceptedStatus,
+                acceptedPoints: new Decimal(grade.pointsAwarded),
+                acceptedAt: new Date(),
+                acceptedByUserId: session.user.id,
+                acceptedByMembershipId: adminMembership.id,
+              },
+            })
+          }
         }
       }
 
@@ -154,9 +167,67 @@ export async function PATCH(
       }, 0)
 
       // Check if all questions are graded
-      const allGraded = updatedAnswers.every((answer) => answer.gradedAt !== null)
+      // For free response questions (LONG_TEXT, SHORT_TEXT), check if they have gradedAt set
+      // For multipart FRQs, check if ALL parts are graded
+      // For auto-graded questions (MCQ, NUMERIC, etc.), they're considered graded if answered
+      const allGraded = updatedAnswers.every((answer) => {
+        const isFreeResponse = answer.question.type === 'LONG_TEXT' || answer.question.type === 'SHORT_TEXT'
+        if (isFreeResponse) {
+          // Free response questions must have gradedAt to be considered graded
+          if (answer.gradedAt === null) {
+            return false
+          }
+          
+          // Check if this is a multipart FRQ by checking promptMd
+          const promptMd = answer.question.promptMd || ''
+          const isMultipart = promptMd.includes('---FRQ_PARTS---')
+          
+          if (isMultipart && answer.graderNote) {
+            // Parse partPoints from graderNote to check if all parts are graded
+            try {
+              const parsed = JSON.parse(answer.graderNote)
+              if (parsed && typeof parsed === 'object' && Array.isArray(parsed.partPoints)) {
+                const partPoints = parsed.partPoints
+                
+                // Extract expected number of parts from promptMd
+                const partsText = promptMd.match(/---FRQ_PARTS---\n\n([\s\S]+)$/)?.[1]
+                if (partsText) {
+                  const partRegex = /\[PART:([a-z]):(\d+(?:\.\d+)?)\]\n([\s\S]*?)(?=\n\n\[PART:|$)/g
+                  const expectedParts: any[] = []
+                  let match
+                  while ((match = partRegex.exec(partsText)) !== null) {
+                    expectedParts.push(match[1])
+                  }
+                  
+                  // Check if all expected parts are graded (all are not null)
+                  if (expectedParts.length > 0) {
+                    const allPartsGraded = expectedParts.every((_, index) => {
+                      return partPoints[index] !== null && partPoints[index] !== undefined
+                    })
+                    return allPartsGraded
+                  }
+                }
+              }
+            } catch {
+              // If parsing fails, treat as plain text feedback (single-part)
+            }
+          }
+          
+          // For single-part FRQs, just check if gradedAt is set
+          return true
+        } else {
+          // Auto-graded questions are considered graded if they have an answer
+          return answer.gradedAt !== null || (
+            answer.selectedOptionIds !== null || 
+            answer.numericAnswer !== null ||
+            answer.answerText !== null
+          )
+        }
+      })
 
       // Update attempt with new score and status
+      // SUBMITTED means partially graded or not graded
+      // GRADED means all questions are graded
       await tx.testAttempt.update({
         where: { id: resolvedParams.attemptId },
         data: {

@@ -69,6 +69,7 @@ export async function POST(
             },
           },
           answers: true,
+          proctorEvents: true,
         },
       })
 
@@ -167,8 +168,8 @@ export async function POST(
       .filter((r) => !r.needsManualGrade)
       .reduce((sum, r) => sum + r.pointsAwarded, 0)
 
-    // Calculate proctoring score (ESTest doesn't have proctorEvents, so use 0)
-    const proctoringScore = isESTest ? 0 : calculateProctoringScore((attempt as any).proctorEvents || [])
+    // Calculate proctoring score from proctorEvents
+    const proctoringScore = calculateProctoringScore((attempt as any).proctorEvents || [])
 
     // Get IP at submit
     const ipAtSubmit = getClientIp(req.headers)
@@ -176,6 +177,12 @@ export async function POST(
     // Update attempt and answers in transaction
     await prisma.$transaction(async (tx) => {
       if (isESTest) {
+        // Get current tab tracking values from the attempt
+        const esAttemptData = await tx.eSTestAttempt.findUnique({
+          where: { id: params.attemptId },
+          select: { tabSwitchCount: true, timeOffPageSeconds: true },
+        })
+        
         // Update ESTestAttempt
         await tx.eSTestAttempt.update({
           where: { id: params.attemptId },
@@ -185,6 +192,9 @@ export async function POST(
             gradeEarned: totalAutoGraded,
             proctoringScore,
             ipAtSubmit,
+            // Preserve tab tracking values if they exist
+            tabSwitchCount: esAttemptData?.tabSwitchCount ?? 0,
+            timeOffPageSeconds: esAttemptData?.timeOffPageSeconds ?? 0,
           },
         })
 

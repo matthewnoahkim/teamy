@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { NewTestBuilder } from '@/components/tests/new-test-builder'
+import { hasESTestAccess } from '@/lib/rbac'
 
 interface Props {
   params: Promise<{ testId: string }>
@@ -124,10 +125,11 @@ export default async function TDEditTestPage({ params }: Props) {
     redirect('/td')
   }
 
-  // Verify user is a tournament director for this tournament
-  const isTD = await isTournamentDirector(session.user.id, session.user.email, esTest.tournamentId)
+  // Verify user has access to this specific test
+  // TDs have full access, ES only for their assigned events
+  const hasAccess = await hasESTestAccess(session.user.id, session.user.email, testId)
   
-  if (!isTD) {
+  if (!hasAccess) {
     redirect('/td')
   }
 

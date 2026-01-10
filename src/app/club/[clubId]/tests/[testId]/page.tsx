@@ -212,7 +212,7 @@ export default async function TeamTestDetailPage({
     }
 
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+      <div className="min-h-screen bg-background grid-pattern">
         <div className="px-4 py-8 lg:px-8">
           {tournamentTest && (
             <div className="mb-6">
@@ -318,7 +318,7 @@ export default async function TeamTestDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+    <div className="min-h-screen bg-background grid-pattern">
       <div className="container mx-auto max-w-6xl space-y-8 py-8 px-4 lg:px-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-2">

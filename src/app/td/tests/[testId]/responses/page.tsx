@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { isTournamentAdmin, isTournamentDirector } from '@/lib/rbac'
+import { isTournamentAdmin, hasESTestAccess } from '@/lib/rbac'
 import { ESTestAttemptsView } from '@/components/tests/es-test-attempts-view'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -10,61 +10,6 @@ import { ArrowLeft } from 'lucide-react'
 
 interface Props {
   params: Promise<{ testId: string }>
-}
-
-// Helper to check if user is a tournament director for a tournament
-async function isTD(userId: string, userEmail: string, tournamentId: string): Promise<boolean> {
-  const admin = await prisma.tournamentAdmin.findUnique({
-    where: {
-      tournamentId_userId: {
-        tournamentId,
-        userId,
-      },
-    },
-  })
-  
-  if (admin) return true
-  
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    select: { createdById: true },
-  })
-  
-  if (tournament?.createdById === userId) return true
-  
-  const hostingRequest = await prisma.tournamentHostingRequest.findFirst({
-    where: {
-      tournament: {
-        id: tournamentId,
-      },
-      directorEmail: {
-        equals: userEmail,
-        mode: 'insensitive',
-      },
-      status: 'APPROVED',
-    },
-  })
-  
-  if (hostingRequest) return true
-  
-  const staffRecord = await prisma.tournamentStaff.findFirst({
-    where: {
-      tournamentId,
-      role: 'TOURNAMENT_DIRECTOR',
-      status: 'ACCEPTED',
-      OR: [
-        { userId },
-        {
-          email: {
-            equals: userEmail,
-            mode: 'insensitive',
-          },
-        },
-      ],
-    },
-  })
-  
-  return !!staffRecord
 }
 
 export default async function TDTestResponsesPage({ params }: Props) {
@@ -103,11 +48,12 @@ export default async function TDTestResponsesPage({ params }: Props) {
     notFound()
   }
 
-  // Verify user is a tournament director or admin for this tournament
-  const isTDUser = await isTD(session.user.id, session.user.email, esTest.tournamentId)
+  // Verify user has access to this specific test or is admin
+  // TDs have full access, ES only for their assigned events
+  const hasAccess = await hasESTestAccess(session.user.id, session.user.email, testId)
   const isAdmin = await isTournamentAdmin(session.user.id, esTest.tournamentId)
   
-  if (!isTDUser && !isAdmin) {
+  if (!hasAccess && !isAdmin) {
     redirect('/td')
   }
 
@@ -132,7 +78,7 @@ export default async function TDTestResponsesPage({ params }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
+    <div className="min-h-screen bg-background grid-pattern">
       <div className="container mx-auto max-w-6xl space-y-8 py-8 px-4 lg:px-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-2">

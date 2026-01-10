@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { isTournamentAdmin, isTournamentDirector } from '@/lib/rbac'
+import { isTournamentAdmin, hasESTestAccess } from '@/lib/rbac'
 
 // GET /api/es/tests/[testId]/attempts - Get all attempts for an ESTest (tournament director/admin only)
 export async function GET(
@@ -26,13 +26,14 @@ export async function GET(
       return NextResponse.json({ error: 'Test not found' }, { status: 404 })
     }
 
-    // Check if user is tournament director or admin
+    // Check if user is tournament admin or has access to this specific test
+    // TDs have full access, ES only for their assigned events
     const isAdmin = await isTournamentAdmin(session.user.id, test.tournamentId)
-    const isTD = await isTournamentDirector(session.user.id, session.user.email || '', test.tournamentId)
+    const hasAccess = await hasESTestAccess(session.user.id, session.user.email || '', resolvedParams.testId)
     
-    if (!isAdmin && !isTD) {
+    if (!isAdmin && !hasAccess) {
       return NextResponse.json(
-        { error: 'Only tournament directors and admins can view test attempts' },
+        { error: 'Only tournament directors, event supervisors, and admins can view test attempts' },
         { status: 403 }
       )
     }
@@ -49,6 +50,11 @@ export async function GET(
                 },
               },
             },
+          },
+        },
+        proctorEvents: {
+          orderBy: {
+            ts: 'asc',
           },
         },
       },
@@ -116,6 +122,12 @@ export async function GET(
               name: membership.club.name,
             }
           : null,
+        proctorEvents: attempt.proctorEvents.map((event) => ({
+          id: event.id,
+          kind: event.kind,
+          ts: event.ts.toISOString(),
+          meta: event.meta,
+        })),
         answers: attempt.answers.map((answer) => ({
           id: answer.id,
           questionId: answer.questionId,

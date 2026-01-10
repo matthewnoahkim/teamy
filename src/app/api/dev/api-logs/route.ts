@@ -1,25 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import {
+  sanitizeSearchQuery,
+  validateId,
+  validateInteger,
+  validateDate,
+  validateBoolean,
+  validateEnum,
+} from '@/lib/input-validation'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     
-    // Filter parameters
-    const method = searchParams.get('method')
-    const route = searchParams.get('route')
-    const statusCode = searchParams.get('statusCode')
-    const userId = searchParams.get('userId')
-    const minExecutionTime = searchParams.get('minExecutionTime')
-    const errorsOnly = searchParams.get('errorsOnly') === 'true'
-    const slowOnly = searchParams.get('slowOnly') === 'true'
-    const startDate = searchParams.get('startDate')
-    const endDate = searchParams.get('endDate')
-    const page = parseInt(searchParams.get('page') || '1', 10)
-    const limit = parseInt(searchParams.get('limit') || '100', 10)
+    // Filter parameters - all validated and sanitized
+    const method = validateEnum(searchParams.get('method'), ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'] as const)
+    const route = sanitizeSearchQuery(searchParams.get('route'), 200)
+    const statusCode = validateInteger(searchParams.get('statusCode'), 100, 599)
+    const userId = validateId(searchParams.get('userId'))
+    const minExecutionTime = validateInteger(searchParams.get('minExecutionTime'), 0, 60000) // Max 60 seconds
+    const errorsOnly = validateBoolean(searchParams.get('errorsOnly')) ?? false
+    const slowOnly = validateBoolean(searchParams.get('slowOnly')) ?? false
+    const startDate = validateDate(searchParams.get('startDate'))
+    const endDate = validateDate(searchParams.get('endDate'))
+    const page = validateInteger(searchParams.get('page'), 1, 1000, 1) ?? 1
+    const limit = validateInteger(searchParams.get('limit'), 1, 100, 20) ?? 20
     const skip = (page - 1) * limit
 
-    // Build where clause
+    // Build where clause - all inputs are now validated
     const where: any = {}
     
     if (method) {
@@ -30,8 +38,8 @@ export async function GET(request: NextRequest) {
       where.route = { contains: route, mode: 'insensitive' }
     }
     
-    if (statusCode) {
-      where.statusCode = parseInt(statusCode, 10)
+    if (statusCode !== null) {
+      where.statusCode = statusCode
     }
     
     if (userId) {
@@ -46,17 +54,17 @@ export async function GET(request: NextRequest) {
       where.executionTime = { gte: 1000 } // 1 second or more
     }
     
-    if (minExecutionTime) {
-      where.executionTime = { gte: parseInt(minExecutionTime, 10) }
+    if (minExecutionTime !== null) {
+      where.executionTime = { gte: minExecutionTime }
     }
     
     if (startDate || endDate) {
       where.timestamp = {}
       if (startDate) {
-        where.timestamp.gte = new Date(startDate)
+        where.timestamp.gte = startDate
       }
       if (endDate) {
-        where.timestamp.lte = new Date(endDate)
+        where.timestamp.lte = endDate
       }
     }
 

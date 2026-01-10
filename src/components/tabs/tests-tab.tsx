@@ -8,12 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Clock, Users, FileText, AlertCircle, Play, Eye, Trash2, Lock, Search, Edit, Calculator as CalcIcon, FileEdit, Settings } from 'lucide-react'
+import { Plus, Clock, Users, FileText, AlertCircle, Play, Eye, Trash2, Lock, Search, Edit, Calculator as CalcIcon, FileEdit, Settings, Copy } from 'lucide-react'
 import { NoteSheetUpload } from '@/components/tests/note-sheet-upload'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PageLoading } from '@/components/ui/loading-spinner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { format } from 'date-fns'
 
 interface TestsTabProps {
   clubId: string
@@ -39,6 +41,16 @@ interface Test {
   maxAttempts: number | null
   scoreReleaseMode: 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST'
   createdAt: string
+  updatedAt: string
+  createdByMembershipId: string
+  createdByMembership?: {
+    id: string
+    user: {
+      id: string
+      name: string | null
+      email: string
+    }
+  }
   _count: {
     questions: number
     attempts: number
@@ -51,25 +63,42 @@ interface UserAttemptInfo {
   hasReachedLimit: boolean
 }
 
-// Helper function to highlight search terms in text (exact copy from dev panel)
+// Memoized regex cache for highlightText
+const regexCache = new Map<string, RegExp>()
+
+// Helper function to highlight search terms in text (optimized with regex caching)
 const highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
   if (!text || !searchQuery) return text || ''
   
   const query = searchQuery.trim()
   if (!query) return text
   
-  // Escape special regex characters
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const regex = new RegExp(`(${escapedQuery})`, 'gi')
+  // Use cached regex if available
+  let regex = regexCache.get(query)
+  if (!regex) {
+    // Escape special regex characters
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    regex = new RegExp(`(${escapedQuery})`, 'gi')
+    // Cache regex (limit cache size to prevent memory leaks)
+    if (regexCache.size < 50) {
+      regexCache.set(query, regex)
+    }
+  }
+  
+  // Split text using regex - alternate parts will be matches
   const parts = text.split(regex)
   
-  return parts.map((part, index) => 
-    regex.test(part) ? (
+  // Check if part matches by comparing with original query (case-insensitive)
+  // This avoids regex.test() which modifies lastIndex
+  return parts.map((part, index) => {
+    // Even indices are non-matches, odd indices are matches (due to capture group)
+    const isMatch = index % 2 === 1
+    return isMatch ? (
       <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-foreground px-0.5 rounded">
         {part}
       </mark>
     ) : part
-  )
+  })
 }
 
 export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProps) {
@@ -86,7 +115,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     })) || []
   }, [initialTests])
   const [tests, setTests] = useState<Test[]>(normalizedInitialTests)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialTests) // Only show loading if we don't have initial data
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'opened' | 'completed'>('all')
   const [userAttempts, setUserAttempts] = useState<Map<string, UserAttemptInfo>>(new Map())
@@ -131,65 +160,10 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     }
   }
 
-  // Fetch user attempts even when initialTests is provided
-  const fetchUserAttempts = useCallback(async (tests: Test[]) => {
-    if (tests.length === 0) {
-      setUserAttempts(new Map())
-      return
-    }
-    
-    const attemptMap = new Map<string, UserAttemptInfo>()
-    for (const test of tests) {
-      try {
-        const attemptsResponse = await fetch(`/api/tests/${test.id}/user-attempts`)
-        if (attemptsResponse.ok) {
-          const attemptsData = await attemptsResponse.json()
-          attemptMap.set(test.id, {
-            attemptsUsed: attemptsData.attemptsUsed || 0,
-            maxAttempts: test.maxAttempts,
-            hasReachedLimit: test.maxAttempts !== null && (attemptsData.attemptsUsed || 0) >= test.maxAttempts,
-          })
-        }
-      } catch (err) {
-        console.error(`Failed to fetch attempts for test ${test.id}:`, err)
-      }
-    }
-    setUserAttempts(attemptMap)
-  }, [])
-
-  // Fetch note sheet status for tests that allow note sheets
-  const fetchNoteSheets = useCallback(async (tests: Test[]) => {
-    if (tests.length === 0) {
-      return
-    }
-    
-    const noteSheetMap = new Map<string, { status: string; rejectionReason: string | null }>()
-    for (const test of tests) {
-      if (test.allowNoteSheet && test.startAt) {
-        try {
-          const noteSheetResponse = await fetch(`/api/tests/${test.id}/note-sheets`)
-          if (noteSheetResponse.ok) {
-            const noteSheetData = await noteSheetResponse.json()
-            if (noteSheetData.noteSheet) {
-              noteSheetMap.set(test.id, {
-                status: noteSheetData.noteSheet.status,
-                rejectionReason: noteSheetData.noteSheet.rejectionReason || null,
-              })
-            }
-          }
-        } catch (err) {
-          console.error(`Failed to fetch note sheet for test ${test.id}:`, err)
-        }
-      }
-    }
-    // Merge with existing note sheets instead of replacing
-    setNoteSheets(prev => {
-      const merged = new Map(prev)
-      noteSheetMap.forEach((value, key) => {
-        merged.set(key, value)
-      })
-      return merged
-    })
+  // Batch fetch user attempts and note sheets (now included in tests API response)
+  const updateUserAttemptsAndNoteSheets = useCallback((userAttemptsData: Record<string, UserAttemptInfo>, noteSheetsData: Record<string, { status: string; rejectionReason: string | null }>) => {
+    setUserAttempts(new Map(Object.entries(userAttemptsData)))
+    setNoteSheets(new Map(Object.entries(noteSheetsData)))
   }, [])
 
   const fetchTests = useCallback(async (options?: { silent?: boolean }) => {
@@ -210,13 +184,11 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
         }))
         setTests(testsWithCount)
 
-        // Fetch attempt counts for each test to show "Take Test" and "View Results" buttons
-        // Fetch note sheet status for each test
-        // Wait for user attempts and note sheets to load before setting loading to false
-        await Promise.all([
-          fetchUserAttempts(testsWithCount),
-          fetchNoteSheets(testsWithCount),
-        ])
+        // Update user attempts and note sheets from batched API response
+        updateUserAttemptsAndNoteSheets(
+          data.userAttempts || {},
+          data.noteSheets || {}
+        )
       } else {
         throw new Error('Failed to fetch tests')
       }
@@ -232,24 +204,39 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
         setLoading(false)
       }
     }
-  }, [clubId, isAdmin, toast, fetchUserAttempts, fetchNoteSheets])
+  }, [clubId, isAdmin, toast, updateUserAttemptsAndNoteSheets])
 
   useEffect(() => {
     // Skip initial fetch if we already have data from server
     if (!initialTests) {
       fetchTests()
     } else {
-      // Still fetch user attempts and note sheets even with initialTests, then set loading to false
-      const loadInitialData = async () => {
-        await Promise.all([
-          fetchUserAttempts(normalizedInitialTests),
-          fetchNoteSheets(normalizedInitialTests),
-        ])
+      // With initialTests, we still need to fetch user attempts and note sheets
+      // Only fetch if we don't already have this data (avoid duplicate calls)
+      if (userAttempts.size === 0 && noteSheets.size === 0) {
+        const loadInitialData = async () => {
+          try {
+            const response = await fetch(`/api/tests?clubId=${clubId}`)
+            if (response.ok) {
+              const data = await response.json()
+              updateUserAttemptsAndNoteSheets(
+                data.userAttempts || {},
+                data.noteSheets || {}
+              )
+            }
+          } catch (error) {
+            console.error('Failed to fetch user attempts and note sheets:', error)
+          } finally {
+            setLoading(false)
+          }
+        }
+        loadInitialData()
+      } else {
+        // Already have data, just set loading to false
         setLoading(false)
       }
-      loadInitialData()
     }
-  }, [fetchTests, initialTests, fetchUserAttempts, fetchNoteSheets, normalizedInitialTests])
+  }, [fetchTests, initialTests, clubId, updateUserAttemptsAndNoteSheets, userAttempts.size, noteSheets.size])
 
   useBackgroundRefresh(
     () => fetchTests({ silent: true }),
@@ -263,9 +250,16 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && tests.length > 0) {
-        // Refresh user attempts and note sheets when user returns to the page
-        fetchUserAttempts(tests)
-        fetchNoteSheets(tests)
+        // Refresh user attempts and note sheets via single API call
+        fetch(`/api/tests?clubId=${clubId}`)
+          .then(res => res.json())
+          .then(data => {
+            updateUserAttemptsAndNoteSheets(
+              data.userAttempts || {},
+              data.noteSheets || {}
+            )
+          })
+          .catch(err => console.error('Failed to refresh attempts and note sheets:', err))
       }
     }
 
@@ -273,7 +267,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [tests, fetchUserAttempts, fetchNoteSheets])
+  }, [tests, clubId, updateUserAttemptsAndNoteSheets])
 
   // Handle hash navigation - set up listener once, check hash when loading completes
   useEffect(() => {
@@ -392,41 +386,80 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     }
   }
 
-  const handleViewTest = (test: Test) => {
+  const handleViewTest = useCallback((test: Test) => {
     // Navigate to test detail page
     // The page will automatically show the builder for drafts or detail view for published tests
     window.location.href = `/club/${clubId}/tests/${test.id}`
-  }
+  }, [clubId])
 
-  const handleViewResponses = (test: Test) => {
+  const handleViewResponses = useCallback((test: Test) => {
     // Navigate to test detail page with Responses tab (default)
     window.location.href = `/club/${clubId}/tests/${test.id}`
-  }
+  }, [clubId])
 
-  const handleViewSettings = (test: Test) => {
+  const handleViewSettings = useCallback((test: Test) => {
     // Navigate to test detail page with Settings tab
     window.location.href = `/club/${clubId}/tests/${test.id}?view=test`
-  }
+  }, [clubId])
 
-  const handleTakeTest = (test: Test) => {
+  const handleDuplicateTest = useCallback(async (testId: string) => {
+    try {
+      const response = await fetch(`/api/tests/${testId}/duplicate`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to duplicate test')
+      }
+
+      toast({
+        title: 'Test Duplicated',
+        description: 'The test has been duplicated as a draft.',
+      })
+
+      // Refresh tests list
+      await fetchTests()
+    } catch (error: any) {
+      console.error('Failed to duplicate test:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to duplicate test',
+        variant: 'destructive',
+      })
+    }
+  }, [toast, fetchTests])
+
+  const handleTakeTest = useCallback((test: Test) => {
     // Navigate to test player
     window.location.href = `/club/${clubId}/tests/${test.id}/take`
-  }
+  }, [clubId])
 
-  const handleNoteSheetUpload = (testId: string) => {
+  const handleNoteSheetUpload = useCallback((testId: string) => {
     const test = tests.find(t => t.id === testId)
     setNoteSheetTestId(testId)
     setNoteSheetInstructions(test?.noteSheetInstructions || null)
     setNoteSheetUploadOpen(true)
-  }
+  }, [tests])
 
   const handleNoteSheetSuccess = () => {
-    // Just refresh note sheets for the specific test, no need to reload everything
+    // Refresh note sheets for the specific test
     if (noteSheetTestId) {
-      const test = tests.find(t => t.id === noteSheetTestId)
-      if (test) {
-        fetchNoteSheets([test])
-      }
+      fetch(`/api/tests/${noteSheetTestId}/note-sheets`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.noteSheet) {
+            setNoteSheets(prev => {
+              const updated = new Map(prev)
+              updated.set(noteSheetTestId, {
+                status: data.noteSheet.status,
+                rejectionReason: data.noteSheet.rejectionReason || null,
+              })
+              return updated
+            })
+          }
+        })
+        .catch(err => console.error('Failed to refresh note sheet:', err))
     }
   }
 
@@ -542,114 +575,167 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     return { drafts: draftsList, scheduled: scheduledList, opened: openedList, completed: completedList }
   }, [tests, searchQuery, statusFilter, isAdmin, userAttempts])
 
-  const renderTestCard = (test: Test) => (
-    <Card key={test.id} id={`test-${test.id}`}>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <CardTitle>
-                {searchQuery ? highlightText(test.name, searchQuery) : test.name}
-              </CardTitle>
-              {getStatusBadge(test.status)}
-              {test.requireFullscreen && (
-                <Badge variant="outline" className="gap-1">
-                  <Lock className="h-3 w-3" />
-                  Lockdown
-                </Badge>
+  const renderTestCard = useCallback((test: Test) => {
+    const getCalculatorTypeLabel = () => {
+      if (!test.allowCalculator || !test.calculatorType) return null
+      if (test.calculatorType === 'FOUR_FUNCTION') return 'Four Function'
+      if (test.calculatorType === 'SCIENTIFIC') return 'Scientific'
+      return 'Graphing'
+    }
+
+    const calculatorTypeLabel = getCalculatorTypeLabel()
+    const creatorName = test.createdByMembership?.user?.name || test.createdByMembership?.user?.email || 'Unknown'
+    const attemptCount = test._count?.attempts ?? 0
+
+    return (
+      <Card key={test.id} id={`test-${test.id}`}>
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <CardTitle>
+                  {searchQuery ? highlightText(test.name, searchQuery) : test.name}
+                </CardTitle>
+                {getStatusBadge(test.status)}
+                {test.requireFullscreen && (
+                  <Badge variant="outline" className="gap-1">
+                    <Lock className="h-3 w-3" />
+                    Lockdown
+                  </Badge>
+                )}
+                {test.allowCalculator && test.calculatorType && (
+                  <Badge variant="outline" className="gap-1">
+                    <CalcIcon className="h-3 w-3" />
+                    {test.calculatorType === 'FOUR_FUNCTION' ? 'Basic Calc' : 
+                     test.calculatorType === 'SCIENTIFIC' ? 'Scientific Calc' : 
+                     'Graphing Calc'}
+                  </Badge>
+                )}
+              </div>
+              {test.description && (
+                <CardDescription className="mb-2">
+                  {searchQuery ? highlightText(test.description, searchQuery) : test.description}
+                </CardDescription>
               )}
-              {test.allowCalculator && test.calculatorType && (
-                <Badge variant="outline" className="gap-1">
-                  <CalcIcon className="h-3 w-3" />
-                  {test.calculatorType === 'FOUR_FUNCTION' ? 'Basic Calc' : 
-                   test.calculatorType === 'SCIENTIFIC' ? 'Scientific Calc' : 
-                   'Graphing Calc'}
-                </Badge>
-              )}
+              <div className={`flex items-center gap-3 text-sm text-muted-foreground ${test.status === 'DRAFT' ? 'mt-2 mb-0' : 'mt-3 mb-1'}`}>
+                {test.status === 'PUBLISHED' ? (
+                  <>
+                    <span>{test._count?.questions ?? 0} question{(test._count?.questions ?? 0) !== 1 ? 's' : ''}</span>
+                    <span>•</span>
+                    <span>{test.durationMinutes} minute{test.durationMinutes !== 1 ? 's' : ''}</span>
+                    <span>•</span>
+                    <span>{attemptCount} attempt{attemptCount !== 1 ? 's' : ''}</span>
+                    {calculatorTypeLabel && (
+                      <>
+                        <span>•</span>
+                        <span>{calculatorTypeLabel}</span>
+                      </>
+                    )}
+                    <span>•</span>
+                    <span>Created by {creatorName}</span>
+                    {test.updatedAt && test.updatedAt !== test.createdAt && (
+                      <>
+                        <span>•</span>
+                        <span>Last edited {format(new Date(test.updatedAt), 'MMM d, yyyy')}</span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span>{test._count?.questions ?? 0} question{(test._count?.questions ?? 0) !== 1 ? 's' : ''}</span>
+                    <span>•</span>
+                    <span>{test.durationMinutes} minute{test.durationMinutes !== 1 ? 's' : ''}</span>
+                    {calculatorTypeLabel && (
+                      <>
+                        <span>•</span>
+                        <span>{calculatorTypeLabel}</span>
+                      </>
+                    )}
+                    <span>•</span>
+                    <span>Created by {creatorName}</span>
+                    {test.updatedAt && test.updatedAt !== test.createdAt && (
+                      <>
+                        <span>•</span>
+                        <span>Last edited by {format(new Date(test.updatedAt), 'MMM d, yyyy')}</span>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            {test.description && (
-              <CardDescription>
-                {searchQuery ? highlightText(test.description, searchQuery) : test.description}
-              </CardDescription>
+            {isAdmin && (
+              <TooltipProvider>
+                <div className="flex gap-2">
+                  {test.status === 'DRAFT' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleViewTest(test)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleViewResponses(test)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Responses
+                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDuplicateTest(test.id)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Duplicate</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewSettings(test)}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Settings</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </>
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteClick(test)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Delete</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
             )}
           </div>
-          {isAdmin && (
-            <div className="flex gap-2">
-              {test.status === 'DRAFT' ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleViewTest(test)}
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleViewResponses(test)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Responses
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleViewSettings(test)}
-                  >
-                    <Settings className="h-4 w-4 mr-1" />
-                    Settings
-                  </Button>
-                </>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleDeleteClick(test)}
-                className="text-red-600 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="flex items-center gap-2 text-sm">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{test.durationMinutes} minutes</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            <span>{test._count?.questions ?? 0} questions</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span>{userAttempts.get(test.id)?.attemptsUsed || 0} attempt{(userAttempts.get(test.id)?.attemptsUsed || 0) !== 1 ? 's' : ''}</span>
-          </div>
-          {test.maxAttempts && (
-            <div className="flex items-center gap-2 text-sm">
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
-              <span>Max: {test.maxAttempts}</span>
-            </div>
-          )}
-          {test.allowCalculator && test.calculatorType && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CalcIcon className="h-4 w-4" />
-              <span>
-                {test.calculatorType === 'FOUR_FUNCTION' ? 'Four Function' : 
-                 test.calculatorType === 'SCIENTIFIC' ? 'Scientific' : 
-                 'Graphing'} Calculator
-              </span>
-            </div>
-          )}
-          <div className="text-sm text-muted-foreground col-span-2">
-            {getTestTimeInfo(test)}
-          </div>
-        </div>
+        </CardHeader>
+        <CardContent className={test.status === 'DRAFT' ? 'pt-0 pb-0' : ''}>
 
         {test.status === 'PUBLISHED' && test.startAt && test.allowNoteSheet && (() => {
           const noteSheet = noteSheets.get(test.id)
@@ -804,7 +890,8 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
         )}
       </CardContent>
     </Card>
-  )
+    )
+  }, [clubId, isAdmin, router, searchQuery, userAttempts, noteSheets, handleTakeTest, handleViewTest, handleViewResponses, handleViewSettings, handleDuplicateTest, handleNoteSheetUpload])
 
   if (loading) {
     return (

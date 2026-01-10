@@ -108,9 +108,9 @@ export function TDPortalClient({ user, requests }: TDPortalClientProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern flex flex-col">
+    <div className="min-h-screen bg-background grid-pattern flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-teamy-primary dark:bg-slate-900 shadow-nav">
+      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Logo size="md" href="/" variant="light" />

@@ -4,6 +4,13 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { Division } from '@prisma/client'
+import {
+  sanitizeSearchQuery,
+  validateId,
+  validateInteger,
+  validateBoolean,
+  validateEnum,
+} from '@/lib/input-validation'
 
 // Helper to check if user is tournament admin
 async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
@@ -41,25 +48,36 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url)
-    const division = searchParams.get('division') as Division | null
-    const search = searchParams.get('search')
-    const upcomingParam = searchParams.get('upcoming')
+    
+    // Validate and sanitize all inputs
+    const division = validateEnum(searchParams.get('division'), [Division.B, Division.C] as const)
+    const search = sanitizeSearchQuery(searchParams.get('search'), 200)
+    const upcomingParam = validateBoolean(searchParams.get('upcoming'))
     const createdByParam = searchParams.get('createdBy')
     const managedByParam = searchParams.get('managedBy')
-    const teamRegisteredParam = searchParams.get('teamRegistered')
-    const pendingApprovalParam = searchParams.get('pendingApproval')
-    const sortBy = searchParams.get('sortBy') || 'date-asc'
+    const teamRegisteredParam = validateBoolean(searchParams.get('teamRegistered'))
+    const pendingApprovalParam = validateBoolean(searchParams.get('pendingApproval'))
+    const sortBy = validateEnum(searchParams.get('sortBy'), ['date-asc', 'date-desc', 'name-asc', 'name-desc', 'price-asc', 'price-desc', 'popularity-asc', 'popularity-desc'] as const, 'date-asc') ?? 'date-asc'
+    
     // Only filter by upcoming if explicitly set to 'true'
     // If not provided or 'false', return ALL tournaments (past and future)
-    const upcoming = upcomingParam === 'true'
-    // Filter by creator if 'me' is passed (current user) or a specific user ID
-    const createdBy = createdByParam === 'me' ? session.user.id : createdByParam
-    // Filter by tournaments managed by user (creator or admin)
-    const managedBy = managedByParam === 'me' ? session.user.id : managedByParam
+    const upcoming = upcomingParam === true
+    
+    // Filter by creator if 'me' is passed (current user) or a specific user ID (validated)
+    const createdBy = createdByParam === 'me' 
+      ? session.user.id 
+      : validateId(createdByParam) ?? undefined
+    
+    // Filter by tournaments managed by user (creator or admin) - validate ID
+    const managedBy = managedByParam === 'me' 
+      ? session.user.id 
+      : validateId(managedByParam) ?? undefined
+    
     // Filter by tournaments where user's team is registered
-    const teamRegistered = teamRegisteredParam === 'me'
+    const teamRegistered = teamRegisteredParam === true
+    
     // Filter by tournaments pending approval (created by user but not approved)
-    const pendingApproval = pendingApprovalParam === 'me'
+    const pendingApproval = pendingApprovalParam === true
 
     const where: any = {}
     
@@ -85,6 +103,7 @@ export async function GET(req: NextRequest) {
     }
     
     if (search) {
+      // Search is already sanitized
       where.name = {
         contains: search,
         mode: 'insensitive',
@@ -180,6 +199,10 @@ export async function GET(req: NextRequest) {
       orderBy = { startDate: 'asc' }
     } else if (sortBy === 'date-desc') {
       orderBy = { startDate: 'desc' }
+    } else if (sortBy === 'name-asc') {
+      orderBy = { name: 'asc' }
+    } else if (sortBy === 'name-desc') {
+      orderBy = { name: 'desc' }
     } else if (sortBy === 'price-asc') {
       orderBy = { price: 'asc' }
     } else if (sortBy === 'price-desc') {

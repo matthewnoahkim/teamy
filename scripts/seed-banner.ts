@@ -35,10 +35,10 @@ async function main() {
 
   await prisma.siteSetting.upsert({
     where: { key: 'banner_background_color' },
-    update: { value: '#5865F2' },
+    update: { value: '#8B5CF6' },
     create: {
       key: 'banner_background_color',
-      value: '#5865F2',
+      value: '#8B5CF6',
     },
   })
 

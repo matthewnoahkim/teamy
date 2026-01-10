@@ -747,14 +747,17 @@ model AttemptAnswer {
 }
 
 model ProctorEvent {
-  id        String           @id @default(cuid())
-  attemptId String
-  kind      ProctorEventKind
-  ts        DateTime         @default(now())
-  meta      Json?
-  attempt   TestAttempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  id          String           @id @default(cuid())
+  attemptId   String?          // Optional for regular TestAttempt
+  esAttemptId String?          // Optional for ESTestAttempt
+  kind        ProctorEventKind
+  ts          DateTime         @default(now())
+  meta        Json?
+  attempt     TestAttempt?     @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  esAttempt   ESTestAttempt?   @relation(fields: [esAttemptId], references: [id], onDelete: Cascade)
 
   @@index([attemptId])
+  @@index([esAttemptId])
   @@index([ts])
 }
 
@@ -792,10 +795,11 @@ model AiGradingSuggestion {
   acceptedByMembershipId  String?
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
-  answer                  AttemptAnswer      @relation(fields: [answerId], references: [id], onDelete: Cascade)
-  attempt                 TestAttempt        @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question                Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  test                    Test               @relation(fields: [testId], references: [id], onDelete: Cascade)
+  // Optional relations - can be null for ES tests
+  answer                  AttemptAnswer?     @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  attempt                 TestAttempt?       @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question                Question?          @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  test                    Test?              @relation(fields: [testId], references: [id], onDelete: Cascade)
 
   @@index([attemptId])
   @@index([answerId])
@@ -1125,6 +1129,19 @@ model Tournament {
   registrationStartDate   DateTime?
   published               Boolean                   @default(false)
   trialEvents             String?
+  // Default test creation settings
+  defaultDurationMinutes  Int?
+  defaultStartAt          DateTime?
+  defaultEndAt            DateTime?
+  defaultReleaseScoresAt  DateTime?
+  defaultScoreReleaseMode ScoreReleaseMode?
+  defaultRequireFullscreen Boolean?
+  defaultAllowCalculator  Boolean?
+  defaultCalculatorType   CalculatorType?
+  defaultAllowNoteSheet   Boolean?
+  defaultAutoApproveNoteSheet Boolean?
+  defaultRequireOneSitting Boolean?
+  defaultMaxAttempts      Int?
   esTests                 ESTest[]
   createdBy               User                      @relation("TournamentCreator", fields: [createdById], references: [id], onDelete: Cascade)
   hostingRequest          TournamentHostingRequest? @relation("TournamentFromRequest", fields: [hostingRequestId], references: [id])
@@ -1231,6 +1248,7 @@ model TournamentHostingRequest {
 
   @@index([status])
   @@index([createdAt])
+  @@index([directorEmail])
 }
 
 model BlogPost {
@@ -1331,7 +1349,7 @@ model ESTest {
   requireOneSitting     Boolean          @default(true)
   releaseScoresAt       DateTime?
   scoreReleaseMode      ScoreReleaseMode @default(FULL_TEST)
-  scoresReleased         Boolean          @default(false)
+  scoresReleased        Boolean          @default(false)
   maxAttempts           Int?
   createdBy             TournamentStaff  @relation("ESTestCreator", fields: [createdByStaffId], references: [id], onDelete: Cascade)
   event                 Event?           @relation(fields: [eventId], references: [id])
@@ -1415,6 +1433,7 @@ model ESTestAttempt {
   membership            Membership            @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   test                  ESTest                @relation(fields: [testId], references: [id], onDelete: Cascade)
   answers               ESTestAttemptAnswer[]
+  proctorEvents         ProctorEvent[]
 
   @@index([testId])
   @@index([membershipId])
@@ -1485,19 +1504,19 @@ model ResourceRequest {
 }
 
 model PromoCode {
-  id              String                @id @default(cuid())
-  code            String                @unique
-  effectType      PromoEffectType
-  effectDuration  Int? // Duration in weeks for PRO_SUBSCRIPTION
-  effectQuantity  Int? // Quantity of boosts for CLUB_BOOST
-  activatesAt     DateTime? // When the promo code becomes active
-  expiresAt       DateTime? // When the promo code expires
-  maxRedemptions  Int? // Maximum number of total redemptions (null = unlimited)
-  currentRedemptions Int @default(0) // Current number of redemptions
-  createdById     String? // Dev who created it
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-  redemptions     PromoCodeRedemption[]
+  id                 String                @id @default(cuid())
+  code               String                @unique
+  effectType         PromoEffectType
+  effectDuration     Int? // Duration in weeks for PRO_SUBSCRIPTION
+  effectQuantity     Int? // Quantity of boosts for CLUB_BOOST
+  activatesAt        DateTime? // When the promo code becomes active
+  expiresAt          DateTime? // When the promo code expires
+  maxRedemptions     Int? // Maximum number of total redemptions (null = unlimited)
+  currentRedemptions Int                   @default(0) // Current number of redemptions
+  createdById        String? // Dev who created it
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  redemptions        PromoCodeRedemption[]
 
   @@index([code])
   @@index([effectType])
@@ -1520,15 +1539,15 @@ model PromoCodeRedemption {
 }
 
 model ClubBoost {
-  id              String   @id @default(cuid())
-  userId          String
-  clubId          String
-  assignedAt      DateTime @default(now())
-  expiresAt       DateTime // When this boost expires (end of the month it was assigned)
-  sourceType      String   @default("PROMO") // "PROMO", "PURCHASE", "PRO_SUBSCRIPTION"
-  sourceId        String? // Reference to promo redemption or purchase
-  user            User     @relation("UserClubBoosts", fields: [userId], references: [id], onDelete: Cascade)
-  club            Club     @relation("ClubBoosts", fields: [clubId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  clubId     String
+  assignedAt DateTime @default(now())
+  expiresAt  DateTime // When this boost expires (end of the month it was assigned)
+  sourceType String   @default("PROMO") // "PROMO", "PURCHASE", "PRO_SUBSCRIPTION"
+  sourceId   String? // Reference to promo redemption or purchase
+  user       User     @relation("UserClubBoosts", fields: [userId], references: [id], onDelete: Cascade)
+  club       Club     @relation("ClubBoosts", fields: [clubId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([clubId])
@@ -1537,16 +1556,16 @@ model ClubBoost {
 }
 
 model DevAuditLog {
-  id          String   @id @default(cuid())
-  userId      String
-  userEmail   String
-  userName    String?
-  action      String   // "LOGIN", "CREATE_PROMO", "DELETE_PROMO", "UPDATE_PROMO", "CREATE_BLOG", etc.
-  target      String?  // What was affected (e.g., promo code, blog post slug)
-  details     Json?    // Additional details about the action
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  userEmail String
+  userName  String?
+  action    String // "LOGIN", "CREATE_PROMO", "DELETE_PROMO", "UPDATE_PROMO", "CREATE_BLOG", etc.
+  target    String? // What was affected (e.g., promo code, blog post slug)
+  details   Json? // Additional details about the action
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([action])
