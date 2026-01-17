@@ -33,8 +33,8 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   })
 
   if (!membership) {
-    // User is not a member, redirect to dashboard which will handle appropriately
-    redirect('/dashboard')
+    // User is not a member, redirect to no-clubs page
+    redirect('/no-clubs')
   }
 
   // Get all user's clubs for the dropdown
@@ -102,7 +102,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   })
 
   if (!club) {
-    redirect('/dashboard')
+    redirect('/no-clubs')
   }
 
   // Check if user is admin (needed for filtering)

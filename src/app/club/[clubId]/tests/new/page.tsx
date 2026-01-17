@@ -51,7 +51,7 @@ export default async function NewTestPage({
   })
 
   if (!club) {
-    redirect('/dashboard')
+    redirect('/no-clubs')
   }
 
   return (

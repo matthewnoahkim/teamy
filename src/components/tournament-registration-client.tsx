@@ -663,7 +663,7 @@ export function TournamentRegistrationClient({
                     <p className="text-sm text-muted-foreground">
                       You need to be a club admin to register teams.
                     </p>
-                    <Link href="/dashboard">
+                    <Link href="/no-clubs">
                       <Button variant="outline" size="sm" className="gap-2 transition-colors hover:bg-muted/50">
                         <Building className="h-4 w-4" />
                         Go to Dashboard

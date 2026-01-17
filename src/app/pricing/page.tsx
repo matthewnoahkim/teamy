@@ -28,7 +28,7 @@ const plans = [
       '5 club boosts included',
     ],
     cta: 'Upgrade to Pro',
-    ctaLink: '/dashboard/billing',
+    ctaLink: '/billing',
     highlighted: true,
   },
 ]
@@ -179,7 +179,7 @@ export default function PricingPage() {
               </div>
 
               {/* Get Boosts Button */}
-              <Link href="/dashboard/billing">
+              <Link href="/billing">
                 <button className="w-full py-3 rounded-xl font-semibold bg-teamy-primary text-white hover:bg-teamy-primary-dark transition-all duration-300">
                   Get Boosts
                 </button>

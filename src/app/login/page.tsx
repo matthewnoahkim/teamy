@@ -5,6 +5,8 @@ import { SignInButton } from '@/components/signin-button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
+import { prisma } from '@/lib/prisma'
+import { cookies } from 'next/headers'
 
 type SignInPageProps = {
   searchParams?: {
@@ -12,11 +14,37 @@ type SignInPageProps = {
   }
 }
 
-const DEFAULT_CALLBACK_URL = '/dashboard'
+async function getDefaultRedirect(userId: string) {
+  // Check if user has any club memberships
+  const memberships = await prisma.clubMembership.findMany({
+    where: { userId },
+    include: { club: true },
+    orderBy: { joinedAt: 'desc' }
+  })
 
-function resolveCallbackUrl(rawCallbackUrl?: string) {
+  if (memberships.length === 0) {
+    return '/no-clubs'
+  }
+
+  // Check for last visited club cookie
+  const cookieStore = cookies()
+  const lastVisitedClub = cookieStore.get('lastVisitedClub')?.value
+
+  if (lastVisitedClub) {
+    // Verify the user is still a member of this club
+    const isMember = memberships.some(m => m.club.id === lastVisitedClub)
+    if (isMember) {
+      return `/club/${lastVisitedClub}`
+    }
+  }
+
+  // Default to first club
+  return `/club/${memberships[0].club.id}`
+}
+
+function resolveCallbackUrl(rawCallbackUrl?: string, defaultUrl?: string) {
   if (!rawCallbackUrl) {
-    return DEFAULT_CALLBACK_URL
+    return defaultUrl || '/no-clubs'
   }
 
   if (rawCallbackUrl.startsWith('/')) {
@@ -32,14 +60,15 @@ function resolveCallbackUrl(rawCallbackUrl?: string) {
     // Ignore parsing errors and fallback to default
   }
 
-  return DEFAULT_CALLBACK_URL
+  return defaultUrl || '/no-clubs'
 }
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const session = await getServerSession(authOptions)
-  const callbackUrl = resolveCallbackUrl(searchParams?.callbackUrl)
 
   if (session?.user) {
+    const defaultRedirect = await getDefaultRedirect(session.user.id)
+    const callbackUrl = resolveCallbackUrl(searchParams?.callbackUrl, defaultRedirect)
     redirect(callbackUrl)
   }
 

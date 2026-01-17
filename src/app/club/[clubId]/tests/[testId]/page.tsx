@@ -174,7 +174,7 @@ export default async function TeamTestDetailPage({
     })
 
     if (!club) {
-      redirect('/dashboard/club')
+      redirect(`/club/${params.clubId}`)
     }
 
     // Transform the test data to match NewTestBuilder's expected format

@@ -59,7 +59,7 @@ export default async function TournamentTestsPage({
   })
 
   if (!tournament) {
-    redirect('/dashboard/tournaments')
+    redirect('/tournament-listings')
   }
 
   // Get events for this division

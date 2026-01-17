@@ -8,14 +8,48 @@ import { Logo } from '@/components/logo'
 import { HomeNav } from '@/components/home-nav'
 import { format } from 'date-fns'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
+import { cookies } from 'next/headers'
 
 interface Props {
   params: { slug: string }
 }
 
+async function getLoggedInUserRedirect(userId: string) {
+  // Check if user has any club memberships
+  const memberships = await prisma.clubMembership.findMany({
+    where: { userId },
+    include: { club: true },
+    orderBy: { joinedAt: 'desc' }
+  })
+
+  if (memberships.length === 0) {
+    return '/no-clubs'
+  }
+
+  // Check for last visited club cookie
+  const cookieStore = cookies()
+  const lastVisitedClub = cookieStore.get('lastVisitedClub')?.value
+
+  if (lastVisitedClub) {
+    // Verify the user is still a member of this club
+    const isMember = memberships.some(m => m.club.id === lastVisitedClub)
+    if (isMember) {
+      return `/club/${lastVisitedClub}`
+    }
+  }
+
+  // Default to first club
+  return `/club/${memberships[0].club.id}`
+}
+
 export default async function BlogPostPage({ params }: Props) {
   const session = await getServerSession(authOptions)
   const isLoggedIn = !!session?.user
+  
+  // Get smart redirect for logged-in users
+  const loggedInRedirect = isLoggedIn && session?.user?.id 
+    ? await getLoggedInUserRedirect(session.user.id)
+    : '/login'
 
   const post = await prisma.blogPost.findUnique({
     where: { slug: params.slug },
@@ -35,16 +69,16 @@ export default async function BlogPostPage({ params }: Props) {
             <HomeNav 
               variant="light" 
               mobileButton={
-                <Link href={isLoggedIn ? "/dashboard" : "/login"}>
+                <Link href={isLoggedIn ? loggedInRedirect : "/login"}>
                   <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
-                    {isLoggedIn ? "Dashboard" : "Sign In"}
+                    Sign In
                   </button>
                 </Link>
               }
             />
-            <Link href={isLoggedIn ? "/dashboard" : "/login"} className="hidden md:block">
+            <Link href={isLoggedIn ? loggedInRedirect : "/login"} className="hidden md:block">
               <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm whitespace-nowrap">
-                {isLoggedIn ? "Dashboard" : "Sign In"}
+                Sign In
               </button>
             </Link>
           </div>

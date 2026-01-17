@@ -579,8 +579,8 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                     <p className="text-sm text-muted-foreground">
                       You don&apos;t have admin access to any {formatDivision(tournament.division)} division teams. Only team admins can register teams for tournaments.
                     </p>
-                    <Button variant="outline" onClick={() => router.push('/dashboard')} className="transition-colors hover:bg-muted/50">
-                      Go to Dashboard
+                    <Button variant="outline" onClick={() => router.push('/no-clubs')} className="transition-colors hover:bg-muted/50">
+                      Go to Clubs
                     </Button>
                   </div>
                 ) : (
