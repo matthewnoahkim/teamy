@@ -16,7 +16,7 @@ interface Props {
 
 async function getLoggedInUserRedirect(userId: string) {
   // Check if user has any club memberships
-  const memberships = await prisma.clubMembership.findMany({
+  const memberships = await prisma.membership.findMany({
     where: { userId },
     include: { club: true },
     orderBy: { joinedAt: 'desc' }
