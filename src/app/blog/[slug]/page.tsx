@@ -19,7 +19,7 @@ async function getLoggedInUserRedirect(userId: string) {
   const memberships = await prisma.membership.findMany({
     where: { userId },
     include: { club: true },
-    orderBy: { joinedAt: 'desc' }
+    orderBy: { createdAt: 'desc' }
   })
 
   if (memberships.length === 0) {
