@@ -718,9 +718,12 @@ export function TournamentRegistrationClient({
               <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
               <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Teamy. All rights reserved.
-            </p>
+            <div className="flex flex-col items-center md:items-end gap-1">
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                © {new Date().getFullYear()} Teamy. All rights reserved.
+              </p>
+              <p className="text-xs text-muted-foreground font-medium">FERPA and COPPA compliant</p>
+            </div>
           </div>
         </div>
       </footer>

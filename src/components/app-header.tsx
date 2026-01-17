@@ -4,18 +4,26 @@ import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { LogOut, Pencil, ArrowLeft, Settings, CreditCard, ChevronDown } from 'lucide-react'
+import { LogOut, Pencil, Settings, CreditCard, ChevronDown, Plus, Users as UsersIcon } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Logo } from '@/components/logo'
 import { signOut } from 'next-auth/react'
 import { EditUsernameDialog } from '@/components/edit-username-dialog'
-import { useState } from 'react'
+import { CreateClubDialog } from '@/components/create-club-dialog'
+import { JoinClubDialog } from '@/components/join-club-dialog'
+import { useState, useEffect } from 'react'
+
+interface Club {
+  id: string
+  name: string
+}
 
 interface AppHeaderProps {
   user: {
@@ -27,21 +35,25 @@ interface AppHeaderProps {
   showBackButton?: boolean
   backHref?: string
   title?: string
+  clubId?: string // Current club ID
+  clubs?: Club[] // List of clubs user belongs to
+  onClubChange?: (clubId: string) => void
 }
 
-export function AppHeader({ user, showBackButton = false, backHref, title }: AppHeaderProps) {
+export function AppHeader({ user, showBackButton = false, backHref, title, clubId, clubs, onClubChange }: AppHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
+  const [createClubOpen, setCreateClubOpen] = useState(false)
+  const [joinClubOpen, setJoinClubOpen] = useState(false)
   
-  // Show customization and billing only on club dashboard pages (not tournament pages)
-  const isOnClubDashboard = pathname?.startsWith('/dashboard') ||
-                            pathname === '/dashboard/customization' || 
-                            pathname === '/dashboard/billing'
-  const isOnESPortal = pathname?.startsWith('/es')
-  const isOnTDPortal = pathname?.startsWith('/td')
-  const showCustomizationBilling = isOnClubDashboard && !isOnESPortal && !isOnTDPortal
+  // Show customization and billing on club pages
+  const isOnClubPage = pathname?.startsWith('/club/')
+  const showCustomizationBilling = isOnClubPage
+  const showClubDropdown = isOnClubPage && clubs && clubs.length > 0
+
+  const currentClub = clubs?.find(c => c.id === clubId)
 
   const handleSignOut = async () => {
     try {
@@ -51,37 +63,68 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
     }
   }
 
+  const handleClubChange = (newClubId: string) => {
+    if (newClubId !== clubId) {
+      // Save last visited club to cookie
+      document.cookie = `lastVisitedClub=${newClubId}; path=/; max-age=${60 * 60 * 24 * 365}` // 1 year
+      router.push(`/club/${newClubId}`)
+    }
+  }
+
   return (
     <>
       <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl" suppressHydrationWarning>
         <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 md:gap-4 min-w-0">
-            {showBackButton && backHref && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push(backHref)}
-                className="h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 text-white hover:bg-white/10"
-              >
-                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
-            )}
             <Logo size="md" className="flex-shrink-0" href="/" variant="light" />
-            {title && (
+            
+            {showClubDropdown && currentClub ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 px-3 py-1.5 text-sm sm:text-base md:text-lg text-white font-semibold hover:bg-white/10 rounded-lg transition-colors truncate max-w-[150px] sm:max-w-[200px] md:max-w-[300px]">
+                    <span className="truncate">{currentClub.name}</span>
+                    <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64">
+                  <DropdownMenuLabel>Switch Club</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {clubs.map((club) => (
+                    <DropdownMenuItem
+                      key={club.id}
+                      onClick={() => handleClubChange(club.id)}
+                      className={club.id === clubId ? 'bg-accent' : ''}
+                    >
+                      <UsersIcon className="mr-2 h-4 w-4" />
+                      {club.name}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setJoinClubOpen(true)}>
+                    <UsersIcon className="mr-2 h-4 w-4" />
+                    Join Club
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setCreateClubOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Club
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : title ? (
               <h1 className="text-base sm:text-lg md:text-xl font-semibold text-white hidden md:block truncate">
                 {title}
               </h1>
-            )}
+            ) : null}
+            
             {showCustomizationBilling && (
               <>
-                <div className="hidden md:block h-6 w-px bg-white/20 mx-1" />
+                <div className="hidden lg:block h-6 w-px bg-white/20 mx-1" />
                 <button
                   onClick={() => {
-                    const from = 'clubs'
-                    router.push(`/dashboard/customization?from=${from}`)
+                    router.push(`/customization?from=${encodeURIComponent(pathname)}`)
                   }}
-                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
-                    pathname === '/dashboard/customization'
+                  className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
+                    pathname === '/customization'
                       ? 'bg-white/20 text-white font-semibold'
                       : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
@@ -91,11 +134,10 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
                 </button>
                 <button
                   onClick={() => {
-                    const from = 'clubs'
-                    router.push(`/dashboard/billing?from=${from}`)
+                    router.push(`/billing?from=${encodeURIComponent(pathname)}`)
                   }}
-                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
-                    pathname === '/dashboard/billing'
+                  className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
+                    pathname === '/billing'
                       ? 'bg-white/20 text-white font-semibold'
                       : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
@@ -136,21 +178,15 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
                 {showCustomizationBilling && (
                   <>
                     <DropdownMenuItem 
-                      onClick={() => {
-                        const from = 'clubs'
-                        router.push(`/dashboard/customization?from=${from}`)
-                      }} 
-                      className="md:hidden"
+                      onClick={() => router.push(`/customization?from=${encodeURIComponent(pathname)}`)} 
+                      className="lg:hidden"
                     >
                       <Settings className="mr-2 h-4 w-4" />
                       Customization
                     </DropdownMenuItem>
                     <DropdownMenuItem 
-                      onClick={() => {
-                        const from = 'clubs'
-                        router.push(`/dashboard/billing?from=${from}`)
-                      }} 
-                      className="md:hidden"
+                      onClick={() => router.push(`/billing?from=${encodeURIComponent(pathname)}`)} 
+                      className="lg:hidden"
                     >
                       <CreditCard className="mr-2 h-4 w-4" />
                       Billing
@@ -175,6 +211,9 @@ export function AppHeader({ user, showBackButton = false, backHref, title }: App
         currentName={currentUserName}
         onNameUpdated={setCurrentUserName}
       />
+
+      <CreateClubDialog open={createClubOpen} onOpenChange={setCreateClubOpen} />
+      <JoinClubDialog open={joinClubOpen} onOpenChange={setJoinClubOpen} />
     </>
   )
 }

@@ -8,6 +8,7 @@ import { DiscordBanner } from '@/components/discord-banner'
 import { ScrollAnimate } from '@/components/scroll-animate'
 import { HomeHero } from '@/components/home-hero'
 import { prisma } from '@/lib/prisma'
+import { cookies } from 'next/headers'
 
 async function getBannerSettings() {
   try {
@@ -35,10 +36,54 @@ async function getBannerSettings() {
   }
 }
 
+async function getLoggedInUserRedirect(userId: string): Promise<string> {
+  try {
+    // Get user's clubs
+    const memberships = await prisma.membership.findMany({
+      where: { userId },
+      select: {
+        club: {
+          select: {
+            id: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
+
+    // If no clubs, go to no-clubs page
+    if (memberships.length === 0) {
+      return '/no-clubs'
+    }
+
+    // Try to get last visited club from cookie
+    const cookieStore = cookies()
+    const lastClubId = cookieStore.get('lastVisitedClub')?.value
+
+    // If there's a last visited club and user is still a member, redirect there
+    if (lastClubId && memberships.some(m => m.club.id === lastClubId)) {
+      return `/club/${lastClubId}`
+    }
+
+    // Otherwise redirect to the first club (most recently joined)
+    return `/club/${memberships[0].club.id}`
+  } catch (error) {
+    console.error('Error getting user redirect:', error)
+    return '/no-clubs'
+  }
+}
+
 export default async function HomePage() {
   const session = await getServerSession(authOptions)
   const isLoggedIn = !!session?.user
   const bannerSettings = await getBannerSettings()
+  
+  // Get the appropriate redirect URL for logged-in users
+  const loggedInRedirect = isLoggedIn && session?.user?.id 
+    ? await getLoggedInUserRedirect(session.user.id)
+    : '/login'
 
   return (
     <div className="min-h-screen flex flex-col bg-background grid-pattern text-foreground">
@@ -53,16 +98,16 @@ export default async function HomePage() {
             <HomeNav 
               variant="light" 
               mobileButton={
-                <Link href={isLoggedIn ? "/dashboard" : "/login"}>
+                <Link href={isLoggedIn ? loggedInRedirect : "/login"}>
                   <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
-                    {isLoggedIn ? "Dashboard" : "Sign In"}
+                    Sign In
                   </button>
                 </Link>
               }
             />
-            <Link href={isLoggedIn ? "/dashboard" : "/login"} className="hidden md:block">
+            <Link href={isLoggedIn ? loggedInRedirect : "/login"} className="hidden md:block">
               <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm">
-                {isLoggedIn ? "Dashboard" : "Sign In"}
+                Sign In
               </button>
             </Link>
           </div>
@@ -70,7 +115,7 @@ export default async function HomePage() {
       </header>
 
       {/* Hero Section - Takes remaining height */}
-      <HomeHero isLoggedIn={isLoggedIn} />
+      <HomeHero isLoggedIn={isLoggedIn} loggedInRedirect={loggedInRedirect} />
 
       {/* Footer */}
       <footer className="border-t border-border bg-card py-4">
@@ -81,7 +126,10 @@ export default async function HomePage() {
               <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
               <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
+            <div className="flex flex-col items-center md:items-end gap-1">
+              <p className="text-xs sm:text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
+              <p className="text-xs text-muted-foreground font-medium">FERPA and COPPA compliant</p>
+            </div>
           </div>
         </div>
       </footer>

@@ -74,6 +74,7 @@ interface ClubPageProps {
     email: string
     image?: string | null
   }
+  clubs?: Array<{ id: string; name: string }>
   initialData?: {
     attendances?: any[]
     expenses?: any[]
@@ -90,7 +91,7 @@ interface ClubPageProps {
   }
 }
 
-export function ClubPage({ club, currentMembership, user, initialData }: ClubPageProps) {
+export function ClubPage({ club, currentMembership, user, clubs, initialData }: ClubPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -111,6 +112,13 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
     backgroundImageUrl: null,
   }
   const isAdmin = currentMembership.role === 'ADMIN'
+
+  // Save current club as last visited
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      document.cookie = `lastVisitedClub=${club.id}; path=/; max-age=${60 * 60 * 24 * 365}` // 1 year
+    }
+  }, [club.id])
 
   useEffect(() => {
     setPersonalBackground(currentMembership.preferences ?? null)
@@ -646,7 +654,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
       className="min-h-screen bg-background grid-pattern"
       style={backgroundStyle}
     >
-      <AppHeader user={user} showBackButton={true} backHref="/dashboard" title={currentClubName} />
+      <AppHeader user={user} showBackButton={false} clubId={club.id} clubs={clubs} />
 
       <main className="relative z-10 container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-full overflow-x-hidden">
         <div className="flex gap-4 sm:gap-6 lg:gap-8 items-start">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,13 +19,21 @@ import { ButtonLoading } from '@/components/ui/loading-spinner'
 interface JoinClubDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialCode?: string
 }
 
-export function JoinClubDialog({ open, onOpenChange }: JoinClubDialogProps) {
+export function JoinClubDialog({ open, onOpenChange, initialCode = '' }: JoinClubDialogProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(initialCode)
+
+  // Update code when initialCode changes
+  useEffect(() => {
+    if (initialCode) {
+      setCode(initialCode)
+    }
+  }, [initialCode])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,6 +83,11 @@ export function JoinClubDialog({ open, onOpenChange }: JoinClubDialogProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {initialCode && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-3 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-100">
+                Invite link detected. We&apos;ve pre-filled the code below for you.
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="code">Invite Code</Label>
               <Input

@@ -8,7 +8,7 @@ export default async function CustomizationPage() {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    redirect('/login?redirect=/dashboard/customization')
+    redirect('/login?redirect=/customization')
   }
 
   // Fetch user data including preferences

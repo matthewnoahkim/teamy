@@ -235,9 +235,9 @@ export function CustomizationClient({ user, preferences }: CustomizationClientPr
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // Determine back destination based on where user came from
-  const from = searchParams.get('from')
-  const backHref = '/dashboard'
+  // Go back to where we came from, or fall back to no-clubs
+  const fromPath = searchParams.get('from')
+  const backHref = fromPath || '/no-clubs'
 
   const defaultColors = {
     backgroundColor: '#f8fafc',

@@ -82,9 +82,9 @@ export function BillingClient({ user, clubs, subscriptionStatus, subscriptionTyp
   const [isRedeemingPromo, setIsRedeemingPromo] = useState(false)
   const [assigningBoostTo, setAssigningBoostTo] = useState<string | null>(null)
   
-  // Determine back destination based on where user came from
-  const from = searchParams.get('from')
-  const backHref = '/dashboard'
+  // Go back to where we came from, or fall back based on clubs
+  const fromPath = searchParams.get('from')
+  const backHref = fromPath || (clubs.length > 0 ? `/club/${clubs[0].id}` : '/no-clubs')
   
   // Check for success/cancel messages and verify subscription
   useEffect(() => {
@@ -128,7 +128,7 @@ export function BillingClient({ user, clubs, subscriptionStatus, subscriptionTyp
         .finally(() => {
           setIsLoading(false)
           // Clean up URL
-          router.replace('/dashboard/billing')
+          router.replace('/billing')
         })
     } else if (success === 'true') {
       toast({
@@ -482,8 +482,8 @@ export function BillingClient({ user, clubs, subscriptionStatus, subscriptionTyp
             {clubs.length === 0 ? (
               <div className="text-center py-4">
                 <p className="text-muted-foreground mb-4">Join a club to assign boosts to it</p>
-                <Link href="/dashboard/club">
-                  <Button variant="outline">Go to Dashboard</Button>
+                <Link href="/no-clubs">
+                  <Button variant="outline">Join or Create a Club</Button>
                 </Link>
               </div>
             ) : (

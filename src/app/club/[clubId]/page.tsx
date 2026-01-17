@@ -33,8 +33,27 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   })
 
   if (!membership) {
+    // User is not a member, redirect to dashboard which will handle appropriately
     redirect('/dashboard')
   }
+
+  // Get all user's clubs for the dropdown
+  const userClubs = await prisma.membership.findMany({
+    where: { userId: session.user.id },
+    select: {
+      club: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  })
+
+  const clubs = userClubs.map(m => m.club)
 
   const club = await prisma.club.findUnique({
     where: { id: params.clubId },
@@ -586,6 +605,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
         club={club}
         currentMembership={membership}
         user={session.user}
+        clubs={clubs}
         initialData={{
           attendances,
           expenses,
