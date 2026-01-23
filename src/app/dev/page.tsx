@@ -243,6 +243,10 @@ export default function DevPage() {
                   Edit Username
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-default">
+                  <ThemeToggle variant="menu" />
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => {
                     signOut({ callbackUrl: '/dev' })
@@ -254,7 +258,6 @@ export default function DevPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <ThemeToggle variant="header" />
           </div>
         </div>
       </header>

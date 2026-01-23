@@ -414,6 +414,10 @@ export function TournamentPageClient({
                     Edit Username
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-default">
+                    <ThemeToggle variant="menu" />
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign Out
@@ -427,7 +431,6 @@ export function TournamentPageClient({
                 </button>
               </Link>
             )}
-            <ThemeToggle variant="header" />
             {isDirector && !isEditing && (
               <Button 
                 onClick={() => setIsEditing(true)}
