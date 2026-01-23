@@ -102,14 +102,14 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
               mobileButton={
                 <Link href={isLoggedIn ? loggedInRedirect : "/login"}>
                   <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
-                    Sign In
+                    {isLoggedIn ? "My Clubs" : "Sign In"}
                   </button>
                 </Link>
               }
             />
             <Link href={isLoggedIn ? loggedInRedirect : "/login"} className="hidden md:block">
               <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm">
-                Sign In
+                {isLoggedIn ? "My Clubs" : "Sign In"}
               </button>
             </Link>
           </div>
