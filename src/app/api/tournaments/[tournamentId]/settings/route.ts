@@ -61,15 +61,16 @@ async function isTournamentDirector(userEmail: string, tournamentId: string): Pr
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const tournamentId = params.tournamentId
+    const tournamentId = resolvedParams.tournamentId
 
     // Check if user is TD or admin
     const isAdmin = await isTournamentAdmin(session.user.id, tournamentId)
@@ -148,7 +149,7 @@ export async function PATCH(
   } catch (error) {
     console.error('Failed to update tournament settings:', error)
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid data', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid data', details: error.issues }, { status: 400 })
     }
     return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 })
   }

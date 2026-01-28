@@ -12,15 +12,16 @@ const regenerateSchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await requireAdmin(session.user.id, params.clubId)
+    await requireAdmin(session.user.id, resolvedParams.clubId)
 
     const body = await req.json()
     const { type } = regenerateSchema.parse(body)
@@ -40,7 +41,7 @@ export async function POST(
         }
 
     await prisma.club.update({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
       data: updateData,
     })
 
@@ -50,7 +51,7 @@ export async function POST(
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })

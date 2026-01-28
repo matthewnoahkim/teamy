@@ -336,7 +336,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ 
         error: 'Invalid event data', 
         message: 'Please check all required fields',
-        details: error.errors 
+        details: error.issues 
       }, { status: 400 })
     }
     if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {

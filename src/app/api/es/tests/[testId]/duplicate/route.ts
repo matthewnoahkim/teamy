@@ -8,15 +8,16 @@ import { hasESTestAccess } from '@/lib/rbac'
 // POST /api/es/tests/[testId]/duplicate
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string }> | { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
 
     // Get the original test with all related data
     const originalTest = await prisma.eSTest.findUnique({

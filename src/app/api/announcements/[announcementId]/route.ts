@@ -13,8 +13,9 @@ const updateAnnouncementSchema = z.object({
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { announcementId: string } }
+  { params }: { params: Promise<{ announcementId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -26,7 +27,7 @@ export async function PATCH(
 
     // Get the announcement first to check permissions
     const announcement = await prisma.announcement.findUnique({
-      where: { id: params.announcementId },
+      where: { id: resolvedParams.announcementId },
       include: {
         author: {
           include: {
@@ -58,7 +59,7 @@ export async function PATCH(
     // Update announcement and linked calendar event if exists
     const updatedAnnouncement = await prisma.$transaction(async (tx) => {
       const updated = await tx.announcement.update({
-        where: { id: params.announcementId },
+        where: { id: resolvedParams.announcementId },
         data: {
           ...(validated.title && { title: validated.title }),
           ...(validated.content && { content: validated.content }),
@@ -106,7 +107,7 @@ export async function PATCH(
     return NextResponse.json({ announcement: updatedAnnouncement })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     console.error('Update announcement error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -115,8 +116,9 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { announcementId: string } }
+  { params }: { params: Promise<{ announcementId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -125,7 +127,7 @@ export async function DELETE(
 
     // Get the announcement first to check permissions
     const announcement = await prisma.announcement.findUnique({
-      where: { id: params.announcementId },
+      where: { id: resolvedParams.announcementId },
       include: {
         author: {
           include: {
@@ -159,7 +161,7 @@ export async function DELETE(
     // Delete announcement only (keep calendar event and attendance if they exist)
     // The calendar event remains in the calendar and attendance tabs
     await prisma.announcement.delete({
-      where: { id: params.announcementId },
+      where: { id: resolvedParams.announcementId },
     })
 
     return NextResponse.json({ success: true })

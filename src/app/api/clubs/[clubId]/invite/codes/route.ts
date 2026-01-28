@@ -7,18 +7,19 @@ import { decryptInviteCode } from '@/lib/invite-codes'
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await requireAdmin(session.user.id, params.clubId)
+    await requireAdmin(session.user.id, resolvedParams.clubId)
 
     const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
       select: {
         adminInviteCodeEncrypted: true,
         memberInviteCodeEncrypted: true,

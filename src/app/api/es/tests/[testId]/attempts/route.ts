@@ -7,15 +7,16 @@ import { isTournamentAdmin, hasESTestAccess } from '@/lib/rbac'
 // GET /api/es/tests/[testId]/attempts - Get all attempts for an ESTest (tournament director/admin only)
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string }> | { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
 
     const test = await prisma.eSTest.findUnique({
       where: { id: resolvedParams.testId },

@@ -19,7 +19,7 @@ import { getSecurityHeaders } from '@/lib/security-config'
  * 4. Request validation
  */
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Skip rate limiting for certain paths
@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
     '/api/auth/callback', // OAuth callbacks need to work
     '/api/auth/session', // Session checks are frequent
   ]
-  
+
   if (skipPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
   }
@@ -43,18 +43,18 @@ export async function middleware(request: NextRequest) {
   try {
     // Get rate limit configuration based on method and path
     const config = getRateLimitConfig(request.method, pathname)
-    
+
     // Use IP-based limiting in middleware (user-based limiting can be added in individual routes)
     // This provides protection against DDoS attacks even for unauthenticated requests
     const rateLimitKey = getRateLimitKey(request, null, pathname)
-    
+
     // Check rate limit
     const result = checkRateLimit(rateLimitKey, config)
 
     // If rate limited, return 429 Too Many Requests
     if (!result.allowed) {
       const headers = getRateLimitHeaders(result)
-      
+
       return NextResponse.json(
         {
           error: 'Too Many Requests',
@@ -71,7 +71,7 @@ export async function middleware(request: NextRequest) {
     // Add rate limit headers to successful responses
     const response = NextResponse.next()
     const rateLimitHeaders = getRateLimitHeaders(result)
-    
+
     Object.entries(rateLimitHeaders).forEach(([key, value]) => {
       response.headers.set(key, String(value))
     })

@@ -7,12 +7,13 @@ import { TournamentDetailClient } from '@/components/tournament-detail-client'
 import { TournamentPageClient } from '@/components/tournament-page-client'
 
 interface Props {
-  params: { param: string }
+  params: Promise<{ param: string }>
 }
 
 export default async function TournamentPage({ params }: Props) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
-  const { param } = params
+  const { param } = resolvedParams
 
   // First, try to find a tournament by ID
   const tournamentById = await prisma.tournament.findUnique({
@@ -601,4 +602,3 @@ export default async function TournamentPage({ params }: Props) {
     />
   )
 }
-

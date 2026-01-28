@@ -16,15 +16,16 @@ const requestSchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string; attemptId: string }> | { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const body = await req.json().catch(() => ({}))
     const validated = requestSchema.parse(body)
 
@@ -359,7 +360,7 @@ export async function POST(
   } catch (error) {
     console.error('AI grading error:', error)
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid request', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request', details: error.issues }, { status: 400 })
     }
     if (error instanceof Error && error.message?.includes('OpenAI')) {
       return NextResponse.json({ error: error.message }, { status: 400 })

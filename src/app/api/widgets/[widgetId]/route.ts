@@ -19,15 +19,16 @@ const updateWidgetSchema = z.object({
 // PATCH - Update a widget (admin only)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { widgetId: string } }
+  { params }: { params: Promise<{ widgetId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const widgetId = params.widgetId
+    const widgetId = resolvedParams.widgetId
     const body = await req.json()
     const validated = updateWidgetSchema.parse(body)
 
@@ -52,7 +53,7 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ 
         error: 'Invalid widget data', 
-        details: error.errors 
+        details: error.issues 
       }, { status: 400 })
     }
     console.error('Update widget error:', error)
@@ -63,15 +64,16 @@ export async function PATCH(
 // DELETE - Delete a widget (admin only)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { widgetId: string } }
+  { params }: { params: Promise<{ widgetId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const widgetId = params.widgetId
+    const widgetId = resolvedParams.widgetId
 
     // Find the widget and check permissions
     const existingWidget = await prisma.homePageWidget.findUnique({

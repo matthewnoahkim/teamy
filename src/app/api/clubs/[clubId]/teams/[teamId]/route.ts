@@ -11,34 +11,35 @@ const updateTeamSchema = z.object({
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { clubId: string; teamId: string } }
+  { params }: { params: Promise<{ clubId: string; teamId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await requireAdmin(session.user.id, params.clubId)
+    await requireAdmin(session.user.id, resolvedParams.clubId)
 
     const body = await req.json()
     const { name } = updateTeamSchema.parse(body)
 
     // Verify team belongs to this club
     const existingTeam = await prisma.team.findUnique({
-      where: { id: params.teamId },
+      where: { id: resolvedParams.teamId },
     })
 
     if (!existingTeam) {
       return NextResponse.json({ error: 'Team not found' }, { status: 404 })
     }
 
-    if (existingTeam.clubId !== params.clubId) {
+    if (existingTeam.clubId !== resolvedParams.clubId) {
       return NextResponse.json({ error: 'Team does not belong to this club' }, { status: 403 })
     }
 
     const team = await prisma.team.update({
-      where: { id: params.teamId },
+      where: { id: resolvedParams.teamId },
       data: { name },
       include: {
         members: {
@@ -64,7 +65,7 @@ export async function PATCH(
     return NextResponse.json({ team })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -76,31 +77,32 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { clubId: string; teamId: string } }
+  { params }: { params: Promise<{ clubId: string; teamId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await requireAdmin(session.user.id, params.clubId)
+    await requireAdmin(session.user.id, resolvedParams.clubId)
 
     // Verify team belongs to this club
     const existingTeam = await prisma.team.findUnique({
-      where: { id: params.teamId },
+      where: { id: resolvedParams.teamId },
     })
 
     if (!existingTeam) {
       return NextResponse.json({ error: 'Team not found' }, { status: 404 })
     }
 
-    if (existingTeam.clubId !== params.clubId) {
+    if (existingTeam.clubId !== resolvedParams.clubId) {
       return NextResponse.json({ error: 'Team does not belong to this club' }, { status: 403 })
     }
 
     await prisma.team.delete({
-      where: { id: params.teamId },
+      where: { id: resolvedParams.teamId },
     })
 
     return NextResponse.json({ success: true })

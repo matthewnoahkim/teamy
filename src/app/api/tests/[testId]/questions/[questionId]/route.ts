@@ -26,19 +26,21 @@ const updateQuestionSchema = z.object({
 // PATCH /api/tests/[testId]/questions/[questionId]
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { testId: string; questionId: string } }
+  { params }: { params: Promise<{ testId: string; questionId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { testId, questionId } = resolvedParams
     const body = await req.json()
     const validatedData = updateQuestionSchema.parse(body)
 
     const test = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: testId },
     })
 
     if (!test) {
@@ -69,7 +71,7 @@ export async function PATCH(
       if (validatedData.numericTolerance !== undefined) updateData.numericTolerance = validatedData.numericTolerance
 
       const updatedQuestion = await tx.question.update({
-        where: { id: params.questionId },
+        where: { id: questionId },
         data: updateData,
       })
 
@@ -77,14 +79,14 @@ export async function PATCH(
       if (validatedData.options !== undefined) {
         // Delete all existing options
         await tx.questionOption.deleteMany({
-          where: { questionId: params.questionId },
+          where: { questionId },
         })
 
         // Create new options
         if (validatedData.options.length > 0) {
           await tx.questionOption.createMany({
             data: validatedData.options.map((opt) => ({
-              questionId: params.questionId,
+              questionId,
               label: opt.label,
               isCorrect: opt.isCorrect,
               order: opt.order,
@@ -95,7 +97,7 @@ export async function PATCH(
 
       // Return question with options
       return tx.question.findUnique({
-        where: { id: params.questionId },
+        where: { id: questionId },
         include: {
           options: {
             orderBy: { order: 'asc' },
@@ -108,7 +110,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }
@@ -120,16 +122,18 @@ export async function PATCH(
 // DELETE /api/tests/[testId]/questions/[questionId]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { testId: string; questionId: string } }
+  { params }: { params: Promise<{ testId: string; questionId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { testId, questionId } = resolvedParams
     const test = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: testId },
     })
 
     if (!test) {
@@ -148,7 +152,7 @@ export async function DELETE(
 
     // Delete question (options will be cascade deleted)
     await prisma.question.delete({
-      where: { id: params.questionId },
+      where: { id: questionId },
     })
 
     return NextResponse.json({ success: true })
@@ -157,4 +161,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

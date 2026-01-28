@@ -46,8 +46,9 @@ const STATUS_CONFIG: Record<
 export default async function TeamTestDetailPage({
   params,
 }: {
-  params: { clubId: string; testId: string }
+  params: Promise<{ clubId: string; testId: string }>
 }) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.id) {
@@ -58,7 +59,7 @@ export default async function TeamTestDetailPage({
     where: {
       userId_clubId: {
         userId: session.user.id,
-        clubId: params.clubId,
+        clubId: resolvedParams.clubId,
       },
     },
     select: {
@@ -73,13 +74,13 @@ export default async function TeamTestDetailPage({
 
   // Only admins can view the authoring dashboard
   if (String(membership.role) !== 'ADMIN') {
-    redirect(`/club/${params.clubId}?tab=tests`)
+    redirect(`/club/${resolvedParams.clubId}?tab=tests`)
   }
 
   const test = await prisma.test.findFirst({
     where: {
-      id: params.testId,
-      clubId: params.clubId,
+      id: resolvedParams.testId,
+      clubId: resolvedParams.clubId,
     },
     select: {
       id: true,
@@ -156,7 +157,7 @@ export default async function TeamTestDetailPage({
   // If the test is a draft, show the builder/editor interface
   if (test.status === 'DRAFT') {
     const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
       select: {
         id: true,
         name: true,
@@ -174,7 +175,7 @@ export default async function TeamTestDetailPage({
     })
 
     if (!club) {
-      redirect(`/club/${params.clubId}`)
+      redirect(`/club/${resolvedParams.clubId}`)
     }
 
     // Transform the test data to match NewTestBuilder's expected format
@@ -323,7 +324,7 @@ export default async function TeamTestDetailPage({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-2">
           <Link 
-            href={tournamentTest ? `/tournaments/${tournamentTest.tournament.id}/tests` : `/club/${params.clubId}?tab=tests`} 
+            href={tournamentTest ? `/tournaments/${tournamentTest.tournament.id}/tests` : `/club/${resolvedParams.clubId}?tab=tests`} 
             className="w-fit"
           >
             <Button variant="ghost" size="sm" className="h-8 gap-2 px-2">
@@ -360,7 +361,7 @@ export default async function TeamTestDetailPage({
           <DuplicateTestButton
             testId={test.id}
             testName={test.name}
-            clubId={params.clubId}
+            clubId={resolvedParams.clubId}
           />
         </div>
       </div>

@@ -7,15 +7,16 @@ import { isAdmin } from '@/lib/rbac'
 // GET /api/tests/[testId]/attempts - Get all attempts for a test (admin only)
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string }> | { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
 
     const test = await prisma.test.findUnique({
       where: { id: resolvedParams.testId },

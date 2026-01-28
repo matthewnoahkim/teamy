@@ -13,8 +13,9 @@ const reviewNoteSheetSchema = z.object({
 // PATCH - Review note sheet (accept or reject)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { testId: string; noteSheetId: string } }
+  { params }: { params: Promise<{ testId: string; noteSheetId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -26,7 +27,7 @@ export async function PATCH(
 
     // Get the note sheet
     const noteSheet = await prisma.noteSheet.findUnique({
-      where: { id: params.noteSheetId },
+      where: { id: resolvedParams.noteSheetId },
       include: {
         test: true,
       },
@@ -36,7 +37,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Note sheet not found' }, { status: 404 })
     }
 
-    if (noteSheet.testId !== params.testId) {
+    if (noteSheet.testId !== resolvedParams.testId) {
       return NextResponse.json(
         { error: 'Note sheet does not belong to this test' },
         { status: 400 }
@@ -72,7 +73,7 @@ export async function PATCH(
 
     // Update the note sheet
     const updated = await prisma.noteSheet.update({
-      where: { id: params.noteSheetId },
+      where: { id: resolvedParams.noteSheetId },
       data: {
         status: validatedData.status,
         rejectionReason:
@@ -112,7 +113,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }

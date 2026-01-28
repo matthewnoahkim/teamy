@@ -71,8 +71,9 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
 // POST /api/tournaments/[tournamentId]/tests/create
 export async function POST(
   req: NextRequest,
-  { params }: { params: { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -80,14 +81,14 @@ export async function POST(
     }
 
     // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, params.tournamentId)
+    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
     if (!isAdmin) {
       return NextResponse.json({ error: 'Only tournament admins can create tests' }, { status: 403 })
     }
 
     // Get tournament info
     const tournament = await prisma.tournament.findUnique({
-      where: { id: params.tournamentId },
+      where: { id: resolvedParams.tournamentId },
       select: {
         id: true,
         division: true,
@@ -221,7 +222,7 @@ export async function POST(
       // Automatically link the test to the tournament
       await tx.tournamentTest.create({
         data: {
-          tournamentId: params.tournamentId,
+          tournamentId: resolvedParams.tournamentId,
           testId: baseTest.id,
         },
       })
@@ -250,7 +251,7 @@ export async function POST(
     return NextResponse.json({ test: createdTest }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     console.error('Create tournament test error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

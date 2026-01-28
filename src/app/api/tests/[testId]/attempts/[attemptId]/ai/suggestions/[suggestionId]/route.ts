@@ -16,18 +16,17 @@ export async function PATCH(
   {
     params,
   }: {
-    params:
-      | Promise<{ testId: string; attemptId: string; suggestionId: string }>
-      | { testId: string; attemptId: string; suggestionId: string }
+    params: Promise<{ testId: string; attemptId: string; suggestionId: string }>
   }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const body = await req.json()
     const validated = bodySchema.parse(body)
 
@@ -92,10 +91,9 @@ export async function PATCH(
   } catch (error) {
     console.error('AI suggestion update error:', error)
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid request', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request', details: error.issues }, { status: 400 })
     }
     return NextResponse.json({ error: 'Failed to update suggestion' }, { status: 500 })
   }
 }
-
 

@@ -10,7 +10,8 @@ interface Props {
 }
 
 export default async function TournamentManagePage({ params }: Props) {
-  const { tournamentId } = await params
+  const resolvedParams = await params
+  const { tournamentId } = resolvedParams
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) {

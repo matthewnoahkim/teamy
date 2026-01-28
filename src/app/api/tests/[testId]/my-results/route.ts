@@ -9,15 +9,16 @@ import { shouldReleaseScores, filterAttemptByReleaseMode } from '@/lib/test-secu
 // Get the current user's latest test results
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string }> | { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const testId = resolvedParams.testId
 
     const test = await prisma.test.findUnique({

@@ -36,8 +36,9 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
 // GET /api/tournaments/[tournamentId]
 export async function GET(
   req: NextRequest,
-  { params }: { params: { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -45,7 +46,7 @@ export async function GET(
     }
 
     const tournament = await prisma.tournament.findUnique({
-      where: { id: params.tournamentId },
+      where: { id: resolvedParams.tournamentId },
       include: {
         createdBy: {
           select: {
@@ -164,11 +165,11 @@ export async function GET(
       division: displayDivision,
     }
 
-    const isAdmin = await isTournamentAdmin(session.user.id, params.tournamentId)
+    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
     
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[Tournament ${params.tournamentId}] User ${session.user.id} isAdmin: ${isAdmin}`)
+      console.log(`[Tournament ${resolvedParams.tournamentId}] User ${session.user.id} isAdmin: ${isAdmin}`)
     }
 
     return NextResponse.json({ tournament: tournamentWithDisplayDivision, isAdmin })
@@ -185,8 +186,9 @@ export async function GET(
 // PUT /api/tournaments/[tournamentId]
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -194,7 +196,7 @@ export async function PUT(
     }
 
     // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, params.tournamentId)
+    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
     if (!isAdmin) {
       return NextResponse.json({ error: 'Only tournament admins can update tournaments' }, { status: 403 })
     }
@@ -217,14 +219,14 @@ export async function PUT(
     if (validated.approved !== undefined) updateData.approved = validated.approved
 
     const tournament = await prisma.tournament.update({
-      where: { id: params.tournamentId },
+      where: { id: resolvedParams.tournamentId },
       data: updateData,
     })
 
     return NextResponse.json({ tournament })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     console.error('Update tournament error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -234,8 +236,9 @@ export async function PUT(
 // DELETE /api/tournaments/[tournamentId]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -243,13 +246,13 @@ export async function DELETE(
     }
 
     // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, params.tournamentId)
+    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
     if (!isAdmin) {
       return NextResponse.json({ error: 'Only tournament admins can delete tournaments' }, { status: 403 })
     }
 
     await prisma.tournament.delete({
-      where: { id: params.tournamentId },
+      where: { id: resolvedParams.tournamentId },
     })
 
     return NextResponse.json({ success: true })

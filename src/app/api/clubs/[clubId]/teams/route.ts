@@ -11,15 +11,16 @@ const createTeamSchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await requireAdmin(session.user.id, params.clubId)
+    await requireAdmin(session.user.id, resolvedParams.clubId)
 
     const body = await req.json()
     const { name } = createTeamSchema.parse(body)
@@ -27,14 +28,14 @@ export async function POST(
     const team = await prisma.team.create({
       data: {
         name,
-        clubId: params.clubId,
+        clubId: resolvedParams.clubId,
       },
     })
 
     return NextResponse.json({ team })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -46,8 +47,9 @@ export async function POST(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -55,7 +57,7 @@ export async function GET(
     }
 
     const teams = await prisma.team.findMany({
-      where: { clubId: params.clubId },
+      where: { clubId: resolvedParams.clubId },
       include: {
         members: {
           include: {

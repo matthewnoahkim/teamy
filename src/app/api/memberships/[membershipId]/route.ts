@@ -17,8 +17,9 @@ const updateMembershipSchema = z.object({
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { membershipId: string } }
+  { params }: { params: Promise<{ membershipId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -26,7 +27,7 @@ export async function PATCH(
     }
 
     const membership = await prisma.membership.findUnique({
-      where: { id: params.membershipId },
+      where: { id: resolvedParams.membershipId },
     })
 
     if (!membership) {
@@ -93,7 +94,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.membership.update({
-      where: { id: params.membershipId },
+      where: { id: resolvedParams.membershipId },
       data: updateData,
       include: {
         user: {
@@ -111,7 +112,7 @@ export async function PATCH(
     return NextResponse.json({ membership: updated })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -123,8 +124,9 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { membershipId: string } }
+  { params }: { params: Promise<{ membershipId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -132,7 +134,7 @@ export async function DELETE(
     }
 
     const membership = await prisma.membership.findUnique({
-      where: { id: params.membershipId },
+      where: { id: resolvedParams.membershipId },
       include: {
         club: {
           include: {
@@ -186,7 +188,7 @@ export async function DELETE(
 
     // Delete the membership (cascade will handle related records)
     await prisma.membership.delete({
-      where: { id: params.membershipId },
+      where: { id: resolvedParams.membershipId },
     })
 
     // Revalidate dashboard to refresh the memberships list

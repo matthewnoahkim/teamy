@@ -11,8 +11,9 @@ import { AlertCircle, ArrowLeft } from 'lucide-react'
 export default async function TournamentTakeTestPage({
   params,
 }: {
-  params: Promise<{ testId: string }> | { testId: string }
+  params: Promise<{ testId: string }>
 }) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.id) {
@@ -20,7 +21,6 @@ export default async function TournamentTakeTestPage({
   }
 
   // Resolve params if it's a Promise (Next.js 15 compatibility)
-  const resolvedParams = params instanceof Promise ? await params : params
   const testId = resolvedParams.testId
 
   // Try to find the test - could be a regular Test or ESTest

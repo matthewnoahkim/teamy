@@ -12,15 +12,16 @@ async function hasESGradingAccess(userId: string, userEmail: string, testId: str
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string; attemptId: string }> | { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
 
     // Check access
     const hasAccess = await hasESGradingAccess(session.user.id, session.user.email, resolvedParams.testId)

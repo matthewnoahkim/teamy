@@ -17,18 +17,19 @@ const updateClubSchema = z.object({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await requireMember(session.user.id, params.clubId)
+    await requireMember(session.user.id, resolvedParams.clubId)
 
     const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
       include: {
         memberships: {
           include: {
@@ -83,8 +84,9 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -92,14 +94,14 @@ export async function PATCH(
     }
 
     // Only admins can update clubs
-    await requireAdmin(session.user.id, params.clubId)
+    await requireAdmin(session.user.id, resolvedParams.clubId)
 
     const body = await req.json()
     const validatedData = updateClubSchema.parse(body)
 
     // Verify club exists
     const existingClub = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
     })
 
     if (!existingClub) {
@@ -129,20 +131,20 @@ export async function PATCH(
 
     // Update club
     const updatedClub = await prisma.club.update({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
       data: updateData,
     })
 
     // Ensure club pages show the new background immediately
-    revalidatePath(`/club/${params.clubId}`)
+    revalidatePath(`/club/${resolvedParams.clubId}`)
 
     return NextResponse.json({ club: updatedClub })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('Validation error:', error.errors)
+      console.error('Validation error:', error.issues)
       return NextResponse.json({ 
         error: 'Invalid input', 
-        details: error.errors 
+        details: error.issues 
       }, { status: 400 })
     }
     if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {
@@ -158,8 +160,9 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -167,11 +170,11 @@ export async function DELETE(
     }
 
     // Only admins can delete clubs
-    await requireAdmin(session.user.id, params.clubId)
+    await requireAdmin(session.user.id, resolvedParams.clubId)
 
     // Verify club exists
     const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
     })
 
     if (!club) {
@@ -180,7 +183,7 @@ export async function DELETE(
 
     // Delete club (cascading deletes will handle related records)
     await prisma.club.delete({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
     })
 
     // Revalidate dashboard to refresh the memberships list

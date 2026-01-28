@@ -31,8 +31,9 @@ const updateTestSchema = z.object({
 // GET /api/tests/[testId]
 export async function GET(
   req: NextRequest,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -41,7 +42,7 @@ export async function GET(
 
     // First try to find as regular Test
     let test = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: resolvedParams.testId },
       include: {
         sections: {
           orderBy: { order: 'asc' },
@@ -76,7 +77,7 @@ export async function GET(
     let esTest = null
     if (!test) {
       esTest = await prisma.eSTest.findUnique({
-        where: { id: params.testId },
+        where: { id: resolvedParams.testId },
         include: {
           tournament: {
             select: {
@@ -190,7 +191,7 @@ export async function GET(
     const userAttempts = await prisma.testAttempt.findMany({
       where: {
         membershipId: membership.id,
-        testId: params.testId,
+        testId: resolvedParams.testId,
       },
       select: {
         id: true,
@@ -220,8 +221,9 @@ export async function GET(
 // PATCH /api/tests/[testId]
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -232,7 +234,7 @@ export async function PATCH(
     const validatedData = updateTestSchema.parse(body)
 
     const test = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: resolvedParams.testId },
     })
 
     if (!test) {
@@ -320,7 +322,7 @@ export async function PATCH(
       updateData.scoreReleaseMode = validatedData.scoreReleaseMode
 
     const updatedTest = await prisma.test.update({
-      where: { id: params.testId },
+      where: { id: resolvedParams.testId },
       data: updateData,
     })
 
@@ -342,7 +344,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }
@@ -354,8 +356,9 @@ export async function PATCH(
 // DELETE /api/tests/[testId]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -363,7 +366,7 @@ export async function DELETE(
     }
 
     const test = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: resolvedParams.testId },
     })
 
     if (!test) {
@@ -411,7 +414,7 @@ export async function DELETE(
     })
 
     await prisma.test.delete({
-      where: { id: params.testId },
+      where: { id: resolvedParams.testId },
     })
 
     return NextResponse.json({ success: true })

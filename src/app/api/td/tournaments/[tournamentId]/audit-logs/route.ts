@@ -66,8 +66,9 @@ async function isTournamentDirector(userId: string, userEmail: string, tournamen
 // Get audit logs for all tests in a tournament
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ tournamentId: string }> | { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id || !session.user.email) {
@@ -75,7 +76,6 @@ export async function GET(
     }
 
     // Resolve params if it's a Promise (Next.js 15 compatibility)
-    const resolvedParams = params instanceof Promise ? await params : params
     const tournamentId = resolvedParams.tournamentId
 
     // Check if user is tournament director

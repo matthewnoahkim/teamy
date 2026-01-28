@@ -4,8 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getUserMembership, isAdmin } from '@/lib/rbac'
 import { z } from 'zod'
-import { Decimal } from '@prisma/client/runtime/library'
-import { AiSuggestionStatus } from '@prisma/client'
+import { AiSuggestionStatus, Prisma } from '@prisma/client'
 
 const gradeAnswerSchema = z.object({
   answerId: z.string(),
@@ -22,15 +21,16 @@ const gradeAttemptSchema = z.object({
 // Grade FRQ answers for an attempt (admin only)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string; attemptId: string }> | { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const body = await req.json()
     const validatedData = gradeAttemptSchema.parse(body)
 
@@ -113,7 +113,7 @@ export async function PATCH(
           await tx.attemptAnswer.update({
             where: { id: grade.answerId },
             data: {
-              pointsAwarded: new Decimal(grade.pointsAwarded),
+              pointsAwarded: new Prisma.Decimal(grade.pointsAwarded),
               graderNote: grade.graderNote || null,
               gradedAt: new Date(), // Set gradedAt when saving a grade
             },
@@ -142,7 +142,7 @@ export async function PATCH(
               where: { id: suggestion.id },
               data: {
                 status: acceptedStatus,
-                acceptedPoints: new Decimal(grade.pointsAwarded),
+                acceptedPoints: new Prisma.Decimal(grade.pointsAwarded),
                 acceptedAt: new Date(),
                 acceptedByUserId: session.user.id,
                 acceptedByMembershipId: adminMembership.id,
@@ -231,7 +231,7 @@ export async function PATCH(
       await tx.testAttempt.update({
         where: { id: resolvedParams.attemptId },
         data: {
-          gradeEarned: new Decimal(totalEarned),
+          gradeEarned: new Prisma.Decimal(totalEarned),
           status: allGraded ? 'GRADED' : 'SUBMITTED',
         },
       })
@@ -260,7 +260,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }
@@ -271,4 +271,3 @@ export async function PATCH(
     )
   }
 }
-

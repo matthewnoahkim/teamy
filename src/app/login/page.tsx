@@ -9,9 +9,9 @@ import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 
 type SignInPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     callbackUrl?: string
-  }
+  }>
 }
 
 async function getDefaultRedirect(userId: string) {
@@ -27,7 +27,7 @@ async function getDefaultRedirect(userId: string) {
   }
 
   // Check for last visited club cookie
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const lastVisitedClub = cookieStore.get('lastVisitedClub')?.value
 
   if (lastVisitedClub) {
@@ -65,17 +65,18 @@ function resolveCallbackUrl(rawCallbackUrl?: string, defaultUrl?: string) {
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const session = await getServerSession(authOptions)
+  const resolvedSearchParams = await searchParams
 
   // Calculate callback URL for both logged-in and logged-out states
   let callbackUrl = '/auth/callback' // default redirect handler
   
   if (session?.user) {
     const defaultRedirect = await getDefaultRedirect(session.user.id)
-    callbackUrl = resolveCallbackUrl(searchParams?.callbackUrl, defaultRedirect)
+    callbackUrl = resolveCallbackUrl(resolvedSearchParams?.callbackUrl, defaultRedirect)
     redirect(callbackUrl)
   } else {
     // For non-logged-in users, use the callback from query params or default to auth callback
-    callbackUrl = resolveCallbackUrl(searchParams?.callbackUrl, '/auth/callback')
+    callbackUrl = resolveCallbackUrl(resolvedSearchParams?.callbackUrl, '/auth/callback')
   }
 
   return (

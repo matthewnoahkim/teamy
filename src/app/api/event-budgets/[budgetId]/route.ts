@@ -7,8 +7,9 @@ import { isAdmin } from '@/lib/rbac'
 // DELETE /api/event-budgets/[budgetId]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { budgetId: string } }
+  { params }: { params: Promise<{ budgetId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -17,7 +18,7 @@ export async function DELETE(
 
     // Get the budget to check team
     const budget = await prisma.eventBudget.findUnique({
-      where: { id: params.budgetId },
+      where: { id: resolvedParams.budgetId },
     })
 
     if (!budget) {
@@ -34,7 +35,7 @@ export async function DELETE(
     }
 
     await prisma.eventBudget.delete({
-      where: { id: params.budgetId },
+      where: { id: resolvedParams.budgetId },
     })
 
     return NextResponse.json({ success: true })

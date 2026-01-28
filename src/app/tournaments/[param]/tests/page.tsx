@@ -29,8 +29,9 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
 export default async function TournamentTestsPage({ 
   params 
 }: { 
-  params: Promise<{ param: string }> | { param: string } 
+  params: Promise<{ param: string }> 
 }) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
@@ -38,7 +39,6 @@ export default async function TournamentTestsPage({
   }
 
   // Handle both Promise and direct params (Next.js 15 compatibility)
-  const resolvedParams = params instanceof Promise ? await params : params
   const tournamentId = resolvedParams.param
 
   // Check if user is tournament admin

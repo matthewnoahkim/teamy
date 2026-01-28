@@ -26,8 +26,9 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
 // Bulk assign a test to all teams registered for a specific event
 export async function POST(
   req: NextRequest,
-  { params }: { params: { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -35,7 +36,7 @@ export async function POST(
     }
 
     // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, params.tournamentId)
+    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
     if (!isAdmin) {
       return NextResponse.json({ error: 'Only tournament admins can assign tests' }, { status: 403 })
     }
@@ -47,7 +48,7 @@ export async function POST(
     const tournamentTest = await prisma.tournamentTest.findUnique({
       where: {
         tournamentId_testId: {
-          tournamentId: params.tournamentId,
+          tournamentId: resolvedParams.tournamentId,
           testId: validated.testId,
         },
       },
@@ -62,7 +63,7 @@ export async function POST(
 
     // Verify event exists and matches tournament
     const tournament = await prisma.tournament.findUnique({
-      where: { id: params.tournamentId },
+      where: { id: resolvedParams.tournamentId },
       select: { division: true },
     })
 
@@ -78,7 +79,7 @@ export async function POST(
     // Get all teams registered for this tournament that selected this event
     const registrations = await prisma.tournamentRegistration.findMany({
       where: {
-        tournamentId: params.tournamentId,
+        tournamentId: resolvedParams.tournamentId,
         status: 'CONFIRMED',
         eventSelections: {
           some: {
@@ -160,7 +161,7 @@ export async function POST(
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     console.error('Assign tournament tests error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

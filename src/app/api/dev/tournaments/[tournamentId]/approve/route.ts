@@ -7,8 +7,9 @@ import { prisma } from '@/lib/prisma'
 // Allows dev panel users to approve tournaments without requiring tournament admin status
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ tournamentId: string }> | { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -16,7 +17,7 @@ export async function PATCH(
     }
 
     // Handle both sync and async params (Next.js 13 vs 15)
-    const resolvedParams = await Promise.resolve(params)
+
     const tournamentId = resolvedParams.tournamentId
     
     const body = await req.json()

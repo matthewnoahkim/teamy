@@ -31,8 +31,9 @@ async function deleteExistingImage(filePath?: string | null) {
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { membershipId: string } }
+  { params }: { params: Promise<{ membershipId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -40,7 +41,7 @@ export async function PATCH(
     }
 
     const membership = await prisma.membership.findUnique({
-      where: { id: params.membershipId },
+      where: { id: resolvedParams.membershipId },
       include: { preferences: true },
     })
 
@@ -141,7 +142,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }

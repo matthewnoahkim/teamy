@@ -25,19 +25,21 @@ const simpleRegisterSchema = z.object({
 // POST /api/tournaments/[tournamentId]/register
 export async function POST(
   req: NextRequest,
-  { params }: { params: { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { tournamentId } = resolvedParams
     const body = await req.json()
     
     // Verify tournament exists
     const tournament = await prisma.tournament.findUnique({
-      where: { id: params.tournamentId },
+      where: { id: tournamentId },
     })
 
     if (!tournament) {
@@ -66,7 +68,7 @@ export async function POST(
           eventIds: reg.eventIds || [],
         }))
       } else {
-        return NextResponse.json({ error: 'Invalid input', details: simpleResult.error.errors }, { status: 400 })
+        return NextResponse.json({ error: 'Invalid input', details: simpleResult.error.issues }, { status: 400 })
       }
     }
 
@@ -103,7 +105,7 @@ export async function POST(
       // Check if already registered (with same team if specified)
       const existingRegistration = await prisma.tournamentRegistration.findFirst({
         where: {
-          tournamentId: params.tournamentId,
+          tournamentId: resolvedParams.tournamentId,
           clubId: reg.clubId,
           teamId: teamId ?? null,
         },
@@ -150,7 +152,7 @@ export async function POST(
         
         return prisma.tournamentRegistration.create({
           data: {
-            tournamentId: params.tournamentId,
+            tournamentId,
             clubId: reg.clubId,
             teamId: teamId ?? null,
             registeredById: session.user.id,
@@ -197,7 +199,7 @@ export async function POST(
     return NextResponse.json({ registrations })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     console.error('Register for tournament error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -209,4 +211,3 @@ export async function POST(
     }, { status: 500 })
   }
 }
-

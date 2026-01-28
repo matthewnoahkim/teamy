@@ -12,15 +12,14 @@ const tabTrackingSchema = z.object({
 // PATCH /api/es/tests/[testId]/attempts/[attemptId]/tab-tracking
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string; attemptId: string }> | { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const resolvedParams = params instanceof Promise ? await params : params
     const body = await req.json()
     const validatedData = tabTrackingSchema.parse(body)
 
@@ -62,7 +61,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }

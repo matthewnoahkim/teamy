@@ -12,8 +12,9 @@ const rsvpSchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -22,7 +23,7 @@ export async function POST(
 
     const body = await req.json()
     const validated = rsvpSchema.parse(body)
-    const { eventId } = params
+    const { eventId } = resolvedParams
 
     // Get the event to check team membership
     const event = await prisma.calendarEvent.findUnique({
@@ -68,7 +69,7 @@ export async function POST(
     return NextResponse.json({ rsvp })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -80,15 +81,16 @@ export async function POST(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { eventId } = params
+    const { eventId } = resolvedParams
 
     // Get the event to check team membership
     const event = await prisma.calendarEvent.findUnique({

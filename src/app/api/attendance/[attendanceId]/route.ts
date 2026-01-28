@@ -8,15 +8,16 @@ import { requireMember, isAdmin } from '@/lib/rbac'
 // Get single attendance record details
 export async function GET(
   req: NextRequest,
-  { params }: { params: { attendanceId: string } }
+  { params }: { params: Promise<{ attendanceId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { attendanceId } = params
+    const { attendanceId } = resolvedParams
 
     const attendance = await prisma.attendance.findUnique({
       where: { id: attendanceId },
@@ -76,15 +77,16 @@ export async function GET(
 // Delete attendance record only (keeps calendar event and announcement)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { attendanceId: string } }
+  { params }: { params: Promise<{ attendanceId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { attendanceId } = params
+    const { attendanceId } = resolvedParams
 
     // Get the attendance record first to check permissions
     const attendance = await prisma.attendance.findUnique({

@@ -44,13 +44,14 @@ function SettingToggle({ label, enabled, note }: { label: string; enabled: boole
 }
 
 export default async function ESTestSettingsPage({ params }: Props) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) {
     redirect('/es')
   }
 
-  const { testId } = await params
+  const { testId } = resolvedParams
 
   // Find the ES test
   const esTest = await prisma.eSTest.findUnique({
