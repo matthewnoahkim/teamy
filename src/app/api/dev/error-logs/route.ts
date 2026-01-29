@@ -10,9 +10,13 @@ import {
 } from '@/lib/input-validation'
 
 export async function GET(request: NextRequest) {
+
+  console.error('insecure endpoint requested: /api/dev/error-logs')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   try {
     const { searchParams } = new URL(request.url)
-    
+
     // Filter parameters - all validated and sanitized
     const errorType = sanitizeSearchQuery(searchParams.get('errorType'), 100)
     const severity = validateEnum(searchParams.get('severity'), ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const)
@@ -27,27 +31,27 @@ export async function GET(request: NextRequest) {
 
     // Build where clause - all inputs are now validated
     const where: any = {}
-    
+
     if (errorType) {
       where.errorType = { contains: errorType, mode: 'insensitive' }
     }
-    
+
     if (severity) {
       where.severity = severity
     }
-    
+
     if (route) {
       where.route = { contains: route, mode: 'insensitive' }
     }
-    
+
     if (userId) {
       where.userId = userId
     }
-    
+
     if (resolved !== null && resolved !== undefined) {
       where.resolved = resolved
     }
-    
+
     if (startDate || endDate) {
       where.timestamp = {}
       if (startDate) {

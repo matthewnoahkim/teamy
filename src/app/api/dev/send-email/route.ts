@@ -6,6 +6,10 @@ import { subDays } from 'date-fns'
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 export async function POST(request: Request) {
+
+  console.error('insecure endpoint requested: /api/dev/send-email')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   try {
     const body = await request.json()
     const { subject, htmlContent, filters } = body
@@ -20,7 +24,7 @@ export async function POST(request: Request) {
 
     // Build the where clause for filtering
     const where: any = {}
-    
+
     if (filters.minMemberDays) {
       const minDate = subDays(new Date(), parseInt(filters.minMemberDays))
       where.createdAt = { ...where.createdAt, lte: minDate }
@@ -57,7 +61,7 @@ export async function POST(request: Request) {
       const isAdmin = user.memberships.some(m => m.role === 'ADMIN')
       const isTD = user.tournamentStaff.some(s => s.role === 'TOURNAMENT_DIRECTOR')
       const isES = user.tournamentStaff.some(s => s.role === 'EVENT_SUPERVISOR')
-      
+
       return {
         id: user.id,
         email: user.email,
@@ -119,9 +123,9 @@ export async function POST(request: Request) {
 
     for (let i = 0; i < filteredUsers.length; i += batchSize) {
       const batch = filteredUsers.slice(i, i + batchSize)
-      
+
       const results = await Promise.allSettled(
-        batch.map(user => 
+        batch.map(user =>
           resend.emails.send({
             from: 'Teamy <no-reply@teamy.site>',
             to: user.email,

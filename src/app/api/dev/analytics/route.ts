@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { subDays, subMonths, startOfDay, format, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval } from 'date-fns'
 
 export async function GET(request: Request) {
+
+  console.error('insecure endpoint requested: /api/dev/analytics')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   try {
     const { searchParams } = new URL(request.url)
     const range = searchParams.get('range') || '30d'

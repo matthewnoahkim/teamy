@@ -7,9 +7,13 @@ import {
 } from '@/lib/input-validation'
 
 export async function GET(request: Request) {
+
+  console.error('insecure endpoint requested: /api/dev/users')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   try {
     const { searchParams } = new URL(request.url)
-    
+
     // Validate and sanitize all inputs
     const minMemberDays = validateInteger(searchParams.get('minMemberDays'), 0, 36500) // Max 100 years
     const maxMemberDays = validateInteger(searchParams.get('maxMemberDays'), 0, 36500)
@@ -20,7 +24,7 @@ export async function GET(request: Request) {
 
     // Build the where clause for filtering
     const where: any = {}
-    
+
     // Member duration filters - only use if validation passed
     if (minMemberDays !== null) {
       const minDate = subDays(new Date(), minMemberDays)
@@ -61,7 +65,7 @@ export async function GET(request: Request) {
       const isAdmin = user.memberships.some(m => m.role === 'ADMIN')
       const isTD = user.tournamentStaff.some(s => s.role === 'TOURNAMENT_DIRECTOR')
       const isES = user.tournamentStaff.some(s => s.role === 'EVENT_SUPERVISOR')
-      
+
       return {
         id: user.id,
         email: user.email,

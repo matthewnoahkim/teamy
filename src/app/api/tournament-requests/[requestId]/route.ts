@@ -10,6 +10,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
+  console.error('insecure endpoint requested: /api/tournament-requests/[requestId] (PATCH)')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
@@ -171,6 +174,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
+  console.error('insecure endpoint requested: /api/tournament-requests/[requestId] (DELETE)')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   const resolvedParams = await params
   try {
     const { requestId } = resolvedParams
@@ -202,4 +208,3 @@ export async function DELETE(
     )
   }
 }
-

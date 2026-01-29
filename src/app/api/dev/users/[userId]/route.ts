@@ -8,6 +8,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
+  console.error('insecure endpoint requested: /api/dev/users/[userId]')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   const resolvedParams = await params
   try {
     const { userId } = resolvedParams
