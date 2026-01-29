@@ -16,15 +16,16 @@ const updateTodoSchema = z.object({
 // GET /api/todos/[todoId] - Get a single todo
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ todoId: string }> | { todoId: string } }
+  { params }: { params: Promise<{ todoId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const { todoId } = resolvedParams
 
     const todo = await prisma.todo.findUnique({
@@ -82,15 +83,16 @@ export async function GET(
 // PATCH /api/todos/[todoId] - Update a todo
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ todoId: string }> | { todoId: string } }
+  { params }: { params: Promise<{ todoId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const { todoId } = resolvedParams
 
     const todo = await prisma.todo.findUnique({
@@ -167,7 +169,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }
@@ -182,15 +184,16 @@ export async function PATCH(
 // DELETE /api/todos/[todoId] - Delete a todo
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ todoId: string }> | { todoId: string } }
+  { params }: { params: Promise<{ todoId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const { todoId } = resolvedParams
 
     const todo = await prisma.todo.findUnique({

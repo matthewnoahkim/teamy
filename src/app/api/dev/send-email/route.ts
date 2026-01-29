@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { subDays } from 'date-fns'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 export async function POST(request: Request) {
 
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Subject and content are required' }, { status: 400 })
     }
 
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500 })
     }
 
@@ -162,4 +162,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to send emails' }, { status: 500 })
   }
 }
-

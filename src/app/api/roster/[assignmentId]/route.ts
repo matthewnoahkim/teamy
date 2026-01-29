@@ -6,8 +6,9 @@ import { requireAdmin } from '@/lib/rbac'
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { assignmentId: string } }
+  { params }: { params: Promise<{ assignmentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -15,7 +16,7 @@ export async function DELETE(
     }
 
     const assignment = await prisma.rosterAssignment.findUnique({
-      where: { id: params.assignmentId },
+      where: { id: resolvedParams.assignmentId },
       include: {
         team: {
           include: {
@@ -32,7 +33,7 @@ export async function DELETE(
     await requireAdmin(session.user.id, assignment.team.club.id)
 
     await prisma.rosterAssignment.delete({
-      where: { id: params.assignmentId },
+      where: { id: resolvedParams.assignmentId },
     })
 
     return NextResponse.json({ success: true })

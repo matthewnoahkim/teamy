@@ -129,32 +129,26 @@ export const grantApplicationSchema = z
       .max(500, 'Address must not exceed 500 characters')
       .transform((val) => sanitizeString(val, 500)),
     clubDivision: z.enum(['B', 'C', 'B&C'], {
-      errorMap: () => ({ message: 'Division must be B, C, or B&C' }),
+      message: 'Division must be B, C, or B&C',
     }),
     numberOfTeams: z
-      .string()
-      .or(z.number())
-      .pipe(z.coerce.number().int().min(1, 'Must have at least 1 team').max(100, 'Number of teams seems unrealistic')),
+      .coerce
+      .number()
+      .int()
+      .min(1, 'Must have at least 1 team')
+      .max(100, 'Number of teams seems unrealistic'),
     yearsParticipating: z
-      .string()
-      .or(z.number())
-      .pipe(
-        z.coerce
-          .number()
-          .int()
-          .min(0, 'Years cannot be negative')
-          .max(100, 'Years in Science Olympiad seems unrealistic')
-      ),
+      .coerce
+      .number()
+      .int()
+      .min(0, 'Years cannot be negative')
+      .max(100, 'Years in Science Olympiad seems unrealistic'),
     grantAmount: z
-      .string()
-      .or(z.number())
-      .pipe(
-        z.coerce
-          .number()
-          .int()
-          .min(1, 'Grant amount must be at least $1')
-          .max(100000, 'Grant amount exceeds maximum limit')
-      ),
+      .coerce
+      .number()
+      .int()
+      .min(1, 'Grant amount must be at least $1')
+      .max(100000, 'Grant amount exceeds maximum limit'),
     
     // Long-form answers
     clubDescription: textContentSchema(10000),
@@ -167,7 +161,7 @@ export const grantApplicationSchema = z
     
     // Contact Information
     contactRole: z.enum(['officer', 'coach'], {
-      errorMap: () => ({ message: 'Contact role must be officer or coach' }),
+      message: 'Contact role must be officer or coach',
     }),
     applicantName: nameSchema,
     applicantEmail: emailSchema,
@@ -210,13 +204,13 @@ export const tournamentRequestSchema = z
       .max(200, 'Tournament name must not exceed 200 characters')
       .transform((val) => sanitizeString(val, 200)),
     tournamentLevel: z.enum(['invitational', 'regional', 'state', 'national'], {
-      errorMap: () => ({ message: 'Invalid tournament level' }),
+      message: 'Invalid tournament level',
     }),
     division: z.enum(['B', 'C', 'B&C'], {
-      errorMap: () => ({ message: 'Division must be B, C, or B&C' }),
+      message: 'Division must be B, C, or B&C',
     }),
     tournamentFormat: z.enum(['in-person', 'satellite', 'mini-so'], {
-      errorMap: () => ({ message: 'Invalid tournament format' }),
+      message: 'Invalid tournament format',
     }),
     location: z
       .string()
@@ -314,7 +308,7 @@ export function validateRequestBody<T extends z.ZodType>(
     }
     
     // Format Zod errors into user-friendly messages
-    const errors = result.error.errors.map((err) => ({
+    const errors = result.error.issues.map((err) => ({
       field: err.path.join('.'),
       message: err.message,
     }))

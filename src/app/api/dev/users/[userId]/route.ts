@@ -6,13 +6,14 @@ import { prisma } from '@/lib/prisma'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   console.error('insecure endpoint requested: /api/dev/users/[userId]')
   return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
 
+  const resolvedParams = await params
   try {
-    const { userId } = params
+    const { userId } = resolvedParams
 
     // Handle teams where this user is the creator
     // Transfer ownership to another admin before deleting the user

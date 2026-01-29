@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resendApiKey = process.env.RESEND_API_KEY
+const resend = resendApiKey ? new Resend(resendApiKey) : null
 
 /**
  * Get the base URL for the app.
@@ -50,7 +51,7 @@ export async function sendStaffInviteEmail({
   events = [],
 }: StaffInviteEmailParams): Promise<{ messageId: string | null }> {
   try {
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       console.error('RESEND_API_KEY is not configured')
       return { messageId: null }
     }
@@ -227,7 +228,7 @@ export async function sendAnnouncementEmail({
 }: SendAnnouncementEmailParams): Promise<{ messageId: string | null }> {
   try {
     // Validate we have the API key
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       console.error('RESEND_API_KEY is not configured')
       return { messageId: null }
     }
@@ -276,7 +277,7 @@ export async function sendAnnouncementEmail({
       to,
       cc,
       bcc,
-      reply_to: replyTo,
+      replyTo,
       subject: `[${clubName}] ${title}`,
       html: `
         <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

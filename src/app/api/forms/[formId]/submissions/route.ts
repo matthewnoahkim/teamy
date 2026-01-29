@@ -19,15 +19,16 @@ const ALLOWED_TYPES = [
 // GET - Get all submissions for a form (admin only)
 export async function GET(
   req: NextRequest,
-  { params }: { params: { formId: string } }
+  { params }: { params: Promise<{ formId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const formId = params.formId
+    const formId = resolvedParams.formId
 
     // Find the form
     const form = await prisma.form.findUnique({
@@ -99,15 +100,16 @@ export async function GET(
 // POST - Submit a signed form
 export async function POST(
   req: NextRequest,
-  { params }: { params: { formId: string } }
+  { params }: { params: Promise<{ formId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const formId = params.formId
+    const formId = resolvedParams.formId
     const formData = await req.formData()
     const file = formData.get('file') as File
     const notes = formData.get('notes') as string | null

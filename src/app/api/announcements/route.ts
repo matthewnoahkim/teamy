@@ -299,11 +299,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ announcement: fullAnnouncement })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('Announcement validation error:', error.errors)
+      console.error('Announcement validation error:', error.issues)
       return NextResponse.json({ 
         error: 'Invalid announcement data', 
         message: 'Please check all required fields',
-        details: error.errors 
+        details: error.issues 
       }, { status: 400 })
     }
     if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {

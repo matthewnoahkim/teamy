@@ -7,8 +7,9 @@ import { NewTestBuilder } from '@/components/tests/new-test-builder'
 export default async function NewTestPage({
   params,
 }: {
-  params: { clubId: string }
+  params: Promise<{ clubId: string }>
 }) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.id) {
@@ -19,7 +20,7 @@ export default async function NewTestPage({
     where: {
       userId_clubId: {
         userId: session.user.id,
-        clubId: params.clubId,
+        clubId: resolvedParams.clubId,
       },
     },
     select: {
@@ -29,11 +30,11 @@ export default async function NewTestPage({
   })
 
   if (!membership || String(membership.role) !== 'ADMIN') {
-    redirect(`/club/${params.clubId}?tab=tests`)
+    redirect(`/club/${resolvedParams.clubId}?tab=tests`)
   }
 
   const club = await prisma.club.findUnique({
-    where: { id: params.clubId },
+    where: { id: resolvedParams.clubId },
     select: {
       id: true,
       name: true,

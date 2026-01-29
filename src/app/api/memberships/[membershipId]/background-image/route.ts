@@ -49,15 +49,16 @@ async function deleteExistingFile(filePath?: string | null) {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { membershipId: string } }
+  { params }: { params: Promise<{ membershipId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const access = await ensureAccess(session.user.id, params.membershipId)
+    const access = await ensureAccess(session.user.id, resolvedParams.membershipId)
     if (access.error) return access.error
     const membership = access.membership!
 
@@ -124,15 +125,16 @@ export async function POST(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { membershipId: string } }
+  { params }: { params: Promise<{ membershipId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const access = await ensureAccess(session.user.id, params.membershipId)
+    const access = await ensureAccess(session.user.id, resolvedParams.membershipId)
     if (access.error) return access.error
     const membership = access.membership!
 

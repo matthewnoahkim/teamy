@@ -27,15 +27,15 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
 export default async function NewTournamentTestPage({
   params,
 }: {
-  params: Promise<{ param: string }> | { param: string }
+  params: Promise<{ param: string }>
 }) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.id) {
     redirect('/login')
   }
 
-  const resolvedParams = params instanceof Promise ? await params : params
   const tournamentId = resolvedParams.param
 
   // Check if user is tournament admin

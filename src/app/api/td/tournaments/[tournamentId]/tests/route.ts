@@ -8,18 +8,15 @@ import { hasESAccess } from '@/lib/rbac'
 // Get all ES tests for a tournament, organized by event
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ tournamentId: string }> | { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
+  const tournamentId = resolvedParams.tournamentId
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    // Resolve params if it's a Promise (Next.js 15 compatibility)
-    // In Next.js 15, params is always a Promise, but we handle both for compatibility
-    const resolvedParams = await Promise.resolve(params)
-    const tournamentId = resolvedParams.tournamentId
 
     if (!tournamentId) {
       console.error('Missing tournamentId in params:', resolvedParams)
@@ -461,13 +458,10 @@ export async function GET(
     console.error('Error fetching TD tournament tests:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorStack = error instanceof Error ? error.stack : undefined
-    // tournamentId is in scope here, so we can use it
-    const currentTournamentId = params instanceof Promise ? (await params).tournamentId : params.tournamentId
-    console.error('Error details:', { errorMessage, errorStack, tournamentId: currentTournamentId })
+    console.error('Error details:', { errorMessage, errorStack, tournamentId })
     return NextResponse.json({ 
       error: 'Failed to fetch tests',
       details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
     }, { status: 500 })
   }
 }
-

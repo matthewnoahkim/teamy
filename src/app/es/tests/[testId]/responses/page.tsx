@@ -13,13 +13,14 @@ interface Props {
 }
 
 export default async function ESTestResponsesPage({ params }: Props) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) {
     redirect('/es')
   }
 
-  const { testId } = await params
+  const { testId } = resolvedParams
 
   // Find the ES test
   // Use select to avoid fields that might not exist yet (if migration hasn't run)

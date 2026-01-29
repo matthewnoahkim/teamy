@@ -33,8 +33,9 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
 // PATCH - Review note sheet (accept or reject) for tournament tests
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string; noteSheetId: string }> | { testId: string; noteSheetId: string } }
+  { params }: { params: Promise<{ testId: string; noteSheetId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -42,7 +43,6 @@ export async function PATCH(
     }
 
     // Resolve params if it's a Promise (Next.js 15 compatibility)
-    const resolvedParams = params instanceof Promise ? await params : params
     const { testId, noteSheetId } = resolvedParams
 
     const body = await req.json()
@@ -180,7 +180,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }

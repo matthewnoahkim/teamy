@@ -26,16 +26,14 @@ const updateRegistrationSchema = z.object({
 // PATCH /api/tournaments/[tournamentId]/register/[registrationId]
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ tournamentId: string; registrationId: string }> | { tournamentId: string; registrationId: string } }
+  { params }: { params: Promise<{ tournamentId: string; registrationId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    // Resolve params if it's a Promise
-    const resolvedParams = params instanceof Promise ? await params : params
 
     // Check if user is tournament admin
     const userIsAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
@@ -75,7 +73,7 @@ export async function PATCH(
     return NextResponse.json({ registration: updatedRegistration })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     
     // Enhanced error logging
@@ -118,8 +116,9 @@ export async function PATCH(
 // DELETE /api/tournaments/[tournamentId]/register/[registrationId]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { tournamentId: string; registrationId: string } }
+  { params }: { params: Promise<{ tournamentId: string; registrationId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -128,7 +127,7 @@ export async function DELETE(
 
     // Get the registration
     const registration = await prisma.tournamentRegistration.findUnique({
-      where: { id: params.registrationId },
+      where: { id: resolvedParams.registrationId },
       include: {
         team: {
           select: {
@@ -150,7 +149,7 @@ export async function DELETE(
     }
 
     // Verify the registration belongs to the tournament
-    if (registration.tournamentId !== params.tournamentId) {
+    if (registration.tournamentId !== resolvedParams.tournamentId) {
       return NextResponse.json({ error: 'Registration does not belong to this tournament' }, { status: 400 })
     }
 
@@ -168,7 +167,7 @@ export async function DELETE(
 
     // Delete the registration (cascade will handle event selections)
     await prisma.tournamentRegistration.delete({
-      where: { id: params.registrationId },
+      where: { id: resolvedParams.registrationId },
     })
 
     return NextResponse.json({ success: true })
@@ -181,4 +180,3 @@ export async function DELETE(
     }, { status: 500 })
   }
 }
-

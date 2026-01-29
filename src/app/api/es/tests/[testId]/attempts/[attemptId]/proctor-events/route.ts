@@ -3,24 +3,23 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { ProctorEventKind } from '@prisma/client'
+import { ProctorEventKind, Prisma } from '@prisma/client'
 
 const proctorEventSchema = z.object({
   kind: z.nativeEnum(ProctorEventKind),
-  meta: z.record(z.any()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
 })
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string; attemptId: string }> | { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const resolvedParams = params instanceof Promise ? await params : params
     const body = await req.json()
     const validatedData = proctorEventSchema.parse(body)
 
@@ -54,7 +53,7 @@ export async function POST(
       data: {
         esAttemptId: resolvedParams.attemptId,
         kind: validatedData.kind,
-        meta: validatedData.meta || undefined,
+        meta: validatedData.meta ? (validatedData.meta as Prisma.InputJsonValue) : undefined,
       },
     })
 
@@ -62,7 +61,7 @@ export async function POST(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }
@@ -70,4 +69,3 @@ export async function POST(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

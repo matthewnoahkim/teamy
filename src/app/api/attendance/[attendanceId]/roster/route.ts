@@ -8,15 +8,16 @@ import { requireAdmin } from '@/lib/rbac'
 // Get full attendance roster (admins only)
 export async function GET(
   req: NextRequest,
-  { params }: { params: { attendanceId: string } }
+  { params }: { params: Promise<{ attendanceId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { attendanceId } = params
+    const { attendanceId } = resolvedParams
 
     const attendance = await prisma.attendance.findUnique({
       where: { id: attendanceId },

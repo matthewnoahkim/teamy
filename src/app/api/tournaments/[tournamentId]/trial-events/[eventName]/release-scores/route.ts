@@ -11,15 +11,16 @@ export const dynamic = 'force-dynamic'
 // Release scores for all published tests in a specific trial event (tournament director/admin only)
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ tournamentId: string; eventName: string }> | { tournamentId: string; eventName: string } }
+  { params }: { params: Promise<{ tournamentId: string; eventName: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const { tournamentId, eventName } = resolvedParams
     const decodedEventName = decodeURIComponent(eventName)
 

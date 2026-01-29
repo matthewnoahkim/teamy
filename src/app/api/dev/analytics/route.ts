@@ -13,33 +13,33 @@ export async function GET(request: Request) {
 
     // Calculate date range
     let startDate: Date
-    let intervalFn: typeof eachDayOfInterval | typeof eachWeekOfInterval | typeof eachMonthOfInterval
     let dateFormat: string
+    let intervals: Date[]
 
     switch (range) {
       case '7d':
         startDate = subDays(new Date(), 7)
-        intervalFn = eachDayOfInterval
+        intervals = eachDayOfInterval({ start: startDate, end: new Date() })
         dateFormat = 'MMM d'
         break
       case '30d':
         startDate = subDays(new Date(), 30)
-        intervalFn = eachDayOfInterval
+        intervals = eachDayOfInterval({ start: startDate, end: new Date() })
         dateFormat = 'MMM d'
         break
       case '90d':
         startDate = subDays(new Date(), 90)
-        intervalFn = eachWeekOfInterval
+        intervals = eachWeekOfInterval({ start: startDate, end: new Date() })
         dateFormat = 'MMM d'
         break
       case '1y':
         startDate = subMonths(new Date(), 12)
-        intervalFn = eachMonthOfInterval
+        intervals = eachMonthOfInterval({ start: startDate, end: new Date() })
         dateFormat = 'MMM yyyy'
         break
       default:
         startDate = subDays(new Date(), 30)
-        intervalFn = eachDayOfInterval
+        intervals = eachDayOfInterval({ start: startDate, end: new Date() })
         dateFormat = 'MMM d'
     }
 
@@ -95,7 +95,6 @@ export async function GET(request: Request) {
     })
 
     // Build growth data with cumulative
-    const intervals = intervalFn({ start: startDate, end: new Date() })
     let cumulative = usersBeforeStart
     const userGrowth = intervals.map(date => {
       const dateKey = format(date, 'yyyy-MM-dd')
@@ -235,4 +234,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 })
   }
 }
-

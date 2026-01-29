@@ -59,7 +59,7 @@ async function getLoggedInUserRedirect(userId: string): Promise<string> {
     }
 
     // Try to get last visited club from cookie
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const lastClubId = cookieStore.get('lastVisitedClub')?.value
 
     // If there's a last visited club and user is still a member, redirect there

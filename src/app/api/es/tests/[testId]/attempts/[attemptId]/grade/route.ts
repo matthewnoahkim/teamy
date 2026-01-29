@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { Decimal } from '@prisma/client/runtime/library'
+import { Prisma } from '@prisma/client'
 
 const gradeAnswerSchema = z.object({
   answerId: z.string(),
@@ -26,15 +26,16 @@ async function hasESGradingAccess(userId: string, userEmail: string, testId: str
 // Grade FRQ answers for an ES test attempt
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string; attemptId: string }> | { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const body = await req.json()
     const validatedData = gradeAttemptSchema.parse(body)
 
@@ -91,7 +92,7 @@ export async function PATCH(
         await tx.eSTestAttemptAnswer.update({
           where: { id: grade.answerId },
           data: {
-            pointsAwarded: new Decimal(grade.pointsAwarded),
+            pointsAwarded: new Prisma.Decimal(grade.pointsAwarded),
             graderNote: grade.graderNote || null,
             gradedAt: new Date(),
           },
@@ -119,7 +120,7 @@ export async function PATCH(
       await tx.eSTestAttempt.update({
         where: { id: resolvedParams.attemptId },
         data: {
-          gradeEarned: new Decimal(totalEarned),
+          gradeEarned: new Prisma.Decimal(totalEarned),
           status: allGraded ? 'GRADED' : 'SUBMITTED',
         },
       })
@@ -148,7 +149,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }
@@ -159,7 +160,6 @@ export async function PATCH(
     )
   }
 }
-
 
 
 

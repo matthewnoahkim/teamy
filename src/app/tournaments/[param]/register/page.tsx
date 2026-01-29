@@ -5,12 +5,13 @@ import { prisma } from '@/lib/prisma'
 import { TournamentRegistrationClient } from '@/components/tournament-registration-client'
 
 interface PageProps {
-  params: { param: string }
+  params: Promise<{ param: string }>
 }
 
 export default async function TournamentRegistrationPage({ params }: PageProps) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
-  const { param } = params
+  const { param } = resolvedParams
 
   // Find tournament by slug or ID
   let tournament = await prisma.tournament.findFirst({
@@ -211,4 +212,3 @@ export default async function TournamentRegistrationPage({ params }: PageProps) 
     />
   )
 }
-

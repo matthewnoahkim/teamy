@@ -12,8 +12,9 @@ import { AlertCircle, ArrowLeft } from 'lucide-react'
 export default async function TakeTestPage({
   params,
 }: {
-  params: { clubId: string; testId: string }
+  params: Promise<{ clubId: string; testId: string }>
 }) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.id) {
@@ -22,8 +23,8 @@ export default async function TakeTestPage({
 
   const test = await prisma.test.findFirst({
     where: {
-      id: params.testId,
-      clubId: params.clubId,
+      id: resolvedParams.testId,
+      clubId: resolvedParams.clubId,
     },
     select: {
       id: true,
@@ -231,31 +232,31 @@ export default async function TakeTestPage({
     }
   } else {
     // Regular club test - use existing logic
-    membership = await getUserMembership(session.user.id, params.clubId)
+    membership = await getUserMembership(session.user.id, resolvedParams.clubId)
     if (!membership) {
       redirect('/no-clubs')
     }
 
-    isAdminUser = await isAdmin(session.user.id, params.clubId)
+    isAdminUser = await isAdmin(session.user.id, resolvedParams.clubId)
 
     // Admins can take any test, but members need proper access
     if (!isAdminUser) {
       // Check if test is published
       if (test.status !== 'PUBLISHED') {
-        redirect(`/club/${params.clubId}?tab=tests`)
+        redirect(`/club/${resolvedParams.clubId}?tab=tests`)
       }
 
       // Check if test is available (scheduling)
       const availability = isTestAvailable(test)
       if (!availability.available) {
-        redirect(`/club/${params.clubId}?tab=tests`)
+        redirect(`/club/${resolvedParams.clubId}?tab=tests`)
       }
 
       // Get user's event assignments from roster for event-based test access
       const userEventAssignments = await prisma.rosterAssignment.findMany({
         where: {
           membershipId: membership.id,
-          team: { clubId: params.clubId },
+          team: { clubId: resolvedParams.clubId },
         },
         select: { eventId: true },
       })
@@ -264,7 +265,7 @@ export default async function TakeTestPage({
       // Check assignment - must match logic in API routes
       // If test has no assignments, user cannot access it
       if (test.assignments.length === 0) {
-        redirect(`/club/${params.clubId}?tab=tests`)
+        redirect(`/club/${resolvedParams.clubId}?tab=tests`)
       }
 
       hasAccess = test.assignments.some(
@@ -280,7 +281,7 @@ export default async function TakeTestPage({
       )
 
       if (!hasAccess) {
-        redirect(`/club/${params.clubId}?tab=tests`)
+        redirect(`/club/${resolvedParams.clubId}?tab=tests`)
       }
     } else {
       hasAccess = true
@@ -328,7 +329,7 @@ export default async function TakeTestPage({
     if (completedAttempts >= test.maxAttempts) {
       const redirectPath = tournamentTest 
         ? '/testing' 
-        : `/club/${params.clubId}?tab=tests`
+        : `/club/${resolvedParams.clubId}?tab=tests`
       
       return (
         <div className="min-h-screen flex items-center justify-center px-4 py-12 grid-pattern">

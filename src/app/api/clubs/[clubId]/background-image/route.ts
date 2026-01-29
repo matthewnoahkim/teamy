@@ -14,8 +14,9 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'
 // POST - Upload background image
 export async function POST(
   req: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -23,7 +24,7 @@ export async function POST(
     }
 
     // Only admins can upload background images
-    await requireAdmin(session.user.id, params.clubId)
+    await requireAdmin(session.user.id, resolvedParams.clubId)
 
     const formData = await req.formData()
     const file = formData.get('file') as File
@@ -50,7 +51,7 @@ export async function POST(
 
     // Verify club exists
     const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
     })
 
     if (!club) {
@@ -92,14 +93,14 @@ export async function POST(
 
     // Update club with new background image URL
     await prisma.club.update({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
       data: {
         backgroundImageUrl: imageUrl,
         backgroundType: 'image',
       },
     })
 
-    revalidatePath(`/club/${params.clubId}`)
+    revalidatePath(`/club/${resolvedParams.clubId}`)
 
     return NextResponse.json({ imageUrl })
   } catch (error) {
@@ -114,8 +115,9 @@ export async function POST(
 // DELETE - Delete background image
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -123,11 +125,11 @@ export async function DELETE(
     }
 
     // Only admins can delete background images
-    await requireAdmin(session.user.id, params.clubId)
+    await requireAdmin(session.user.id, resolvedParams.clubId)
 
     // Get club to find the image URL
     const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
     })
 
     if (!club) {
@@ -149,14 +151,14 @@ export async function DELETE(
 
     // Update club to remove background image
     await prisma.club.update({
-      where: { id: params.clubId },
+      where: { id: resolvedParams.clubId },
       data: {
         backgroundImageUrl: null,
         backgroundType: 'image', // Keep image type selected for future uploads
       },
     })
 
-    revalidatePath(`/club/${params.clubId}`)
+    revalidatePath(`/club/${resolvedParams.clubId}`)
 
     return NextResponse.json({ success: true })
   } catch (error) {

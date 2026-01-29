@@ -7,8 +7,9 @@ import { isAdmin, getUserMembership } from '@/lib/rbac'
 // POST /api/tests/[testId]/duplicate
 export async function POST(
   req: NextRequest,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -16,7 +17,7 @@ export async function POST(
     }
 
     const originalTest = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: resolvedParams.testId },
       include: {
         questions: {
           orderBy: { order: 'asc' },

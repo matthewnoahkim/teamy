@@ -12,7 +12,8 @@ import { CalendarScope, AnnouncementScope } from '@prisma/client'
 // Revalidate every 60 seconds in production
 export const revalidate = 60
 
-export default async function ClubDetailPage({ params }: { params: { clubId: string } }) {
+export default async function ClubDetailPage({ params }: { params: Promise<{ clubId: string }> }) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
@@ -24,7 +25,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
     where: {
       userId_clubId: {
         userId: session.user.id,
-        clubId: params.clubId,
+        clubId: resolvedParams.clubId,
       },
     },
     include: {
@@ -56,7 +57,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   const clubs = userClubs.map(m => m.club)
 
   const club = await prisma.club.findUnique({
-    where: { id: params.clubId },
+    where: { id: resolvedParams.clubId },
     include: {
       memberships: {
         include: {
@@ -106,7 +107,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   }
 
   // Check if user is admin (needed for filtering)
-  const isAdminUser = await isAdmin(session.user.id, params.clubId)
+  const isAdminUser = await isAdmin(session.user.id, resolvedParams.clubId)
 
   // Fetch only critical data for initial page render (homepage tab + finance tab)
   // Other tab data (gallery, paperwork, todos, stats) is fetched on-demand when tabs are clicked for faster initial load
@@ -114,7 +115,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   const [attendances, expenses, purchaseRequests, eventBudgets] = await Promise.all([
     // Attendance data
     prisma.attendance.findMany({
-      where: { calendarEvent: { clubId: params.clubId } },
+      where: { calendarEvent: { clubId: resolvedParams.clubId } },
       include: {
         calendarEvent: {
           include: {
@@ -147,7 +148,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
     }),
     // Expenses data
     prisma.expense.findMany({
-      where: { clubId: params.clubId },
+      where: { clubId: resolvedParams.clubId },
       include: {
         event: {
           select: {
@@ -176,7 +177,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
     }),
     // Purchase requests data
     prisma.purchaseRequest.findMany({
-      where: { clubId: params.clubId },
+      where: { clubId: resolvedParams.clubId },
       include: {
         event: {
           select: {
@@ -205,7 +206,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
     }),
     // Event budgets data
     prisma.eventBudget.findMany({
-      where: { clubId: params.clubId },
+      where: { clubId: resolvedParams.clubId },
       include: {
         event: {
           select: {
@@ -230,7 +231,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
     eventBudgets.map(async (budget) => {
       const totalSpent = await prisma.expense.aggregate({
         where: {
-          clubId: params.clubId,
+          clubId: resolvedParams.clubId,
           eventId: budget.eventId,
           ...(budget.teamId && {
             addedBy: {
@@ -245,7 +246,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
 
       const totalRequested = await prisma.purchaseRequest.aggregate({
         where: {
-          clubId: params.clubId,
+          clubId: resolvedParams.clubId,
           eventId: budget.eventId,
           status: 'PENDING',
           ...(budget.teamId && {
@@ -275,7 +276,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   const userRosterAssignments = await prisma.rosterAssignment.findMany({
     where: {
       membershipId: membership.id,
-      team: { clubId: params.clubId },
+      team: { clubId: resolvedParams.clubId },
     },
     select: { 
       eventId: true,
@@ -288,7 +289,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   // Get events visible to this user (simplified version for homepage)
   const calendarEvents = await prisma.calendarEvent.findMany({
     where: {
-      clubId: params.clubId,
+      clubId: resolvedParams.clubId,
       OR: [
         // Club-wide events
         { scope: CalendarScope.CLUB },
@@ -384,7 +385,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   // Fetch announcements for homepage (with proper filtering)
   const announcements = await prisma.announcement.findMany({
     where: {
-      clubId: params.clubId,
+      clubId: resolvedParams.clubId,
       // Admins see all announcements for the club
       ...(isAdminUser ? {} : {
         OR: [
@@ -515,7 +516,7 @@ export default async function ClubDetailPage({ params }: { params: { clubId: str
   // Fetch tests for homepage (with proper filtering)
   const allTests = await prisma.test.findMany({
     where: {
-      clubId: params.clubId,
+      clubId: resolvedParams.clubId,
       // Non-admins only see published tests
       ...(!isAdminUser && { status: 'PUBLISHED' }),
     },

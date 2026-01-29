@@ -25,15 +25,16 @@ const updateDefaultTestSettingsSchema = z.object({
 // Get default test settings for a tournament
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ tournamentId: string }> | { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const tournamentId = resolvedParams.tournamentId
 
     if (!tournamentId) {
@@ -95,15 +96,16 @@ export async function GET(
 // Update default test settings for a tournament
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ tournamentId: string }> | { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const resolvedParams = await Promise.resolve(params)
+
     const tournamentId = resolvedParams.tournamentId
 
     if (!tournamentId) {
@@ -213,7 +215,7 @@ export async function PATCH(
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     console.error('Error updating default test settings:', error)
     return NextResponse.json({ error: 'Failed to update default test settings' }, { status: 500 })

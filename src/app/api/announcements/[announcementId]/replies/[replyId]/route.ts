@@ -6,15 +6,16 @@ import { requireMember, getUserMembership } from '@/lib/rbac'
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { announcementId: string; replyId: string } }
+  { params }: { params: Promise<{ announcementId: string; replyId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { announcementId, replyId } = params
+    const { announcementId, replyId } = resolvedParams
 
     // Verify announcement exists and get its clubId
     const announcement = await prisma.announcement.findUnique({
