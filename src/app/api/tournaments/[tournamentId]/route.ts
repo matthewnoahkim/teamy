@@ -38,6 +38,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { tournamentId: string } }
 ) {
+  console.error('insecure endpoint requested: /api/tournaments/[tournamentId] (GET)')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -258,4 +261,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

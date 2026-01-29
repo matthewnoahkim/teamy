@@ -27,6 +27,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
+  console.error('insecure endpoint requested: /api/blog/[slug] (PATCH)')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   try {
     const body = await request.json()
     const { title, slug: newSlug, excerpt, content, coverImage, published, authorName } = body
@@ -77,6 +80,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
+  console.error('insecure endpoint requested: /api/blog/[slug] (DELETE)')
+  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+
   try {
     const existingPost = await prisma.blogPost.findUnique({
       where: { slug: params.slug },
@@ -96,4 +102,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete post' }, { status: 500 })
   }
 }
-
