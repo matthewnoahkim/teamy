@@ -13,15 +13,16 @@ const updateSubmissionSchema = z.object({
 // PATCH - Update submission status (admin only)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { submissionId: string } }
+  { params }: { params: Promise<{ submissionId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const submissionId = params.submissionId
+    const submissionId = resolvedParams.submissionId
     const body = await req.json()
     const validated = updateSubmissionSchema.parse(body)
 
@@ -70,7 +71,7 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ 
         error: 'Invalid data', 
-        details: error.errors 
+        details: error.issues 
       }, { status: 400 })
     }
     console.error('Update submission error:', error)

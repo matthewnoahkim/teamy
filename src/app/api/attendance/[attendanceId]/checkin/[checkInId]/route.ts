@@ -8,15 +8,16 @@ import { requireAdmin } from '@/lib/rbac'
 // Delete a check-in (admins only)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { attendanceId: string; checkInId: string } }
+  { params }: { params: Promise<{ attendanceId: string; checkInId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { attendanceId, checkInId } = params
+    const { attendanceId, checkInId } = resolvedParams
 
     // Get the attendance record to verify team
     const attendance = await prisma.attendance.findUnique({

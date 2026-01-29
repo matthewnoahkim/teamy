@@ -18,8 +18,9 @@ const updateExpenseSchema = z.object({
 // PATCH /api/expenses/[expenseId]
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { expenseId: string } }
+  { params }: { params: Promise<{ expenseId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -31,7 +32,7 @@ export async function PATCH(
 
     // Get the expense to check team
     const expense = await prisma.expense.findUnique({
-      where: { id: params.expenseId },
+      where: { id: resolvedParams.expenseId },
     })
 
     if (!expense) {
@@ -57,7 +58,7 @@ export async function PATCH(
     if (validatedData.notes !== undefined) updateData.notes = validatedData.notes
 
     const updatedExpense = await prisma.expense.update({
-      where: { id: params.expenseId },
+      where: { id: resolvedParams.expenseId },
       data: updateData,
       include: {
         event: {
@@ -81,7 +82,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }
@@ -93,8 +94,9 @@ export async function PATCH(
 // DELETE /api/expenses/[expenseId]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { expenseId: string } }
+  { params }: { params: Promise<{ expenseId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -103,7 +105,7 @@ export async function DELETE(
 
     // Get the expense to check team
     const expense = await prisma.expense.findUnique({
-      where: { id: params.expenseId },
+      where: { id: resolvedParams.expenseId },
     })
 
     if (!expense) {
@@ -121,7 +123,7 @@ export async function DELETE(
 
     await prisma.$transaction(async (tx) => {
       await tx.expense.delete({
-        where: { id: params.expenseId },
+        where: { id: resolvedParams.expenseId },
       })
 
       if (expense.purchaseRequestId) {

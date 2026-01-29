@@ -11,7 +11,7 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { cookies } from 'next/headers'
 
 interface Props {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }
 
 async function getLoggedInUserRedirect(userId: string) {
@@ -27,7 +27,7 @@ async function getLoggedInUserRedirect(userId: string) {
   }
 
   // Check for last visited club cookie
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const lastVisitedClub = cookieStore.get('lastVisitedClub')?.value
 
   if (lastVisitedClub) {
@@ -43,6 +43,7 @@ async function getLoggedInUserRedirect(userId: string) {
 }
 
 export default async function BlogPostPage({ params }: Props) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
   const isLoggedIn = !!session?.user
   
@@ -52,7 +53,7 @@ export default async function BlogPostPage({ params }: Props) {
     : '/login'
 
   const post = await prisma.blogPost.findUnique({
-    where: { slug: params.slug },
+    where: { slug: resolvedParams.slug },
   })
 
   if (!post || !post.published) {

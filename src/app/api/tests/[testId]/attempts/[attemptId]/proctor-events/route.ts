@@ -3,28 +3,30 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { ProctorEventKind } from '@prisma/client'
+import { ProctorEventKind, Prisma } from '@prisma/client'
 
 const proctorEventSchema = z.object({
   kind: z.nativeEnum(ProctorEventKind),
-  meta: z.record(z.any()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
 })
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+
     const body = await req.json()
     const validatedData = proctorEventSchema.parse(body)
 
     const attempt = await prisma.testAttempt.findUnique({
-      where: { id: params.attemptId },
+      where: { id: resolvedParams.attemptId },
       select: { membershipId: true, testId: true },
     })
 
@@ -38,7 +40,7 @@ export async function POST(
         club: {
           tests: {
             some: {
-              id: params.testId,
+              id: resolvedParams.testId,
             },
           },
         },
@@ -51,9 +53,9 @@ export async function POST(
 
     const proctorEvent = await prisma.proctorEvent.create({
       data: {
-        attemptId: params.attemptId,
+        attemptId: resolvedParams.attemptId,
         kind: validatedData.kind,
-        meta: validatedData.meta || undefined,
+        meta: validatedData.meta ? (validatedData.meta as Prisma.InputJsonValue) : undefined,
       },
     })
 
@@ -61,7 +63,7 @@ export async function POST(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }

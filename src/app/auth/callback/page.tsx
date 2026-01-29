@@ -17,7 +17,7 @@ async function getDefaultRedirect(userId: string) {
   }
 
   // Check for last visited club cookie
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const lastVisitedClub = cookieStore.get('lastVisitedClub')?.value
 
   if (lastVisitedClub) {

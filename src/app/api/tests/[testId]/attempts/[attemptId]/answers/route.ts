@@ -16,8 +16,9 @@ const saveAnswerSchema = z.object({
 // POST /api/tests/[testId]/attempts/[attemptId]/answers
 export async function POST(
   req: NextRequest,
-  { params }: { params: { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -29,7 +30,7 @@ export async function POST(
 
     // Try to find as TestAttempt first
     let attempt = await prisma.testAttempt.findUnique({
-      where: { id: params.attemptId },
+      where: { id: resolvedParams.attemptId },
       include: {
         test: true,
       },
@@ -49,7 +50,7 @@ export async function POST(
       const question = await prisma.question.findFirst({
         where: {
           id: validatedData.questionId,
-          testId: params.testId,
+          testId: resolvedParams.testId,
         },
       })
 
@@ -78,13 +79,13 @@ export async function POST(
       const answer = await prisma.attemptAnswer.upsert({
         where: {
           attemptId_questionId: {
-            attemptId: params.attemptId,
+            attemptId: resolvedParams.attemptId,
             questionId: validatedData.questionId,
           },
         },
         update: updateData,
         create: {
-          attemptId: params.attemptId,
+          attemptId: resolvedParams.attemptId,
           questionId: validatedData.questionId,
           answerText: validatedData.answerText,
           selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
@@ -97,7 +98,7 @@ export async function POST(
     } else {
       // Try to find as ESTestAttempt
       const esAttempt = await prisma.eSTestAttempt.findUnique({
-        where: { id: params.attemptId },
+        where: { id: resolvedParams.attemptId },
         include: {
           test: {
             include: {
@@ -158,7 +159,7 @@ export async function POST(
       const esQuestion = await prisma.eSTestQuestion.findFirst({
         where: {
           id: validatedData.questionId,
-          testId: params.testId,
+          testId: resolvedParams.testId,
         },
       })
 
@@ -180,13 +181,13 @@ export async function POST(
       const answer = await prisma.eSTestAttemptAnswer.upsert({
         where: {
           attemptId_questionId: {
-            attemptId: params.attemptId,
+            attemptId: resolvedParams.attemptId,
             questionId: validatedData.questionId,
           },
         },
         update: updateData,
         create: {
-          attemptId: params.attemptId,
+          attemptId: resolvedParams.attemptId,
           questionId: validatedData.questionId,
           answerText: validatedData.answerText,
           selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
@@ -200,7 +201,7 @@ export async function POST(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }

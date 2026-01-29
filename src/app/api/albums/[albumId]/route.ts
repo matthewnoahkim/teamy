@@ -14,15 +14,16 @@ const updateAlbumSchema = z.object({
 // PATCH - Update album
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { albumId: string } }
+  { params }: { params: Promise<{ albumId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const albumId = params.albumId
+    const { albumId } = await params
     const body = await req.json()
     const validated = updateAlbumSchema.parse(body)
 
@@ -59,9 +60,9 @@ export async function PATCH(
     return NextResponse.json({ album })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ 
-        error: 'Invalid data', 
-        details: error.errors 
+      return NextResponse.json({
+        error: 'Invalid data',
+        details: error.issues
       }, { status: 400 })
     }
     console.error('Update album error:', error)
@@ -72,15 +73,16 @@ export async function PATCH(
 // DELETE - Delete album
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { albumId: string } }
+  { params }: { params: Promise<{ albumId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const albumId = params.albumId
+    const { albumId } = await params
 
     // Find the album
     const existingAlbum = await prisma.album.findUnique({

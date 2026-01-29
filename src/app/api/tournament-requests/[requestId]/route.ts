@@ -8,15 +8,16 @@ import { authOptions } from '@/lib/auth'
 // Any authenticated user can update requests (dev panel access is controlled by the dev panel UI)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { requestId } = params
+    const { requestId } = resolvedParams
     const body = await request.json()
     const { status, reviewNotes } = body
 
@@ -168,10 +169,11 @@ export async function PATCH(
 // DELETE - Delete a tournament hosting request
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
+  const resolvedParams = await params
   try {
-    const { requestId } = params
+    const { requestId } = resolvedParams
 
     // First, find and delete any associated tournament
     const hostingRequest = await prisma.tournamentHostingRequest.findUnique({

@@ -17,15 +17,16 @@ const updateFormSchema = z.object({
 // PATCH - Update form
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { formId: string } }
+  { params }: { params: Promise<{ formId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const formId = params.formId
+    const formId = resolvedParams.formId
     const body = await req.json()
     const validated = updateFormSchema.parse(body)
 
@@ -68,7 +69,7 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ 
         error: 'Invalid data', 
-        details: error.errors 
+        details: error.issues 
       }, { status: 400 })
     }
     console.error('Update form error:', error)
@@ -79,15 +80,16 @@ export async function PATCH(
 // DELETE - Delete form
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { formId: string } }
+  { params }: { params: Promise<{ formId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const formId = params.formId
+    const formId = resolvedParams.formId
 
     // Find the form
     const existingForm = await prisma.form.findUnique({

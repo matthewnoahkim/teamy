@@ -25,8 +25,9 @@ const createQuestionSchema = z.object({
 // POST /api/tests/[testId]/questions
 export async function POST(
   req: NextRequest,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -37,7 +38,7 @@ export async function POST(
     const validatedData = createQuestionSchema.parse(body)
 
     const test = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: resolvedParams.testId },
     })
 
     if (!test) {
@@ -58,7 +59,7 @@ export async function POST(
     const question = await prisma.$transaction(async (tx) => {
       const q = await tx.question.create({
         data: {
-          testId: params.testId,
+          testId: resolvedParams.testId,
           sectionId: validatedData.sectionId,
           type: validatedData.type,
           promptMd: validatedData.promptMd,
@@ -97,7 +98,7 @@ export async function POST(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }

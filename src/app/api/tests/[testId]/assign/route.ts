@@ -17,19 +17,21 @@ const assignSchema = z.object({
 // POST /api/tests/[testId]/assign
 export async function POST(
   req: NextRequest,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { testId } = resolvedParams
     const body = await req.json()
     const validatedData = assignSchema.parse(body)
 
     const test = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: testId },
     })
 
     if (!test) {
@@ -49,13 +51,13 @@ export async function POST(
     await prisma.$transaction(async (tx) => {
       // Delete old assignments
       await tx.testAssignment.deleteMany({
-        where: { testId: params.testId },
+        where: { testId },
       })
 
       // Create new assignments
       await tx.testAssignment.createMany({
         data: validatedData.assignments.map((a) => ({
-          testId: params.testId,
+          testId,
           assignedScope: a.assignedScope,
           teamId: a.teamId,
           targetMembershipId: a.targetMembershipId,
@@ -66,7 +68,7 @@ export async function POST(
 
     // Fetch updated assignments
     const assignments = await prisma.testAssignment.findMany({
-      where: { testId: params.testId },
+      where: { testId },
       include: {
         team: {
           select: {
@@ -81,7 +83,7 @@ export async function POST(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }
@@ -89,4 +91,3 @@ export async function POST(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

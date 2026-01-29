@@ -20,8 +20,9 @@ const updateEventSchema = z.object({
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -30,7 +31,7 @@ export async function PATCH(
 
     // Get the event first to check permissions
     const event = await prisma.calendarEvent.findUnique({
-      where: { id: params.eventId },
+      where: { id: resolvedParams.eventId },
       include: {
         creator: {
           include: {
@@ -91,7 +92,7 @@ export async function PATCH(
       // Check if there's a linked announcement that needs to be deleted
       // This happens when changing from CLUB/TEAM to PERSONAL
       const existingEvent = await tx.calendarEvent.findUnique({
-        where: { id: params.eventId },
+        where: { id: resolvedParams.eventId },
         include: { announcement: true },
       })
 
@@ -108,7 +109,7 @@ export async function PATCH(
       }
 
       const updated = await tx.calendarEvent.update({
-        where: { id: params.eventId },
+        where: { id: resolvedParams.eventId },
         data: updateData,
         include: {
           creator: {
@@ -153,7 +154,7 @@ export async function PATCH(
     return NextResponse.json({ event: updatedEvent })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     console.error('Update calendar event error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -162,8 +163,9 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -172,7 +174,7 @@ export async function DELETE(
 
     // Get the event first to check permissions
     const event = await prisma.calendarEvent.findUnique({
-      where: { id: params.eventId },
+      where: { id: resolvedParams.eventId },
       include: {
         creator: {
           include: {
@@ -218,7 +220,7 @@ export async function DELETE(
 
       // Delete the calendar event
       await tx.calendarEvent.delete({
-        where: { id: params.eventId },
+        where: { id: resolvedParams.eventId },
       })
     })
 

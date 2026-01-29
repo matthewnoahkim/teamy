@@ -1,6 +1,12 @@
+import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient, Division } from '@prisma/client'
 
-const prisma = new PrismaClient()
+const connectionString = process.env.DATABASE_URL
+const adapter = connectionString ? new PrismaPg({ connectionString }) : undefined
+
+const prisma = new PrismaClient({
+  ...(adapter ? { adapter } : {}),
+})
 
 // Division C Events (2026)
 const divisionCEvents = [
@@ -206,4 +212,3 @@ seed()
   .finally(async () => {
     await prisma.$disconnect()
   })
-

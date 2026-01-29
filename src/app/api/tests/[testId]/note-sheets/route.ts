@@ -18,8 +18,9 @@ const createNoteSheetSchema = z.object({
 // POST - Create or upload note sheet
 export async function POST(
   req: NextRequest,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -28,7 +29,7 @@ export async function POST(
 
     // First try to find as regular Test
     let test = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: resolvedParams.testId },
       include: {
         club: true,
         assignments: {
@@ -46,7 +47,7 @@ export async function POST(
     let esTest = null
     if (!test) {
       esTest = await prisma.eSTest.findUnique({
-        where: { id: params.testId },
+        where: { id: resolvedParams.testId },
         include: {
           tournament: {
             select: {
@@ -136,7 +137,7 @@ export async function POST(
         const existingNoteSheet = await prisma.noteSheet.findUnique({
           where: {
             esTestId_membershipId: {
-              esTestId: params.testId,
+              esTestId: resolvedParams.testId,
               membershipId: membership.id,
             },
           },
@@ -174,7 +175,7 @@ export async function POST(
             where: {
               eventId: esTest.eventId,
               tournamentId: esTest.tournamentId,
-              id: { not: params.testId },
+              id: { not: resolvedParams.testId },
               allowNoteSheet: true,
               status: 'PUBLISHED',
             },
@@ -213,7 +214,7 @@ export async function POST(
 
           const noteSheet = await prisma.noteSheet.create({
             data: {
-              esTestId: params.testId,
+              esTestId: resolvedParams.testId,
               membershipId: membership.id,
               type: 'CREATED',
               content,
@@ -240,7 +241,7 @@ export async function POST(
               where: {
                 eventId: esTest.eventId,
                 tournamentId: esTest.tournamentId,
-                id: { not: params.testId },
+                id: { not: resolvedParams.testId },
                 allowNoteSheet: true,
                 status: 'PUBLISHED',
               },
@@ -322,7 +323,7 @@ export async function POST(
 
           const noteSheet = await prisma.noteSheet.create({
             data: {
-              esTestId: params.testId,
+              esTestId: resolvedParams.testId,
               membershipId: membership.id,
               type: 'UPLOADED',
               filePath: `/uploads/note-sheets/${filename}`,
@@ -352,7 +353,7 @@ export async function POST(
               where: {
                 eventId: esTest.eventId,
                 tournamentId: esTest.tournamentId,
-                id: { not: params.testId },
+                id: { not: resolvedParams.testId },
                 allowNoteSheet: true,
                 status: 'PUBLISHED',
               },
@@ -435,7 +436,7 @@ export async function POST(
     const existingNoteSheet = await prisma.noteSheet.findUnique({
       where: {
         testId_membershipId: {
-          testId: params.testId,
+          testId: resolvedParams.testId,
           membershipId: membership.id,
         },
       },
@@ -475,7 +476,7 @@ export async function POST(
       const otherTests = await prisma.test.findMany({
         where: {
           clubId: test.clubId,
-          id: { not: params.testId },
+          id: { not: resolvedParams.testId },
           allowNoteSheet: true,
           status: 'PUBLISHED',
           assignments: {
@@ -519,7 +520,7 @@ export async function POST(
 
           const noteSheet = await prisma.noteSheet.create({
             data: {
-              testId: params.testId, // For regular Test
+              testId: resolvedParams.testId, // For regular Test
               esTestId: null, // Not an ESTest
               membershipId: membership.id,
               type: 'CREATED',
@@ -550,7 +551,7 @@ export async function POST(
             const otherTests = await prisma.test.findMany({
               where: {
                 clubId: test.clubId,
-                id: { not: params.testId },
+                id: { not: resolvedParams.testId },
                 allowNoteSheet: true,
                 status: 'PUBLISHED',
                 assignments: {
@@ -638,7 +639,7 @@ export async function POST(
 
       const noteSheet = await prisma.noteSheet.create({
         data: {
-          testId: params.testId, // For regular Test
+          testId: resolvedParams.testId, // For regular Test
           esTestId: null, // Not an ESTest
           membershipId: membership.id,
           type: 'UPLOADED',
@@ -672,7 +673,7 @@ export async function POST(
             const otherTests = await prisma.test.findMany({
               where: {
                 clubId: test.clubId,
-                id: { not: params.testId },
+                id: { not: resolvedParams.testId },
                 allowNoteSheet: true,
                 status: 'PUBLISHED',
                 assignments: {
@@ -736,8 +737,9 @@ export async function POST(
 // GET - Get user's note sheet for a test
 export async function GET(
   req: NextRequest,
-  { params }: { params: { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -749,7 +751,7 @@ export async function GET(
 
     // First try to find as regular Test
     let test = await prisma.test.findUnique({
-      where: { id: params.testId },
+      where: { id: resolvedParams.testId },
       include: {
         club: true,
       },
@@ -759,7 +761,7 @@ export async function GET(
     let esTest = null
     if (!test) {
       esTest = await prisma.eSTest.findUnique({
-        where: { id: params.testId },
+        where: { id: resolvedParams.testId },
         include: {
           tournament: {
             select: {
@@ -842,7 +844,7 @@ export async function GET(
 
           const noteSheets = await prisma.noteSheet.findMany({
             where: {
-              esTestId: params.testId,
+              esTestId: resolvedParams.testId,
             },
             include: {
               membership: {
@@ -879,7 +881,7 @@ export async function GET(
           const noteSheet = await prisma.noteSheet.findUnique({
             where: {
               esTestId_membershipId: {
-                esTestId: params.testId,
+                esTestId: resolvedParams.testId,
                 membershipId: membership.id,
               },
             },
@@ -926,7 +928,7 @@ export async function GET(
 
       const noteSheets = await prisma.noteSheet.findMany({
         where: {
-          testId: params.testId,
+          testId: resolvedParams.testId,
         },
         include: {
           membership: {
@@ -963,7 +965,7 @@ export async function GET(
       const noteSheet = await prisma.noteSheet.findUnique({
         where: {
           testId_membershipId: {
-            testId: params.testId,
+            testId: resolvedParams.testId,
             membershipId: membership.id,
           },
         },

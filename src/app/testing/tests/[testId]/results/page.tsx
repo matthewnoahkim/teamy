@@ -7,15 +7,15 @@ import { ViewResultsClient } from '@/components/tests/view-results-client'
 export default async function TournamentTestResultsPage({
   params,
 }: {
-  params: Promise<{ testId: string }> | { testId: string }
+  params: Promise<{ testId: string }>
 }) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.id) {
     redirect('/login')
   }
 
-  const resolvedParams = await Promise.resolve(params)
   const testId = resolvedParams.testId
 
   // Find the ESTest (query without new fields that might not exist yet)

@@ -8,8 +8,9 @@ import { isTestAvailable, getClientIp, generateClientFingerprint, verifyTestPass
 // POST /api/tests/[testId]/attempts/start
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string }> | { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -17,7 +18,6 @@ export async function POST(
     }
 
     // Resolve params if it's a Promise (Next.js 15 compatibility)
-    const resolvedParams = params instanceof Promise ? await params : params
     const testId = resolvedParams.testId
 
     const body = await req.json()

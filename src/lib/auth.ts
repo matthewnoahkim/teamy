@@ -4,15 +4,27 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import { prisma } from './prisma'
 import type { Adapter } from 'next-auth/adapters'
 
-export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as Adapter,
-  providers: [
+const googleClientId = process.env.GOOGLE_CLIENT_ID
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET
+
+const providers = []
+if (googleClientId && googleClientSecret) {
+  providers.push(
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
       allowDangerousEmailAccountLinking: true,
-    }),
-  ],
+    })
+  )
+} else if (process.env.NODE_ENV !== 'production') {
+  console.warn('Google OAuth env vars are missing; auth providers are not configured.')
+}
+
+const prismaAdapter = process.env.DATABASE_URL ? (PrismaAdapter(prisma) as Adapter) : undefined
+
+export const authOptions: NextAuthOptions = {
+  adapter: prismaAdapter,
+  providers,
   session: {
     strategy: 'jwt',
   },
@@ -111,4 +123,3 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
   },
 }
-

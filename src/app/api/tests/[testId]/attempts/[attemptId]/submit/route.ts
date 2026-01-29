@@ -14,8 +14,9 @@ const submitSchema = z.object({
 // POST /api/tests/[testId]/attempts/[attemptId]/submit
 export async function POST(
   req: NextRequest,
-  { params }: { params: { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -27,7 +28,7 @@ export async function POST(
 
     // Try to find as TestAttempt first
     let attempt = await prisma.testAttempt.findUnique({
-      where: { id: params.attemptId },
+      where: { id: resolvedParams.attemptId },
       include: {
         test: {
           include: {
@@ -55,7 +56,7 @@ export async function POST(
     } else {
       // Try to find as ESTestAttempt
       const esAttempt = await prisma.eSTestAttempt.findUnique({
-        where: { id: params.attemptId },
+        where: { id: resolvedParams.attemptId },
         include: {
           test: {
             include: {
@@ -179,13 +180,13 @@ export async function POST(
       if (isESTest) {
         // Get current tab tracking values from the attempt
         const esAttemptData = await tx.eSTestAttempt.findUnique({
-          where: { id: params.attemptId },
+          where: { id: resolvedParams.attemptId },
           select: { tabSwitchCount: true, timeOffPageSeconds: true },
         })
         
         // Update ESTestAttempt
         await tx.eSTestAttempt.update({
-          where: { id: params.attemptId },
+          where: { id: resolvedParams.attemptId },
           data: {
             status: gradingResults.some((r) => r.needsManualGrade) ? 'SUBMITTED' : 'GRADED',
             submittedAt: new Date(),
@@ -203,7 +204,7 @@ export async function POST(
           await tx.eSTestAttemptAnswer.upsert({
             where: {
               attemptId_questionId: {
-                attemptId: params.attemptId,
+                attemptId: resolvedParams.attemptId,
                 questionId: result.questionId,
               },
             },
@@ -212,7 +213,7 @@ export async function POST(
               gradedAt: result.needsManualGrade ? null : new Date(),
             },
             create: {
-              attemptId: params.attemptId,
+              attemptId: resolvedParams.attemptId,
               questionId: result.questionId,
               answerText: null,
               selectedOptionIds: undefined,
@@ -225,7 +226,7 @@ export async function POST(
       } else {
         // Update TestAttempt
         await tx.testAttempt.update({
-          where: { id: params.attemptId },
+          where: { id: resolvedParams.attemptId },
           data: {
             status: gradingResults.some((r) => r.needsManualGrade) ? 'SUBMITTED' : 'GRADED',
             submittedAt: new Date(),
@@ -240,7 +241,7 @@ export async function POST(
           await tx.attemptAnswer.upsert({
             where: {
               attemptId_questionId: {
-                attemptId: params.attemptId,
+                attemptId: resolvedParams.attemptId,
                 questionId: result.questionId,
               },
             },
@@ -249,7 +250,7 @@ export async function POST(
               gradedAt: result.needsManualGrade ? null : new Date(),
             },
             create: {
-              attemptId: params.attemptId,
+              attemptId: resolvedParams.attemptId,
               questionId: result.questionId,
               answerText: null,
               selectedOptionIds: undefined,
@@ -265,7 +266,7 @@ export async function POST(
     // Fetch updated attempt
     const updatedAttempt = isESTest
       ? await prisma.eSTestAttempt.findUnique({
-          where: { id: params.attemptId },
+          where: { id: resolvedParams.attemptId },
           include: {
             answers: {
               include: {
@@ -275,7 +276,7 @@ export async function POST(
           },
         })
       : await prisma.testAttempt.findUnique({
-          where: { id: params.attemptId },
+          where: { id: resolvedParams.attemptId },
           include: {
             answers: {
               include: {
@@ -294,7 +295,7 @@ export async function POST(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }

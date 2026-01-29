@@ -19,8 +19,9 @@ const reviewPurchaseRequestSchema = z.object({
 // PATCH /api/purchase-requests/[requestId]
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -32,7 +33,7 @@ export async function PATCH(
 
     // Get the purchase request
     const purchaseRequest = await prisma.purchaseRequest.findUnique({
-      where: { id: params.requestId },
+      where: { id: resolvedParams.requestId },
     })
 
     if (!purchaseRequest) {
@@ -103,7 +104,7 @@ export async function PATCH(
     // Update the purchase request in a transaction
     const result = await prisma.$transaction(async (tx) => {
       const updated = await tx.purchaseRequest.update({
-        where: { id: params.requestId },
+        where: { id: resolvedParams.requestId },
         data: {
           status: validatedData.status,
           reviewNote: validatedData.reviewNote,
@@ -148,14 +149,14 @@ export async function PATCH(
             amount: validatedData.actualAmount ?? purchaseRequest.estimatedAmount,
             date: validatedData.expenseDate ? new Date(validatedData.expenseDate) : new Date(),
             notes: validatedData.expenseNotes,
-            purchaseRequestId: params.requestId,
+            purchaseRequestId: resolvedParams.requestId,
             addedById: reviewerMembership.id,
           },
         })
 
         // Update the purchase request status to COMPLETED
         await tx.purchaseRequest.update({
-          where: { id: params.requestId },
+          where: { id: resolvedParams.requestId },
           data: { status: 'COMPLETED' },
         })
       }
@@ -167,7 +168,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }
@@ -179,8 +180,9 @@ export async function PATCH(
 // DELETE /api/purchase-requests/[requestId]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -189,7 +191,7 @@ export async function DELETE(
 
     // Get the purchase request
     const purchaseRequest = await prisma.purchaseRequest.findUnique({
-      where: { id: params.requestId },
+      where: { id: resolvedParams.requestId },
     })
 
     if (!purchaseRequest) {
@@ -214,7 +216,7 @@ export async function DELETE(
     }
 
     await prisma.purchaseRequest.delete({
-      where: { id: params.requestId },
+      where: { id: resolvedParams.requestId },
     })
 
     return NextResponse.json({ success: true })

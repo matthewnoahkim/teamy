@@ -10,8 +10,9 @@ const createReplySchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { announcementId: string } }
+  { params }: { params: Promise<{ announcementId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -23,7 +24,7 @@ export async function POST(
 
     // Get the announcement to verify it exists and get the team ID
     const announcement = await prisma.announcement.findUnique({
-      where: { id: params.announcementId },
+      where: { id: resolvedParams.announcementId },
       select: { id: true, clubId: true },
     })
 
@@ -48,7 +49,7 @@ export async function POST(
     // Create the reply
     const reply = await prisma.announcementReply.create({
       data: {
-        announcementId: params.announcementId,
+        announcementId: resolvedParams.announcementId,
         authorId: membership.id,
         content,
       },
@@ -80,8 +81,9 @@ export async function POST(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { announcementId: string } }
+  { params }: { params: Promise<{ announcementId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -90,7 +92,7 @@ export async function GET(
 
     // Get the announcement to verify access
     const announcement = await prisma.announcement.findUnique({
-      where: { id: params.announcementId },
+      where: { id: resolvedParams.announcementId },
       select: { id: true, clubId: true },
     })
 
@@ -114,7 +116,7 @@ export async function GET(
 
     // Fetch all replies
     const replies = await prisma.announcementReply.findMany({
-      where: { announcementId: params.announcementId },
+      where: { announcementId: resolvedParams.announcementId },
       include: {
         author: {
           include: {

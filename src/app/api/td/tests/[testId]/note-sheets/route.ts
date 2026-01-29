@@ -7,8 +7,9 @@ import { hasESTestAccess, isTournamentAdmin } from '@/lib/rbac'
 // GET - Get all note sheets for a test (tournament admin view)
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ testId: string }> | { testId: string } }
+  { params }: { params: Promise<{ testId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -16,7 +17,6 @@ export async function GET(
     }
 
     // Resolve params if it's a Promise (Next.js 15 compatibility)
-    const resolvedParams = params instanceof Promise ? await params : params
     const testId = resolvedParams.testId
 
     // Try to find as regular Test first

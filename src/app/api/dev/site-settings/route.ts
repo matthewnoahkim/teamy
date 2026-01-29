@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Failed to update site setting:', error)
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid data', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid data', details: error.issues }, { status: 400 })
     }
     return NextResponse.json({ error: 'Failed to update setting' }, { status: 500 })
   }

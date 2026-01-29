@@ -12,8 +12,9 @@ const tabTrackingSchema = z.object({
 // PATCH /api/tests/[testId]/attempts/[attemptId]/tab-tracking
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { testId: string; attemptId: string } }
+  { params }: { params: Promise<{ testId: string; attemptId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -24,7 +25,7 @@ export async function PATCH(
     const validatedData = tabTrackingSchema.parse(body)
 
     const attempt = await prisma.testAttempt.findUnique({
-      where: { id: params.attemptId },
+      where: { id: resolvedParams.attemptId },
       select: { membershipId: true, testId: true },
     })
 
@@ -38,7 +39,7 @@ export async function PATCH(
         club: {
           tests: {
             some: {
-              id: params.testId,
+              id: resolvedParams.testId,
             },
           },
         },
@@ -50,7 +51,7 @@ export async function PATCH(
     }
 
     const updatedAttempt = await prisma.testAttempt.update({
-      where: { id: params.attemptId },
+      where: { id: resolvedParams.attemptId },
       data: {
         tabSwitchCount: validatedData.tabSwitchCount,
         timeOffPageSeconds: validatedData.timeOffPageSeconds,
@@ -61,7 +62,7 @@ export async function PATCH(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
+        { error: 'Invalid input', details: error.issues },
         { status: 400 }
       )
     }

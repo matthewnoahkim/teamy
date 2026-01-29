@@ -15,15 +15,16 @@ const updateMediaSchema = z.object({
 // PATCH - Update media item
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { mediaId: string } }
+  { params }: { params: Promise<{ mediaId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const mediaId = params.mediaId
+    const mediaId = resolvedParams.mediaId
     const body = await req.json()
     const validated = updateMediaSchema.parse(body)
 
@@ -66,7 +67,7 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ 
         error: 'Invalid data', 
-        details: error.errors 
+        details: error.issues 
       }, { status: 400 })
     }
     console.error('Update media error:', error)
@@ -77,15 +78,16 @@ export async function PATCH(
 // DELETE - Delete media item
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { mediaId: string } }
+  { params }: { params: Promise<{ mediaId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const mediaId = params.mediaId
+    const mediaId = resolvedParams.mediaId
 
     // Find the media item
     const existingMedia = await prisma.mediaItem.findUnique({

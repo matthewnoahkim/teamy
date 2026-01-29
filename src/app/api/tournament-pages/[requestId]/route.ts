@@ -10,11 +10,12 @@ const updatePageSchema = z.object({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const hostingRequest = await prisma.tournamentHostingRequest.findUnique({
-      where: { id: params.requestId },
+      where: { id: resolvedParams.requestId },
     })
 
     if (!hostingRequest) {
@@ -38,8 +39,9 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
 
@@ -52,7 +54,7 @@ export async function PUT(
 
     // Find the hosting request
     const hostingRequest = await prisma.tournamentHostingRequest.findUnique({
-      where: { id: params.requestId },
+      where: { id: resolvedParams.requestId },
     })
 
     if (!hostingRequest) {
@@ -82,7 +84,7 @@ export async function PUT(
     const validatedData = updatePageSchema.parse(body)
 
     await prisma.tournamentHostingRequest.update({
-      where: { id: params.requestId },
+      where: { id: resolvedParams.requestId },
       data: {
         pageContent: validatedData.pageContent,
       },
@@ -92,7 +94,7 @@ export async function PUT(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
+        { error: 'Invalid request data', details: error.issues },
         { status: 400 }
       )
     }

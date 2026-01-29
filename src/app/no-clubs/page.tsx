@@ -4,9 +4,9 @@ import { redirect } from 'next/navigation'
 import { NoClubsClient } from '@/components/no-clubs-client'
 
 type NoClubsPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     code?: string
-  }
+  }>
 }
 
 export default async function NoClubsPage({ searchParams }: NoClubsPageProps) {
@@ -16,7 +16,8 @@ export default async function NoClubsPage({ searchParams }: NoClubsPageProps) {
     redirect('/login')
   }
 
-  const code = searchParams?.code?.toString() ?? ''
+  const resolvedSearchParams = await searchParams
+  const code = resolvedSearchParams?.code?.toString() ?? ''
 
   return <NoClubsClient user={session.user} initialCode={code} />
 }

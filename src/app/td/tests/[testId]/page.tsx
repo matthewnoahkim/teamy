@@ -69,13 +69,14 @@ async function isTournamentDirector(userId: string, userEmail: string, tournamen
 }
 
 export default async function TDEditTestPage({ params }: Props) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) {
     redirect('/td')
   }
 
-  const { testId } = await params
+  const { testId } = resolvedParams
 
   // Find the ES test
   const esTest = await prisma.eSTest.findUnique({

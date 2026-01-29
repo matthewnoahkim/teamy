@@ -44,13 +44,14 @@ function SettingToggle({ label, enabled, note }: { label: string; enabled: boole
 }
 
 export default async function TDTestSettingsPage({ params }: Props) {
+  const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.email) {
     redirect('/td')
   }
 
-  const { testId } = await params
+  const { testId } = resolvedParams
 
   // Find the ES test
   const esTest = await prisma.eSTest.findUnique({

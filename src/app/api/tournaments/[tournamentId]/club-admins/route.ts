@@ -24,8 +24,9 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
 // GET /api/tournaments/[tournamentId]/club-admins?clubIds=id1,id2,id3
 export async function GET(
   req: NextRequest,
-  { params }: { params: { tournamentId: string } }
+  { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -33,7 +34,7 @@ export async function GET(
     }
 
     // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, params.tournamentId)
+    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }

@@ -14,15 +14,16 @@ const manualCheckInSchema = z.object({
 // Manually add a check-in (admins only)
 export async function POST(
   req: NextRequest,
-  { params }: { params: { attendanceId: string } }
+  { params }: { params: Promise<{ attendanceId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { attendanceId } = params
+    const { attendanceId } = resolvedParams
     const body = await req.json()
     const validated = manualCheckInSchema.parse(body)
 
@@ -91,7 +92,7 @@ export async function POST(
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
     if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
