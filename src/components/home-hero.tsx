@@ -35,16 +35,16 @@ export function HomeHero({ isLoggedIn, loggedInRedirect }: HomeHeroProps) {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
               <span>The complete platform for team</span>
               <Typewriter
-                  text={[
-                    "communication",
-                    "organization",
-                    "planning",
-                    "management",
-                  ]}
-                  speed={60}
-                  className="text-teamy-primary dark:text-teamy-accent font-semibold"
-                  waitTime={2000}
-                  deleteSpeed={40}
+                text={[
+                  "communication",
+                  "organization",
+                  "planning",
+                  "management",
+                ]}
+                speed={60}
+                className="text-teamy-primary dark:text-teamy-accent font-semibold"
+                waitTime={2000}
+                deleteSpeed={40}
                 cursorChar="|"
               />
             </div>
@@ -65,31 +65,6 @@ export function HomeHero({ isLoggedIn, loggedInRedirect }: HomeHeroProps) {
                 View Features
               </button>
             </Link>
-          </div>
-        </ScrollAnimate>
-
-        {/* FERPA & COPPA Compliance Badge */}
-        <ScrollAnimate animation="fade-scale" delay={500} duration={800}>
-          <div className="pt-6 px-4 w-full max-w-3xl mx-auto">
-            <div className="rounded-xl border border-border/50 bg-card/50 p-4 sm:p-5 w-full">
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <div className="flex-1 text-center sm:text-left">
-                  <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1">Safety and Security</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    We follow industry best practices for security and compliance.{' '}
-                    <a href="/privacy" className="text-teamy-primary hover:underline font-medium">Learn More</a>
-                  </p>
-                </div>
-                <div className="flex gap-3 flex-shrink-0">
-                  <div className="flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-blue-500/90 text-white font-semibold text-sm shadow-sm">
-                    FERPA
-                  </div>
-                  <div className="flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-green-500/90 text-white font-semibold text-sm shadow-sm">
-                    COPPA
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </ScrollAnimate>
       </div>
