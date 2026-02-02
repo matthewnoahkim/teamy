@@ -79,9 +79,9 @@ export default async function HomePage() {
   const session = await getServerSession(authOptions)
   const isLoggedIn = !!session?.user
   const bannerSettings = await getBannerSettings()
-  
+
   // Get the appropriate redirect URL for logged-in users
-  const loggedInRedirect = isLoggedIn && session?.user?.id 
+  const loggedInRedirect = isLoggedIn && session?.user?.id
     ? await getLoggedInUserRedirect(session.user.id)
     : '/login'
 
@@ -89,14 +89,14 @@ export default async function HomePage() {
     <div className="min-h-screen flex flex-col bg-background grid-pattern text-foreground">
       {/* Discord Banner */}
       <DiscordBanner initialSettings={bannerSettings} />
-      
+
       {/* Header */}
       <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 overflow-x-auto">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">
-            <HomeNav 
-              variant="light" 
+            <HomeNav
+              variant="light"
               mobileButton={
                 <Link href={isLoggedIn ? loggedInRedirect : "/login"}>
                   <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
@@ -128,7 +128,6 @@ export default async function HomePage() {
             </div>
             <div className="flex flex-col items-center md:items-end gap-1">
               <p className="text-xs sm:text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
-              <p className="text-xs text-muted-foreground font-medium">FERPA and COPPA compliant</p>
             </div>
           </div>
         </div>
