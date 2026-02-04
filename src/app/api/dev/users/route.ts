@@ -27,11 +27,11 @@ export async function GET(request: Request) {
 
     // Member duration filters - only use if validation passed
     if (minMemberDays !== null) {
-      const minDate = subDays(new Date(), minMemberDays)
+      const minDate = subDays(new Date(), minMemberDays as number)
       where.createdAt = { ...where.createdAt, lte: minDate }
     }
     if (maxMemberDays !== null) {
-      const maxDate = subDays(new Date(), maxMemberDays)
+      const maxDate = subDays(new Date(), maxMemberDays as number)
       where.createdAt = { ...where.createdAt, gte: maxDate }
     }
 
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
 
     // Apply additional filters - using validated values
     if (minClubs !== null) {
-      filteredUsers = filteredUsers.filter(u => u.clubCount >= minClubs)
+      filteredUsers = filteredUsers.filter(u => u.clubCount >= (minClubs as number))
     }
     if (isClubAdmin === true) {
       filteredUsers = filteredUsers.filter(u => u.isClubAdmin)

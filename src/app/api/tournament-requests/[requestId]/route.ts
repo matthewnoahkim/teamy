@@ -42,11 +42,20 @@ export async function PATCH(
       return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     }
 
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // TypeScript narrowing: we know currentRequest and session are not null after checks
+    // Use non-null assertions since we've already checked
+    const hostingRequest = currentRequest!
+    const userSession = session!
+
     // If approving and no tournament exists yet, create one
-    if (status === 'APPROVED' && !currentRequest.tournament) {
+    if (status === 'APPROVED' && !hostingRequest.tournament) {
       // Generate a slug from the tournament name
-      const baseSlug = currentRequest.preferredSlug || 
-        currentRequest.tournamentName
+      const baseSlug = hostingRequest.preferredSlug || 
+        hostingRequest.tournamentName
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-+|-+$/g, '')
@@ -61,9 +70,9 @@ export async function PATCH(
 
       // Determine division - handle "B&C" case
       let division: 'B' | 'C' = 'C'
-      if (currentRequest.division === 'B') {
+      if (hostingRequest.division === 'B') {
         division = 'B'
-      } else if (currentRequest.division === 'C') {
+      } else if (hostingRequest.division === 'C') {
         division = 'C'
       }
       // For "B&C", default to C (can be changed later)
@@ -73,18 +82,18 @@ export async function PATCH(
         // Create the tournament
         const tournament = await tx.tournament.create({
           data: {
-            name: currentRequest.tournamentName,
+            name: hostingRequest.tournamentName,
             slug,
             division,
-            description: currentRequest.otherNotes,
-            isOnline: currentRequest.tournamentFormat === 'satellite',
+            description: hostingRequest.otherNotes,
+            isOnline: hostingRequest.tournamentFormat === 'satellite',
             startDate: new Date(), // Default to now, TD can update later
             endDate: new Date(),
             startTime: new Date(),
             endTime: new Date(),
-            location: currentRequest.location,
+            location: hostingRequest.location,
             approved: true,
-            createdById: session.user.id,
+            createdById: userSession.user.id,
             hostingRequestId: requestId,
           },
         })
@@ -93,7 +102,7 @@ export async function PATCH(
         // This allows them to see and manage the tournament in the dev panel
         const director = await tx.user.findUnique({
           where: {
-            email: currentRequest.directorEmail.toLowerCase(),
+            email: hostingRequest.directorEmail.toLowerCase(),
           },
         })
 
@@ -113,12 +122,12 @@ export async function PATCH(
           where: {
             tournamentId_userId: {
               tournamentId: tournament.id,
-              userId: session.user.id,
+              userId: userSession.user.id,
             },
           },
           create: {
             tournamentId: tournament.id,
-            userId: session.user.id,
+            userId: userSession.user.id,
           },
           update: {},
         })
@@ -187,10 +196,13 @@ export async function DELETE(
       include: { tournament: true },
     })
 
-    if (hostingRequest?.tournament) {
+    const tournament = hostingRequest?.tournament
+    if (tournament) {
       // Delete the tournament first (this will cascade delete related records)
+      // TypeScript narrowing: we know tournament is not null after the if check
+      const tournamentId = (tournament as NonNullable<typeof tournament>).id
       await prisma.tournament.delete({
-        where: { id: hostingRequest.tournament.id },
+        where: { id: tournamentId },
       })
     }
 

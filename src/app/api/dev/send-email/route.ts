@@ -126,7 +126,7 @@ export async function POST(request: Request) {
 
       const results = await Promise.allSettled(
         batch.map(user =>
-          resend.emails.send({
+          resend!.emails.send({
             from: 'Teamy <no-reply@teamy.site>',
             to: user.email,
             subject,

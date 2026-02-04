@@ -1,12 +1,19 @@
-import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient, Division } from '@prisma/client'
 
-const connectionString = process.env.DATABASE_URL
-const adapter = connectionString ? new PrismaPg({ connectionString }) : undefined
+// Conditionally import adapter if available
+let PrismaPg: any = null
+try {
+  PrismaPg = require('@prisma/adapter-pg').PrismaPg
+} catch {
+  // Adapter not available, will use default
+}
 
-const prisma = new PrismaClient({
-  ...(adapter ? { adapter } : {}),
-})
+const connectionString = process.env.DATABASE_URL
+const adapter = connectionString && PrismaPg ? new PrismaPg({ connectionString }) : undefined
+
+const prisma = adapter 
+  ? new PrismaClient({ adapter } as any)
+  : new PrismaClient()
 
 // Division C Events (2026)
 const divisionCEvents = [

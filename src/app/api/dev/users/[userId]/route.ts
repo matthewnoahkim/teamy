@@ -103,10 +103,22 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting user:', error)
+  } catch (err: unknown) {
+    console.error('Error deleting user:', err)
+    let errorMessage = 'Unknown error'
+    if (err instanceof Error) {
+      errorMessage = (err as Error).message
+    } else if (typeof err === 'string') {
+      errorMessage = err as string
+    } else if (err !== null && err !== undefined) {
+      try {
+        errorMessage = JSON.stringify(err)
+      } catch {
+        errorMessage = 'Unknown error'
+      }
+    }
     return NextResponse.json(
-      { error: 'Failed to delete user', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to delete user', details: errorMessage },
       { status: 500 }
     )
   }

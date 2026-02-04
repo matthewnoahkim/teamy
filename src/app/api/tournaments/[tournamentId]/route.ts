@@ -150,35 +150,60 @@ export async function GET(
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
     }
 
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // TypeScript narrowing: we know tournament and session are not null after checks
+    // Use non-null assertions since we've already checked
+    const tournamentData = tournament!
+    const userSession = session!
+
     // Get hosting request division if available (supports "B&C")
-    let displayDivision = tournament.division
-    if (tournament.hostingRequestId) {
+    let displayDivision = tournamentData.division
+    if (tournamentData.hostingRequestId) {
       const hostingRequest = await prisma.tournamentHostingRequest.findUnique({
-        where: { id: tournament.hostingRequestId },
+        where: { id: tournamentData.hostingRequestId ?? undefined },
         select: { division: true },
       })
-      if (hostingRequest?.division) {
-        displayDivision = hostingRequest.division as any // Use hosting request division for display
+      const division = hostingRequest?.division
+      if (division) {
+        displayDivision = division as 'B' | 'C' // Use hosting request division for display
       }
     }
 
     // Override division for display
     const tournamentWithDisplayDivision = {
-      ...tournament,
-      division: displayDivision,
+      ...tournamentData,
+      division: displayDivision ?? tournamentData.division,
     }
 
-    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
+    const isAdmin = await isTournamentAdmin(userSession.user.id, resolvedParams.tournamentId)
     
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[Tournament ${resolvedParams.tournamentId}] User ${session.user.id} isAdmin: ${isAdmin}`)
+      console.log(`[Tournament ${resolvedParams.tournamentId}] User ${userSession.user.id} isAdmin: ${isAdmin}`)
     }
 
     return NextResponse.json({ tournament: tournamentWithDisplayDivision, isAdmin })
-  } catch (error) {
-    console.error('Get tournament error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+  } catch (err: unknown) {
+    console.error('Get tournament error:', err)
+    let errorMessage = 'Unknown error'
+    if (err instanceof Error) {
+      errorMessage = (err as Error).message
+    } else if (typeof err === 'string') {
+      errorMessage = err as string
+    } else if (err !== null && err !== undefined) {
+      try {
+        errorMessage = JSON.stringify(err)
+      } catch {
+        errorMessage = 'Unknown error'
+      }
+    }
     return NextResponse.json({ 
       error: 'Internal server error', 
       details: process.env.NODE_ENV === 'development' ? errorMessage : undefined 
