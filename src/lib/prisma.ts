@@ -5,15 +5,25 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 // Conditionally import adapter if available
-let PrismaPg: any = null
-try {
-  PrismaPg = require('@prisma/adapter-pg').PrismaPg
-} catch {
-  // Adapter not available, will use default
+// Using a function to prevent webpack from trying to bundle this at build time
+function getAdapter() {
+  if (typeof window !== 'undefined') return undefined // Client-side, no adapter needed
+  
+  try {
+    // Dynamic import that webpack won't try to bundle
+    const adapterModule = require('@prisma/adapter-pg')
+    const PrismaPg = adapterModule?.PrismaPg
+    const connectionString = process.env.DATABASE_URL
+    if (connectionString && PrismaPg) {
+      return new PrismaPg({ connectionString })
+    }
+  } catch {
+    // Adapter not available, will use default
+  }
+  return undefined
 }
 
-const connectionString = process.env.DATABASE_URL
-const adapter = connectionString && PrismaPg ? new PrismaPg({ connectionString }) : undefined
+const adapter = getAdapter()
 
 const prismaClient =
   globalForPrisma.prisma ??
