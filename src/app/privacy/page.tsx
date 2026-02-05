@@ -9,6 +9,9 @@ export default function PrivacyPolicyPage() {
           <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
           <p className="text-muted-foreground mb-8">Last updated: January 16, 2026</p>
 
+          <section className="mb-8">The privacy policy is under review.</section>
+
+          {/*
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Introduction</h2>
             <p>
@@ -265,6 +268,7 @@ export default function PrivacyPolicyPage() {
               Washington, DC 20202
             </p>
           </section>
+          */}
         </div>
       </div>
     </PublicPageLayout>
