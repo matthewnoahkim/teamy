@@ -25,8 +25,10 @@ function getBaseUrl(): string {
     return 'https://teamy.site'
   }
   // Development fallback
+  
   return 'http://localhost:3000'
 }
+
 
 export interface StaffInviteEmailParams {
   to: string
