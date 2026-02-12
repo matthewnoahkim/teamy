@@ -6,6 +6,8 @@ import { NewTestBuilder } from '@/components/tests/new-test-builder'
 import { nanoid } from 'nanoid'
 import { hasESAccess } from '@/lib/rbac'
 
+export const dynamic = 'force-dynamic'
+
 interface Props {
   searchParams: Promise<{ eventId?: string; tournamentId?: string; trialEventName?: string; trialEventDivision?: string }>
 }
