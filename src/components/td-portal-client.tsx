@@ -326,7 +326,7 @@ export function TDPortalClient({ user, requests }: TDPortalClientProps) {
             </div>
             <div className="flex flex-col items-center md:items-end gap-1">
               <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
-              <p className="text-xs text-muted-foreground font-medium">FERPA and COPPA compliant</p>
+              
             </div>
           </div>
         </div>
