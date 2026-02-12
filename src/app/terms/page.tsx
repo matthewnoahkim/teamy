@@ -9,9 +9,6 @@ export default function TermsOfServicePage() {
           <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Terms of Service</h1>
           <p className="text-muted-foreground mb-8">Last updated: January 16, 2026</p>
 
-          <section className="mb-8">The terms of service are under review.</section>
-
-          {/*
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p>
@@ -268,7 +265,6 @@ export default function TermsOfServicePage() {
               For questions regarding FERPA or COPPA compliance, educational institutions and parents may contact us at the same email address.
             </p>
           </section>
-          */}
         </div>
       </div>
     </PublicPageLayout>

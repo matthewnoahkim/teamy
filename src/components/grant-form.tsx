@@ -26,9 +26,6 @@ interface GrantFormContentProps {
 }
 
 export function GrantFormContent({ isAuthenticated: initialIsAuthenticated }: GrantFormContentProps) {
-
-  return <div className="py-12 px-4 sm:px-6">Grants are temporarily unavailable while we improve the application process. Please check back later!</div>
-
   const { status } = useSession()
   // Use client-side session check if available, otherwise fall back to server-side prop during loading
   const isAuthenticated = status === 'authenticated' || (status === 'loading' ? initialIsAuthenticated : false)
@@ -61,7 +58,7 @@ export function GrantFormContent({ isAuthenticated: initialIsAuthenticated }: Gr
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault()
-
+    
     // Check if user is authenticated
     if (!isAuthenticated) {
       toast({
@@ -71,12 +68,12 @@ export function GrantFormContent({ isAuthenticated: initialIsAuthenticated }: Gr
       })
       return
     }
-
+    
     // Validate required fields
-    if (!formData.clubName || !formData.schoolName || !formData.schoolAddress ||
-      !formData.clubDivision || !formData.numberOfTeams || !formData.yearsParticipating ||
-      !formData.grantAmount || !formData.clubDescription || !formData.grantBenefit ||
-      !formData.contactRole || !formData.applicantName || !formData.applicantEmail || !formData.confirmEmail) {
+    if (!formData.clubName || !formData.schoolName || !formData.schoolAddress || 
+        !formData.clubDivision || !formData.numberOfTeams || !formData.yearsParticipating ||
+        !formData.grantAmount || !formData.clubDescription || !formData.grantBenefit ||
+        !formData.contactRole || !formData.applicantName || !formData.applicantEmail || !formData.confirmEmail) {
       toast({
         title: 'Missing Required Fields',
         description: 'Please fill in all required fields.',
@@ -296,7 +293,7 @@ export function GrantFormContent({ isAuthenticated: initialIsAuthenticated }: Gr
                         {/* Club Information */}
                         <div className="space-y-4">
                           <h3 className="font-semibold text-foreground border-b pb-2">Club Information</h3>
-
+                          
                           <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                               <Label htmlFor="clubName">Club Name *</Label>
@@ -392,7 +389,7 @@ export function GrantFormContent({ isAuthenticated: initialIsAuthenticated }: Gr
                         {/* Long Answers */}
                         <div className="space-y-4">
                           <h3 className="font-semibold text-foreground border-b pb-2">Tell Us About Your Club</h3>
-
+                          
                           <div className="space-y-2">
                             <Label htmlFor="clubDescription">Thoroughly describe your club and goals. *</Label>
                             <Textarea
@@ -432,7 +429,7 @@ export function GrantFormContent({ isAuthenticated: initialIsAuthenticated }: Gr
                         {/* Contact Information */}
                         <div className="space-y-4">
                           <h3 className="font-semibold text-foreground border-b pb-2">Contact Information</h3>
-
+                          
                           <div className="space-y-2">
                             <Label htmlFor="contactRole">Your role in the club *</Label>
                             <Select
