@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export const runtime = 'edge'
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -24,17 +22,6 @@ export function middleware(request: NextRequest) {
   return NextResponse.redirect(new URL('/', request.url))
 }
 
-export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Note: Exclusions are handled in the middleware function itself
-     * Using a simple pattern without capturing groups for Vercel compatibility
-     */
-    '/:path*',
-  ],
-}
+// No matcher config needed - Next.js automatically matches all routes
+// All exclusions are handled in the middleware function above
 
