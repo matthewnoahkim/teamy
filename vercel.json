@@ -1,6 +1,11 @@
 {
   "buildCommand": "prisma generate && next build",
   "framework": "nextjs",
-  "installCommand": "pnpm install"
+  "installCommand": "pnpm install",
+  "functions": {
+    "middleware.js": {
+      "runtime": "edge"
+    }
+  }
 }
 

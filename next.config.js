@@ -23,7 +23,7 @@ const nextConfig = {
   experimental: {
     scrollRestoration: true, // Better scroll behavior on navigation
   },
-  // Disable output file tracing for middleware to fix Vercel deployment issue
+  // Disable output file tracing for middleware to fix Vercel deployment
   outputFileTracingExcludes: {
     '*': [
       'node_modules/@swc/core-linux-x64-gnu',
