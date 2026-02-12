@@ -114,9 +114,9 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
 export function TournamentTestsClient({
   tournamentId,
   tournamentName,
-  tournamentDivision,
+  tournamentDivision: _tournamentDivision,
   events,
-  userClubs,
+  userClubs: _userClubs,
   user,
 }: TournamentTestsClientProps) {
   const router = useRouter()
@@ -159,10 +159,10 @@ export function TournamentTestsClient({
       if (!response.ok) throw new Error('Failed to load tournament tests')
       const data = await response.json()
       setTournamentTests(data.tests || [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load tournament tests',
+        description: error instanceof Error ? error.message : 'Failed to load tournament tests',
         variant: 'destructive',
       })
     } finally {
@@ -197,10 +197,10 @@ export function TournamentTestsClient({
       setDeleteDialogOpen(false)
       setTestToDelete(null)
       loadTournamentTests()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to remove test',
+        description: error instanceof Error ? error.message : 'Failed to remove test',
         variant: 'destructive',
       })
     } finally {
@@ -244,10 +244,10 @@ export function TournamentTestsClient({
       setAssigningTest(null)
       setSelectedAssignEventId('')
       loadTournamentTests()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to assign test',
+        description: error instanceof Error ? error.message : 'Failed to assign test',
         variant: 'destructive',
       })
     } finally {
@@ -492,7 +492,7 @@ export function TournamentTestsClient({
                   className="pl-11"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | 'draft' | 'scheduled' | 'opened' | 'completed')}>
                 <SelectTrigger className="h-12 w-[180px]">
                   <SelectValue placeholder="All Tests" />
                 </SelectTrigger>

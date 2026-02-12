@@ -17,7 +17,7 @@ const updateTournamentSchema = z.object({
   startTime: z.string().datetime().optional(),
   endTime: z.string().datetime().optional(),
   location: z.string().optional(),
-  approved: z.boolean().optional(),
+  // Note: 'approved' is intentionally excluded - only platform admins can approve tournaments via the dev panel
 })
 
 // Helper to check if user is tournament admin
@@ -232,7 +232,7 @@ export async function PUT(
     const body = await req.json()
     const validated = updateTournamentSchema.parse(body)
 
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (validated.name !== undefined) updateData.name = validated.name
     if (validated.division !== undefined) updateData.division = validated.division as Division
     if (validated.description !== undefined) updateData.description = validated.description
@@ -244,7 +244,6 @@ export async function PUT(
     if (validated.startTime !== undefined) updateData.startTime = new Date(validated.startTime)
     if (validated.endTime !== undefined) updateData.endTime = new Date(validated.endTime)
     if (validated.location !== undefined) updateData.location = validated.location
-    if (validated.approved !== undefined) updateData.approved = validated.approved
 
     const tournament = await prisma.tournament.update({
       where: { id: resolvedParams.tournamentId },

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { JSX } from 'react'
 import { signOut } from 'next-auth/react'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -36,7 +36,6 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Trophy,
   ChevronRight,
   ChevronDown,
   ArrowLeft,
@@ -182,7 +181,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
   const [staffMembershipsWithTests, setStaffMembershipsWithTests] = useState<StaffMembership[]>(() => {
     // Check if tests are already included in the props (from server-side fetch)
     const hasTestsInProps = staffMemberships.some(m => 
-      m.events.some(e => 'tests' in e && Array.isArray((e as any).tests))
+      m.events.some(e => 'tests' in e && Array.isArray((e as unknown as Record<string, unknown>).tests))
     )
     
     if (hasTestsInProps) {
@@ -225,11 +224,10 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
           setActiveContentTab(savedTab)
         }
       }
-    } catch (e) {
+    } catch (_e) {
       // localStorage not available
     }
     setIsHydrated(true)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Save content tab to localStorage when it changes
@@ -238,7 +236,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
       try {
         const storageKey = `es-portal-tab-${activeTournament}`
         localStorage.setItem(storageKey, activeContentTab)
-      } catch (e) {
+      } catch (_e) {
         // localStorage not available
       }
     }
@@ -287,10 +285,10 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
       
       // Refresh tests list (force fetch after delete)
       fetchTests(true)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete test',
+        description: error instanceof Error ? error.message : 'Failed to delete test',
         variant: 'destructive',
       })
     } finally {
@@ -316,11 +314,11 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
 
       // Refresh tests list
       fetchTests(true)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to duplicate test:', error)
       toast({
         title: 'Error',
-        description: error.message || 'Failed to duplicate test',
+        description: error instanceof Error ? error.message : 'Failed to duplicate test',
         variant: 'destructive',
       })
     }
@@ -415,7 +413,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
         fetchTests(true) // Force fetch when switching to a tournament without data
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTournament])
   
   // Initial fetch on mount only if we don't have server-side data
@@ -433,7 +430,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
       }
     }
     hasFetchedTests.current = true
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Run once on mount
 
   // Ensure URL is set correctly on mount
@@ -450,7 +446,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
       // No tournament in URL, clear activeTournament
       setActiveTournament('')
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   
   // Sync with URL changes after initialization (e.g., browser back/forward)
@@ -465,7 +460,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
       // URL param was removed, clear activeTournament
       setActiveTournament('')
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
   
   useEffect(() => {
@@ -481,7 +475,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
     if (activeTournament) {
       fetchTimeline(activeTournament)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTournament])
 
   const getTimelineStatus = (dueDate: string) => {

@@ -5,7 +5,6 @@ import type { JSX } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -21,21 +20,17 @@ import { Label } from '@/components/ui/label'
 import {
   RefreshCw,
   Search,
-  Filter,
   Activity,
   Users,
   Server,
   Clock,
   AlertCircle,
   X,
-  CheckCircle2,
-  XCircle,
   Loader2,
   Download,
   Trash2,
   Shield,
   Plus,
-  Mail,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -70,7 +65,7 @@ interface LogEntry {
     email: string
     image?: string | null
   } | null
-  metadata?: any
+  metadata?: Record<string, unknown>
   stack?: string
   resolved?: boolean
 }
@@ -108,10 +103,10 @@ export function HealthTools() {
   const [allLogs, setAllLogs] = useState<LogEntry[]>([])
   const [apiLogs, setApiLogs] = useState<LogEntry[]>([])
   const [errorLogs, setErrorLogs] = useState<LogEntry[]>([])
-  const [activityLogs, setActivityLogs] = useState<LogEntry[]>([])
+  const [_activityLogs, setActivityLogs] = useState<LogEntry[]>([])
   
   // Pagination
-  const [pagination, setPagination] = useState<Pagination>({
+  const [pagination, _setPagination] = useState<Pagination>({
     page: 1,
     limit: 50,
     total: 0,
@@ -148,11 +143,11 @@ export function HealthTools() {
   const [selectKey, setSelectKey] = useState(0)
 
   // User search
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<Array<Record<string, unknown>>>([])
   const [userSearch, setUserSearch] = useState('')
   const [userLoading, setUserLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [userToDelete, setUserToDelete] = useState<any>(null)
+  const [userToDelete, setUserToDelete] = useState<Record<string, unknown> | null>(null)
 
   // Email whitelist
   const [whitelistEmails, setWhitelistEmails] = useState<Array<{ email: string; name: string | null; image: string | null }>>([])
@@ -225,9 +220,9 @@ export function HealthTools() {
 
       // Combine all logs
       const combined = [
-        ...(activityData.logs || []).map((log: any) => ({ ...log, source: 'activity' })),
-        ...(apiData.logs || []).map((log: any) => ({ ...log, source: 'api' })),
-        ...(errorData.logs || []).map((log: any) => ({ ...log, source: 'error' })),
+        ...(activityData.logs || []).map((log: LogEntry) => ({ ...log, source: 'activity' })),
+        ...(apiData.logs || []).map((log: LogEntry) => ({ ...log, source: 'api' })),
+        ...(errorData.logs || []).map((log: LogEntry) => ({ ...log, source: 'error' })),
       ].sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )
@@ -590,9 +585,9 @@ export function HealthTools() {
   }
 
   // Handle export user
-  const handleExportUser = (user: any) => {
+  const handleExportUser = (user: Record<string, unknown>) => {
     // Helper function to escape CSV fields
-    const escapeCSV = (value: any): string => {
+    const escapeCSV = (value: unknown): string => {
       if (value === null || value === undefined) return ''
       const str = String(value)
       // If contains comma, quote, or newline, wrap in quotes and escape quotes
@@ -615,14 +610,14 @@ export function HealthTools() {
     ]
 
     // Add team memberships
-    const membershipRows = (user.memberships || []).map((m: any) => [
-      escapeCSV(m.club?.name || 'N/A'),
-      escapeCSV(m.club?.id || 'N/A'),
-      escapeCSV(m.team?.name || 'N/A'),
-      escapeCSV(m.team?.id || 'N/A'),
+    const membershipRows = ((user.memberships || []) as Array<Record<string, unknown>>).map((m) => [
+      escapeCSV((m.club as Record<string, unknown>)?.name || 'N/A'),
+      escapeCSV((m.club as Record<string, unknown>)?.id || 'N/A'),
+      escapeCSV((m.team as Record<string, unknown>)?.name || 'N/A'),
+      escapeCSV((m.team as Record<string, unknown>)?.id || 'N/A'),
       escapeCSV(m.role || 'N/A'),
-      escapeCSV(m.club?.division || 'None'),
-      escapeCSV(new Date(m.createdAt).toLocaleString()),
+      escapeCSV((m.club as Record<string, unknown>)?.division || 'None'),
+      escapeCSV(new Date(m.createdAt as string).toLocaleString()),
     ])
 
     if (membershipRows.length === 0) {
@@ -651,7 +646,7 @@ export function HealthTools() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="all" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
@@ -1060,7 +1055,7 @@ export function HealthTools() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2 p-4 border rounded-xl bg-muted/30 backdrop-blur-sm">
-                <Select value={resolvedFilter} onValueChange={(v: any) => setResolvedFilter(v)}>
+                <Select value={resolvedFilter} onValueChange={(v) => setResolvedFilter(v as typeof resolvedFilter)}>
                   <SelectTrigger className="w-[200px]">
                     <SelectValue />
                   </SelectTrigger>
@@ -1217,11 +1212,11 @@ export function HealthTools() {
                             <p className="text-xs text-muted-foreground mt-1">ID: {highlightText(user.id, userSearch)}</p>
                             {user.memberships && user.memberships.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-2">
-                                {user.memberships.map((membership: any) => (
-                                  <Badge key={membership.id} variant="outline">
-                                    {membership.club?.name 
-                                      ? (membership.team?.name ? `${membership.club.name} - ${membership.team.name}` : membership.club.name)
-                                      : (membership.team?.name || 'No club/team')} ({membership.role})
+                                {(user.memberships as Array<Record<string, unknown>>).map((membership) => (
+                                  <Badge key={membership.id as string} variant="outline">
+                                    {(membership.club as Record<string, unknown>)?.name 
+                                      ? ((membership.team as Record<string, unknown>)?.name ? `${(membership.club as Record<string, unknown>).name} - ${(membership.team as Record<string, unknown>).name}` : (membership.club as Record<string, unknown>).name)
+                                      : ((membership.team as Record<string, unknown>)?.name || 'No club/team')} ({membership.role as string})
                                   </Badge>
                                 ))}
                               </div>

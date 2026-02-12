@@ -17,7 +17,6 @@ import {
   AlertCircle,
   Users,
   Calendar as CalendarIcon,
-  Edit
 } from 'lucide-react'
 import {
   Dialog,
@@ -34,19 +33,72 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { formatDateTime } from '@/lib/utils'
 import { format } from 'date-fns'
-import { Skeleton } from '@/components/ui/skeleton'
 import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
+import type { SessionUser } from '@/types/models'
+
+interface FormSubmission {
+  id: string
+  status: string
+  submittedAt: string
+  filePath: string
+  originalFilename: string
+  user: { id: string; name?: string | null; email: string; image?: string | null }
+}
+
+interface PaperworkForm {
+  id: string
+  title: string
+  description?: string | null
+  dueDate?: string | null
+  isRequired: boolean
+  filePath: string
+  originalFilename: string
+  _count: { submissions: number }
+  submissions: FormSubmission[]
+}
+
+interface NotSubmittedUser {
+  id: string
+  name?: string | null
+  email: string
+  image?: string | null
+}
+
+interface UploadFormDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onUpload: (formData: FormData) => void
+  clubId: string
+  uploading: boolean
+}
+
+interface SubmitFormDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (formData: FormData) => void
+  form: PaperworkForm | null
+  uploading: boolean
+}
+
+interface ViewSubmissionsDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  form: PaperworkForm | null
+  submissions: FormSubmission[]
+  notSubmitted: NotSubmittedUser[]
+  onUpdateStatus: (submissionId: string, status: string) => void
+}
 
 interface PaperworkTabProps {
   clubId: string
-  user: any
+  user: SessionUser
   isAdmin: boolean
-  initialForms?: any[]
+  initialForms?: PaperworkForm[]
 }
 
-export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkTabProps) {
+export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: PaperworkTabProps) {
   const { toast } = useToast()
-  const [forms, setForms] = useState<any[]>(initialForms || [])
+  const [forms, setForms] = useState<PaperworkForm[]>(initialForms || [])
   const [loading, setLoading] = useState(!initialForms)
   const [uploading, setUploading] = useState(false)
   
@@ -54,15 +106,15 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
   const [uploadFormDialogOpen, setUploadFormDialogOpen] = useState(false)
   const [submitFormDialogOpen, setSubmitFormDialogOpen] = useState(false)
   const [viewSubmissionsDialogOpen, setViewSubmissionsDialogOpen] = useState(false)
-  const [selectedForm, setSelectedForm] = useState<any | null>(null)
-  const [submissions, setSubmissions] = useState<any[]>([])
-  const [notSubmitted, setNotSubmitted] = useState<any[]>([])
+  const [selectedForm, setSelectedForm] = useState<PaperworkForm | null>(null)
+  const [submissions, setSubmissions] = useState<FormSubmission[]>([])
+  const [notSubmitted, setNotSubmitted] = useState<NotSubmittedUser[]>([])
   const [deleteFormDialogOpen, setDeleteFormDialogOpen] = useState(false)
   const [formToDelete, setFormToDelete] = useState<string | null>(null)
-  const [deletingForm, setDeletingForm] = useState(false)
+  const [_deletingForm, setDeletingForm] = useState(false)
   
-  const formFileInputRef = useRef<HTMLInputElement>(null)
-  const submissionFileInputRef = useRef<HTMLInputElement>(null)
+  const _formFileInputRef = useRef<HTMLInputElement>(null)
+  const _submissionFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!initialForms) {
@@ -85,9 +137,9 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
       if (!response.ok) throw new Error('Failed to fetch forms')
       const data = await response.json()
       setForms(data.forms || [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Don't show error on abort (user navigated away)
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         return
       }
       
@@ -122,10 +174,10 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
 
       fetchForms()
       setUploadFormDialogOpen(false)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Upload failed',
-        description: error.message || 'Failed to upload form',
+        description: error instanceof Error ? error.message : 'Failed to upload form',
         variant: 'destructive',
       })
     } finally {
@@ -156,10 +208,10 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
       fetchForms()
       setSubmitFormDialogOpen(false)
       setSelectedForm(null)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Submission failed',
-        description: error.message || 'Failed to submit form',
+        description: error instanceof Error ? error.message : 'Failed to submit form',
         variant: 'destructive',
       })
     } finally {
@@ -191,7 +243,7 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
       fetchForms()
       setDeleteFormDialogOpen(false)
       setFormToDelete(null)
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to delete form',
@@ -202,7 +254,7 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
     }
   }
 
-  const handleViewSubmissions = async (form: any) => {
+  const handleViewSubmissions = async (form: PaperworkForm) => {
     setSelectedForm(form)
     setViewSubmissionsDialogOpen(true)
 
@@ -220,8 +272,8 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
       const data = await response.json()
       setSubmissions(data.submissions || [])
       setNotSubmitted(data.notSubmitted || [])
-    } catch (error: any) {
-      if (error.name === 'AbortError') return
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') return
       
       toast({
         title: 'Error',
@@ -250,7 +302,7 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
       if (selectedForm) {
         handleViewSubmissions(selectedForm)
       }
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to update status',
@@ -259,7 +311,7 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
     }
   }
 
-  const getFormStatus = (form: any) => {
+  const getFormStatus = (form: PaperworkForm) => {
     if (form.submissions && form.submissions.length > 0) {
       const submission = form.submissions[0]
       return {
@@ -495,7 +547,7 @@ export function PaperworkTab({ clubId, user, isAdmin, initialForms }: PaperworkT
 }
 
 // Upload Form Dialog Component
-function UploadFormDialog({ open, onOpenChange, onUpload, clubId, uploading }: any) {
+function UploadFormDialog({ open, onOpenChange, onUpload, clubId, uploading }: UploadFormDialogProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -614,7 +666,7 @@ function UploadFormDialog({ open, onOpenChange, onUpload, clubId, uploading }: a
 }
 
 // Submit Form Dialog Component
-function SubmitFormDialog({ open, onOpenChange, onSubmit, form, uploading }: any) {
+function SubmitFormDialog({ open, onOpenChange, onSubmit, form, uploading }: SubmitFormDialogProps) {
   const [file, setFile] = useState<File | null>(null)
   const [notes, setNotes] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -703,7 +755,7 @@ function ViewSubmissionsDialog({
   submissions, 
   notSubmitted,
   onUpdateStatus
-}: any) {
+}: ViewSubmissionsDialogProps) {
   if (!form) return null
 
   return (
@@ -721,7 +773,7 @@ function ViewSubmissionsDialog({
             <div>
               <h3 className="font-semibold mb-3">Submitted ({submissions.length})</h3>
               <div className="space-y-2">
-                {submissions.map((submission: any) => (
+                {submissions.map((submission) => (
                   <Card key={submission.id}>
                     <CardContent className="flex items-center justify-between p-4">
                       <div className="flex items-center gap-3">
@@ -793,7 +845,7 @@ function ViewSubmissionsDialog({
                 Not Submitted ({notSubmitted.length})
               </h3>
               <div className="space-y-2">
-                {notSubmitted.map((user: any) => (
+                {notSubmitted.map((user) => (
                   <Card key={user.id}>
                     <CardContent className="flex items-center gap-3 p-4">
                       <Avatar>

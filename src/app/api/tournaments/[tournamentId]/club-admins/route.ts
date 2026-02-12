@@ -72,7 +72,7 @@ export async function GET(
     const adminEmails = [...new Set(admins.map(admin => admin.user.email).filter(Boolean))]
 
     return NextResponse.json({ adminEmails })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching club admins:', error)
     return NextResponse.json(
       { error: 'Failed to fetch club admins' },

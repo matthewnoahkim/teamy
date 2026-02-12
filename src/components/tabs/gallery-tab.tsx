@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useToast } from '@/components/ui/use-toast'
 import { 
   Upload, 
@@ -13,9 +12,7 @@ import {
   Trash2,
   FolderPlus,
   Folder,
-  X,
   Download,
-  Edit,
   Calendar,
   User,
   Grid3x3,
@@ -33,29 +30,55 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { formatDateTime } from '@/lib/utils'
-import { Skeleton } from '@/components/ui/skeleton'
 import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
+import type { SessionUser } from '@/types/models'
+
+interface MediaItem {
+  id: string
+  mediaType: string
+  filePath: string
+  originalFilename: string
+  fileSize: number
+  createdAt: string
+  uploadedById: string
+  uploadedBy: { id: string; name?: string | null; email: string; image?: string | null }
+  album?: { id: string; name: string } | null
+}
+
+interface Album {
+  id: string
+  name: string
+  createdById: string
+  _count: { media: number }
+}
+
+interface CreateAlbumDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onCreateAlbum: (name: string, description: string) => void
+}
+
+interface MediaViewerDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  media: MediaItem | null
+  canDelete: boolean
+  onDelete: () => void
+}
 
 interface GalleryTabProps {
   clubId: string
-  user: any
+  user: SessionUser
   isAdmin: boolean
-  initialMediaItems?: any[]
-  initialAlbums?: any[]
+  initialMediaItems?: MediaItem[]
+  initialAlbums?: Album[]
 }
 
 export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAlbums }: GalleryTabProps) {
   const { toast } = useToast()
-  const [mediaItems, setMediaItems] = useState<any[]>(initialMediaItems || [])
-  const [albums, setAlbums] = useState<any[]>(initialAlbums || [])
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>(initialMediaItems || [])
+  const [albums, setAlbums] = useState<Album[]>(initialAlbums || [])
   const [loading, setLoading] = useState(!(initialMediaItems && initialAlbums))
   const [uploading, setUploading] = useState(false)
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null)
@@ -63,16 +86,16 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
   const [filterType, setFilterType] = useState<'all' | 'images' | 'videos'>('all')
   
   // Dialogs
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+  const [_uploadDialogOpen, _setUploadDialogOpen] = useState(false)
   const [createAlbumDialogOpen, setCreateAlbumDialogOpen] = useState(false)
   const [viewerOpen, setViewerOpen] = useState(false)
-  const [selectedMedia, setSelectedMedia] = useState<any | null>(null)
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
   const [deleteMediaDialogOpen, setDeleteMediaDialogOpen] = useState(false)
   const [mediaToDelete, setMediaToDelete] = useState<string | null>(null)
-  const [deletingMedia, setDeletingMedia] = useState(false)
+  const [_deletingMedia, setDeletingMedia] = useState(false)
   const [deleteAlbumDialogOpen, setDeleteAlbumDialogOpen] = useState(false)
   const [albumToDelete, setAlbumToDelete] = useState<string | null>(null)
-  const [deletingAlbum, setDeletingAlbum] = useState(false)
+  const [_deletingAlbum, setDeletingAlbum] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -159,10 +182,10 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
       })
 
       fetchMedia()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Upload failed',
-        description: error.message || 'Failed to upload files',
+        description: error instanceof Error ? error.message : 'Failed to upload files',
         variant: 'destructive',
       })
     } finally {
@@ -190,7 +213,7 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
 
       fetchAlbums()
       setCreateAlbumDialogOpen(false)
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to create album',
@@ -224,7 +247,7 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
       setViewerOpen(false)
       setDeleteMediaDialogOpen(false)
       setMediaToDelete(null)
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to delete media',
@@ -262,7 +285,7 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
       fetchAlbums()
       setDeleteAlbumDialogOpen(false)
       setAlbumToDelete(null)
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to delete album',
@@ -273,11 +296,11 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
     }
   }
 
-  const canDeleteMedia = (media: any) => {
+  const canDeleteMedia = (media: MediaItem) => {
     return media.uploadedById === user.id || isAdmin
   }
 
-  const canDeleteAlbum = (album: any) => {
+  const canDeleteAlbum = (album: Album) => {
     return album.createdById === user.id || isAdmin
   }
 
@@ -573,7 +596,7 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
 }
 
 // Create Album Dialog Component
-function CreateAlbumDialog({ open, onOpenChange, onCreateAlbum }: any) {
+function CreateAlbumDialog({ open, onOpenChange, onCreateAlbum }: CreateAlbumDialogProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
 
@@ -637,7 +660,7 @@ function CreateAlbumDialog({ open, onOpenChange, onCreateAlbum }: any) {
 }
 
 // Media Viewer Dialog Component
-function MediaViewerDialog({ open, onOpenChange, media, canDelete, onDelete }: any) {
+function MediaViewerDialog({ open, onOpenChange, media, canDelete, onDelete }: MediaViewerDialogProps) {
   if (!media) return null
 
   return (

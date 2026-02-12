@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get club resources and public resources
-    const where: any = {
+    const where: Record<string, unknown> = {
       OR: [
         { scope: 'PUBLIC' },
         { scope: 'CLUB', clubId },
@@ -62,14 +62,16 @@ export async function GET(req: NextRequest) {
     })
 
     return NextResponse.json({ resources })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching resources:', error)
     // If the error is about the model not existing, return empty array
-    if (error.message?.includes('resource') || error.code === 'P2021') {
+    const errMessage = error instanceof Error ? error.message : undefined
+    const errCode = (error as Record<string, unknown>)?.code
+    if (errMessage?.includes('resource') || errCode === 'P2021') {
       return NextResponse.json({ resources: [] })
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch resources' },
+      { error: errMessage || 'Failed to fetch resources' },
       { status: 500 }
     )
   }

@@ -114,6 +114,7 @@ export default async function BillingPage() {
   // If user has Stripe customer ID but no subscription status, try to sync from Stripe
   if (user?.stripeCustomerId && !user.subscriptionStatus && process.env.STRIPE_SECRET_KEY) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const Stripe = require('stripe')
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
       
@@ -129,7 +130,7 @@ export default async function BillingPage() {
         const subscriptionType = subscription.metadata?.type || 'pro'
         
         // Update user subscription status
-        const currentPeriodEnd = (subscription as any).current_period_end
+        const currentPeriodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end
         await prisma.user.update({
           where: { id: session.user.id },
           data: {

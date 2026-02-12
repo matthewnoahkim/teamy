@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create or update reaction
-    const reactionData: any = {
+    const reactionData: Record<string, unknown> = {
       emoji,
       userId: session.user.id,
     }
@@ -150,7 +150,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Build where clause based on target type
-    let whereClause: any = {
+    const whereClause: Record<string, unknown> = {
       userId: session.user.id,
       emoji,
     }

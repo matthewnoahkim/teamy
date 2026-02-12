@@ -71,12 +71,17 @@ interface Tournament {
       maxAttempts: number | null
       scoreReleaseMode: string | null
       releaseScoresAt: string | null
+      scoresReleased?: boolean
       questionCount: number
       clubId: string
       club: {
         id: string
         name: string
       }
+      isESTest?: boolean
+      hasCompletedAttempt?: boolean
+      canViewResults?: boolean
+      tournamentEnded?: boolean
     }>
   }>
   trialEvents: Array<{
@@ -114,6 +119,7 @@ interface Tournament {
       isESTest?: boolean
       hasCompletedAttempt?: boolean
       canViewResults?: boolean
+      tournamentEnded?: boolean
     }>
   }>
   generalTests: Array<{
@@ -143,6 +149,7 @@ interface Tournament {
     isESTest?: boolean
     hasCompletedAttempt?: boolean
     canViewResults?: boolean
+    tournamentEnded?: boolean
   }>
 }
 
@@ -202,7 +209,6 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, tournaments, searchParams])
 
   // Save selected tournament to localStorage whenever user changes selection
@@ -231,11 +237,11 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
       
       // Load note sheet statuses for all tests that allow note sheets
       await loadNoteSheetStatuses(data.tournaments || [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load tournaments:', error)
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load tournaments',
+        description: error instanceof Error ? error.message : 'Failed to load tournaments',
         variant: 'destructive',
       })
     } finally {
@@ -296,7 +302,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
             rejectionReason: null,
           })
         }
-      } catch (error) {
+      } catch (_error) {
         // Silently fail for individual tests
         statusMap.set(testId, {
           status: null,
@@ -324,7 +330,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
     ? tournaments.find((t) => t.tournament.id === selectedTournament)
     : null
 
-  const formatDate = (dateString: string) => {
+  const _formatDate = (dateString: string) => {
     try {
       return format(new Date(dateString), 'MMM d, yyyy')
     } catch {
@@ -409,7 +415,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
     })
   }
 
-  const handleTakeTest = (testId: string, clubId: string, isESTest?: boolean) => {
+  const handleTakeTest = (testId: string, _clubId: string, _isESTest?: boolean) => {
     // Use the new universal testing portal route for tournament tests
     window.location.href = `/testing/tests/${testId}/take`
   }
@@ -864,19 +870,19 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                         const availability = checkTestAvailability(test)
                                         // For ESTest, check if user can view results
                                         // Debug logging to help diagnose issues
-                                        if (process.env.NODE_ENV === 'development' && (test as any).isESTest) {
+                                        if (process.env.NODE_ENV === 'development' && test.isESTest) {
                                           console.log(`[Testing Portal] Test ${test.id} (${test.name}):`, {
-                                            isESTest: (test as any).isESTest,
-                                            canViewResults: (test as any).canViewResults,
-                                            hasCompletedAttempt: (test as any).hasCompletedAttempt,
-                                            scoresReleased: (test as any).scoresReleased,
+                                            isESTest: test.isESTest,
+                                            canViewResults: test.canViewResults,
+                                            hasCompletedAttempt: test.hasCompletedAttempt,
+                                            scoresReleased: test.scoresReleased,
                                           })
                                         }
                                         // Check if tournament has ended
-                                        const tournamentEnded = (test as any).tournamentEnded === true
+                                        const tournamentEnded = test.tournamentEnded === true
                                         
                                         // If scores are released and user can view results, show View Results button (for both ESTest and regular tests)
-                                        if ((test as any).canViewResults) {
+                                        if (test.canViewResults) {
                                           return (
                                             <div className="flex flex-col items-end gap-2">
                                               <Link href={`/testing/tests/${test.id}/results`}>
@@ -1240,19 +1246,19 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                                         const availability = checkTestAvailability(test)
                                         // For ESTest, check if user can view results
                                         // Debug logging to help diagnose issues
-                                        if (process.env.NODE_ENV === 'development' && (test as any).isESTest) {
+                                        if (process.env.NODE_ENV === 'development' && test.isESTest) {
                                           console.log(`[Testing Portal] Test ${test.id} (${test.name}):`, {
-                                            isESTest: (test as any).isESTest,
-                                            canViewResults: (test as any).canViewResults,
-                                            hasCompletedAttempt: (test as any).hasCompletedAttempt,
-                                            scoresReleased: (test as any).scoresReleased,
+                                            isESTest: test.isESTest,
+                                            canViewResults: test.canViewResults,
+                                            hasCompletedAttempt: test.hasCompletedAttempt,
+                                            scoresReleased: test.scoresReleased,
                                           })
                                         }
                                         // Check if tournament has ended
-                                        const tournamentEnded = (test as any).tournamentEnded === true
+                                        const tournamentEnded = test.tournamentEnded === true
                                         
                                         // If scores are released and user can view results, show View Results button (for both ESTest and regular tests)
-                                        if ((test as any).canViewResults) {
+                                        if (test.canViewResults) {
                                           return (
                                             <div className="flex flex-col items-end gap-2">
                                               <Link href={`/testing/tests/${test.id}/results`}>
@@ -1605,7 +1611,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                               {(() => {
                                 const availability = checkTestAvailability(test)
                                 // Check if tournament has ended
-                                const tournamentEnded = (test as any).tournamentEnded === true
+                                const tournamentEnded = test.tournamentEnded === true
                                 
                                 // If tournament has ended, don't show Take Test button
                                 if (tournamentEnded) {

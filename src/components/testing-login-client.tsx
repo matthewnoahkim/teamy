@@ -12,7 +12,7 @@ interface TestingLoginClientProps {
   email?: string
 }
 
-export function TestingLoginClient({ unauthorized, email }: TestingLoginClientProps) {
+export function TestingLoginClient({ unauthorized, email: _email }: TestingLoginClientProps) {
   const handleSignIn = () => {
     signIn('google', { callbackUrl: '/testing' })
   }

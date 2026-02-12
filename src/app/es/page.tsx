@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma'
 import { ESPortalClient } from '@/components/es-portal-client'
 import { ESLoginClient } from '@/components/es-login-client'
 import { Suspense } from 'react'
-import { Division } from '@prisma/client'
 import { getESTestsForUser } from '@/lib/es-tests'
 
 interface ESPortalPageProps {
@@ -228,7 +227,7 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
         trialEvents: null,
         tournament: admin.tournament,
         events: [],
-      } as any)
+      } as unknown as typeof staffMemberships[number])
     }
   }
 
@@ -252,7 +251,7 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
         trialEvents: null,
         tournament: tournament,
         events: [],
-      } as any)
+      } as unknown as typeof staffMemberships[number])
     }
   }
 
@@ -276,7 +275,7 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
         trialEvents: null,
         tournament: request.tournament,
         events: [],
-      } as any)
+      } as unknown as typeof staffMemberships[number])
     }
   }
 

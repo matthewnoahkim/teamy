@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Home, MessageSquare, Users, Calendar, Settings, ClipboardCheck, DollarSign, FileText, Pencil, Image, File, Menu, CheckSquare, BarChart3, BookOpen, Wrench } from 'lucide-react'
+import { Home, MessageSquare, Users, Calendar, Settings, ClipboardCheck, DollarSign, FileText, Pencil, Image, File, Menu, CheckSquare, BarChart3, Wrench } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
-import { HomePageTab } from '@/components/tabs/homepage-tab'
 import { PageLoading } from '@/components/ui/loading-spinner'
 import dynamic from 'next/dynamic'
 
 // Lazy load heavy tab components for better initial load performance
+const HomePageTab = dynamic(() => import('@/components/tabs/homepage-tab').then(mod => ({ default: mod.HomePageTab })), {
+  loading: () => <PageLoading title="Loading dashboard" description="Preparing widgets and updates..." variant="orbit" />
+})
 const StreamTab = dynamic(() => import('@/components/tabs/stream-tab').then(mod => ({ default: mod.StreamTab })), {
   loading: () => <PageLoading title="Loading stream" description="Fetching announcements and posts..." variant="orbit" />
 })
@@ -64,31 +66,31 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { useFaviconBadge } from '@/hooks/use-favicon-badge'
+import type {
+  ClubWithMembers,
+  MembershipWithPreferences,
+  SessionUser,
+  ClubPageInitialData,
+} from '@/types/models'
+
+/** Pulsing notification dot for tab buttons with unread content */
+const NotificationDot = memo(function NotificationDot() {
+  return (
+    <span className="absolute right-3 top-1/2 -translate-y-1/2">
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+      </span>
+    </span>
+  )
+})
 
 interface ClubPageProps {
-  club: any
-  currentMembership: any
-  user: {
-    id: string
-    name?: string | null
-    email: string
-    image?: string | null
-  }
+  club: ClubWithMembers
+  currentMembership: MembershipWithPreferences
+  user: SessionUser
   clubs?: Array<{ id: string; name: string }>
-  initialData?: {
-    attendances?: any[]
-    expenses?: any[]
-    purchaseRequests?: any[]
-    eventBudgets?: any[]
-    calendarEvents?: any[]
-    tests?: any[]
-    announcements?: any[]
-    mediaItems?: any[]
-    albums?: any[]
-    forms?: any[]
-    todos?: any[]
-    stats?: any
-  }
+  initialData?: Partial<ClubPageInitialData>
 }
 
 export function ClubPage({ club, currentMembership, user, clubs, initialData }: ClubPageProps) {
@@ -128,26 +130,25 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
   useFaviconBadge(totalUnreadCount)
 
   // Get last cleared time for a tab from localStorage
-  const getLastClearedTime = (tab: string): Date => {
+  const getLastClearedTime = useCallback((tab: string): Date => {
     if (typeof window === 'undefined') return new Date(0)
     const key = `lastCleared_${club.id}_${tab}_${user.id}`
     const stored = localStorage.getItem(key)
     return stored ? new Date(stored) : new Date(0)
-  }
+  }, [club.id, user.id])
 
   // Clear notification for a tab when it's opened
-  const clearTabNotification = (tab: string) => {
+  const clearTabNotification = useCallback((tab: string) => {
     if (typeof window === 'undefined') return
     const key = `lastCleared_${club.id}_${tab}_${user.id}`
     localStorage.setItem(key, new Date().toISOString())
     setTabNotifications(prev => {
       const updated = { ...prev, [tab]: false }
-      // Recalculate total count
       const totalCount = Object.values(updated).filter(Boolean).length
       setTotalUnreadCount(totalCount)
       return updated
     })
-  }
+  }, [club.id, user.id])
 
   // Check for new content in each tab (from anyone, not just other users)
   // Optimized: Only check tabs that aren't active, batch API calls, and cache announcements/calendar data
@@ -162,8 +163,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       const tabsToCheck = ['stream', 'calendar', 'attendance', 'finance', 'tests', 'people'].filter(tab => tab !== activeTab)
       
       // Batch fetch shared data once (announcements and calendar are used by multiple tabs)
-      let announcementsData: any = null
-      let calendarData: any = null
+      let announcementsData: Record<string, unknown> | null = null
+      let calendarData: Record<string, unknown> | null = null
       
       if (tabsToCheck.includes('stream') || tabsToCheck.includes('calendar') || tabsToCheck.includes('attendance')) {
         try {
@@ -187,16 +188,16 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       if (tabsToCheck.includes('stream') && announcementsData) {
         try {
           const lastCleared = getLastClearedTime('stream')
-          const hasNewAnnouncement = announcementsData.announcements?.some((announcement: any) => {
-            const isNew = new Date(announcement.createdAt) > lastCleared
-            const isFromOtherUser = announcement.author?.user?.id !== user.id
+          const hasNewAnnouncement = (announcementsData.announcements as Array<Record<string, unknown>> | undefined)?.some((announcement) => {
+            const isNew = new Date(announcement.createdAt as string) > lastCleared
+            const isFromOtherUser = (announcement.author as Record<string, unknown>)?.user && ((announcement.author as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
             return isNew && isFromOtherUser
           })
           
-          const hasNewCalendarPost = announcementsData.announcements?.some((announcement: any) => {
-            const announcementCreated = new Date(announcement.createdAt)
+          const hasNewCalendarPost = (announcementsData.announcements as Array<Record<string, unknown>> | undefined)?.some((announcement) => {
+            const announcementCreated = new Date(announcement.createdAt as string)
             const isNew = announcementCreated > lastCleared
-            const isFromOtherUser = announcement.author?.user?.id !== user.id
+            const isFromOtherUser = (announcement.author as Record<string, unknown>)?.user && ((announcement.author as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
             return isNew && announcement.calendarEventId && isFromOtherUser
           })
           
@@ -210,17 +211,17 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       if (tabsToCheck.includes('calendar') && calendarData) {
         try {
           const lastCleared = getLastClearedTime('calendar')
-          const events = calendarData.events || []
-          const hasNewEvent = events.some((event: any) => {
-            const isNew = new Date(event.createdAt) > lastCleared
-            const isFromOtherUser = event.creator?.user?.id !== user.id
+          const events = (calendarData.events || []) as Array<Record<string, unknown>>
+          const hasNewEvent = events.some((event) => {
+            const isNew = new Date(event.createdAt as string) > lastCleared
+            const isFromOtherUser = (event.creator as Record<string, unknown>)?.user && ((event.creator as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
             return isNew && isFromOtherUser
           })
           
-          const hasNewEventFromAnnouncement = announcementsData?.announcements?.some((announcement: any) => {
-            const announcementCreated = new Date(announcement.createdAt)
+          const hasNewEventFromAnnouncement = (announcementsData?.announcements as Array<Record<string, unknown>> | undefined)?.some((announcement) => {
+            const announcementCreated = new Date(announcement.createdAt as string)
             const isNew = announcementCreated > lastCleared
-            const isFromOtherUser = announcement.author?.user?.id !== user.id
+            const isFromOtherUser = (announcement.author as Record<string, unknown>)?.user && ((announcement.author as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
             return isNew && announcement.calendarEventId && isFromOtherUser
           })
           
@@ -237,15 +238,15 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
           if (attendanceResponse.ok) {
             const attendanceData = await attendanceResponse.json()
             const lastCleared = getLastClearedTime('attendance')
-            const hasNewAttendance = attendanceData.attendance?.some((record: any) => {
-              const isNew = new Date(record.createdAt) > lastCleared
+            const hasNewAttendance = (attendanceData.attendance as Array<Record<string, unknown>> | undefined)?.some((record) => {
+              const isNew = new Date(record.createdAt as string) > lastCleared
               const isFromOtherUser = record.createdById !== currentMembership.id
               return isNew && isFromOtherUser
             })
             
-            const hasNewCalendarEvent = calendarData?.events?.some((event: any) => {
-              const isNew = new Date(event.createdAt) > lastCleared
-              const isFromOtherUser = event.creator?.user?.id !== user.id
+            const hasNewCalendarEvent = (calendarData?.events as Array<Record<string, unknown>> | undefined)?.some((event) => {
+              const isNew = new Date(event.createdAt as string) > lastCleared
+              const isFromOtherUser = (event.creator as Record<string, unknown>)?.user && ((event.creator as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
               return isNew && isFromOtherUser
             })
             
@@ -273,15 +274,15 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
           if (financeResponse.ok) {
             const financeData = await financeResponse.json()
             const purchaseRequests = financeData.purchaseRequests || []
-            hasNewRequest = purchaseRequests.some((item: any) => {
-              const isNew = new Date(item.createdAt) > lastCleared
+            hasNewRequest = purchaseRequests.some((item: Record<string, unknown>) => {
+              const isNew = new Date(item.createdAt as string) > lastCleared
               const isFromOtherUser = item.requesterId !== currentMembership.id
               return isNew && isFromOtherUser
             })
             
-            hasNewApproval = purchaseRequests.some((request: any) => {
+            hasNewApproval = purchaseRequests.some((request: Record<string, unknown>) => {
               if (request.status === 'APPROVED' && request.reviewedAt) {
-                const isNew = new Date(request.reviewedAt) > lastCleared
+                const isNew = new Date(request.reviewedAt as string) > lastCleared
                 const isFromOtherUser = request.requesterId !== currentMembership.id
                 return isNew && isFromOtherUser
               }
@@ -292,8 +293,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
           if (expensesResponse.ok) {
             const expensesData = await expensesResponse.json()
             const expenses = expensesData.expenses || []
-            hasNewExpense = expenses.some((item: any) => {
-              const isNew = new Date(item.createdAt) > lastCleared
+            hasNewExpense = expenses.some((item: Record<string, unknown>) => {
+              const isNew = new Date(item.createdAt as string) > lastCleared
               const isFromOtherUser = item.addedById !== currentMembership.id
               return isNew && isFromOtherUser
             })
@@ -312,8 +313,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
           if (testsResponse.ok) {
             const testsData = await testsResponse.json()
             const lastCleared = getLastClearedTime('tests')
-            const hasNew = testsData.tests?.some((test: any) => {
-              const isNew = new Date(test.createdAt) > lastCleared
+            const hasNew = (testsData.tests as Array<Record<string, unknown>> | undefined)?.some((test) => {
+              const isNew = new Date(test.createdAt as string) > lastCleared
               const isFromOtherUser = test.createdById !== currentMembership.id
               return isNew && isFromOtherUser
             })
@@ -328,7 +329,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       if (tabsToCheck.includes('people')) {
         try {
           const lastCleared = getLastClearedTime('people')
-          const hasNew = club.memberships?.some((membership: any) => {
+          const hasNew = club.memberships?.some((membership) => {
             const isNew = new Date(membership.createdAt) > lastCleared
             return isNew
           })
@@ -360,14 +361,14 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       if (timeoutId) clearTimeout(timeoutId)
       clearInterval(interval)
     }
-  }, [club.id, club.memberships, user.id, currentMembership.id, activeTab])
+  }, [club.id, club.memberships, user.id, currentMembership.id, activeTab, getLastClearedTime])
 
   // Clear notification when tab is opened
   useEffect(() => {
     if (activeTab) {
       clearTabNotification(activeTab)
     }
-  }, [activeTab, club.id, user.id])
+  }, [activeTab, clearTabNotification])
 
   useEffect(() => {
     const tabParam = searchParams.get('tab')
@@ -376,14 +377,14 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
     }
   }, [searchParams])
 
-  const handleTabChange = (newTab: string) => {
+  const handleTabChange = useCallback((newTab: string) => {
     clearTabNotification(newTab)
     setActiveTab(newTab)
     setMobileMenuOpen(false)
     const url = new URL(window.location.href)
     url.searchParams.set('tab', newTab)
     router.replace(url.pathname + url.search, { scroll: false })
-  }
+  }, [clearTabNotification, router])
 
   const handleUpdateClubName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -418,10 +419,11 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
 
       setCurrentClubName(newClubName.trim())
       setEditClubNameOpen(false)
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update club name'
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update club name',
+        description: message,
         variant: 'destructive',
       })
     } finally {
@@ -429,7 +431,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
     }
   }
 
-  const handleBackgroundUpdate = (prefs: any | null) => {
+  const handleBackgroundUpdate = (prefs: MembershipWithPreferences['preferences'] | null) => {
     setPersonalBackground(prefs)
   }
 
@@ -477,7 +479,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
   }, [resolvedBackgroundSource])
 
   const effectiveBgType = resolvedBackgroundSource.backgroundType || 'grid'
-  const showGridPattern = effectiveBgType === 'grid'
+  const _showGridPattern = effectiveBgType === 'grid'
 
   // Memoize navigation buttons to prevent recreation on every render
   const renderNavigationButtons = useCallback(() => (
@@ -497,14 +499,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <MessageSquare className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Stream
-        {tabNotifications.stream && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-          </span>
-        )}
+        {tabNotifications.stream && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'people' ? 'default' : 'ghost'}
@@ -513,14 +508,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <Users className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         People
-        {tabNotifications.people && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-          </span>
-        )}
+        {tabNotifications.people && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'calendar' ? 'default' : 'ghost'}
@@ -529,14 +517,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <Calendar className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Calendar
-        {tabNotifications.calendar && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-          </span>
-        )}
+        {tabNotifications.calendar && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'attendance' ? 'default' : 'ghost'}
@@ -545,14 +526,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <ClipboardCheck className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Attendance
-        {tabNotifications.attendance && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-          </span>
-        )}
+        {tabNotifications.attendance && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'finance' ? 'default' : 'ghost'}
@@ -561,14 +535,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <DollarSign className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Finance
-        {tabNotifications.finance && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-          </span>
-        )}
+        {tabNotifications.finance && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'tests' ? 'default' : 'ghost'}
@@ -577,14 +544,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <FileText className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Tests
-        {tabNotifications.tests && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-          </span>
-        )}
+        {tabNotifications.tests && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'gallery' ? 'default' : 'ghost'}
@@ -609,14 +569,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <CheckSquare className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         To-Do List
-        {tabNotifications.todos && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-          </span>
-        )}
+        {tabNotifications.todos && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'tools' ? 'default' : 'ghost'}

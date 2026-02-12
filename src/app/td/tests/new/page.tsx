@@ -18,7 +18,7 @@ export default async function TDNewTestPage({ searchParams }: Props) {
       redirect('/td')
     }
 
-    const { eventId, tournamentId, trialEventName, trialEventDivision } = await searchParams
+    const { eventId, tournamentId, trialEventName, _trialEventDivision } = await searchParams
 
     if (!tournamentId) {
       redirect('/td')

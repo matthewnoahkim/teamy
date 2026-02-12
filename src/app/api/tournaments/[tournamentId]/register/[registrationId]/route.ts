@@ -82,8 +82,8 @@ export async function PATCH(
     console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const errorCode = (error as any)?.code
-    const errorMeta = (error as any)?.meta
+    const errorCode = (error as Record<string, unknown>)?.code
+    const errorMeta = (error as Record<string, unknown>)?.meta
     
     // Check for Prisma errors
     if (errorCode === 'P2009' || errorMessage.includes('Unknown column') || (errorMessage.includes('column') && errorMessage.includes('does not exist'))) {

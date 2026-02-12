@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
     // Build where clause to filter budgets
     // Admins see all budgets, regular members only see their team's budgets or club-wide budgets
-    const whereClause: any = {
+    const whereClause: Record<string, unknown> = {
       clubId,
     }
 
@@ -88,11 +88,11 @@ export async function GET(req: NextRequest) {
     const budgetsWithRemaining = await Promise.all(
       budgets.map(async (budget) => {
         // Build where clauses that match the budget's scope (club-wide or team-specific)
-        const expenseWhere: any = {
+        const expenseWhere: Record<string, unknown> = {
           clubId,
           eventId: budget.eventId,
         }
-        const requestWhere: any = {
+        const requestWhere: Record<string, unknown> = {
           clubId,
           eventId: budget.eventId,
           status: 'PENDING',
@@ -206,7 +206,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Check if changing eventId/teamId would create a duplicate
-      const whereClause: any = {
+      const whereClause: Record<string, unknown> = {
         clubId: validatedData.clubId,
         eventId: validatedData.eventId,
       }
@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
       })
     } else {
       // Creating a new budget - check if one already exists for this combination
-      const whereClause: any = {
+      const whereClause: Record<string, unknown> = {
         clubId: validatedData.clubId,
         eventId: validatedData.eventId,
       }
@@ -327,11 +327,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Calculate remaining budget and requested amounts (same logic as GET)
-    const expenseWhere: any = {
+    const expenseWhere: Record<string, unknown> = {
       clubId: validatedData.clubId,
       eventId: budget.eventId,
     }
-    const requestWhere: any = {
+    const requestWhere: Record<string, unknown> = {
       clubId: validatedData.clubId,
       eventId: budget.eventId,
       status: 'PENDING',

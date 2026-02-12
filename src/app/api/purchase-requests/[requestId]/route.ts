@@ -68,7 +68,7 @@ export async function PATCH(
 
       if (budget && !validatedData.adminOverride) {
         // Filter expenses by club if budget is team-specific
-        const expenseWhere: any = {
+        const expenseWhere: Record<string, unknown> = {
           clubId: purchaseRequest.clubId,
           eventId: purchaseRequest.eventId,
         }

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Link as LinkIcon, ExternalLink, Link2 } from 'lucide-react'
 
 interface ImportantLinksWidgetProps {
-  config?: any
+  config?: Record<string, unknown>
 }
 
 interface LinkItem {
@@ -14,7 +14,7 @@ interface LinkItem {
 }
 
 export function ImportantLinksWidget({ config }: ImportantLinksWidgetProps) {
-  const links: LinkItem[] = config?.links || []
+  const links: LinkItem[] = (config?.links as LinkItem[]) || []
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow duration-300">

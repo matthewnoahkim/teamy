@@ -92,7 +92,7 @@ export default async function TournamentManagePage({ params }: Props) {
   })
 
   // Fetch hosting request if tournament has one
-  const hostingRequest = tournament.hostingRequestId
+  const _hostingRequest = tournament.hostingRequestId
     ? await prisma.tournamentHostingRequest.findUnique({
         where: { id: tournament.hostingRequestId },
       })

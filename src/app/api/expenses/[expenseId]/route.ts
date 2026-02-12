@@ -48,7 +48,7 @@ export async function PATCH(
       )
     }
 
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (validatedData.eventId !== undefined) updateData.eventId = validatedData.eventId
     if (validatedData.teamId !== undefined) updateData.teamId = validatedData.teamId
     if (validatedData.description !== undefined) updateData.description = validatedData.description

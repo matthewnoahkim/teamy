@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { ClipboardList, AlertCircle, Calendar, MapPin, Users } from 'lucide-react'
+import { ClipboardList, AlertCircle, Calendar, Users } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { formatDivision } from '@/lib/utils'

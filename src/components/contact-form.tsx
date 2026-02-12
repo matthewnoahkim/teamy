@@ -42,7 +42,7 @@ export function ContactForm() {
           message: 'Failed to send your message. Please try again or email us directly.',
         })
       }
-    } catch (error) {
+    } catch (_error) {
       setSubmitStatus({
         type: 'error',
         message: 'An error occurred. Please try again or email us directly.',

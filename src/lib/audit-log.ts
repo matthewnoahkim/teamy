@@ -7,7 +7,7 @@ interface AuditLogParams {
   userName?: string | null
   action: string
   target?: string
-  details?: Record<string, any>
+  details?: Record<string, unknown>
   request?: NextRequest
 }
 

@@ -23,7 +23,7 @@ interface AuditLog {
   userName: string | null
   action: string
   target: string | null
-  details: any
+  details: Record<string, unknown>
   ipAddress: string | null
   userAgent: string | null
   createdAt: string

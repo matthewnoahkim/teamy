@@ -95,7 +95,7 @@ export async function POST(
     const matchingTestIds = createAudits
       .filter(audit => {
         if (audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
-          const auditEventName = (audit.details as any).eventName
+          const auditEventName = (audit.details as Record<string, unknown>).eventName
           return auditEventName && typeof auditEventName === 'string' && auditEventName === decodedEventName
         }
         return false
@@ -131,9 +131,11 @@ export async function POST(
         console.log(`[Release Trial Event Scores] Test ${testId}: verification query scoresReleased =`, verify?.scoresReleased)
         
         updatedCount++
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If the column doesn't exist, skip this test
-        if (error?.code === 'P2025' || error?.message?.includes('does not exist')) {
+        const errCode = (error as Record<string, unknown>)?.code
+        const errMessage = error instanceof Error ? error.message : undefined
+        if (errCode === 'P2025' || errMessage?.includes('does not exist')) {
           console.warn(`scoresReleased column does not exist for test ${testId}`)
         } else {
           console.error(`Error updating test ${testId}:`, error)

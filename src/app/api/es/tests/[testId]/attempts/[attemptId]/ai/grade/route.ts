@@ -130,18 +130,18 @@ export async function POST(
           })
           
           // Get existing part suggestions if any
-          let existingPartSuggestions: any[] = []
+          let existingPartSuggestions: Array<Record<string, unknown>> = []
           if (existingSuggestion?.rawResponse && typeof existingSuggestion.rawResponse === 'object' && 'isMultipart' in existingSuggestion.rawResponse && existingSuggestion.rawResponse.isMultipart) {
-            const rawResponse = existingSuggestion.rawResponse as any
+            const rawResponse = existingSuggestion.rawResponse as Record<string, unknown>
             if (rawResponse.partSuggestions && Array.isArray(rawResponse.partSuggestions)) {
               existingPartSuggestions = rawResponse.partSuggestions
             }
           }
           
           // Create a map of existing part suggestions by index
-          const existingByIndex = new Map(existingPartSuggestions.map((p: any) => [p.partIndex, p]))
+          const existingByIndex = new Map(existingPartSuggestions.map((p) => [p.partIndex, p]))
           
-          const partSuggestions: any[] = []
+          const partSuggestions: Array<Record<string, unknown>> = []
           
           // Grade all parts or just the specified part
           for (let i = 0; i < frqParts.length; i++) {
@@ -219,8 +219,8 @@ export async function POST(
                   ...partSuggestions.reduce((acc, p, idx) => {
                     acc[`part${idx}`] = p
                     return acc
-                  }, {} as any),
-                } as any,
+                  }, {} as Record<string, unknown>),
+                } as Prisma.JsonObject,
               },
             })
           } else {
@@ -245,8 +245,8 @@ export async function POST(
                   ...partSuggestions.reduce((acc, p, idx) => {
                     acc[`part${idx}`] = p
                     return acc
-                  }, {} as any),
-                } as any,
+                  }, {} as Record<string, unknown>),
+                } as Prisma.JsonObject,
               },
             })
           }

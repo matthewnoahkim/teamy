@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
     await requireMember(session.user.id, clubId)
 
-    const whereClause: any = { clubId }
+    const whereClause: Record<string, unknown> = { clubId }
 
     if (albumId) {
       whereClause.albumId = albumId

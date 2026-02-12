@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { 
-  BookOpen, 
   CheckCircle2, 
   XCircle, 
   Clock, 
@@ -133,10 +132,10 @@ export function ResourceRequests() {
           variant: 'destructive',
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to fetch resource requests',
+        description: error instanceof Error ? error.message : 'Failed to fetch resource requests',
         variant: 'destructive',
       })
     } finally {
@@ -212,10 +211,10 @@ export function ResourceRequests() {
           variant: 'destructive',
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to approve request',
+        description: error instanceof Error ? error.message : 'Failed to approve request',
         variant: 'destructive',
       })
     } finally {
@@ -260,10 +259,10 @@ export function ResourceRequests() {
           variant: 'destructive',
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to reject request',
+        description: error instanceof Error ? error.message : 'Failed to reject request',
         variant: 'destructive',
       })
     } finally {
@@ -294,10 +293,10 @@ export function ResourceRequests() {
           variant: 'destructive',
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to reset request',
+        description: error instanceof Error ? error.message : 'Failed to reset request',
         variant: 'destructive',
       })
     } finally {
@@ -348,7 +347,7 @@ export function ResourceRequests() {
                 className="pl-9"
               />
             </div>
-            <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+            <Select value={statusFilter} onValueChange={(v: string) => setStatusFilter(v)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>

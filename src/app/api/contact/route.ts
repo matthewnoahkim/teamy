@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withRateLimit, RATE_LIMITS } from '@/lib/rate-limit-api'
+import { withRateLimit } from '@/lib/rate-limit-api'
 import { contactFormSchema, validateRequestBody } from '@/lib/validation-schemas'
 import { getValidatedWebhook } from '@/lib/security-config'
 

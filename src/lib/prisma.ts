@@ -11,6 +11,7 @@ function getAdapter() {
   
   try {
     // Dynamic import that webpack won't try to bundle
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const adapterModule = require('@prisma/adapter-pg')
     const PrismaPg = adapterModule?.PrismaPg
     const connectionString = process.env.DATABASE_URL
@@ -31,7 +32,7 @@ const prismaClient =
     ? new PrismaClient({
         adapter,
         log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-      } as any)
+      } as unknown as ConstructorParameters<typeof PrismaClient>[0])
     : new PrismaClient({
         log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
       }))

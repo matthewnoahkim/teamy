@@ -18,8 +18,8 @@ function generateRecurrenceInstances(
   recurrenceCount: number | undefined
 ): Date[] {
   const instances: Date[] = []
-  const eventDuration = endDate.getTime() - startDate.getTime()
-  let currentDate = new Date(startDate)
+  const _eventDuration = endDate.getTime() - startDate.getTime()
+  const currentDate = new Date(startDate)
   let count = 0
   const maxIterations = recurrenceCount || 365 // Safety limit
   const endLimit = recurrenceEndDate || new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000) // 1 year max
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       : (validated.rsvpEnabled !== undefined ? validated.rsvpEnabled : true)
 
     // Build the event data object
-    const eventData: any = {
+    const eventData: Record<string, unknown> = {
       clubId: validated.clubId,
       creatorId: membership.id,
       scope: validated.scope as CalendarScope,
@@ -587,7 +587,7 @@ export async function GET(req: NextRequest) {
                 return true
               }
               // Also check membership.roles array for CAPTAIN etc.
-              if ((membership as any).roles?.includes(target.targetRole)) {
+              if ((membership as unknown as { roles?: string[] }).roles?.includes(target.targetRole)) {
                 return true
               }
             }
@@ -600,7 +600,7 @@ export async function GET(req: NextRequest) {
         })
 
     // Remove internal fields from response
-    const cleanedEvents = filteredEvents.map(({ test, targets, ...event }) => event)
+    const cleanedEvents = filteredEvents.map(({ test: _test, targets: _targets, ...event }) => event)
 
     return NextResponse.json({ events: cleanedEvents })
   } catch (error) {

@@ -39,7 +39,7 @@ export function UserBackgroundApplier() {
       
       try {
         // Default: reset everything
-        let css = `
+        const css = `
           :root {
             --user-background: none;
             --user-background-image: none;

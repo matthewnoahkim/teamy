@@ -94,7 +94,7 @@ export async function GET(
       },
     })
 
-    const esTestIds = esTests.map(t => t.id)
+    const _esTestIds = esTests.map(t => t.id)
 
     // Get all clubs registered for this tournament (needed for filtering deleted tests)
     const registrations = await prisma.tournamentRegistration.findMany({
@@ -106,7 +106,7 @@ export async function GET(
       },
     })
 
-    const clubIds = registrations.map(r => r.clubId)
+    const _clubIds = registrations.map(r => r.clubId)
 
     // Get test IDs from TournamentTest - only tests actually linked to this tournament
     const tournamentTests = await prisma.tournamentTest.findMany({
@@ -124,7 +124,7 @@ export async function GET(
     // Fetch audit logs for regular Test models
     // Query all audit logs - includes logs for deleted tests (testId will be null after migration)
     // Limit to most recent 1000 for performance
-    const testAuditWhere: any = {
+    const testAuditWhere: Record<string, unknown> = {
       OR: [
         // Deleted tests - we'll filter these by clubId in details after fetching
         {
@@ -168,16 +168,16 @@ export async function GET(
         return linkedTestIds.includes(audit.test.id)
       } else if (audit.testId === null) {
         // Test was deleted and testId is null - check tournamentIds in details
-        const details = audit.details as any
+        const details = audit.details as Record<string, unknown> | null
         if (details?.tournamentIds && Array.isArray(details.tournamentIds)) {
-          return details.tournamentIds.includes(tournamentId)
+          return (details.tournamentIds as string[]).includes(tournamentId)
         }
         return false
       } else {
         // Test was deleted but testId is still in audit log - check tournamentIds in details
-        const details = audit.details as any
+        const details = audit.details as Record<string, unknown> | null
         if (details?.tournamentIds && Array.isArray(details.tournamentIds)) {
-          return details.tournamentIds.includes(tournamentId)
+          return (details.tournamentIds as string[]).includes(tournamentId)
         }
         // Fallback: check if testId was in linkedTestIds (for older audit logs without tournamentIds)
         return linkedTestIds.includes(audit.testId)
@@ -208,7 +208,7 @@ export async function GET(
 
     // Fetch ESTest audit logs (now we have proper audit tracking)
     // Include both existing and deleted tests (testId will be null for deleted tests)
-    let allESTestAuditsRaw: any[] = []
+    let allESTestAuditsRaw: Array<Record<string, unknown>> = []
     try {
       allESTestAuditsRaw = await prisma.eSTestAudit.findMany({
         where: {
@@ -252,9 +252,9 @@ export async function GET(
         },
         take: 1000, // Limit to most recent 1000 for performance
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If ESTestAudit table doesn't exist yet, just use empty array
-      console.warn('ESTestAudit table may not exist yet:', error?.message)
+      console.warn('ESTestAudit table may not exist yet:', error instanceof Error ? error.message : error)
       allESTestAuditsRaw = []
     }
 
@@ -266,7 +266,7 @@ export async function GET(
         return audit.test.tournamentId === tournamentId
       } else if (audit.testId === null) {
         // Test was deleted - check tournamentId in details
-        const details = audit.details as any
+        const details = audit.details as Record<string, unknown> | null
         if (details?.tournamentId && typeof details.tournamentId === 'string') {
           return details.tournamentId === tournamentId
         }
@@ -281,12 +281,12 @@ export async function GET(
       .map(audit => {
         const testName = audit.test?.name || 
                         (audit.details && typeof audit.details === 'object' && 'testName' in audit.details 
-                          ? (audit.details as any).testName 
+                          ? (audit.details as Record<string, unknown>).testName 
                           : 'Deleted Test')
         
         const eventName = audit.test?.event?.name ||
                          (audit.details && typeof audit.details === 'object' && 'eventName' in audit.details
-                           ? (audit.details as any).eventName
+                           ? (audit.details as Record<string, unknown>).eventName
                            : null)
         
         return {
@@ -311,7 +311,7 @@ export async function GET(
         // If test exists, use its name, otherwise try to get from details
         const testName = audit.test?.name || 
                         (audit.details && typeof audit.details === 'object' && 'testName' in audit.details 
-                          ? (audit.details as any).testName 
+                          ? (audit.details as Record<string, unknown>).testName 
                           : 'Deleted Test')
         
         return {
@@ -333,16 +333,19 @@ export async function GET(
     )
 
     return NextResponse.json({ auditLogs: allAudits })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching tournament audit logs:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    const errorName = error instanceof Error ? error.name : undefined
     console.error('Error details:', {
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
+      message: errorMessage,
+      stack: errorStack,
+      name: errorName,
     })
     return NextResponse.json({ 
       error: 'Failed to fetch audit logs',
-      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
     }, { status: 500 })
   }
 }

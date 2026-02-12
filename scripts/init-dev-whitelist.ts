@@ -29,7 +29,7 @@ async function initWhitelist() {
           console.log('Whitelist already exists with', currentEmails.length, 'emails')
           console.log('Current emails:', currentEmails)
         }
-      } catch (e) {
+      } catch (_e) {
         console.log('Existing whitelist is invalid, replacing with defaults...')
       }
     }

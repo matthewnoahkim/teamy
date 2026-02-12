@@ -6,10 +6,19 @@ import { FileText, Clock, AlertCircle, BookOpen } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 
+interface UpcomingTest {
+  id: string
+  name: string
+  status: string
+  startAt: string
+  endAt?: string
+  durationMinutes: number
+}
+
 interface UpcomingTestsWidgetProps {
-  tests: any[]
+  tests: UpcomingTest[]
   clubId: string
-  config?: any
+  config?: Record<string, unknown>
 }
 
 export function UpcomingTestsWidget({ 

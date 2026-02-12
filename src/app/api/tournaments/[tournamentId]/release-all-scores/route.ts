@@ -120,9 +120,11 @@ export async function POST(
         console.log(`[Release All Scores] Test ${test.id}: verification query scoresReleased =`, verify?.scoresReleased)
         
         updatedCount++
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If the column doesn't exist, skip this test
-        if (error?.code === 'P2025' || error?.message?.includes('does not exist')) {
+        const errCode = (error as Record<string, unknown>)?.code
+        const errMessage = error instanceof Error ? error.message : undefined
+        if (errCode === 'P2025' || errMessage?.includes('does not exist')) {
           console.warn(`scoresReleased column does not exist for test ${test.id}`)
         } else {
           console.error(`Error updating ESTest ${test.id}:`, error)
@@ -149,7 +151,7 @@ export async function POST(
         console.log(`[Release All Scores] Regular test ${test.id} (${updated.name}): after update releaseScoresAt =`, updated.releaseScoresAt)
         
         updatedCount++
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(`Error updating regular test ${test.id}:`, error)
         // Don't throw - continue with other tests
       }

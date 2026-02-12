@@ -9,7 +9,7 @@ export const revalidate = 0
 
 // GET /api/testing/tournaments
 // Get all tournaments the user's teams are registered for, with their assigned events and released tests
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -398,10 +398,12 @@ export async function GET(req: NextRequest) {
                 }]
               })
             )
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error(`[API Testing Tournaments] Error fetching scoresReleased:`, error)
             // If fields don't exist (migration not run), try without scoresReleased
-            if (error?.message?.includes('does not exist') || error?.code === 'P2025') {
+            const errMsg = error instanceof Error ? error.message : ''
+            const errCode = (error as Record<string, unknown>)?.code
+            if (errMsg.includes('does not exist') || errCode === 'P2025') {
               console.warn(`[API Testing Tournaments] scoresReleased column doesn't exist, trying without it`)
               try {
                 const esTestScoresStatus = await prisma.eSTest.findMany({
@@ -587,7 +589,7 @@ export async function GET(req: NextRequest) {
             const parsed = JSON.parse(registration.tournament.trialEvents)
             if (Array.isArray(parsed)) {
               // Normalize format: handle both old format (string[]) and new format ({ name, division }[])
-              trialEvents = parsed.map((e: any) => 
+              trialEvents = parsed.map((e: string | { name: string; division?: string }) => 
                 typeof e === 'string' 
                   ? { name: e, division: registration.tournament.division } 
                   : { name: e.name, division: e.division || registration.tournament.division }
@@ -621,7 +623,7 @@ export async function GET(req: NextRequest) {
             })
             for (const audit of esCreateAudits) {
               if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
-                const eventName = (audit.details as any).eventName
+                const eventName = (audit.details as Record<string, unknown>).eventName
                 if (eventName && typeof eventName === 'string') {
                   testEventNameMap.set(audit.testId, eventName)
                 }
@@ -643,7 +645,7 @@ export async function GET(req: NextRequest) {
             })
             for (const audit of testCreateAudits) {
               if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
-                const eventName = (audit.details as any).eventName
+                const eventName = (audit.details as Record<string, unknown>).eventName
                 if (eventName && typeof eventName === 'string') {
                   testEventNameMap.set(audit.testId, eventName)
                 }
@@ -654,7 +656,7 @@ export async function GET(req: NextRequest) {
 
         // Group tests by event
         // If user has no roster assignments, show all event-specific tests grouped by their events
-        let eventsWithTests: Array<{ event: any; tests: any[] }> = []
+        let eventsWithTests: Array<{ event: Record<string, unknown>; tests: Array<Record<string, unknown>> }> = []
         
         if (eventIds.length === 0) {
           // No roster assignments - show all event-specific tests grouped by event
@@ -703,14 +705,14 @@ export async function GET(req: NextRequest) {
                   maxAttempts: tt.test.maxAttempts,
                   scoreReleaseMode: tt.test.scoreReleaseMode,
                   releaseScoresAt: tt.test.releaseScoresAt,
-                  scoresReleased: (tt.test as any).scoresReleased,
+                  scoresReleased: tt.test.scoresReleased,
                   questionCount: tt.test.questionCount,
                   clubId: tt.test.clubId,
                   club: tt.test.club,
                   isESTest: tt.isESTest,
-                  hasCompletedAttempt: (tt.test as any).hasCompletedAttempt,
-                  canViewResults: (tt.test as any).canViewResults,
-                  tournamentEnded: (tt.test as any).tournamentEnded || tournamentEnded,
+                  hasCompletedAttempt: tt.test.hasCompletedAttempt,
+                  canViewResults: tt.test.canViewResults,
+                  tournamentEnded: tt.test.tournamentEnded || tournamentEnded,
                 })),
               }
             })
@@ -740,14 +742,14 @@ export async function GET(req: NextRequest) {
                 maxAttempts: tt.test.maxAttempts,
                 scoreReleaseMode: tt.test.scoreReleaseMode,
                 releaseScoresAt: tt.test.releaseScoresAt,
-                scoresReleased: (tt.test as any).scoresReleased,
+                scoresReleased: tt.test.scoresReleased,
                 questionCount: tt.test.questionCount,
                 clubId: tt.test.clubId,
                 club: tt.test.club,
                 isESTest: tt.isESTest,
-                hasCompletedAttempt: (tt.test as any).hasCompletedAttempt,
-                canViewResults: (tt.test as any).canViewResults,
-                tournamentEnded: (tt.test as any).tournamentEnded || tournamentEnded,
+                hasCompletedAttempt: tt.test.hasCompletedAttempt,
+                canViewResults: tt.test.canViewResults,
+                tournamentEnded: tt.test.tournamentEnded || tournamentEnded,
               })),
             }
           })
@@ -757,8 +759,8 @@ export async function GET(req: NextRequest) {
         const testsWithNullEventId_ = releasedTests.filter((tt) => !tt.eventId)
         
         // Group trial event tests by event name
-        const trialEventTestsByEvent = new Map<string, any[]>()
-        const generalTests: any[] = []
+        const trialEventTestsByEvent = new Map<string, Array<Record<string, unknown>>>()
+        const generalTests: Array<Record<string, unknown>> = []
 
         for (const tt of testsWithNullEventId_) {
           const eventName = testEventNameMap.get(tt.test.id)
@@ -784,14 +786,14 @@ export async function GET(req: NextRequest) {
               maxAttempts: tt.test.maxAttempts,
               scoreReleaseMode: tt.test.scoreReleaseMode,
               releaseScoresAt: tt.test.releaseScoresAt,
-              scoresReleased: (tt.test as any).scoresReleased,
+              scoresReleased: tt.test.scoresReleased,
               questionCount: tt.test.questionCount,
               clubId: tt.test.clubId,
               club: tt.test.club,
               isESTest: tt.isESTest,
-              hasCompletedAttempt: (tt.test as any).hasCompletedAttempt,
-              canViewResults: (tt.test as any).canViewResults,
-              tournamentEnded: (tt.test as any).tournamentEnded || tournamentEnded,
+              hasCompletedAttempt: tt.test.hasCompletedAttempt,
+              canViewResults: tt.test.canViewResults,
+              tournamentEnded: tt.test.tournamentEnded || tournamentEnded,
             })
           } else {
             // True general test (not a trial event)
@@ -812,14 +814,14 @@ export async function GET(req: NextRequest) {
               maxAttempts: tt.test.maxAttempts,
               scoreReleaseMode: tt.test.scoreReleaseMode,
               releaseScoresAt: tt.test.releaseScoresAt,
-              scoresReleased: (tt.test as any).scoresReleased,
+              scoresReleased: tt.test.scoresReleased,
               questionCount: tt.test.questionCount,
               clubId: tt.test.clubId,
               club: tt.test.club,
               isESTest: tt.isESTest,
-              hasCompletedAttempt: (tt.test as any).hasCompletedAttempt,
-              canViewResults: (tt.test as any).canViewResults,
-              tournamentEnded: (tt.test as any).tournamentEnded || tournamentEnded,
+              hasCompletedAttempt: tt.test.hasCompletedAttempt,
+              canViewResults: tt.test.canViewResults,
+              tournamentEnded: tt.test.tournamentEnded || tournamentEnded,
             })
           }
         }

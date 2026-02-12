@@ -1,5 +1,5 @@
-import { PublicPageLayout } from '@/components/public-page-layout'
 import Link from 'next/link'
+import { PublicPageLayout } from '@/components/public-page-layout'
 
 export default function PrivacyPolicyPage() {
   return (
@@ -7,11 +7,8 @@ export default function PrivacyPolicyPage() {
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-12">
         <div className="prose prose-slate dark:prose-invert max-w-none bg-card border border-border rounded-2xl p-8 md:p-12 shadow-card">
           <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
-          <p className="text-muted-foreground mb-8">Last updated: January 16, 2026</p>
+          <p className="text-muted-foreground mb-8">Last updated: February 11, 2026</p>
 
-          <section className="mb-8">The privacy policy is under review.</section>
-
-          {/*
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Introduction</h2>
             <p>
@@ -52,7 +49,12 @@ export default function PrivacyPolicyPage() {
               <li>Review the personal information collected from their child</li>
               <li>Request that we delete their child&apos;s personal information</li>
               <li>Refuse to allow further collection or use of their child&apos;s information</li>
-              <li>Contact us at teamysite@gmail.com to exercise these rights</li>
+              <li>Contact us at{' '}
+                <a href="mailto:teamysite@gmail.com" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
+                  teamysite@gmail.com
+                </a>{' '}
+                to exercise these rights
+              </li>
             </ul>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">2.4 Information Collected from Children</h3>
@@ -124,18 +126,30 @@ export default function PrivacyPolicyPage() {
               <li>Content you create (announcements, calendar events, test submissions)</li>
               <li>Financial data (expenses, purchase requests) if applicable</li>
               <li>Attendance records and check-in data</li>
+              <li>Contact form submissions</li>
+              <li>Tournament hosting requests and related information</li>
             </ul>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">4.2 Automatically Collected Information</h3>
             <p>We automatically collect certain information when you use our Service:</p>
             <ul>
               <li>Usage data and interaction patterns</li>
-              <li>Device information</li>
+              <li>Device information and browser type</li>
               <li>IP address and approximate location data</li>
               <li>Cookies and similar tracking technologies</li>
+              <li>API request logs for security and performance monitoring</li>
             </ul>
             <p className="mt-4">
               <strong>Note:</strong> We do not use tracking technologies to build advertising profiles of students or for behavioral advertising purposes.
+            </p>
+
+            <h3 className="text-lg font-semibold mb-3 mt-6">4.3 Payment Information</h3>
+            <p>
+              Payment processing is handled by Stripe. We do not store your full credit card details on our servers. We may store your Stripe customer ID and subscription status for account management purposes. Please refer to{' '}
+              <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
+                Stripe&apos;s Privacy Policy
+              </a>{' '}
+              for information on how they handle your payment data.
             </p>
           </section>
 
@@ -147,8 +161,11 @@ export default function PrivacyPolicyPage() {
               <li>Authenticate users and manage accounts</li>
               <li>Send notifications and communications related to your teams</li>
               <li>Process and manage team activities</li>
-              <li>Detect and prevent fraud or abuse</li>
+              <li>Process payments and manage subscriptions</li>
+              <li>Provide AI-assisted features (such as test grading) using anonymized data</li>
+              <li>Detect and prevent fraud, abuse, or security incidents</li>
               <li>Comply with legal obligations</li>
+              <li>Monitor and analyze usage trends to improve the Service</li>
             </ul>
             <p className="mt-4">
               <strong>Student Data:</strong> Student information is used solely for educational purposes and to provide the Service. We do not use student personal information for advertising or marketing purposes.
@@ -159,19 +176,20 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-heading text-xl font-semibold mb-4">6. Information Sharing</h2>
             <p>We do not sell, rent, or trade your personal information. We may share your information only with:</p>
             <ul>
-              <li><strong>Within Your Teams:</strong> Information you post is visible to members of your teams</li>
-              <li><strong>Service Providers:</strong> Trusted third-party services (Google OAuth, email delivery) that are contractually obligated to protect your data and use it only for providing services to us</li>
-              <li><strong>Legal Requirements:</strong> When required by law or to protect our rights</li>
+              <li><strong>Within Your Teams:</strong> Information you post is visible to members of your teams and clubs</li>
+              <li><strong>Tournament Participants:</strong> Tournament-related information may be visible to tournament administrators, event supervisors, and registered participants as necessary for tournament operations</li>
+              <li><strong>Service Providers:</strong> Trusted third-party services that help us operate the Service, including:
+                <ul>
+                  <li>Google (authentication)</li>
+                  <li>Stripe (payment processing)</li>
+                  <li>Resend (email delivery)</li>
+                  <li>OpenAI (AI-assisted features)</li>
+                  <li>Vercel (hosting and infrastructure)</li>
+                </ul>
+                These providers are contractually obligated to protect your data and use it only for providing services to us.
+              </li>
+              <li><strong>Legal Requirements:</strong> When required by law, court order, or to protect our rights and the safety of our users</li>
               <li><strong>School Officials:</strong> With educational institutions for students under their authority, as permitted by FERPA</li>
-            </ul>
-            <p className="mt-4">
-              <strong>Third-Party Service Providers:</strong> Any third-party service providers who handle student data are carefully vetted and contractually required to:
-            </p>
-            <ul>
-              <li>Maintain the confidentiality and security of student data</li>
-              <li>Use student data only for the purpose of providing services to us</li>
-              <li>Comply with FERPA and COPPA requirements</li>
-              <li>Return or securely destroy student data upon termination of services</li>
             </ul>
           </section>
 
@@ -182,10 +200,13 @@ export default function PrivacyPolicyPage() {
             </p>
             <ul>
               <li>Encryption of data in transit (TLS/SSL) and at rest</li>
-              <li>Regular security assessments and audits</li>
-              <li>Access controls and authentication measures</li>
-              <li>Secure data centers with physical security measures</li>
-              <li>Employee training on data privacy and security</li>
+              <li>Regular security assessments and code audits</li>
+              <li>Role-based access controls and authentication measures</li>
+              <li>Input validation and sanitization to prevent injection attacks</li>
+              <li>Rate limiting to prevent abuse</li>
+              <li>Audit logging for security-sensitive operations</li>
+              <li>Secure password hashing using industry-standard algorithms</li>
+              <li>Content Security Policy (CSP) headers</li>
               <li>Incident response procedures for data breaches</li>
             </ul>
             <p className="mt-4">
@@ -197,7 +218,21 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">8. Your Rights</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">8. Data Retention</h2>
+            <p>
+              We retain your personal information for as long as your account is active or as needed to provide you with the Service. Specifically:
+            </p>
+            <ul>
+              <li><strong>Account data:</strong> Retained until you request account deletion</li>
+              <li><strong>API and security logs:</strong> Retained for up to 90 days for security monitoring, then automatically purged</li>
+              <li><strong>Audit logs:</strong> Retained for up to 1 year for compliance purposes</li>
+              <li><strong>Education records:</strong> Retained only as long as needed to provide the Service, and deleted upon request from the educational institution</li>
+              <li><strong>Payment records:</strong> Retained as required by applicable financial regulations</li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-heading text-xl font-semibold mb-4">9. Your Rights</h2>
             <p>You have the right to:</p>
             <ul>
               <li><strong>Access:</strong> Request a copy of your personal information</li>
@@ -207,7 +242,7 @@ export default function PrivacyPolicyPage() {
               <li><strong>Opt-Out:</strong> Opt out of certain data collection practices</li>
             </ul>
             
-            <h3 className="text-lg font-semibold mb-3 mt-6">8.1 Student and Parent Rights</h3>
+            <h3 className="text-lg font-semibold mb-3 mt-6">9.1 Student and Parent Rights</h3>
             <p>
               For students and their parents/guardians, additional rights include:
             </p>
@@ -219,21 +254,40 @@ export default function PrivacyPolicyPage() {
               <li>Withdraw consent for collection of information from children under 13 (where applicable)</li>
             </ul>
 
-            <h3 className="text-lg font-semibold mb-3 mt-6">8.2 Exercising Your Rights</h3>
+            <h3 className="text-lg font-semibold mb-3 mt-6">9.2 Exercising Your Rights</h3>
             <p className="mt-4">
-              To exercise these rights, please contact us at teamysite@gmail.com. For students, please have your parent/guardian or school administrator contact us on your behalf. We will respond to all legitimate requests within 30 days.
+              To exercise these rights, please contact us at{' '}
+              <a href="mailto:teamysite@gmail.com" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
+                teamysite@gmail.com
+              </a>
+              . For students, please have your parent/guardian or school administrator contact us on your behalf. We will respond to all legitimate requests within 30 days.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">9. International Users</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">10. Cookies and Tracking</h2>
+            <p>
+              We use cookies and similar technologies to:
+            </p>
+            <ul>
+              <li>Maintain your authentication session</li>
+              <li>Remember your preferences (such as theme settings)</li>
+              <li>Analyze usage patterns to improve the Service</li>
+            </ul>
+            <p className="mt-4">
+              We do not use cookies for third-party advertising or cross-site tracking. You can control cookie settings through your browser preferences.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-heading text-xl font-semibold mb-4">11. International Users</h2>
             <p>
               We do not target, market to, or knowingly collect personal information from individuals outside the United States. If we become aware that we have collected information from a non-U.S. resident, we will delete it promptly.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">10. Changes to This Privacy Policy</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">12. Changes to This Privacy Policy</h2>
             <p>
               We may update this Privacy Policy from time to time to reflect changes in our practices or legal requirements. We will notify users of any material changes by:
             </p>
@@ -248,12 +302,15 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">11. Contact Us</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">13. Contact Us</h2>
             <p>
               If you have any questions about this Privacy Policy, our privacy practices, or wish to exercise your rights, please contact us at:
             </p>
             <p className="mt-4">
-              <strong>Email:</strong> teamysite@gmail.com
+              <strong>Email:</strong>{' '}
+              <a href="mailto:teamysite@gmail.com" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
+                teamysite@gmail.com
+              </a>
             </p>
             <p className="mt-4">
               For FERPA-related inquiries, educational institutions may contact us directly. For COPPA-related inquiries, parents may contact us to review, modify, or delete their child&apos;s information.
@@ -268,7 +325,6 @@ export default function PrivacyPolicyPage() {
               Washington, DC 20202
             </p>
           </section>
-          */}
         </div>
       </div>
     </PublicPageLayout>

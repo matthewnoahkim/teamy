@@ -102,7 +102,7 @@ export default async function ESTestResponsesPage({ params }: Props) {
         <ESTestAttemptsView
           testId={esTest.id}
           testName={esTest.name}
-          scoresReleased={(esTest as any).scoresReleased || false}
+          scoresReleased={(esTest as unknown as { scoresReleased?: boolean }).scoresReleased || false}
         />
       </div>
     </div>

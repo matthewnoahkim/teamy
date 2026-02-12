@@ -24,7 +24,7 @@ export async function POST(
     }
 
     const body = await req.json()
-    const validatedData = submitSchema.parse(body)
+    const _validatedData = submitSchema.parse(body)
 
     // Try to find as TestAttempt first
     let attempt = await prisma.testAttempt.findUnique({
@@ -45,7 +45,7 @@ export async function POST(
     })
 
     let isESTest = false
-    let membership: any = null
+    let membership: { id: string; [key: string]: unknown } | null = null
 
     if (attempt) {
       // Verify ownership - check if user is a member of the club and owns this attempt
@@ -79,7 +79,7 @@ export async function POST(
       }
 
       isESTest = true
-      attempt = esAttempt as any
+      attempt = esAttempt as unknown as typeof attempt
 
       // For ESTest, verify membership through tournament registration
       const userMemberships = await prisma.membership.findMany({
@@ -170,7 +170,7 @@ export async function POST(
       .reduce((sum, r) => sum + r.pointsAwarded, 0)
 
     // Calculate proctoring score from proctorEvents
-    const proctoringScore = calculateProctoringScore((attempt as any).proctorEvents || [])
+    const proctoringScore = calculateProctoringScore((attempt as unknown as { proctorEvents: Array<{ kind: string }> }).proctorEvents || [])
 
     // Get IP at submit
     const ipAtSubmit = getClientIp(req.headers)

@@ -27,7 +27,7 @@ interface PublishTestButtonProps {
 
 export function PublishTestButton({
   testId,
-  clubId,
+  clubId: _clubId,
   currentStatus,
   questionCount,
 }: PublishTestButtonProps) {
@@ -136,7 +136,7 @@ export function PublishTestButton({
       })
 
       // Try to parse JSON, but handle cases where response is not JSON (e.g., HTML error page)
-      let data: any = null
+      let data: { error?: string; message?: string; details?: string } | null = null
       try {
         const text = await response.text()
         data = text ? JSON.parse(text) : {}
@@ -162,10 +162,10 @@ export function PublishTestButton({
       setOpen(false)
       setAddToCalendar(false)
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to publish test',
+        description: error instanceof Error ? error.message : 'Failed to publish test',
         variant: 'destructive',
       })
     } finally {

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // Build where clause - all inputs are now validated
-    const where: any = {}
+    const where: Record<string, unknown> = {}
 
     if (logType) {
       where.logType = logType

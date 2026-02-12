@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -38,7 +38,6 @@ import {
   Minimize2,
   Plus,
   X,
-  AlertCircle,
   Send,
   Bot,
   User,
@@ -923,10 +922,10 @@ function AIAssistantPage() {
       }
 
       setMessages([...updatedMessages, { role: 'assistant', content: data.message }])
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to send message',
+        description: error instanceof Error ? error.message : 'Failed to send message',
         variant: 'destructive',
       })
       // Remove the user message on error
@@ -1233,14 +1232,14 @@ const SCIENCE_OLYMPIAD_RESOURCES: EventResources[] = [
 ]
 
 // Resources Component
-function ResourcesSection({ clubId, currentMembershipId, isAdmin }: { clubId: string; currentMembershipId: string; isAdmin?: boolean }) {
+function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, isAdmin }: { clubId: string; currentMembershipId: string; isAdmin?: boolean }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set(['general']))
   const [showAddForm, setShowAddForm] = useState<Record<string, boolean>>({})
   const [addingResource, setAddingResource] = useState<Record<string, boolean>>({})
   const [resourceForm, setResourceForm] = useState<Record<string, { name: string; tag: string; url: string }>>({})
-  const [clubResources, setClubResources] = useState<any[]>([])
-  const [loadingResources, setLoadingResources] = useState(true)
+  const [clubResources, setClubResources] = useState<Record<string, unknown>[]>([])
+  const [_loadingResources, setLoadingResources] = useState(true)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deletingResource, setDeletingResource] = useState(false)
   const [syncConfirmOpen, setSyncConfirmOpen] = useState(false)
@@ -1373,10 +1372,10 @@ function ResourcesSection({ clubId, currentMembershipId, isAdmin }: { clubId: st
       // Reset form
       setResourceForm(prev => ({ ...prev, [category]: { name: '', tag: '', url: '' } }))
       setShowAddForm(prev => ({ ...prev, [category]: false }))
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to submit resource',
+        description: error instanceof Error ? error.message : 'Failed to submit resource',
         variant: 'destructive',
       })
     } finally {
@@ -1410,10 +1409,10 @@ function ResourcesSection({ clubId, currentMembershipId, isAdmin }: { clubId: st
 
       // Refresh club resources
       await fetchClubResources()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete resource',
+        description: error instanceof Error ? error.message : 'Failed to delete resource',
         variant: 'destructive',
       })
     } finally {
@@ -1443,10 +1442,10 @@ function ResourcesSection({ clubId, currentMembershipId, isAdmin }: { clubId: st
 
       // Refresh club resources
       await fetchClubResources()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to sync resources',
+        description: error instanceof Error ? error.message : 'Failed to sync resources',
         variant: 'destructive',
       })
     } finally {
@@ -1713,7 +1712,7 @@ function ResourcesSection({ clubId, currentMembershipId, isAdmin }: { clubId: st
 
 type ExpandedTool = 'timer' | 'stopwatch' | 'fourFunc' | 'scientific' | 'graphing' | null
 
-export function ToolsTab({ clubId, division, currentMembershipId, isAdmin }: ToolsTabProps) {
+export function ToolsTab({ clubId, division: _division, currentMembershipId, isAdmin }: ToolsTabProps) {
   const [activeTab, setActiveTab] = useState<'tools' | 'resources' | 'ai'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(`tools-tab-active-${clubId}`)

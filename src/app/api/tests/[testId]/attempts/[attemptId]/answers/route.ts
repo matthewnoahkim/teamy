@@ -29,15 +29,15 @@ export async function POST(
     const validatedData = saveAnswerSchema.parse(body)
 
     // Try to find as TestAttempt first
-    let attempt = await prisma.testAttempt.findUnique({
+    const attempt = await prisma.testAttempt.findUnique({
       where: { id: resolvedParams.attemptId },
       include: {
         test: true,
       },
     })
 
-    let isESTest = false
-    let membership: any = null
+    let _isESTest = false
+    let membership: { id: string; [key: string]: unknown } | null = null
 
     if (attempt) {
       // Verify ownership - check if user is a member of the club and owns this attempt
@@ -66,7 +66,7 @@ export async function POST(
       }
 
       // Upsert answer for regular Test
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         answerText: validatedData.answerText,
         selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
         numericAnswer: validatedData.numericAnswer,
@@ -114,7 +114,7 @@ export async function POST(
         return NextResponse.json({ error: 'Attempt not found' }, { status: 404 })
       }
 
-      isESTest = true
+      _isESTest = true
 
       // For ESTest, verify membership through tournament registration
       const userMemberships = await prisma.membership.findMany({
@@ -168,7 +168,7 @@ export async function POST(
       }
 
       // Upsert answer for ESTest
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         answerText: validatedData.answerText,
         selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
         numericAnswer: validatedData.numericAnswer,

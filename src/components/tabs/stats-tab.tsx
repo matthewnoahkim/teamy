@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -16,11 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   Edit,
-  Save,
-  X,
   RefreshCw,
-  Download,
-  Target,
 } from 'lucide-react'
 import {
   Dialog,
@@ -45,17 +41,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Skeleton } from '@/components/ui/skeleton'
 import { PageLoading } from '@/components/ui/loading-spinner'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 
@@ -134,7 +122,7 @@ interface AIRoster {
   recommendations: string[]
 }
 
-export function StatsTab({ clubId, division, initialStats }: StatsTabProps) {
+export function StatsTab({ clubId, division: _division, initialStats }: StatsTabProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(!initialStats)
   const [members, setMembers] = useState<MemberStats[]>(initialStats?.members || [])
@@ -226,7 +214,7 @@ export function StatsTab({ clubId, division, initialStats }: StatsTabProps) {
 
       setEditingMember(null)
       fetchStats()
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to save preferences',
@@ -466,8 +454,7 @@ export function StatsTab({ clubId, division, initialStats }: StatsTabProps) {
               </TableHeader>
               <TableBody>
                 {filteredMembers.map(member => (
-                  <Collapsible key={member.membershipId} asChild>
-                    <>
+                    <Fragment key={member.membershipId}>
                       <TableRow 
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => toggleMemberExpanded(member.membershipId)}
@@ -593,8 +580,7 @@ export function StatsTab({ clubId, division, initialStats }: StatsTabProps) {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
-                  </Collapsible>
+                    </Fragment>
                 ))}
               </TableBody>
             </Table>

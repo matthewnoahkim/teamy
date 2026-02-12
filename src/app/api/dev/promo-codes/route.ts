@@ -37,7 +37,7 @@ async function checkDevAccess(email?: string | null) {
 }
 
 // GET - List all promo codes
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 

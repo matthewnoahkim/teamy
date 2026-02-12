@@ -11,7 +11,7 @@ const addAdminSchema = z.object({
   message: "Either userId or email must be provided",
 })
 
-const removeAdminSchema = z.object({
+const _removeAdminSchema = z.object({
   userId: z.string(),
 })
 

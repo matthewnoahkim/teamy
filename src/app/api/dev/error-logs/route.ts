@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   sanitizeSearchQuery,
@@ -9,10 +11,36 @@ import {
   validateEnum,
 } from '@/lib/input-validation'
 
-export async function GET(request: NextRequest) {
+async function checkDevAccess(email: string): Promise<boolean> {
+  const setting = await prisma.siteSetting.findUnique({
+    where: { key: 'dev_panel_email_whitelist' },
+  })
+  let whitelist: string[] = []
+  if (setting) {
+    try {
+      whitelist = JSON.parse(setting.value)
+      if (!Array.isArray(whitelist)) whitelist = []
+    } catch { whitelist = [] }
+  }
+  if (whitelist.length === 0) {
+    const defaultEmailsEnv = process.env.DEV_PANEL_DEFAULT_EMAILS
+    if (defaultEmailsEnv) {
+      whitelist = defaultEmailsEnv.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0 && e.includes('@'))
+    }
+  }
+  return whitelist.some(e => e.toLowerCase().trim() === email.toLowerCase().trim())
+}
 
-  console.error('insecure endpoint requested: /api/dev/error-logs')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+export async function GET(request: NextRequest) {
+  // Auth check: require authenticated user with dev panel access
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const hasAccess = await checkDevAccess(session.user.email)
+  if (!hasAccess) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   try {
     const { searchParams } = new URL(request.url)
@@ -30,7 +58,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // Build where clause - all inputs are now validated
-    const where: any = {}
+    const where: Record<string, unknown> = {}
 
     if (errorType) {
       where.errorType = { contains: errorType, mode: 'insensitive' }
@@ -104,6 +132,16 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    // Auth check: require authenticated user with dev panel access
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const hasAccess = await checkDevAccess(session.user.email)
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { id, resolved } = body
 

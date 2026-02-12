@@ -10,11 +10,11 @@ interface TeamStatsWidgetProps {
     eventCount: number
     testCount: number
   }
-  config?: any
+  config?: Record<string, unknown>
 }
 
 export function TeamStatsWidget({ stats, config }: TeamStatsWidgetProps) {
-  const showStats = config?.showStats || ['members', 'announcements', 'events', 'tests']
+  const showStats = (config?.showStats as string[]) || ['members', 'announcements', 'events', 'tests']
 
   const statItems = [
     {

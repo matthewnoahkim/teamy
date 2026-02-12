@@ -38,7 +38,7 @@ interface Attempt {
     id: string
     kind: string
     ts: string
-    meta: any
+    meta: ProctorEventMeta
   }>
   answers: Array<{
     id: string
@@ -77,10 +77,43 @@ interface Section {
   title: string | null
 }
 
+interface AiPartSuggestion {
+  partIndex: number
+  summary?: string
+  suggestedScore?: number | null
+  suggestedPoints?: number | null
+}
+
+interface AiSuggestion {
+  answerId: string
+  suggestedPoints?: number | null
+  maxPoints?: number | null
+  summary?: string
+  explanation?: string
+  strengths?: string
+  gaps?: string
+  rubricAlignment?: string
+  createdAt?: string
+  partSuggestions?: AiPartSuggestion[]
+  rawResponse?: {
+    isMultipart?: boolean
+    partSuggestions?: AiPartSuggestion[]
+  }
+}
+
+interface ProctorEventMeta {
+  timeOffSeconds?: number
+  dataLength?: number
+  timestamp?: number
+  leftAt?: string
+  returnedAt?: string
+  [key: string]: unknown
+}
+
 export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
   const { toast } = useToast()
   const [attempts, setAttempts] = useState<Attempt[]>([])
-  const [sections, setSections] = useState<Section[]>([])
+  const [_sections, setSections] = useState<Section[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedAttempt, setSelectedAttempt] = useState<Attempt | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
@@ -89,8 +122,8 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [gradeEdits, setGradeEdits] = useState<Record<string, GradeEdit>>({})
   const [saving, setSaving] = useState(false)
-  const [aiSuggestions, setAiSuggestions] = useState<Record<string, any>>({})
-  const [loadingAiSuggestions, setLoadingAiSuggestions] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<Record<string, AiSuggestion>>({})
+  const [_loadingAiSuggestions, setLoadingAiSuggestions] = useState(false)
   const [requestingAiGrading, setRequestingAiGrading] = useState<string | null>(null) // Track which part is loading: `${answerId}-${partIndex}` or `answerId` for whole question
 
   useEffect(() => {
@@ -108,11 +141,11 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
       const data = await response.json()
       setAttempts(data.attempts || [])
       setSections(data.sections || [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to fetch attempts:', error)
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load test attempts',
+        description: error instanceof Error ? error.message : 'Failed to load test attempts',
         variant: 'destructive',
       })
     } finally {
@@ -198,8 +231,8 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
       if (response.ok) {
         const data = await response.json()
         // Create a map of answerId -> suggestion
-        const suggestionsMap: Record<string, any> = {}
-        data.suggestions?.forEach((suggestion: any) => {
+        const suggestionsMap: Record<string, AiSuggestion> = {}
+        data.suggestions?.forEach((suggestion: AiSuggestion) => {
           // Parse part suggestions from rawResponse if present
           if (suggestion.rawResponse?.isMultipart && suggestion.rawResponse?.partSuggestions) {
             suggestion.partSuggestions = suggestion.rawResponse.partSuggestions
@@ -239,7 +272,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
       
       // Update suggestions map with new suggestions
       const updatedSuggestions = { ...aiSuggestions }
-      data.suggestions?.forEach((suggestion: any) => {
+      data.suggestions?.forEach((suggestion: AiSuggestion) => {
         // Parse part suggestions from rawResponse if present
         if (suggestion.rawResponse?.isMultipart && suggestion.rawResponse?.partSuggestions) {
           suggestion.partSuggestions = suggestion.rawResponse.partSuggestions
@@ -252,11 +285,11 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
         title: 'Success',
         description: `AI grading suggestions generated for ${data.suggestions?.length || 0} question(s)`,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to request AI grading:', error)
       toast({
         title: 'Error',
-        description: error.message || 'Failed to request AI grading',
+        description: error instanceof Error ? error.message : 'Failed to request AI grading',
         variant: 'destructive',
       })
     } finally {
@@ -272,7 +305,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
       ...prev,
       [answerId]: {
         ...prev[answerId],
-        pointsAwarded: suggestion.suggestedPoints,
+        pointsAwarded: suggestion.suggestedPoints ?? null,
         graderNote: suggestion.explanation || prev[answerId]?.graderNote || '',
       },
     }))
@@ -367,7 +400,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
           return (grade.pointsAwarded !== null && grade.pointsAwarded !== undefined) || (wasPreviouslyGraded && isNowCleared)
         })
         .map((grade) => {
-          const answer = selectedAttempt.answers.find((a) => a.id === grade.answerId)!
+          const _answer = selectedAttempt.answers.find((a) => a.id === grade.answerId)!
           
           // For multipart FRQs, store part points in graderNote as JSON
           let graderNote = grade.graderNote || ''
@@ -422,11 +455,11 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
       // Refresh attempts to get updated data
       await fetchAttempts()
       setDetailDialogOpen(false)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save grades:', error)
       toast({
         title: 'Error',
-        description: error.message || 'Failed to save grades',
+        description: error instanceof Error ? error.message : 'Failed to save grades',
         variant: 'destructive',
       })
     } finally {
@@ -465,7 +498,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
               const partsText = promptMd.match(/---FRQ_PARTS---\n\n([\s\S]+)$/)?.[1]
               if (partsText) {
                 const partRegex = /\[PART:([a-z]):(\d+(?:\.\d+)?)\]\n([\s\S]*?)(?=\n\n\[PART:|$)/g
-                const expectedParts: any[] = []
+                const expectedParts: string[] = []
                 let match
                 while ((match = partRegex.exec(partsText)) !== null) {
                   expectedParts.push(match[1])
@@ -904,7 +937,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                             {event.meta && Object.keys(event.meta).length > 0 && (
                               <div className="mt-1">
                                 {(() => {
-                                  const meta = event.meta as any
+                                  const meta = event.meta as ProctorEventMeta
                                   
                                   // Format based on event type
                                   if (event.kind === 'PASTE' || event.kind === 'COPY') {
@@ -1011,7 +1044,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                 // Parse prompt to hide FRQ_PARTS section in header
                                 const promptMd = answer.question.promptMd || ''
                                 const frqPartsMatch = promptMd.match(/---FRQ_PARTS---\n\n([\s\S]+)$/)
-                                let mainContent = frqPartsMatch ? promptMd.substring(0, frqPartsMatch.index).trim() : promptMd
+                                const mainContent = frqPartsMatch ? promptMd.substring(0, frqPartsMatch.index).trim() : promptMd
                                 
                                 // Check if this is a fill-in-the-blank question
                                 const hasBlanks = /\[blank\d*\]/.test(mainContent)
@@ -1038,7 +1071,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                           const tableRegex = /(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|(?:\r?\n(?!\r?\n))?)+)/g
                                           
                                           // Remove images and tables from text for blank processing
-                                          let textOnly = promptSection.replace(imageRegex, '').replace(tableRegex, '')
+                                          const textOnly = promptSection.replace(imageRegex, '').replace(tableRegex, '')
                                           
                                           // Split on blank markers
                                           const normalizedText = textOnly.replace(/\[blank\d*\]/g, '[BLANK_MARKER]')
@@ -1112,7 +1145,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                               <div className="mt-3">
                                 {answer.question.type === 'MCQ_SINGLE' ? (
                                   <RadioGroup 
-                                    value={answer.question.options.find((opt: any) => opt.isCorrect)?.id || ""} 
+                                    value={answer.question.options.find((opt) => opt.isCorrect)?.id || ""} 
                                     disabled 
                                     className="space-y-2"
                                   >
@@ -1261,7 +1294,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                           <div className="space-y-5">
                                             {frqParts.map((part, partIdx) => {
                                               const partPoints = currentPartPoints[partIdx] ?? null
-                                              const displayValue = partPoints === null || partPoints === undefined ? '' : partPoints
+                                              const _displayValue = partPoints === null || partPoints === undefined ? '' : partPoints
                                               
                                               // Check for part-level AI suggestion
                                               const suggestion = aiSuggestions[answer.id]
@@ -1270,13 +1303,13 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                               if (suggestion) {
                                                 // Check partSuggestions array first
                                                 if (suggestion.partSuggestions && Array.isArray(suggestion.partSuggestions)) {
-                                                  partSuggestion = suggestion.partSuggestions.find((p: any) => p.partIndex === partIdx && p.summary)
+                                                  partSuggestion = suggestion.partSuggestions.find((p: AiPartSuggestion) => p.partIndex === partIdx && p.summary)
                                                 }
                                                 // Fall back to rawResponse
                                                 if (!partSuggestion && suggestion.rawResponse?.isMultipart && suggestion.rawResponse?.partSuggestions) {
                                                   const rawParts = suggestion.rawResponse.partSuggestions
                                                   if (Array.isArray(rawParts)) {
-                                                    partSuggestion = rawParts.find((p: any) => p.partIndex === partIdx && p.summary)
+                                                    partSuggestion = rawParts.find((p: AiPartSuggestion) => p.partIndex === partIdx && p.summary)
                                                   }
                                                 }
                                               }
@@ -1382,7 +1415,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                                             variant="outline"
                                                             onClick={() => {
                                                               // Apply part suggestion
-                                                              handlePartGradeEdit(answer.id, partIdx, partSuggestion.suggestedScore, part.points)
+                                                              handlePartGradeEdit(answer.id, partIdx, partSuggestion.suggestedScore ?? '', part.points)
                                                             }}
                                                             className="h-6 px-2 gap-1 text-xs text-xs border-purple-300 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/50"
                                                           >
@@ -1520,7 +1553,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                                   <div className="pt-2 border-t border-purple-200 dark:border-purple-700">
                                     <p className="text-xs text-muted-foreground">
                                       <Clock className="h-3 w-3 inline mr-1" />
-                                    Generated: {new Date(aiSuggestions[answer.id].createdAt).toLocaleString()}
+                                    Generated: {aiSuggestions[answer.id].createdAt ? new Date(aiSuggestions[answer.id].createdAt as string).toLocaleString() : 'Unknown'}
                                   </p>
                                   </div>
                                 </div>
@@ -1532,7 +1565,7 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                               // Check if this is a multipart FRQ
                               const promptMd = answer.question.promptMd || ''
                               const frqPartsMatch = promptMd.match(/---FRQ_PARTS---\n\n([\s\S]+)$/)
-                              let frqParts: Array<{ label: string; points: number; prompt: string }> = []
+                              const frqParts: Array<{ label: string; points: number; prompt: string }> = []
                               
                               if (frqPartsMatch) {
                                 const partsText = frqPartsMatch[1]

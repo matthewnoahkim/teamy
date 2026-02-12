@@ -13,34 +13,34 @@ export async function GET(request: Request) {
 
     // Calculate date range
     let startDate: Date
-    let dateFormat: string
+    let _dateFormat: string
     let intervals: Date[]
 
     switch (range) {
       case '7d':
         startDate = subDays(new Date(), 7)
         intervals = eachDayOfInterval({ start: startDate, end: new Date() })
-        dateFormat = 'MMM d'
+        _dateFormat = 'MMM d'
         break
       case '30d':
         startDate = subDays(new Date(), 30)
         intervals = eachDayOfInterval({ start: startDate, end: new Date() })
-        dateFormat = 'MMM d'
+        _dateFormat = 'MMM d'
         break
       case '90d':
         startDate = subDays(new Date(), 90)
         intervals = eachWeekOfInterval({ start: startDate, end: new Date() })
-        dateFormat = 'MMM d'
+        _dateFormat = 'MMM d'
         break
       case '1y':
         startDate = subMonths(new Date(), 12)
         intervals = eachMonthOfInterval({ start: startDate, end: new Date() })
-        dateFormat = 'MMM yyyy'
+        _dateFormat = 'MMM yyyy'
         break
       default:
         startDate = subDays(new Date(), 30)
         intervals = eachDayOfInterval({ start: startDate, end: new Date() })
-        dateFormat = 'MMM d'
+        _dateFormat = 'MMM d'
     }
 
     // Overview stats

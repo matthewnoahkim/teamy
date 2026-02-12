@@ -26,7 +26,7 @@ interface StaffMembershipWithTests {
       name: string
       division: 'B' | 'C'
     }
-    tests: any[]
+    tests: Array<Record<string, unknown>>
   }>
 }
 
@@ -157,7 +157,7 @@ export async function getESTestsForUser(
         trialEvents: null,
         tournament: admin.tournament,
         events: [],
-      } as any)
+      } as (typeof staffMemberships)[number])
     }
   }
 
@@ -180,7 +180,7 @@ export async function getESTestsForUser(
         trialEvents: null,
         tournament: tournament,
         events: [],
-      } as any)
+      } as (typeof staffMemberships)[number])
     }
   }
 
@@ -203,7 +203,7 @@ export async function getESTestsForUser(
         trialEvents: null,
         tournament: request.tournament,
         events: [],
-      } as any)
+      } as (typeof staffMemberships)[number])
     }
   }
 
@@ -246,7 +246,7 @@ export async function getESTestsForUser(
           if (parsed.length > 0 && typeof parsed[0] === 'string') {
             tournamentTrialEventNamesByTournament.set(membership.tournament.id, parsed)
           } else {
-            tournamentTrialEventNamesByTournament.set(membership.tournament.id, parsed.map((e: any) => e.name))
+            tournamentTrialEventNamesByTournament.set(membership.tournament.id, parsed.map((e: { name: string }) => e.name))
           }
         }
       } catch (e) {
@@ -260,7 +260,7 @@ export async function getESTestsForUser(
         if (Array.isArray(parsed)) {
           const trialEventNames = parsed.length > 0 && typeof parsed[0] === 'string'
             ? parsed
-            : parsed.map((e: any) => e.name)
+            : parsed.map((e: { name: string }) => e.name)
           
           if (!userTrialEventNamesByTournament.has(membership.tournament.id)) {
             userTrialEventNamesByTournament.set(membership.tournament.id, new Set())
@@ -399,7 +399,7 @@ export async function getESTestsForUser(
   const testEventNameMap = new Map<string, string>()
   for (const audit of allCreateAudits) {
     if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
-      const eventName = (audit.details as any).eventName
+      const eventName = (audit.details as Record<string, unknown>).eventName
       if (eventName && typeof eventName === 'string') {
         testEventNameMap.set(audit.testId, eventName)
       }
@@ -407,7 +407,7 @@ export async function getESTestsForUser(
   }
 
   // Organize tests by tournament and event in memory
-  const testsByTournament = new Map<string, Map<string, any[]>>()
+  const testsByTournament = new Map<string, Map<string, typeof allTests>>()
   const userTrialEventAccess = new Map<string, Set<string>>()
   
   for (const membership of staffMemberships) {
@@ -529,12 +529,12 @@ export async function getESTestsForUser(
           try {
             const parsed = JSON.parse(membership.tournament.trialEvents)
             if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] !== 'string') {
-              const trialEvent = parsed.find((e: any) => e.name === trialEventName)
+              const trialEvent = parsed.find((e: { name: string; division?: string }) => e.name === trialEventName)
               if (trialEvent && trialEvent.division) {
                 division = trialEvent.division
               }
             }
-          } catch (e) {
+          } catch (_e) {
             // Use default division
           }
         }
@@ -567,7 +567,7 @@ export async function getESTestsForUser(
         const eventMap = testsByTournament.get(membership.tournament.id) || new Map()
         const eventTests = eventMap.get(eventKey) || []
         
-        const filteredEventTests = eventTests.filter((test: any) => {
+        const filteredEventTests = eventTests.filter((test) => {
           if (test.tournamentId !== membership.tournament.id) {
             console.error(`CRITICAL ERROR: Test ${test.id} has tournamentId ${test.tournamentId} but is being shown for tournament ${membership.tournament.id}`)
             return false
@@ -581,7 +581,7 @@ export async function getESTestsForUser(
             name: e.event.name,
             division: e.event.division,
           },
-          tests: filteredEventTests.map((test: any) => ({
+          tests: filteredEventTests.map((test) => ({
             id: test.id,
             name: test.name,
             status: test.status,
@@ -603,13 +603,13 @@ export async function getESTestsForUser(
               name: test.createdBy.name,
               email: test.createdBy.email,
             } : undefined,
-            questions: includeQuestions && test.questions ? test.questions.map((q: any) => ({
+            questions: includeQuestions && test.questions ? test.questions.map((q) => ({
               id: q.id,
               type: q.type,
               promptMd: q.promptMd,
               points: Number(q.points),
               order: q.order,
-              options: q.options.map((o: any) => ({
+              options: q.options.map((o) => ({
                 id: o.id,
                 label: o.label,
                 isCorrect: o.isCorrect,

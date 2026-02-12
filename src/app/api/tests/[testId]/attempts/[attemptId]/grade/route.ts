@@ -193,7 +193,7 @@ export async function PATCH(
                 const partsText = promptMd.match(/---FRQ_PARTS---\n\n([\s\S]+)$/)?.[1]
                 if (partsText) {
                   const partRegex = /\[PART:([a-z]):(\d+(?:\.\d+)?)\]\n([\s\S]*?)(?=\n\n\[PART:|$)/g
-                  const expectedParts: any[] = []
+                  const expectedParts: string[] = []
                   let match
                   while ((match = partRegex.exec(partsText)) !== null) {
                     expectedParts.push(match[1])

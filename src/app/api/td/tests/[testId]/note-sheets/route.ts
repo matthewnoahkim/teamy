@@ -20,7 +20,7 @@ export async function GET(
     const testId = resolvedParams.testId
 
     // Try to find as regular Test first
-    let test = await prisma.test.findUnique({
+    const test = await prisma.test.findUnique({
       where: { id: testId },
       include: {
         club: {

@@ -23,9 +23,23 @@ export function sanitizeString(input: string | null | undefined, maxLength = 500
   sanitized = sanitized.replace(/\0/g, '')
   
   // Remove control characters except newlines and tabs
+  // eslint-disable-next-line no-control-regex
   sanitized = sanitized.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
   
   return sanitized
+}
+
+/**
+ * Escape HTML special characters for safe interpolation in HTML contexts.
+ * Use this when inserting user data into HTML templates (e.g. emails).
+ */
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
 }
 
 /**
@@ -45,6 +59,7 @@ export function sanitizeSearchQuery(input: string | null | undefined, maxLength 
   sanitized = sanitized.replace(/\0/g, '')
   
   // Remove control characters
+  // eslint-disable-next-line no-control-regex
   sanitized = sanitized.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
   
   return sanitized
@@ -58,7 +73,7 @@ export function validateId(id: string | null | undefined): string | null {
   
   // CUID format: starts with 'c', 25 characters
   // UUID format: 8-4-4-4-12 hex characters
-  const cuidPattern = /^c[0-9a-z]{24}$/i
+  const cuidPattern = /^c[0-9a-z]{24}$/
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   
   const sanitized = id.trim()
@@ -176,38 +191,38 @@ export const dateRangeSchema = z.object({
  * Safe Prisma where clause builder
  * Ensures all user input is properly sanitized
  */
-export function buildSafeWhereClause<T extends Record<string, any>>(input: {
+export function buildSafeWhereClause<T extends Record<string, unknown>>(input: {
   search?: string | null
   id?: string | null
   userId?: string | null
-  [key: string]: any
+  [key: string]: unknown
 }): Partial<T> {
-  const where: Partial<T> = {}
+  const where = {} as Record<string, unknown>
   
   if (input.search) {
     const sanitized = sanitizeSearchQuery(input.search)
     if (sanitized) {
       // Note: Prisma's contains is safe - it uses parameterized queries
       // But we still sanitize to prevent DoS through very long strings
-      ;(where as any).name = { contains: sanitized, mode: 'insensitive' }
+      where.name = { contains: sanitized, mode: 'insensitive' }
     }
   }
   
   if (input.id) {
     const validated = validateId(input.id)
     if (validated) {
-      ;(where as any).id = validated
+      where.id = validated
     }
   }
   
   if (input.userId) {
     const validated = validateId(input.userId)
     if (validated) {
-      ;(where as any).userId = validated
+      where.userId = validated
     }
   }
   
-  return where
+  return where as Partial<T>
 }
 
 /**

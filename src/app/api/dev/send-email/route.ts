@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     // Build the where clause for filtering
-    const where: any = {}
+    const where: Record<string, unknown> = {}
 
     if (filters.minMemberDays) {
       const minDate = subDays(new Date(), parseInt(filters.minMemberDays))

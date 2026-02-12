@@ -8,7 +8,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const resolvedParams = await params
+  const _resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -207,10 +207,10 @@ export async function PATCH(
 
       return NextResponse.json({ success: true, message: 'Resource request rejected' })
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error processing resource request:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to process resource request' },
+      { error: error instanceof Error ? error.message : 'Failed to process resource request' },
       { status: 500 }
     )
   }
@@ -221,7 +221,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const resolvedParams = await params
+  const _resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -279,10 +279,10 @@ export async function DELETE(
     })
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting resource request:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete resource request' },
+      { error: error instanceof Error ? error.message : 'Failed to delete resource request' },
       { status: 500 }
     )
   }

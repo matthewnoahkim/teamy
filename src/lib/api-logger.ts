@@ -1,5 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from './prisma'
+
+/**
+ * Redact sensitive fields from request bodies before logging
+ */
+const SENSITIVE_FIELDS = ['password', 'token', 'secret', 'apiKey', 'api_key', 'access_token', 'refresh_token', 'creditCard', 'cardNumber', 'cvv', 'ssn', 'testPassword']
+
+function redactSensitiveData(obj: Record<string, unknown>): Record<string, unknown> {
+  const redacted: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (SENSITIVE_FIELDS.some(field => key.toLowerCase().includes(field.toLowerCase()))) {
+      redacted[key] = '[REDACTED]'
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      redacted[key] = redactSensitiveData(value as Record<string, unknown>)
+    } else {
+      redacted[key] = value
+    }
+  }
+  return redacted
+}
 
 interface LogApiCallParams {
   method: string
@@ -9,7 +27,7 @@ interface LogApiCallParams {
   userId?: string
   ipAddress?: string
   userAgent?: string
-  requestBody?: any
+  requestBody?: Record<string, unknown>
   responseSize?: number
   error?: string
 }
@@ -29,7 +47,7 @@ export async function logApiCall(params: LogApiCallParams) {
             userId: params.userId,
             ipAddress: params.ipAddress,
             userAgent: params.userAgent,
-            requestBody: params.requestBody ? JSON.parse(JSON.stringify(params.requestBody)) : null,
+            requestBody: params.requestBody ? redactSensitiveData(JSON.parse(JSON.stringify(params.requestBody))) : null,
             responseSize: params.responseSize,
             error: params.error?.substring(0, 500), // Limit error message length
           },
@@ -52,7 +70,7 @@ export async function logError(data: {
   userId?: string
   route?: string
   severity?: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
-  metadata?: any
+  metadata?: Record<string, unknown>
 }) {
   try {
     setImmediate(async () => {
@@ -84,7 +102,7 @@ export async function logActivity(data: {
   logType?: 'USER_ACTION' | 'ADMIN_ACTION' | 'SYSTEM_EVENT' | 'API_USAGE' | 'ERROR' | 'WARNING'
   severity?: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
   route?: string
-  metadata?: any
+  metadata?: Record<string, unknown>
 }) {
   try {
     setImmediate(async () => {

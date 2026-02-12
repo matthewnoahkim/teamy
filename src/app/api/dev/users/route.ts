@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const isEventSupervisor = validateBoolean(searchParams.get('isEventSupervisor'))
 
     // Build the where clause for filtering
-    const where: any = {}
+    const where: Record<string, unknown> = {}
 
     // Member duration filters - only use if validation passed
     if (minMemberDays !== null) {

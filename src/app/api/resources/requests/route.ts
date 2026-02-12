@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
           clubId,
         },
       })
-    } catch (resourceError: any) {
+    } catch (resourceError: unknown) {
       console.error('Error creating resource:', resourceError)
       return NextResponse.json(
         { error: 'Failed to create resource. Database may need migration.' },
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
           requestedById: membership.id,
         },
       })
-    } catch (requestError: any) {
+    } catch (requestError: unknown) {
       console.error('Error creating resource request:', requestError)
       // Resource was created but request failed - still return success
       return NextResponse.json({ 
@@ -96,10 +96,10 @@ export async function POST(req: NextRequest) {
       resource, 
       request 
     }, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating resource request:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to create resource request' },
+      { error: error instanceof Error ? error.message : 'Failed to create resource request' },
       { status: 500 }
     )
   }
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
     const status = validateEnum(searchParams.get('status'), ['PENDING', 'APPROVED', 'REJECTED'] as const)
     const search = sanitizeSearchQuery(searchParams.get('search'), 200)
 
-    const where: any = {}
+    const where: Record<string, unknown> = {}
     if (status) {
       where.status = status
     }
@@ -164,10 +164,10 @@ export async function GET(req: NextRequest) {
     })
 
     return NextResponse.json({ requests })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching resource requests:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch resource requests' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch resource requests' },
       { status: 500 }
     )
   }

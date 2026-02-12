@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Skeleton } from '@/components/ui/skeleton'
 import { PageLoading, ButtonLoading } from '@/components/ui/loading-spinner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,16 +18,98 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, Pencil, Check, X as XIcon, User, Paperclip, X, Calendar, FileText } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, Pencil, Check, X as XIcon, Paperclip, X, Calendar, FileText } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { EventAnnouncementModal } from '@/components/event-announcement-modal'
 import { AttachmentDisplay } from '@/components/ui/attachment-display'
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
+import type { MembershipWithPreferences } from '@/types/models'
+
+// ---------------------------------------------------------------------------
+// Local interfaces for calendar event data (JSON-serialized from API)
+// ---------------------------------------------------------------------------
+
+interface CalendarRsvpUser {
+  id: string
+  name?: string | null
+  email: string
+  image?: string | null
+}
+
+interface CalendarRsvp {
+  id: string
+  userId: string
+  status: string
+  user: CalendarRsvpUser
+}
+
+interface CalendarEventAttachment {
+  id: string
+  fileName?: string
+  fileUrl?: string
+  fileType?: string | null
+  fileSize?: number | null
+  uploadedBy?: CalendarRsvpUser
+}
+
+interface CalendarEventCreator {
+  user: CalendarRsvpUser
+}
+
+interface CalendarTeam {
+  id: string
+  name: string
+}
+
+interface CalendarEvent {
+  id: string
+  title: string
+  description?: string | null
+  startUTC: string
+  endUTC: string
+  location?: string | null
+  color?: string | null
+  scope: string
+  teamId?: string | null
+  attendeeId?: string | null
+  creatorId: string
+  creator?: CalendarEventCreator | null
+  team?: CalendarTeam | null
+  important?: boolean
+  rsvpEnabled?: boolean
+  rsvps: CalendarRsvp[]
+  attachments: CalendarEventAttachment[]
+  testId?: string | null
+  targetRoles?: string[]
+  targetEvents?: string[]
+}
+
+interface CreatedEventData {
+  id: string
+  title: string
+  description?: string | null
+  scope: string
+  teamId?: string | null
+  team?: CalendarTeam | null
+  important?: boolean
+  formData?: Record<string, unknown>
+}
+
+interface SciOlyEvent {
+  id: string
+  name: string
+}
+
+interface EventInterval {
+  event: CalendarEvent
+  startMinutes: number
+  endMinutes: number
+}
 
 interface CalendarTabProps {
   clubId: string
-  currentMembership: any
+  currentMembership: MembershipWithPreferences
   isAdmin: boolean
   user: {
     id: string
@@ -36,7 +117,7 @@ interface CalendarTabProps {
     email: string
     image?: string | null
   }
-  initialEvents?: any[]
+  initialEvents?: CalendarEvent[]
 }
 
 type ViewMode = 'month' | 'week'
@@ -45,27 +126,27 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [events, setEvents] = useState<any[]>(initialEvents || [])
-  const [teams, setTeams] = useState<any[]>([])
-  const [availableEvents, setAvailableEvents] = useState<any[]>([])
+  const [events, setEvents] = useState<CalendarEvent[]>(initialEvents || [])
+  const [teams, setTeams] = useState<CalendarTeam[]>([])
+  const [availableEvents, setAvailableEvents] = useState<SciOlyEvent[]>([])
   const [loading, setLoading] = useState(!initialEvents)
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedEvent, setSelectedEvent] = useState<any>(null)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [eventDetailsOpen, setEventDetailsOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [eventToDelete, setEventToDelete] = useState<any>(null)
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null)
   const [rsvping, setRsvping] = useState(false)
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
-  const [createdEvent, setCreatedEvent] = useState<any>(null)
+  const [createdEvent, setCreatedEvent] = useState<CreatedEventData | null>(null)
   const [showImportantOnly, setShowImportantOnly] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploadingFiles, setUploadingFiles] = useState(false)
   
   // Helper function to format date for datetime-local input
-  const formatDateTimeLocal = (date: Date) => {
+  const _formatDateTimeLocal = (date: Date) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
@@ -286,7 +367,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
         endISO = endDateTime.toISOString()
       }
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         clubId,
         scope: formData.scope,
         title: formData.title,
@@ -410,10 +491,10 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
         setCreatedEvent({ ...newEvent, formData: createdFormData })
         setShowAnnouncementModal(true)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create event',
+        description: error instanceof Error ? error.message : 'Failed to create event',
         variant: 'destructive',
       })
     } finally {
@@ -460,7 +541,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
         endISO = endDateTime.toISOString()
       }
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         title: formData.title,
         description: formData.description,
         startUTC: startISO,
@@ -503,10 +584,10 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
       setSelectedEvent(null)
       setFormData(getInitialFormData())
       fetchEvents()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update event',
+        description: error instanceof Error ? error.message : 'Failed to update event',
         variant: 'destructive',
       })
     } finally {
@@ -540,10 +621,10 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
       setEventDetailsOpen(false)
       setSelectedEvent(null)
       fetchEvents()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete event',
+        description: error instanceof Error ? error.message : 'Failed to delete event',
         variant: 'destructive',
       })
     } finally {
@@ -552,12 +633,12 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     }
   }
 
-  const canEditEvent = (event: any) => {
+  const canEditEvent = (event: CalendarEvent) => {
     // Only the creator can edit their own events
     return event.creatorId === currentMembership.id
   }
 
-  const canDeleteEvent = (event: any) => {
+  const canDeleteEvent = (event: CalendarEvent) => {
     // User can delete their own events
     if (event.creatorId === currentMembership.id) return true
     // Admins can delete any team/club events (not personal events made by others)
@@ -565,9 +646,9 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     return false
   }
 
-  const getScopeBadge = (event: any) => {
+  const getScopeBadge = (event: CalendarEvent) => {
     switch (event.scope) {
-      case 'TEAM':
+      case 'CLUB':
         return <Badge variant="default" className="text-xs">CLUB</Badge>
       case 'TEAM':
         return <Badge variant="secondary" className="text-xs">{event.team?.name || 'TEAM'}</Badge>
@@ -576,14 +657,14 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     }
   }
 
-  const getEventColor = (event: any) => {
+  const getEventColor = (event: CalendarEvent) => {
     // Use custom color if available, otherwise fall back to scope-based colors
     if (event.color) {
       return ''  // We'll use inline styles instead
     }
     
     switch (event.scope) {
-      case 'TEAM':
+      case 'CLUB':
         return 'bg-blue-500 hover:bg-blue-600 text-white'
       case 'TEAM':
         return 'bg-purple-500 hover:bg-purple-600 text-white'
@@ -594,7 +675,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     }
   }
   
-  const getContrastingColor = (hexColor: string) => {
+  const _getContrastingColor = (hexColor: string) => {
     // Convert hex to RGB
     const r = parseInt(hexColor.slice(1, 3), 16)
     const g = parseInt(hexColor.slice(3, 5), 16)
@@ -614,8 +695,8 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     }
   }
   
-  const getEventStyle = (event: any) => {
-    const style: any = {}
+  const getEventStyle = (event: CalendarEvent) => {
+    const style: React.CSSProperties = {}
     if (event.color) {
       style.backgroundColor = event.color
       style.color = '#ffffff'
@@ -628,7 +709,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     return style
   }
   
-  const getImportantBorderColor = (event: any) => {
+  const getImportantBorderColor = (_event: CalendarEvent) => {
     // Always use red border for important events
     return 'border-red-500'
   }
@@ -766,12 +847,12 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     setCreateOpen(true)
   }
 
-  const handleEventClick = (event: any) => {
+  const handleEventClick = (event: CalendarEvent) => {
     setSelectedEvent(event)
     setEventDetailsOpen(true)
   }
 
-  const handleEditClick = (event: any) => {
+  const handleEditClick = (event: CalendarEvent) => {
     setSelectedEvent(event)
     
     const startDate = new Date(event.startUTC)
@@ -827,9 +908,9 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     if (currentEvent) {
       const optimisticEvents = events.map(e => {
         if (e.id === eventId) {
-          const existingRsvp = e.rsvps?.find((r: any) => r.userId === user.id)
+          const existingRsvp = e.rsvps?.find((r: CalendarRsvp) => r.userId === user.id)
           const newRsvps = existingRsvp
-            ? e.rsvps.map((r: any) => r.userId === user.id ? { ...r, status } : r)
+            ? e.rsvps.map((r: CalendarRsvp) => r.userId === user.id ? { ...r, status } : r)
             : [...(e.rsvps || []), { id: 'temp', userId: user.id, status, user }]
           return { ...e, rsvps: newRsvps }
         }
@@ -861,7 +942,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
       toast({
         title: status === 'YES' ? 'RSVP: Going' : 'RSVP: Not Going',
       })
-    } catch (error) {
+    } catch (_error) {
       // Revert optimistic update on error
       await fetchEvents()
       toast({
@@ -880,7 +961,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     // Optimistic update
     const optimisticEvents = events.map(e => {
       if (e.id === eventId) {
-        return { ...e, rsvps: e.rsvps?.filter((r: any) => r.userId !== user.id) || [] }
+        return { ...e, rsvps: e.rsvps?.filter((r: CalendarRsvp) => r.userId !== user.id) || [] }
       }
       return e
     })
@@ -907,7 +988,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
       toast({
         title: 'RSVP removed',
       })
-    } catch (error) {
+    } catch (_error) {
       // Revert optimistic update on error
       await fetchEvents()
       toast({
@@ -920,13 +1001,13 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     }
   }
 
-  const getUserRSVP = (event: any) => {
-    return event.rsvps?.find((r: any) => r.userId === user.id)
+  const getUserRSVP = (event: CalendarEvent) => {
+    return event.rsvps?.find((r: CalendarRsvp) => r.userId === user.id)
   }
 
-  const getRSVPCounts = (event: any) => {
-    const yesCount = event.rsvps?.filter((r: any) => r.status === 'YES').length || 0
-    const noCount = event.rsvps?.filter((r: any) => r.status === 'NO').length || 0
+  const getRSVPCounts = (event: CalendarEvent) => {
+    const yesCount = event.rsvps?.filter((r: CalendarRsvp) => r.status === 'YES').length || 0
+    const noCount = event.rsvps?.filter((r: CalendarRsvp) => r.status === 'NO').length || 0
     return { yesCount, noCount }
   }
 
@@ -966,7 +1047,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
         title: 'Posted to stream',
         description: sendEmail ? 'Email notifications are being sent.' : undefined,
       })
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to post to stream',
@@ -1121,7 +1202,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
   }
 
   // Helper function to calculate overlapping event layouts (Google Calendar style)
-  const calculateEventLayout = (events: any[]) => {
+  const calculateEventLayout = (events: CalendarEvent[]) => {
     if (events.length === 0) return []
     
     // Convert events to intervals with start/end times in minutes
@@ -1144,7 +1225,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
     })
     
     // Calculate columns for overlapping events
-    const columns: any[][] = []
+    const columns: EventInterval[][] = []
     const eventLayouts: Map<string, { column: number, totalColumns: number }> = new Map()
     
     intervals.forEach(interval => {
@@ -2278,7 +2359,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
                             if (eventsResponse.ok) {
                               const data = await eventsResponse.json()
                               setEvents(data.events)
-                              const updatedEvent = data.events.find((e: any) => e.id === selectedEvent.id)
+                              const updatedEvent = (data.events as CalendarEvent[]).find((e) => e.id === selectedEvent.id)
                               if (updatedEvent) {
                                 setSelectedEvent(updatedEvent)
                               }
@@ -2357,8 +2438,8 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
                     {/* RSVP Counts and Lists */}
                     {(() => {
                       const { yesCount, noCount } = getRSVPCounts(selectedEvent)
-                      const yesRsvps = selectedEvent.rsvps?.filter((r: any) => r.status === 'YES') || []
-                      const noRsvps = selectedEvent.rsvps?.filter((r: any) => r.status === 'NO') || []
+                      const yesRsvps = selectedEvent.rsvps?.filter((r: CalendarRsvp) => r.status === 'YES') || []
+                      const noRsvps = selectedEvent.rsvps?.filter((r: CalendarRsvp) => r.status === 'NO') || []
                       
                       return (
                         <div className="space-y-3">
@@ -2369,7 +2450,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
                                 <p className="text-sm font-medium">Going ({yesCount})</p>
                               </div>
                               <div className="space-y-1 pl-6">
-                                {yesRsvps.map((rsvp: any) => (
+                                {yesRsvps.map((rsvp: CalendarRsvp) => (
                                   <div key={rsvp.id} className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6">
                                       <AvatarImage src={rsvp.user.image || ''} />
@@ -2391,7 +2472,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
                                 <p className="text-sm font-medium">Not Going ({noCount})</p>
                               </div>
                               <div className="space-y-1 pl-6">
-                                {noRsvps.map((rsvp: any) => (
+                                {noRsvps.map((rsvp: CalendarRsvp) => (
                                   <div key={rsvp.id} className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6">
                                       <AvatarImage src={rsvp.user.image || ''} />

@@ -99,9 +99,11 @@ export async function POST(
         select: { id: true, scoresReleased: true },
       })
       console.log(`[Release Test Scores] Test ${resolvedParams.testId}: verification query scoresReleased =`, verify?.scoresReleased)
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If the column doesn't exist, that's okay - the feature just won't work until migration is run
-      if (error?.code === 'P2025' || error?.message?.includes('does not exist')) {
+      const errCode = (error as Record<string, unknown>)?.code
+      const errMessage = error instanceof Error ? error.message : undefined
+      if (errCode === 'P2025' || errMessage?.includes('does not exist')) {
         console.warn('scoresReleased column does not exist yet. Migration may need to be run.')
         // Continue anyway - the feature will work once migration is run
       } else {

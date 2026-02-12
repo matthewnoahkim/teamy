@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
     })
 
     // Try to get preferences separately (table might not exist yet)
-    let preferencesMap: Record<string, any> = {}
+    let preferencesMap: Record<string, unknown> = {}
     try {
       const preferences = await prisma.memberPreferences.findMany({
         where: { membershipId: { in: memberships.map(m => m.id) } },

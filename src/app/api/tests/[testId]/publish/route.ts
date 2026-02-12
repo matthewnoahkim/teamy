@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { Prisma } from '@prisma/client'
+import { ScoreReleaseMode } from '@prisma/client'
 import { isAdmin, getUserMembership } from '@/lib/rbac'
 import { hashTestPassword } from '@/lib/test-security'
 import { z } from 'zod'
@@ -102,11 +102,10 @@ export async function POST(
       )
     }
 
-    // Hash test password if provided
+    // Hash test password if provided (plaintext is never stored)
     const testPasswordHash = validatedData.testPassword
       ? await hashTestPassword(validatedData.testPassword)
       : null
-    const testPasswordPlaintext = validatedData.testPassword || null
 
     // Get membership for audit
     const membership = await getUserMembership(session.user.id, test.clubId)
@@ -122,11 +121,11 @@ export async function POST(
         startAt: startAt || null,
         endAt: endAt || null,
         testPasswordHash,
-        testPasswordPlaintext,
+        testPasswordPlaintext: null, // Never store plaintext passwords
         releaseScoresAt: validatedData.releaseScoresAt
           ? new Date(validatedData.releaseScoresAt)
           : null,
-        ...(validatedData.scoreReleaseMode && { scoreReleaseMode: validatedData.scoreReleaseMode as any }),
+        ...(validatedData.scoreReleaseMode && { scoreReleaseMode: validatedData.scoreReleaseMode as ScoreReleaseMode }),
         ...(validatedData.durationMinutes && { durationMinutes: validatedData.durationMinutes }),
         ...(validatedData.maxAttempts !== undefined && { maxAttempts: validatedData.maxAttempts }),
         ...(validatedData.requireFullscreen !== undefined && { requireFullscreen: validatedData.requireFullscreen }),
@@ -198,7 +197,7 @@ export async function POST(
     })
 
     // Create calendar event if requested (only if dates are provided)
-    let calendarEventIds: string[] = []
+    const calendarEventIds: string[] = []
     if (validatedData.addToCalendar && startAt && endAt) {
       // Get the final assignments (either from the request or existing ones)
       const finalAssignments = validatedData.assignmentMode
@@ -327,9 +326,8 @@ export async function POST(
       )
     }
     console.error('Publish test error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Internal server error', message: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

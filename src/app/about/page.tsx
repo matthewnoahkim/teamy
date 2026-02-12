@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { 
   Github, 
   Heart, 
-  ArrowRight,
   ExternalLink,
 } from 'lucide-react'
 

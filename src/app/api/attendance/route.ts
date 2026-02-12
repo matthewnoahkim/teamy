@@ -6,7 +6,7 @@ import { requireMember, isAdmin } from '@/lib/rbac'
 import { updateAttendanceStatuses } from '@/lib/attendance'
 import { z } from 'zod'
 
-const getAttendanceSchema = z.object({
+const _getAttendanceSchema = z.object({
   clubId: z.string(),
 })
 

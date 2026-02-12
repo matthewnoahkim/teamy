@@ -15,8 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, Users, Settings, FileText, Search, Calendar, Plus, X, Trash2, Edit, Save, Mail, Download, DollarSign, UserCheck } from 'lucide-react'
-import Link from 'next/link'
+import { ArrowLeft, Users, Settings, FileText, Search, Calendar, Plus, Trash2, Edit, Save, Mail, Download, DollarSign, UserCheck } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { formatDivision } from '@/lib/utils'
 import {
@@ -112,7 +111,7 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
   // Initialize activeTab from URL param, default to 'registrations'
   const tabParam = searchParams.get('tab')
   const validTabs = ['registrations', 'admins', 'tests', 'details'] as const
-  const initialTab = (tabParam && validTabs.includes(tabParam as any)) ? tabParam as typeof validTabs[number] : 'registrations'
+  const initialTab = (tabParam && (validTabs as readonly string[]).includes(tabParam)) ? tabParam as typeof validTabs[number] : 'registrations'
   const [activeTab, setActiveTab] = useState<'registrations' | 'admins' | 'tests' | 'details'>(initialTab)
   
   // Edit form state
@@ -142,11 +141,10 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
   useEffect(() => {
     const tabParam = searchParams.get('tab')
     const validTabs = ['registrations', 'admins', 'tests', 'details'] as const
-    const newTab = (tabParam && validTabs.includes(tabParam as any)) ? tabParam as typeof validTabs[number] : 'registrations'
+    const newTab = (tabParam && (validTabs as readonly string[]).includes(tabParam)) ? tabParam as typeof validTabs[number] : 'registrations'
     if (newTab !== activeTab) {
       setActiveTab(newTab)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
   
   // Update URL when tab changes (only if it doesn't already match)
@@ -162,7 +160,6 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
       const newUrl = params.toString() ? `/tournaments/${tournamentId}/manage?${params.toString()}` : `/tournaments/${tournamentId}/manage`
       router.replace(newUrl, { scroll: false })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, tournamentId])
   
   // Initialize edit form when tournament loads
@@ -212,10 +209,10 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
       // Server-side protection handles access control - if we reached this component,
       // the user is authorized. The API's isAdmin flag is informational only.
       setTournament(data.tournament)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load tournament',
+        description: error instanceof Error ? error.message : 'Failed to load tournament',
         variant: 'destructive',
       })
     } finally {
@@ -336,10 +333,10 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
       setAddAdminDialogOpen(false)
       setAdminEmail('')
       loadTournament()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to add admin',
+        description: error instanceof Error ? error.message : 'Failed to add admin',
         variant: 'destructive',
       })
     } finally {
@@ -366,10 +363,10 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
       })
       
       loadTournament()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to remove admin',
+        description: error instanceof Error ? error.message : 'Failed to remove admin',
         variant: 'destructive',
       })
     } finally {
@@ -407,10 +404,10 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
       const mailtoLink = `mailto:?bcc=${bcc}&subject=${subject}&body=${body}`
       
       window.location.href = mailtoLink
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to open email client',
+        description: error instanceof Error ? error.message : 'Failed to open email client',
         variant: 'destructive',
       })
     }
@@ -448,10 +445,10 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
         title: 'Success',
         description: `Payment status updated to ${!currentPaidStatus ? 'paid' : 'unpaid'}`,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update paid status',
+        description: error instanceof Error ? error.message : 'Failed to update paid status',
         variant: 'destructive',
       })
       // Reload tournament to revert optimistic update
@@ -463,7 +460,7 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
 
   const handleExportCSV = () => {
     // Helper function to escape CSV fields
-    const escapeCSV = (value: any): string => {
+    const escapeCSV = (value: string | number | boolean | null | undefined): string => {
       if (value === null || value === undefined) return ''
       const str = String(value)
       // If contains comma, quote, or newline, wrap in quotes and escape quotes
@@ -619,10 +616,10 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
       
       setIsEditing(false)
       loadTournament()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update tournament',
+        description: error instanceof Error ? error.message : 'Failed to update tournament',
         variant: 'destructive',
       })
     } finally {

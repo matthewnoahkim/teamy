@@ -1,5 +1,5 @@
-import { PublicPageLayout } from '@/components/public-page-layout'
 import Link from 'next/link'
+import { PublicPageLayout } from '@/components/public-page-layout'
 
 export default function TermsOfServicePage() {
   return (
@@ -7,11 +7,8 @@ export default function TermsOfServicePage() {
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-12">
         <div className="prose prose-slate dark:prose-invert max-w-none bg-card border border-border rounded-2xl p-8 md:p-12 shadow-card">
           <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Terms of Service</h1>
-          <p className="text-muted-foreground mb-8">Last updated: January 16, 2026</p>
+          <p className="text-muted-foreground mb-8">Last updated: February 11, 2026</p>
 
-          <section className="mb-8">The terms of service are under review.</section>
-
-          {/*
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p>
@@ -28,15 +25,17 @@ export default function TermsOfServicePage() {
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">2. Description of Service</h2>
             <p>
-              Teamy is a web-based platform designed to help teams manage their activities, including but not limited to:
+              Teamy is a web-based platform designed to help Science Olympiad teams manage their activities, including but not limited to:
             </p>
             <ul>
               <li>Team and member management</li>
               <li>Event scheduling and calendar management</li>
               <li>Announcements and communication</li>
               <li>Attendance tracking</li>
-              <li>Financial management</li>
-              <li>Test administration and grading</li>
+              <li>Financial management and budgeting</li>
+              <li>Test administration, grading, and AI-assisted scoring</li>
+              <li>Tournament hosting and management</li>
+              <li>Resource sharing and collaboration</li>
             </ul>
           </section>
 
@@ -146,6 +145,9 @@ export default function TermsOfServicePage() {
               <li>Attempt to gain unauthorized access to the Service or related systems</li>
               <li>Interfere with or disrupt the Service or servers connected to the Service</li>
               <li>Harass, abuse, or harm other users</li>
+              <li>Scrape, data-mine, or use automated tools to access the Service without prior written consent</li>
+              <li>Reverse-engineer, decompile, or disassemble any portion of the Service</li>
+              <li>Circumvent or attempt to circumvent any security measures or access controls</li>
             </ul>
           </section>
 
@@ -197,16 +199,55 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">7. Geographic Restrictions</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">7. Subscriptions and Payments</h2>
+            <p>
+              Certain features of the Service may require a paid subscription. By subscribing, you agree to:
+            </p>
+            <ul>
+              <li>Pay all applicable fees as described at the time of purchase</li>
+              <li>Provide accurate and complete billing information</li>
+              <li>Authorize recurring charges as applicable to your subscription plan</li>
+            </ul>
+            <p className="mt-4">
+              Subscription payments are processed through Stripe. We do not store your full credit card information on our servers. Refunds and cancellations are handled in accordance with our billing policies available on the billing page.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-heading text-xl font-semibold mb-4">8. Tournament Hosting</h2>
+            <p>
+              If you host a tournament through the Service, you agree to:
+            </p>
+            <ul>
+              <li>Provide accurate tournament information</li>
+              <li>Comply with all applicable Science Olympiad rules and regulations</li>
+              <li>Handle participant data in accordance with FERPA, COPPA, and our Privacy Policy</li>
+              <li>Obtain all necessary permissions and approvals before hosting</li>
+              <li>Not use the platform for unauthorized or fraudulent tournament activities</li>
+            </ul>
+            <p className="mt-4">
+              Tournament hosting requests are subject to approval. We reserve the right to decline or remove any tournament that violates these Terms.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-heading text-xl font-semibold mb-4">9. Intellectual Property</h2>
+            <p>
+              The Service, including its original content, features, and functionality, is owned by Teamy and is protected by international copyright, trademark, and other intellectual property laws. You retain ownership of any User Content you create, but grant us a non-exclusive, worldwide, royalty-free license to use, display, and distribute such content solely for the purpose of operating and improving the Service.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-heading text-xl font-semibold mb-4">10. Geographic Restrictions</h2>
             <p>
               This service is intended for use only by individuals located in the United States. By accessing or using the service, you represent and warrant that you are a U.S. resident. We do not permit access to users outside the United States.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">8. Disclaimer of Warranties</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">11. Disclaimer of Warranties</h2>
             <p>
-              THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+              THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
             </p>
             <p className="mt-4">
               While we strive to maintain FERPA and COPPA compliance, we make no warranties regarding the absolute security of data or the prevention of unauthorized access. Educational institutions and users are responsible for implementing their own security measures and policies.
@@ -214,7 +255,7 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">9. Limitation of Liability</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">12. Limitation of Liability</h2>
             <p>
               TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL TEAMY BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES.
             </p>
@@ -224,12 +265,19 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">10. Termination</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">13. Indemnification</h2>
+            <p>
+              You agree to indemnify and hold harmless Teamy, its officers, directors, employees, and agents from any claims, damages, losses, liabilities, and expenses (including reasonable attorneys&apos; fees) arising out of or related to your use of the Service, your User Content, or your violation of these Terms.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-heading text-xl font-semibold mb-4">14. Termination</h2>
             <p>
               We reserve the right to suspend or terminate your access to the Service at any time, with or without cause, including for violations of these Terms or applicable laws.
             </p>
             
-            <h3 className="text-lg font-semibold mb-3 mt-6">10.1 Data Upon Termination</h3>
+            <h3 className="text-lg font-semibold mb-3 mt-6">14.1 Data Upon Termination</h3>
             <p>
               Upon termination of service:
             </p>
@@ -242,7 +290,14 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">11. Changes to Terms</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">15. Governing Law</h2>
+            <p>
+              These Terms shall be governed by and construed in accordance with the laws of the United States, without regard to its conflict of law provisions.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-heading text-xl font-semibold mb-4">16. Changes to Terms</h2>
             <p>
               We may modify these Terms at any time. We will notify users of material changes by:
             </p>
@@ -257,18 +312,20 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">12. Contact Information</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">17. Contact Information</h2>
             <p>
               If you have any questions about these Terms of Service, please contact us at:
             </p>
             <p className="mt-4">
-              <strong>Email:</strong> teamysite@gmail.com
+              <strong>Email:</strong>{' '}
+              <a href="mailto:teamysite@gmail.com" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
+                teamysite@gmail.com
+              </a>
             </p>
             <p className="mt-4">
               For questions regarding FERPA or COPPA compliance, educational institutions and parents may contact us at the same email address.
             </p>
           </section>
-          */}
         </div>
       </div>
     </PublicPageLayout>

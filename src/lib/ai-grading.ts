@@ -17,7 +17,7 @@ export interface FrqSuggestionResult {
   strengths?: string
   gaps?: string
   rubricAlignment?: string
-  rawResponse: any
+  rawResponse: unknown
 }
 
 const responseFormat = {
@@ -91,7 +91,7 @@ export async function requestFrqSuggestion(input: FrqSuggestionInput): Promise<F
   const completion = await client.chat.completions.create({
     model: DEFAULT_FRQ_MODEL,
     temperature: 0.2,
-    response_format: responseFormat as any,
+    response_format: responseFormat as unknown as Record<string, unknown>,
     messages,
   })
 
@@ -100,10 +100,10 @@ export async function requestFrqSuggestion(input: FrqSuggestionInput): Promise<F
     throw new Error('AI response did not include any content')
   }
 
-  let parsed: any
+  let parsed: Record<string, unknown>
   try {
     parsed = JSON.parse(content)
-  } catch (error) {
+  } catch (_error) {
     throw new Error('Failed to parse AI response')
   }
 

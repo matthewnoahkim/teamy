@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
         // Calculate current spending
         // For team budgets, only count expenses/requests for that team
         // For club-wide budgets, count all expenses/requests
-        const expenseWhere: any = {
+        const expenseWhere: Record<string, unknown> = {
           clubId: validatedData.clubId,
           eventId: validatedData.eventId,
         }
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         })
 
         // Also count pending requests for the same scope
-        const requestWhere: any = {
+        const requestWhere: Record<string, unknown> = {
           clubId: validatedData.clubId,
           eventId: validatedData.eventId,
           status: 'PENDING',
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
         })
 
         const totalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0)
-        const totalRequested = pendingRequests.reduce((sum, req) => sum + req.estimatedAmount, 0)
+        const _totalRequested = pendingRequests.reduce((sum, req) => sum + req.estimatedAmount, 0)
         const remaining = budget.maxBudget - totalSpent
 
         // Check if request exceeds remaining budget

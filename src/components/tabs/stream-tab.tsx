@@ -16,14 +16,31 @@ import { Plus, Send, Trash2, ChevronDown, ChevronUp, Edit, MessageCircle, X, Cal
 import { AttachmentDisplay } from '@/components/ui/attachment-display'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { EmojiPicker } from '@/components/emoji-picker'
-import { Skeleton } from '@/components/ui/skeleton'
 import { PageLoading } from '@/components/ui/loading-spinner'
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
+import type { AnnouncementFull, MembershipWithPreferences } from '@/types/models'
+
+// Extracted sub-types from AnnouncementFull for use in callbacks
+type AnnouncementReply = AnnouncementFull['replies'][number]
+type AnnouncementReaction = AnnouncementFull['reactions'][number]
+type AnnouncementVisibility = AnnouncementFull['visibilities'][number]
+type AnnouncementCalendarEvent = NonNullable<AnnouncementFull['calendarEvent']>
+type CalendarEventRSVP = AnnouncementCalendarEvent['rsvps'][number]
+
+interface StreamTeam {
+  id: string
+  name: string
+}
+
+interface StreamEvent {
+  id: string
+  name: string
+}
 
 interface StreamTabProps {
   clubId: string
-  currentMembership: any
-  teams: any[]
+  currentMembership: MembershipWithPreferences
+  teams: StreamTeam[]
   isAdmin: boolean
   user: {
     id: string
@@ -31,11 +48,11 @@ interface StreamTabProps {
     email: string
     image?: string | null
   }
-  initialAnnouncements?: any[]
+  initialAnnouncements?: AnnouncementFull[]
 }
 
 type AnnouncementsResponse = {
-  announcements: any[]
+  announcements: AnnouncementFull[]
 }
 
 type ApiErrorResponse = {
@@ -55,7 +72,7 @@ async function performRequest(url: string, options: RequestInit = {}, fallbackMe
 
 export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, initialAnnouncements }: StreamTabProps) {
   const { toast } = useToast()
-  const [announcements, setAnnouncements] = useState<any[]>(initialAnnouncements || [])
+  const [announcements, setAnnouncements] = useState<AnnouncementFull[]>(initialAnnouncements || [])
   const [loading, setLoading] = useState(!initialAnnouncements)
   const [posting, setPosting] = useState(false)
   const [title, setTitle] = useState('')
@@ -64,11 +81,11 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
   const [selectedTeams, setSelectedTeams] = useState<string[]>([])
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [selectedEvents, setSelectedEvents] = useState<string[]>([])
-  const [availableEvents, setAvailableEvents] = useState<any[]>([])
+  const [availableEvents, setAvailableEvents] = useState<StreamEvent[]>([])
   const [sendEmail, setSendEmail] = useState(false)
   const [important, setImportant] = useState(false)
   const [isPostSectionCollapsed, setIsPostSectionCollapsed] = useState(true)
-  const [editingAnnouncement, setEditingAnnouncement] = useState<any | null>(null)
+  const [editingAnnouncement, setEditingAnnouncement] = useState<AnnouncementFull | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editImportant, setEditImportant] = useState(false)
@@ -79,7 +96,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
   const [replyContent, setReplyContent] = useState<Record<string, string>>({})
   const [postingReply, setPostingReply] = useState<Record<string, boolean>>({})
   const [showReplies, setShowReplies] = useState<Record<string, boolean>>({})
-  const [reacting, setReacting] = useState<Record<string, boolean>>({})
+  const [_reacting, setReacting] = useState<Record<string, boolean>>({})
   const [deleteReplyDialogOpen, setDeleteReplyDialogOpen] = useState(false)
   const [replyToDelete, setReplyToDelete] = useState<string | null>(null)
   const [deletingReply, setDeletingReply] = useState(false)
@@ -88,26 +105,26 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploadingFiles, setUploadingFiles] = useState(false)
 
-  const memberUserId = currentMembership?.userId as string | undefined
-  const announcementMap = useMemo(() => {
-    const map = new Map<string, any>()
+  const _memberUserId = currentMembership?.userId as string | undefined
+  const _announcementMap = useMemo(() => {
+    const map = new Map<string, AnnouncementFull>()
     announcements.forEach((announcement) => {
       map.set(announcement.id, announcement)
     })
     return map
   }, [announcements])
 
-  const replyMap = useMemo(() => {
-    const map = new Map<string, { reply: any; announcementId: string }>()
+  const _replyMap = useMemo(() => {
+    const map = new Map<string, { reply: AnnouncementReply; announcementId: string }>()
     announcements.forEach((announcement) => {
-      announcement.replies?.forEach((reply: any) => {
+      announcement.replies?.forEach((reply: AnnouncementReply) => {
         map.set(reply.id, { reply, announcementId: announcement.id })
       })
     })
     return map
   }, [announcements])
 
-  const filteredAnnouncements = useMemo(
+  const _filteredAnnouncements = useMemo(
     () => (showImportantOnly ? announcements.filter((a) => a.important) : announcements),
     [announcements, showImportantOnly],
   )
@@ -226,7 +243,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     }
 
     // Optimistically add announcement to the top of the list
-    setAnnouncements((prev) => [tempAnnouncement, ...prev])
+    setAnnouncements((prev) => [tempAnnouncement as AnnouncementFull, ...prev])
 
     // Clear form immediately
     setTitle('')
@@ -267,7 +284,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
 
       const rawData: unknown = await response.json().catch(() => null)
       let announcementId: string | undefined
-      let serverAnnouncement: any = null
+      let serverAnnouncement: AnnouncementFull | null = null
       
       if (
         rawData &&
@@ -277,7 +294,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
         typeof rawData.announcement === 'object' &&
         'id' in rawData.announcement
       ) {
-        serverAnnouncement = rawData.announcement
+        serverAnnouncement = rawData.announcement as AnnouncementFull
         announcementId = (rawData.announcement as { id?: string }).id
       }
 
@@ -330,11 +347,11 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
         title: 'Announcement posted',
         description: formDataToPost.sendEmail ? 'Emails are being sent.' : undefined,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Post announcement error:', error)
       toast({
         title: 'Error',
-        description: error.message || 'Failed to post announcement',
+        description: error instanceof Error ? error.message : 'Failed to post announcement',
         variant: 'destructive',
       })
     } finally {
@@ -366,10 +383,10 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
       })
 
       fetchAnnouncements()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete announcement',
+        description: error instanceof Error ? error.message : 'Failed to delete announcement',
         variant: 'destructive',
       })
     } finally {
@@ -378,12 +395,12 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     }
   }
 
-  const canDeleteAnnouncement = (announcement: any) => {
+  const canDeleteAnnouncement = (announcement: AnnouncementFull) => {
     // Can delete if you're the author or an admin
     return announcement.authorId === currentMembership.id || isAdmin
   }
 
-  const canEditAnnouncement = (announcement: any) => {
+  const canEditAnnouncement = (announcement: AnnouncementFull) => {
     // Cannot edit announcements linked to calendar events (only delete them)
     if (announcement.calendarEvent) {
       return false
@@ -392,7 +409,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     return announcement.authorId === currentMembership.id
   }
 
-  const handleEditClick = (announcement: any) => {
+  const handleEditClick = (announcement: AnnouncementFull) => {
     setEditingAnnouncement(announcement)
     setEditTitle(announcement.title)
     setEditContent(announcement.content)
@@ -430,7 +447,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
         announcement.id === announcementId
           ? {
               ...announcement,
-              replies: [...(announcement.replies || []), tempReply],
+              replies: [...(announcement.replies || []), tempReply as AnnouncementReply],
             }
           : announcement
       )
@@ -453,7 +470,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
             announcement.id === announcementId
               ? {
                   ...announcement,
-                  replies: (announcement.replies || []).filter((r: any) => r.id !== tempReply.id),
+                  replies: (announcement.replies || []).filter((r: AnnouncementReply) => r.id !== tempReply.id),
                 }
               : announcement
           )
@@ -469,7 +486,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
           announcement.id === announcementId
             ? {
                 ...announcement,
-                replies: (announcement.replies || []).map((r: any) =>
+                replies: (announcement.replies || []).map((r: AnnouncementReply) =>
                   r.id === tempReply.id ? data.reply : r
                 ),
               }
@@ -480,7 +497,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
       toast({
         title: 'Reply posted',
       })
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to post reply',
@@ -505,22 +522,22 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     try {
       // Check if user already reacted with this emoji
       let hasReacted = false
-      let currentReactions: any[] = []
+      let currentReactions: AnnouncementReaction[] = []
       
       if (targetType === 'announcement') {
         const announcement = announcements.find(a => a.id === targetId)
-        hasReacted = announcement?.reactions?.some((r: any) => 
+        hasReacted = announcement?.reactions?.some((r: AnnouncementReaction) => 
           r.emoji === emoji && r.user.id === currentMembership.userId
-        )
+        ) ?? false
         currentReactions = announcement?.reactions || []
       } else {
         // For replies, find the reply in any announcement
         for (const announcement of announcements) {
-          const reply = announcement.replies?.find((r: any) => r.id === targetId)
+          const reply = announcement.replies?.find((r: AnnouncementReply) => r.id === targetId)
           if (reply) {
-            hasReacted = reply.reactions?.some((r: any) => 
+            hasReacted = reply.reactions?.some((r: AnnouncementReaction) => 
               r.emoji === emoji && r.user.id === currentMembership.userId
-            )
+            ) ?? false
             currentReactions = reply.reactions || []
             break
           }
@@ -529,7 +546,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
 
       // Optimistically update reactions
       const optimisticReactions = hasReacted
-        ? currentReactions.filter((r: any) => !(r.emoji === emoji && r.user.id === currentMembership.userId))
+        ? currentReactions.filter((r: AnnouncementReaction) => !(r.emoji === emoji && r.user.id === currentMembership.userId))
         : [
             ...currentReactions,
             {
@@ -541,7 +558,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                 email: user.email,
                 image: user.image,
               },
-            },
+            } as AnnouncementReaction,
           ]
 
       // Update state optimistically
@@ -557,7 +574,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
         setAnnouncements((prev) =>
           prev.map((announcement) => ({
             ...announcement,
-            replies: (announcement.replies || []).map((reply: any) =>
+            replies: (announcement.replies || []).map((reply: AnnouncementReply) =>
               reply.id === targetId ? { ...reply, reactions: optimisticReactions } : reply
             ),
           }))
@@ -594,7 +611,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                   announcement.id === targetId
                     ? {
                         ...announcement,
-                        reactions: (announcement.reactions || []).map((r: any) =>
+                        reactions: (announcement.reactions || []).map((r: AnnouncementReaction) =>
                           r.id?.startsWith('temp-') && r.emoji === emoji ? data.reaction : r
                         ),
                       }
@@ -605,11 +622,11 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
               setAnnouncements((prev) =>
                 prev.map((announcement) => ({
                   ...announcement,
-                  replies: (announcement.replies || []).map((reply: any) =>
+                  replies: (announcement.replies || []).map((reply: AnnouncementReply) =>
                     reply.id === targetId
                       ? {
                           ...reply,
-                          reactions: (reply.reactions || []).map((r: any) =>
+                          reactions: (reply.reactions || []).map((r: AnnouncementReaction) =>
                             r.id?.startsWith('temp-') && r.emoji === emoji ? data.reaction : r
                           ),
                         }
@@ -619,11 +636,11 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
               )
             }
           }
-        } catch (e) {
+        } catch (_e) {
           // If response doesn't include reaction, that's okay - optimistic update is fine
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Revert optimistic update on error
       fetchAnnouncements()
       toast({
@@ -636,7 +653,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     }
   }
 
-  const getReactionSummary = (reactions: any[]) => {
+  const getReactionSummary = (reactions: AnnouncementReaction[]) => {
     if (!reactions || reactions.length === 0) return []
     
     const summary: Array<{ emoji: string; count: number; hasUserReacted: boolean }> = []
@@ -678,7 +695,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     try {
       // Find the announcement that contains this reply
       const announcement = announcements.find(a => 
-        a.replies?.some((r: any) => r.id === replyToDelete)
+        a.replies?.some((r: AnnouncementReply) => r.id === replyToDelete)
       )
 
       if (!announcement) {
@@ -704,10 +721,10 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
       
       // Refresh announcements to get updated data
       fetchAnnouncements()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete reply',
+        description: error instanceof Error ? error.message : 'Failed to delete reply',
         variant: 'destructive',
       })
     } finally {
@@ -715,7 +732,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     }
   }
 
-  const canDeleteReply = (reply: any) => {
+  const canDeleteReply = (reply: AnnouncementReply) => {
     // Members can delete their own replies
     if (reply.author.user.id === currentMembership.userId) return true
     // Admins can delete any reply
@@ -743,7 +760,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
 
       // Refresh announcements to get updated RSVP data
       await fetchAnnouncements()
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to update RSVP',
@@ -772,7 +789,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
 
       // Refresh announcements to get updated RSVP data
       await fetchAnnouncements()
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to remove RSVP',
@@ -783,19 +800,19 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     }
   }
 
-  const getUserRSVP = (event: any) => {
+  const getUserRSVP = (event: AnnouncementCalendarEvent) => {
     if (!event?.rsvps) return null
-    return event.rsvps.find((r: any) => r.userId === currentMembership.userId)
+    return event.rsvps.find((r: CalendarEventRSVP) => r.userId === currentMembership.userId)
   }
 
-  const getRSVPCounts = (event: any) => {
+  const getRSVPCounts = (event: AnnouncementCalendarEvent) => {
     if (!event?.rsvps) return { yesCount: 0, noCount: 0 }
-    const yesCount = event.rsvps.filter((r: any) => r.status === 'YES').length
-    const noCount = event.rsvps.filter((r: any) => r.status === 'NO').length
+    const yesCount = event.rsvps.filter((r: CalendarEventRSVP) => r.status === 'YES').length
+    const noCount = event.rsvps.filter((r: CalendarEventRSVP) => r.status === 'NO').length
     return { yesCount, noCount }
   }
 
-  const formatEventTime = (event: any) => {
+  const formatEventTime = (event: AnnouncementCalendarEvent) => {
     const startDate = new Date(event.startUTC)
     const endDate = new Date(event.endUTC)
     
@@ -872,10 +889,10 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
       setIsEditDialogOpen(false)
       setEditingAnnouncement(null)
       fetchAnnouncements()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update announcement',
+        description: error instanceof Error ? error.message : 'Failed to update announcement',
         variant: 'destructive',
       })
     } finally {
@@ -1183,7 +1200,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
-                      {announcement.visibilities.map((v: any) => (
+                      {announcement.visibilities.map((v: AnnouncementVisibility) => (
                         <Badge key={v.id} variant="secondary" className="text-xs">
                           {v.scope === 'CLUB' ? 'CLUB' : v.team?.name || 'TEAM'}
                         </Badge>
@@ -1280,8 +1297,8 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                           {/* RSVP Counts and Lists */}
                           {(() => {
                             const { yesCount, noCount } = getRSVPCounts(announcement.calendarEvent)
-                            const yesRsvps = announcement.calendarEvent.rsvps?.filter((r: any) => r.status === 'YES') || []
-                            const noRsvps = announcement.calendarEvent.rsvps?.filter((r: any) => r.status === 'NO') || []
+                            const yesRsvps = announcement.calendarEvent.rsvps?.filter((r: CalendarEventRSVP) => r.status === 'YES') || []
+                            const noRsvps = announcement.calendarEvent.rsvps?.filter((r: CalendarEventRSVP) => r.status === 'NO') || []
                             
                             return (
                               <div className="space-y-3 text-sm">
@@ -1292,7 +1309,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                                       <p className="font-medium">Going ({yesCount})</p>
                                     </div>
                                     <div className="space-y-1 pl-6">
-                                      {yesRsvps.map((rsvp: any) => (
+                                      {yesRsvps.map((rsvp: CalendarEventRSVP) => (
                                         <div key={rsvp.id} className="flex items-center gap-2">
                                           <Avatar className="h-6 w-6">
                                             <AvatarImage src={rsvp.user.image || ''} />
@@ -1314,7 +1331,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                                       <p className="font-medium">Not Going ({noCount})</p>
                                     </div>
                                     <div className="space-y-1 pl-6">
-                                      {noRsvps.map((rsvp: any) => (
+                                      {noRsvps.map((rsvp: CalendarEventRSVP) => (
                                         <div key={rsvp.id} className="flex items-center gap-2">
                                           <Avatar className="h-6 w-6">
                                             <AvatarImage src={rsvp.user.image || ''} />
@@ -1396,7 +1413,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                       {/* Existing Replies */}
                       {announcement.replies && announcement.replies.length > 0 && (
                         <div className="space-y-3">
-                          {announcement.replies.map((reply: any) => (
+                          {announcement.replies.map((reply: AnnouncementReply) => (
                             <div key={reply.id} className="flex gap-3 pl-4 border-l-2 border-muted">
                               <Avatar className="h-8 w-8 flex-shrink-0">
                                 <AvatarImage src={reply.author.user.image || ''} />

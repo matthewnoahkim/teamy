@@ -10,7 +10,7 @@ interface Props {
 }
 
 // Helper to check if user is a tournament director for a tournament
-async function isTournamentDirector(userId: string, userEmail: string, tournamentId: string): Promise<boolean> {
+async function _isTournamentDirector(userId: string, userEmail: string, tournamentId: string): Promise<boolean> {
   // Check if user is tournament admin
   const admin = await prisma.tournamentAdmin.findUnique({
     where: {
@@ -172,14 +172,14 @@ export default async function TDEditTestPage({ params }: Props) {
     noteSheetInstructions: null,
     status: esTest.status as 'DRAFT' | 'PUBLISHED' | 'CLOSED',
     assignments: [],
-    questions: esTest.questions.map((q: any) => ({
+    questions: esTest.questions.map((q) => ({
       id: q.id,
       type: q.type,
       promptMd: q.promptMd,
       explanation: q.explanation,
       points: Number(q.points),
       shuffleOptions: q.shuffleOptions,
-      options: q.options.map((o: any) => ({
+      options: q.options.map((o) => ({
         id: o.id,
         label: o.label,
         isCorrect: o.isCorrect,

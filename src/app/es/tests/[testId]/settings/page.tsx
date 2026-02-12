@@ -125,9 +125,9 @@ export default async function ESTestSettingsPage({ params }: Props) {
   }
 
   // Safely access new fields that might not exist yet
-  const releaseScoresAt = (esTest as any).releaseScoresAt
-  const scoreReleaseMode = (esTest as any).scoreReleaseMode || 'FULL_TEST'
-  const scoresReleased = (esTest as any).scoresReleased || false
+  const releaseScoresAt = (esTest as unknown as Record<string, unknown>).releaseScoresAt
+  const scoreReleaseMode = (esTest as unknown as Record<string, unknown>).scoreReleaseMode || 'FULL_TEST'
+  const scoresReleased = (esTest as unknown as Record<string, unknown>).scoresReleased || false
 
   return (
     <div className="min-h-screen bg-background grid-pattern">

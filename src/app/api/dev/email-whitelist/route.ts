@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 // GET - Fetch the email whitelist
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   try {
     const session = await getServerSession(authOptions)
     
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Verify user is in whitelist
+    // Verify user is in whitelist (dev access check)
     const setting = await prisma.siteSetting.findUnique({
       where: { key: 'dev_panel_email_whitelist' },
     })
@@ -24,14 +24,12 @@ export async function GET(request: Request) {
         if (!Array.isArray(emails)) {
           emails = []
         }
-      } catch (e) {
+      } catch (_e) {
         emails = []
       }
     }
 
     // If empty, return default emails from environment variable
-    // Format: comma-separated list of emails
-    // Example: DEV_PANEL_DEFAULT_EMAILS="email1@example.com,email2@example.com"
     if (emails.length === 0) {
       const defaultEmailsEnv = process.env.DEV_PANEL_DEFAULT_EMAILS
       if (defaultEmailsEnv) {
@@ -40,6 +38,15 @@ export async function GET(request: Request) {
           .map(email => email.trim().toLowerCase())
           .filter(email => email.length > 0 && email.includes('@'))
       }
+    }
+
+    // Verify requesting user has dev panel access
+    const userEmail = session.user.email.toLowerCase().trim()
+    const isAllowed = emails.some(
+      (email) => email.toLowerCase().trim() === userEmail
+    )
+    if (!isAllowed) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Fetch user info for each email
@@ -97,7 +104,7 @@ export async function PUT(request: NextRequest) {
         if (!Array.isArray(currentWhitelist)) {
           currentWhitelist = []
         }
-      } catch (e) {
+      } catch (_e) {
         currentWhitelist = []
       }
     }
@@ -143,7 +150,7 @@ export async function PUT(request: NextRequest) {
     const uniqueEmails = Array.from(new Set(normalizedEmails))
 
     // Upsert the setting
-    const setting = await prisma.siteSetting.upsert({
+    const _setting = await prisma.siteSetting.upsert({
       where: { key: 'dev_panel_email_whitelist' },
       update: { value: JSON.stringify(uniqueEmails) },
       create: {

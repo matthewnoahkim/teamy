@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { JSX } from 'react'
 import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
@@ -32,7 +32,6 @@ import {
   LogOut, 
   Clock, 
   MapPin, 
-  Link as LinkIcon,
   Plus,
   Users,
   Calendar,
@@ -199,7 +198,7 @@ interface TDTournamentManageClientProps {
 }
 
 // Helper function to highlight search terms in text
-const highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
+const _highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
   if (!text || !searchQuery) return text || ''
   
   const query = searchQuery.trim()
@@ -265,7 +264,7 @@ export function TDTournamentManageClient({
       if (savedTab && ['staff', 'timeline', 'settings', 'events', 'teams'].includes(savedTab)) {
         setActiveTab(savedTab)
       }
-    } catch (e) {
+    } catch (_e) {
       // localStorage not available
     }
     setIsHydrated(true)
@@ -276,7 +275,7 @@ export function TDTournamentManageClient({
     if (isHydrated) {
       try {
         localStorage.setItem(storageKey, activeTab)
-      } catch (e) {
+      } catch (_e) {
         // localStorage not available
       }
     }
@@ -345,7 +344,20 @@ export function TDTournamentManageClient({
   }>({})
 
   // Default test settings state
-  const [defaultTestSettings, setDefaultTestSettings] = useState<any>(null)
+  const [defaultTestSettings, setDefaultTestSettings] = useState<{
+    defaultDurationMinutes?: number | null
+    defaultStartAt?: string | null
+    defaultEndAt?: string | null
+    defaultReleaseScoresAt?: string | null
+    defaultScoreReleaseMode?: string | null
+    defaultRequireFullscreen?: boolean
+    defaultAllowCalculator?: boolean
+    defaultCalculatorType?: string | null
+    defaultAllowNoteSheet?: boolean
+    defaultAutoApproveNoteSheet?: boolean
+    defaultRequireOneSitting?: boolean
+    defaultMaxAttempts?: number | null
+  } | null>(null)
   const [loadingDefaultTestSettings, setLoadingDefaultTestSettings] = useState(true)
   const [isEditingDefaultTestSettings, setIsEditingDefaultTestSettings] = useState(false)
   const [savingDefaultTestSettings, setSavingDefaultTestSettings] = useState(false)
@@ -550,7 +562,7 @@ export function TDTournamentManageClient({
     actorName: string
     actorEmail: string
     createdAt: string
-    details: any
+    details: Record<string, unknown>
   }>>([])
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false)
   const [showAuditLogs, setShowAuditLogs] = useState(false)
@@ -597,7 +609,7 @@ export function TDTournamentManageClient({
   const isBCTournament = tournament.division === 'B&C' || (typeof tournament.division === 'string' && tournament.division.includes('B') && tournament.division.includes('C'))
   
   // Determine default division for trial events based on tournament division
-  const getDefaultTrialEventDivision = (): 'B' | 'C' => {
+  const _getDefaultTrialEventDivision = (): 'B' | 'C' => {
     if (tournament.division === 'C') return 'C'
     if (tournament.division === 'B') return 'B'
     // For B&C tournaments, default to C
@@ -764,10 +776,10 @@ export function TDTournamentManageClient({
         const data = await res.json()
         throw new Error(data.error || 'Failed to update publish status')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update publish status',
+        description: error instanceof Error ? error.message : 'Failed to update publish status',
         variant: 'destructive',
       })
     } finally {
@@ -866,7 +878,7 @@ export function TDTournamentManageClient({
       } else {
         throw new Error('Failed to remove staff')
       }
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to remove staff member',
@@ -1105,7 +1117,7 @@ export function TDTournamentManageClient({
       } else {
         throw new Error('Failed to save timeline item')
       }
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to save timeline item',
@@ -1131,7 +1143,7 @@ export function TDTournamentManageClient({
       } else {
         throw new Error('Failed to remove timeline item')
       }
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to remove timeline item',
@@ -1304,7 +1316,7 @@ export function TDTournamentManageClient({
     }))
   }
 
-  const handleToggleEvent = (eventId: string) => {
+  const _handleToggleEvent = (eventId: string) => {
     setSettingsForm(prev => ({
       ...prev,
       eventsRun: prev.eventsRun.includes(eventId)
@@ -1313,7 +1325,7 @@ export function TDTournamentManageClient({
     }))
   }
 
-  const handleSelectAllEvents = () => {
+  const _handleSelectAllEvents = () => {
     setSettingsForm(prev => ({
       ...prev,
       eventsRun: prev.eventsRun.length === events.length
@@ -1433,7 +1445,7 @@ export function TDTournamentManageClient({
     }
   }
 
-  const handleToggleEventDialog = (eventId: string) => {
+  const _handleToggleEventDialog = (eventId: string) => {
     setEventsDialogForm(prev => ({
       ...prev,
       eventsRun: prev.eventsRun.includes(eventId)
@@ -1640,7 +1652,6 @@ export function TDTournamentManageClient({
     }, 5000)
 
     return () => clearInterval(interval)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAuditLogs])
 
   // Fetch events when events tab is activated
@@ -1648,7 +1659,6 @@ export function TDTournamentManageClient({
     if (activeTab === 'events' && eventsWithTests.length === 0) {
       fetchEventsWithTests()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
   // Fetch registrations when teams tab is activated
@@ -1656,7 +1666,6 @@ export function TDTournamentManageClient({
     if (activeTab === 'teams') {
       fetchRegistrations()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
   // Delete test handlers
@@ -1683,11 +1692,11 @@ export function TDTournamentManageClient({
 
       // Refresh tests list
       fetchEventsWithTests()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to duplicate test:', error)
       toast({
         title: 'Error',
-        description: error.message || 'Failed to duplicate test',
+        description: error instanceof Error ? error.message : 'Failed to duplicate test',
         variant: 'destructive',
       })
     }
@@ -1717,10 +1726,10 @@ export function TDTournamentManageClient({
       
       // Refresh tests list
       fetchEventsWithTests()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete test',
+        description: error instanceof Error ? error.message : 'Failed to delete test',
         variant: 'destructive',
       })
     } finally {

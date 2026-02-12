@@ -57,10 +57,10 @@ export async function POST(req: NextRequest) {
     const questions = await importQuestionsFromDocx(buffer);
 
     return NextResponse.json({ questions });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error importing docx:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to import questions from docx' },
+      { error: error instanceof Error ? error.message : 'Failed to import questions from docx' },
       { status: 500 }
     );
   }

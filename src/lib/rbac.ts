@@ -12,10 +12,12 @@ export async function getUserMembership(userId: string, clubId: string) {
         clubId,
       },
     },
-    include: {
-      club: true,
-      team: true,
-      user: true,
+    select: {
+      id: true,
+      role: true,
+      userId: true,
+      clubId: true,
+      teamId: true,
     },
   })
 }
@@ -42,7 +44,7 @@ export async function isMember(userId: string, clubId: string): Promise<boolean>
 export async function requireAdmin(userId: string, clubId: string) {
   const isAuth = await isAdmin(userId, clubId)
   if (!isAuth) {
-    throw new Error('UNAUTHORIZED: Admin role required')
+    throw new Error('UNAUTHORIZED: Insufficient permissions')
   }
 }
 
@@ -52,7 +54,7 @@ export async function requireAdmin(userId: string, clubId: string) {
 export async function requireMember(userId: string, clubId: string) {
   const isAuth = await isMember(userId, clubId)
   if (!isAuth) {
-    throw new Error('UNAUTHORIZED: Club membership required')
+    throw new Error('UNAUTHORIZED: Insufficient permissions')
   }
 }
 
@@ -247,7 +249,7 @@ export async function hasESTestAccess(userId: string, userEmail: string, testId:
   })
 
   if (createAudit && createAudit.details && typeof createAudit.details === 'object' && 'eventName' in createAudit.details) {
-    const eventName = (createAudit.details as any).eventName
+    const eventName = (createAudit.details as Record<string, unknown>).eventName
     if (eventName && typeof eventName === 'string') {
       // Check if any staff membership has this trial event assigned
       return staffMemberships.some(staff => {
@@ -259,10 +261,10 @@ export async function hasESTestAccess(userId: string, userEmail: string, testId:
             if (parsed.length > 0 && typeof parsed[0] === 'string') {
               return parsed.includes(eventName)
             } else {
-              return parsed.some((e: any) => e.name === eventName)
+              return parsed.some((e: Record<string, unknown>) => e.name === eventName)
             }
           }
-        } catch (e) {
+        } catch (_e) {
           return false
         }
         return false

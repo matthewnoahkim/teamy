@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Copy, RefreshCw, Eye, EyeOff, Trash2, UserX, X, Save, Link as LinkIcon, Upload, Image as ImageIcon, Plus, GripVertical } from 'lucide-react'
+import { Copy, RefreshCw, Eye, EyeOff, Trash2, UserX, X, Link as LinkIcon, Upload, Image as ImageIcon, Plus, GripVertical } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -32,7 +32,8 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragOverlay,
+  type DragStartEvent,
+  type DragEndEvent,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -42,6 +43,18 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import type { ClubWithMembers, MembershipWithPreferences } from '@/types/models'
+
+interface BackgroundPreferences {
+  backgroundType?: string
+  backgroundColor?: string
+  gradientStartColor?: string
+  gradientEndColor?: string
+  gradientColors?: string[]
+  gradientDirection?: string
+  backgroundImageUrl?: string | null
+  [key: string]: unknown
+}
 
 type BackgroundOption = 'grid' | 'solid' | 'gradient' | 'image'
 
@@ -196,7 +209,7 @@ function SortableColorItem({
     listeners,
     setNodeRef,
     transform,
-    transition,
+    transition: _transition,
     isDragging,
   } = useSortable({ id: index })
 
@@ -258,11 +271,11 @@ function SortableColorItem({
 }
 
 interface SettingsTabProps {
-  club: any
-  currentMembership: any
+  club: ClubWithMembers
+  currentMembership: MembershipWithPreferences
   isAdmin: boolean
-  personalBackground?: any | null
-  onBackgroundUpdate?: (preferences: any | null) => void
+  personalBackground?: BackgroundPreferences | null
+  onBackgroundUpdate?: (preferences: BackgroundPreferences | null) => void
 }
 
 export function SettingsTab({
@@ -294,10 +307,10 @@ export function SettingsTab({
   const [transferringAdmin, setTransferringAdmin] = useState(false)
   const [dismissedTransferPrompt, setDismissedTransferPrompt] = useState(false)
   const adminMemberships = club.memberships.filter(
-    (membership: any) => String(membership.role).toUpperCase() === 'ADMIN'
+    (membership) => String(membership.role).toUpperCase() === 'ADMIN'
   )
   const regularMembers = club.memberships.filter(
-    (membership: any) =>
+    (membership) =>
       membership.id !== currentMembership.id && String(membership.role).toUpperCase() === 'MEMBER'
   )
   const isSoleAdmin =
@@ -348,15 +361,15 @@ export function SettingsTab({
   }) // Angle in degrees
   
   // Keep these for backward compatibility but prioritize gradientColors
-  const gradientStartColor = gradientColors[0] || defaultColors.gradientStartColor
-  const gradientEndColor = gradientColors[gradientColors.length - 1] || defaultColors.gradientEndColor
+  const _gradientStartColor = gradientColors[0] || defaultColors.gradientStartColor
+  const _gradientEndColor = gradientColors[gradientColors.length - 1] || defaultColors.gradientEndColor
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(
     memberPreferences?.backgroundImageUrl || null
   )
-  const [savingBackground, setSavingBackground] = useState(false)
+  const [_savingBackground, setSavingBackground] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
-  const [activeColorId, setActiveColorId] = useState<number | null>(null)
+  const [_activeColorId, setActiveColorId] = useState<number | null>(null)
   
   // Drag and drop sensors for gradient color reordering
   const sensors = useSensors(
@@ -436,10 +449,10 @@ export function SettingsTab({
       setMemberToRemove(null)
       // Refresh to update the members list
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to remove member',
+        description: error instanceof Error ? error.message : 'Failed to remove member',
         variant: 'destructive',
       })
     } finally {
@@ -469,7 +482,7 @@ export function SettingsTab({
       setAdminCode(data.adminCode)
       setMemberCode(data.memberCode)
       setCodesFetched(true)
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to fetch invite codes',
@@ -527,7 +540,7 @@ export function SettingsTab({
         title: 'Code regenerated',
         description: `New ${codeTypeToRegenerate} invite code generated`,
       })
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to regenerate code',
@@ -563,7 +576,7 @@ export function SettingsTab({
           setMemberCode(data.memberCode)
         }
         setCodesFetched(true)
-      } catch (error) {
+      } catch (_error) {
         toast({
           title: 'Error',
           description: 'Failed to fetch invite code',
@@ -583,7 +596,7 @@ export function SettingsTab({
             ? `${type} invite link copied to clipboard`
             : `${type} invite code copied to clipboard`,
       })
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to copy to clipboard',
@@ -622,10 +635,10 @@ export function SettingsTab({
       // Redirect to no-clubs page after successful deletion
       router.push('/no-clubs')
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete team',
+        description: error instanceof Error ? error.message : 'Failed to delete team',
         variant: 'destructive',
       })
       setDeleting(false)
@@ -653,10 +666,10 @@ export function SettingsTab({
       // Navigate to no-clubs page or another club
       router.push('/no-clubs')
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to leave team',
+        description: error instanceof Error ? error.message : 'Failed to leave team',
         variant: 'destructive',
       })
       setLeaving(false)
@@ -696,10 +709,10 @@ export function SettingsTab({
       setSelectedAdminTransferId('')
       setDismissedTransferPrompt(true)
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to promote member',
+        description: error instanceof Error ? error.message : 'Failed to promote member',
         variant: 'destructive',
       })
     } finally {
@@ -762,10 +775,10 @@ export function SettingsTab({
       })
 
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to upload image',
+        description: error instanceof Error ? error.message : 'Failed to upload image',
         variant: 'destructive',
       })
     } finally {
@@ -827,10 +840,10 @@ export function SettingsTab({
       })
 
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete image',
+        description: error instanceof Error ? error.message : 'Failed to delete image',
         variant: 'destructive',
       })
     } finally {
@@ -838,7 +851,7 @@ export function SettingsTab({
     }
   }
 
-  const handleSaveBackground = async () => {
+  const _handleSaveBackground = async () => {
     setSavingBackground(true)
 
     try {
@@ -935,10 +948,10 @@ export function SettingsTab({
       })
 
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update background',
+        description: error instanceof Error ? error.message : 'Failed to update background',
         variant: 'destructive',
       })
     } finally {
@@ -946,9 +959,9 @@ export function SettingsTab({
     }
   }
 
-  const previewType = backgroundType
+  const _previewType = backgroundType
 
-  const previewColors = {
+  const _previewColors = {
     color: backgroundColor,
     gradientColors: gradientColors,
     gradientDirection: `${gradientDirection}deg`,
@@ -973,11 +986,11 @@ export function SettingsTab({
   }
   
   // Drag and drop handlers for reordering gradient colors
-  const handleDragStart = (event: any) => {
+  const handleDragStart = (event: DragStartEvent) => {
     setActiveColorId(event.active.id as number)
   }
   
-  const handleDragEnd = (event: any) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     
     if (over && active.id !== over.id) {
@@ -991,7 +1004,7 @@ export function SettingsTab({
     setActiveColorId(null)
   }
 
-  const renderBackgroundControls = () => {
+  const _renderBackgroundControls = () => {
     if (backgroundType === 'solid') {
       return (
         <div className="space-y-2">
@@ -1238,7 +1251,7 @@ export function SettingsTab({
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {club.memberships.map((membership: any) => (
+              {club.memberships.map((membership) => (
                 <div
                   key={membership.id}
                   className="flex items-center justify-between p-3 rounded-lg border"
@@ -1511,7 +1524,7 @@ export function SettingsTab({
                     <SelectValue placeholder="Select a member" />
                   </SelectTrigger>
                   <SelectContent>
-                    {regularMembers.map((member: any) => (
+                    {regularMembers.map((member) => (
                       <SelectItem key={member.id} value={member.id}>
                         {member.user?.name || member.user?.email || 'Member'}
                       </SelectItem>

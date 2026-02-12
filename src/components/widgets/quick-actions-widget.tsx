@@ -15,11 +15,11 @@ import Link from 'next/link'
 interface QuickActionsWidgetProps {
   clubId: string
   isAdmin: boolean
-  config?: any
+  config?: Record<string, unknown>
 }
 
 export function QuickActionsWidget({ clubId, isAdmin, config }: QuickActionsWidgetProps) {
-  const showActions = config?.showActions || ['stream', 'calendar', 'people', 'tests']
+  const showActions = (config?.showActions as string[]) || ['stream', 'calendar', 'people', 'tests']
 
   const allActions = [
     {

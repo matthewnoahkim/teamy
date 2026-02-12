@@ -53,7 +53,7 @@ export function CreateClubDialog({ open, onOpenChange }: CreateClubDialogProps) 
       router.refresh()
       // Navigate to the new club
       router.push(`/club/${data.club.id}`)
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to create club. Please try again.',

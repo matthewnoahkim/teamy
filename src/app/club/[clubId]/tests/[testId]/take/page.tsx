@@ -89,7 +89,7 @@ export default async function TakeTestPage({
     },
   })
 
-  let membership: any
+  let membership: { id: string; teamId: string | null } | null | undefined
   let isAdminUser = false
   let hasAccess = false
 

@@ -109,7 +109,7 @@ export async function PATCH(
     }
 
     // Build update data object
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (validatedData.name !== undefined) {
       updateData.name = validatedData.name
     }

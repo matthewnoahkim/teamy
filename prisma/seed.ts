@@ -1,8 +1,9 @@
 import { PrismaClient, Division } from '@prisma/client'
 
 // Conditionally import adapter if available
-let PrismaPg: any = null
+let PrismaPg: (new (opts: { connectionString: string | undefined }) => unknown) | null = null
 try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   PrismaPg = require('@prisma/adapter-pg').PrismaPg
 } catch {
   // Adapter not available, will use default
@@ -12,7 +13,7 @@ const connectionString = process.env.DATABASE_URL
 const adapter = connectionString && PrismaPg ? new PrismaPg({ connectionString }) : undefined
 
 const prisma = adapter 
-  ? new PrismaClient({ adapter } as any)
+  ? new PrismaClient({ adapter } as unknown as ConstructorParameters<typeof PrismaClient>[0])
   : new PrismaClient()
 
 // Division C Events (2026)

@@ -17,7 +17,7 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PageLoading, ButtonLoading } from '@/components/ui/loading-spinner'
+import { PageLoading } from '@/components/ui/loading-spinner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Clock,
@@ -26,7 +26,6 @@ import {
   Download,
   RefreshCw,
   Eye,
-  EyeOff,
   UserPlus,
   Calendar as CalendarIcon,
   Users,
@@ -34,6 +33,26 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
+import type { AttendanceFull } from '@/types/models'
+
+interface RosterCheckIn {
+  id: string
+  user: { id: string; name?: string | null; email: string; image?: string | null }
+  checkedInAt: string
+  source?: string
+}
+
+interface RosterMember {
+  id: string
+  user: { id: string; name?: string | null; email: string; image?: string | null }
+}
+
+interface RosterData {
+  checkedInCount: number
+  totalMembers: number
+  checkIns: RosterCheckIn[]
+  missingMembers: RosterMember[]
+}
 
 interface AttendanceTabProps {
   clubId: string
@@ -44,28 +63,28 @@ interface AttendanceTabProps {
     email: string
     image?: string | null
   }
-  initialAttendances?: any[]
+  initialAttendances?: AttendanceFull[]
 }
 
 export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: AttendanceTabProps) {
   const { toast } = useToast()
-  const [attendances, setAttendances] = useState<any[]>(initialAttendances || [])
+  const [attendances, setAttendances] = useState<AttendanceFull[]>(initialAttendances || [])
   const [loading, setLoading] = useState(false)
-  const [selectedAttendance, setSelectedAttendance] = useState<any>(null)
+  const [selectedAttendance, setSelectedAttendance] = useState<AttendanceFull | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [checkInOpen, setCheckInOpen] = useState(false)
   const [checkInCode, setCheckInCode] = useState('')
   const [checkingIn, setCheckingIn] = useState(false)
   const [revealedCode, setRevealedCode] = useState<string | null>(null)
   const [revealing, setRevealing] = useState(false)
-  const [rosterData, setRosterData] = useState<any>(null)
+  const [rosterData, setRosterData] = useState<RosterData | null>(null)
   const [loadingRoster, setLoadingRoster] = useState(false)
   const [manualCheckInOpen, setManualCheckInOpen] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState('')
   const [addingManual, setAddingManual] = useState(false)
   const [deletingCheckInId, setDeletingCheckInId] = useState<string | null>(null)
   const [deleteEventDialogOpen, setDeleteEventDialogOpen] = useState(false)
-  const [eventToDelete, setEventToDelete] = useState<any>(null)
+  const [eventToDelete, setEventToDelete] = useState<AttendanceFull | null>(null)
   const [deletingEvent, setDeletingEvent] = useState(false)
 
   const fetchAttendances = useCallback(async (options?: { silent?: boolean }) => {
@@ -152,10 +171,10 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
         title: 'Code Generated',
         description: 'Share this code with attendees during the meeting.',
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to generate code',
+        description: error instanceof Error ? error.message : 'Failed to generate code',
         variant: 'destructive',
       })
     } finally {
@@ -189,10 +208,10 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
       setCheckInCode('')
       setSelectedAttendance(null)
       await fetchAttendances()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Check-in Failed',
-        description: error.message || 'Invalid code or check-in window closed',
+        description: error instanceof Error ? error.message : 'Invalid code or check-in window closed',
         variant: 'destructive',
       })
     } finally {
@@ -226,10 +245,10 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
       setSelectedUserId('')
       await fetchRoster(selectedAttendance.id)
       await fetchAttendances()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to add manual check-in',
+        description: error instanceof Error ? error.message : 'Failed to add manual check-in',
         variant: 'destructive',
       })
     } finally {
@@ -259,10 +278,10 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
 
       await fetchRoster(selectedAttendance.id)
       await fetchAttendances()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to remove check-in',
+        description: error instanceof Error ? error.message : 'Failed to remove check-in',
         variant: 'destructive',
       })
     } finally {
@@ -291,7 +310,7 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
         title: 'Success',
         description: 'Attendance exported successfully',
       })
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to export attendance',
@@ -300,7 +319,7 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
     }
   }
 
-  const handleViewDetails = async (attendance: any) => {
+  const handleViewDetails = async (attendance: AttendanceFull) => {
     setSelectedAttendance(attendance)
     setRevealedCode(null)
     if (isAdmin) {
@@ -337,20 +356,20 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
     })
   }
 
-  const getUserCheckInStatus = (attendance: any) => {
-    return attendance.checkIns?.find((ci: any) => ci.user.id === user.id)
+  const getUserCheckInStatus = (attendance: AttendanceFull) => {
+    return attendance.checkIns?.find((ci) => ci.user.id === user.id)
   }
 
-  const canCheckIn = (attendance: any) => {
+  const canCheckIn = (attendance: AttendanceFull) => {
     return attendance.status === 'ACTIVE' && !getUserCheckInStatus(attendance)
   }
 
-  const canRevealCode = (attendance: any) => {
+  const canRevealCode = (attendance: AttendanceFull) => {
     // Admins can generate codes for upcoming and active events
     return isAdmin && (attendance.status === 'UPCOMING' || attendance.status === 'ACTIVE')
   }
 
-  const handleDeleteEventClick = (attendance: any) => {
+  const handleDeleteEventClick = (attendance: AttendanceFull) => {
     setEventToDelete(attendance)
     setDeleteEventDialogOpen(true)
   }
@@ -379,10 +398,10 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
       setEventToDelete(null)
       setSelectedAttendance(null)
       await fetchAttendances()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete event',
+        description: error instanceof Error ? error.message : 'Failed to delete event',
         variant: 'destructive',
       })
     } finally {
@@ -679,7 +698,7 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
                               Checked In ({rosterData.checkIns.length})
                             </p>
                             <div className="space-y-2 pl-6">
-                              {rosterData.checkIns.map((checkIn: any) => (
+                              {rosterData.checkIns.map((checkIn) => (
                                 <div key={checkIn.id} className="flex items-center justify-between text-sm">
                                   <div className="flex items-center gap-3">
                                     <Avatar className="h-6 w-6">
@@ -723,7 +742,7 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
                               Not Checked In ({rosterData.missingMembers.length})
                             </p>
                             <div className="space-y-2 pl-6">
-                              {rosterData.missingMembers.map((member: any) => (
+                              {rosterData.missingMembers.map((member) => (
                                 <div key={member.id} className="flex items-center gap-3 text-sm text-muted-foreground">
                                   <Avatar className="h-6 w-6">
                                     <AvatarImage src={member.user.image || ''} />
@@ -840,7 +859,7 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
                     <SelectValue placeholder="Select a member..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {rosterData?.missingMembers.map((member: any) => (
+                    {rosterData?.missingMembers.map((member) => (
                       <SelectItem key={member.user.id} value={member.user.id}>
                         {member.user.name || member.user.email}
                       </SelectItem>

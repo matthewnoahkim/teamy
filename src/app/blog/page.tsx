@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { PublicPageLayout } from '@/components/public-page-layout'
 import { Calendar, User, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { format } from 'date-fns'
 
 export default async function BlogPage() {
@@ -12,14 +13,14 @@ export default async function BlogPage() {
 
   return (
     <PublicPageLayout>
-      <div className="py-12 px-4 sm:px-6">
+      <div className="py-8 sm:py-12 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
+          <div className="text-center mb-8 sm:mb-12">
+            <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
               Blog
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
               Updates, announcements, and insights from the Teamy team
             </p>
           </div>
@@ -37,13 +38,17 @@ export default async function BlogPage() {
                   href={`/blog/${post.slug}`}
                   className="group block"
                 >
-                  <article className="p-8 rounded-2xl bg-card border border-border shadow-card hover:shadow-card-hover hover:border-teamy-primary/20 transition-all duration-300">
+                  <article className="p-5 sm:p-8 rounded-2xl bg-card border border-border shadow-card hover:shadow-card-hover hover:border-teamy-primary/20 transition-all duration-300">
                     {post.coverImage && (
                       <div className="mb-6 rounded-xl overflow-hidden">
-                        <img
+                        <Image
                           src={post.coverImage}
                           alt={post.title}
+                          width={1200}
+                          height={480}
+                          sizes="(max-width: 768px) 100vw, 896px"
                           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
                         />
                       </div>
                     )}

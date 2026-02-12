@@ -89,7 +89,7 @@ export async function PATCH(
 
       // If announcement is linked to a calendar event, sync title and important field
       if (updated.calendarEventId) {
-        const updateData: any = {}
+        const updateData: Record<string, unknown> = {}
         if (validated.title) updateData.title = validated.title
         if (validated.important !== undefined) updateData.important = validated.important
         

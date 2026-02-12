@@ -52,10 +52,10 @@ export function DuplicateTestButton({
       setOpen(false)
       // Navigate to the new test's page (will show builder for draft)
       router.push(`/club/${clubId}/tests/${data.test.id}`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to duplicate test',
+        description: error instanceof Error ? error.message : 'Failed to duplicate test',
         variant: 'destructive',
       })
     } finally {

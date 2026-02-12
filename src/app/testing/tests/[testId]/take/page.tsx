@@ -135,7 +135,43 @@ export default async function TournamentTakeTestPage({
     }
   }
 
-  let test: any = null
+  let test: {
+    id: string
+    name: string
+    description: string | null
+    instructions: string | null
+    status: string
+    durationMinutes: number | null
+    startAt: Date | null
+    endAt: Date | null
+    allowLateUntil: Date | null
+    requireFullscreen: boolean
+    allowCalculator: boolean
+    calculatorType: string | null
+    allowNoteSheet: boolean
+    noteSheetInstructions: string | null
+    requireOneSitting: boolean
+    testPasswordHash: string | null
+    maxAttempts: number | null
+    scoreReleaseMode: string | null
+    clubId: string | null
+    questions: Array<{
+      id: string
+      type: string
+      promptMd: string
+      explanation: string | null
+      points: number
+      shuffleOptions: boolean
+      order: number
+      numericTolerance: number | null
+      options: Array<{
+        id: string
+        label: string
+        isCorrect: boolean
+        order: number
+      }>
+    }>
+  } | null = null
   let tournamentId: string | null = null
   let eventId: string | null = null
   let isESTest = false

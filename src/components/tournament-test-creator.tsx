@@ -21,7 +21,7 @@ export function TournamentTestCreator({
   tournamentId,
   tournamentName,
   tournamentDivision,
-  user,
+  user: _user,
 }: TournamentTestCreatorProps) {
   const router = useRouter()
 

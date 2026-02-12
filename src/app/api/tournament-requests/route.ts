@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { withRateLimit } from '@/lib/rate-limit-api'
 import { tournamentRequestSchema, validateRequestBody } from '@/lib/validation-schemas'
 import { getValidatedWebhook, EMAIL_CONFIG } from '@/lib/security-config'
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
 
 /**
  * Tournament Hosting Request API Endpoint
@@ -173,11 +184,11 @@ async function handlePOST(request: NextRequest) {
               <h2 style="color: #1f2937; margin-top: 0;">Tournament Hosting Request Received</h2>
               
               <p style="color: #374151; line-height: 1.6;">
-                Hi ${data.directorName},
+                Hi ${escapeHtml(data.directorName)},
               </p>
               
               <p style="color: #374151; line-height: 1.6;">
-                Thank you for your interest in hosting <strong>${data.tournamentName}</strong> on Teamy! 
+                Thank you for your interest in hosting <strong>${escapeHtml(data.tournamentName)}</strong> on Teamy! 
                 We have received your tournament hosting request and it is currently <strong>pending approval</strong>.
               </p>
               
@@ -207,11 +218,11 @@ async function handlePOST(request: NextRequest) {
                 <table style="width: 100%; border-collapse: collapse;">
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280; width: 140px;">Tournament Name:</td>
-                    <td style="padding: 8px 0; color: #1f2937; font-weight: 500;">${data.tournamentName}</td>
+                    <td style="padding: 8px 0; color: #1f2937; font-weight: 500;">${escapeHtml(data.tournamentName)}</td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280;">Level:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">${data.tournamentLevel.charAt(0).toUpperCase() + data.tournamentLevel.slice(1)}</td>
+                    <td style="padding: 8px 0; color: #1f2937;">${escapeHtml(data.tournamentLevel.charAt(0).toUpperCase() + data.tournamentLevel.slice(1))}</td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280;">Division:</td>
@@ -224,13 +235,13 @@ async function handlePOST(request: NextRequest) {
                   ${data.location ? `
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280;">Location:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">${data.location}</td>
+                    <td style="padding: 8px 0; color: #1f2937;">${escapeHtml(data.location)}</td>
                   </tr>
                   ` : ''}
                   ${data.preferredSlug ? `
                   <tr>
                     <td style="padding: 8px 0; color: #6b7280;">Preferred URL:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">teamy.site/tournaments/${data.preferredSlug}</td>
+                    <td style="padding: 8px 0; color: #1f2937;">teamy.site/tournaments/${escapeHtml(data.preferredSlug)}</td>
                   </tr>
                   ` : ''}
                 </table>
@@ -279,14 +290,40 @@ export const POST = withRateLimit(handlePOST, {
 })
 
 // GET - Get all tournament hosting requests (for dev panel)
-// Note: This should be protected by authentication middleware
 export async function GET(request: NextRequest) {
   try {
+    // Auth check: require authenticated user with dev panel access
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    // Verify dev panel access via whitelist
+    const setting = await prisma.siteSetting.findUnique({
+      where: { key: 'dev_panel_email_whitelist' },
+    })
+    let whitelist: string[] = []
+    if (setting) {
+      try {
+        whitelist = JSON.parse(setting.value)
+        if (!Array.isArray(whitelist)) whitelist = []
+      } catch { whitelist = [] }
+    }
+    if (whitelist.length === 0) {
+      const defaultEmailsEnv = process.env.DEV_PANEL_DEFAULT_EMAILS
+      if (defaultEmailsEnv) {
+        whitelist = defaultEmailsEnv.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0 && e.includes('@'))
+      }
+    }
+    const hasAccess = whitelist.some(e => e.toLowerCase().trim() === session.user!.email!.toLowerCase().trim())
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const search = searchParams.get('search')
 
-    const where: any = {}
+    const where: Record<string, unknown> = {}
 
     if (status && status !== 'all') {
       where.status = status.toUpperCase()

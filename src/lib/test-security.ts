@@ -22,7 +22,7 @@ export async function verifyTestPassword(
 ): Promise<boolean> {
   try {
     return await argon2.verify(hash, password)
-  } catch (error) {
+  } catch (_error) {
     return false
   }
 }
@@ -259,7 +259,7 @@ export function autoGradeQuestion(question: {
 
         return { pointsAwarded: allCorrect ? points : 0, isCorrect: allCorrect }
       }
-    } catch (error) {
+    } catch (_error) {
       // If parsing fails, require manual grading
       return { pointsAwarded: 0, isCorrect: false }
     }
@@ -399,14 +399,14 @@ export function calculateScoreBreakdown(answers: Array<{
  * Filter attempt data based on score release settings
  */
 export function filterAttemptByReleaseMode(
-  attempt: any,
+  attempt: Record<string, unknown> & { gradeEarned?: unknown; proctoringScore?: unknown; answers?: Array<Record<string, unknown>> },
   test: {
     scoreReleaseMode: 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST'
     releaseScoresAt: Date | null
     status: string
   },
   isAdmin: boolean
-): any {
+): Record<string, unknown> {
   // Admins always see everything
   if (isAdmin) {
     return attempt
@@ -421,7 +421,7 @@ export function filterAttemptByReleaseMode(
       ...attempt,
       gradeEarned: null,
       proctoringScore: null,
-      answers: attempt.answers?.map((answer: any) => ({
+      answers: attempt.answers?.map((answer) => ({
         ...answer,
         pointsAwarded: null,
         gradedAt: null,
@@ -457,19 +457,19 @@ export function filterAttemptByReleaseMode(
       ...attempt,
       gradeEarned: attempt.gradeEarned,
       proctoringScore: null,
-      answers: attempt.answers?.map((answer: any) => ({
+      answers: attempt.answers?.map((answer) => ({
         id: answer.id,
         questionId: answer.questionId,
         pointsAwarded: answer.pointsAwarded,
         // Include question data so UI can show which questions were wrong
         // But hide options to prevent seeing correct answers
-        question: answer.question ? {
-          id: answer.question.id,
-          promptMd: answer.question.promptMd,
-          type: answer.question.type,
-          points: answer.question.points,
-          sectionId: answer.question.sectionId,
-          order: answer.question.order,
+        question: (answer.question as Record<string, unknown> | null) ? {
+          id: (answer.question as Record<string, unknown>).id,
+          promptMd: (answer.question as Record<string, unknown>).promptMd,
+          type: (answer.question as Record<string, unknown>).type,
+          points: (answer.question as Record<string, unknown>).points,
+          sectionId: (answer.question as Record<string, unknown>).sectionId,
+          order: (answer.question as Record<string, unknown>).order,
           // Don't include options to hide correct answers
           options: [],
         } : null,

@@ -392,7 +392,7 @@ export async function docxToMarkedText(buffer: Buffer): Promise<string> {
     }
     
     // CHOICE — uppercase only (no /i)
-    if (/^[(\[]?[A-Z][.)\]]/.test(line)) {
+    if (/^[([]?[A-Z][.)\]]/.test(line)) {
       markedLines.push(`[CHOICE] ${line}`);
       continue;
     }
@@ -483,24 +483,24 @@ export async function callGptForImport(markedChunk: string): Promise<ImportedQue
     }
     
     // Add IDs to questions if they don't have them
-    const questions: ImportedQuestion[] = parsed.questions.map((q: any) => ({
-      id: q.id || nanoid(),
-      type: q.type,
-      prompt: q.prompt || '',
-      context: q.context || null,
+    const questions: ImportedQuestion[] = parsed.questions.map((q: Record<string, unknown>) => ({
+      id: (q.id as string) || nanoid(),
+      type: q.type as string,
+      prompt: (q.prompt as string) || '',
+      context: (q.context as string) || null,
       choices: Array.isArray(q.choices) ? q.choices : [],
-      points: q.points || null,
-      frqParts: Array.isArray(q.frqParts) ? q.frqParts.map((part: any) => ({
-        label: part.label || 'a',
-        prompt: part.prompt || '',
-        points: part.points || null,
+      points: (q.points as number) || null,
+      frqParts: Array.isArray(q.frqParts) ? (q.frqParts as Array<Record<string, unknown>>).map((part) => ({
+        label: (part.label as string) || 'a',
+        prompt: (part.prompt as string) || '',
+        points: (part.points as number) || null,
       })) : undefined,
     }));
     
     return questions;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error calling GPT for import:', error);
-    throw new Error(`Failed to parse questions with GPT: ${error.message}`);
+    throw new Error(`Failed to parse questions with GPT: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

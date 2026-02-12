@@ -69,7 +69,7 @@ export async function PATCH(
     const validatedData = updateEventSchema.parse(body)
 
     // Build update data
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (validatedData.title !== undefined) updateData.title = validatedData.title
     if (validatedData.description !== undefined) updateData.description = validatedData.description
     if (validatedData.startUTC !== undefined) updateData.startUTC = new Date(validatedData.startUTC)
@@ -136,7 +136,7 @@ export async function PATCH(
 
       // If event has a linked announcement (and wasn't deleted above), sync title and important field
       if (updated.announcement && !shouldDeleteAnnouncement) {
-        const announcementUpdateData: any = {}
+        const announcementUpdateData: Record<string, unknown> = {}
         if (validatedData.title) announcementUpdateData.title = validatedData.title
         if (validatedData.important !== undefined) announcementUpdateData.important = validatedData.important
         

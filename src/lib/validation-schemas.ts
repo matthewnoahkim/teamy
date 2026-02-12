@@ -46,7 +46,7 @@ export const phoneSchema = z
   .string()
   .max(30, 'Phone number too long')
   .regex(
-    /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}[-\s\.]?[0-9]{1,9}$/,
+    /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}[-\s.]?[0-9]{1,9}$/,
     'Invalid phone number format'
   )
   .optional()
@@ -212,23 +212,35 @@ export const tournamentRequestSchema = z
     tournamentFormat: z.enum(['in-person', 'satellite', 'mini-so'], {
       message: 'Invalid tournament format',
     }),
-    location: z
-      .string()
-      .max(300, 'Location must not exceed 300 characters')
-      .transform((val) => sanitizeString(val, 300))
-      .optional()
-      .nullable(),
-    preferredSlug: slugSchema.nullable(),
+    location: z.preprocess(
+      (val) => (val === '' ? null : val),
+      z
+        .string()
+        .max(300, 'Location must not exceed 300 characters')
+        .transform((val) => sanitizeString(val, 300))
+        .optional()
+        .nullable()
+    ),
+    preferredSlug: z.preprocess(
+      (val) => (val === '' ? null : val),
+      slugSchema.nullable()
+    ),
     directorName: nameSchema,
     directorEmail: emailSchema,
     confirmEmail: emailSchema,
-    directorPhone: phoneSchema.nullable(),
-    otherNotes: z
-      .string()
-      .max(2000, 'Notes must not exceed 2000 characters')
-      .transform((val) => sanitizeString(val, 2000))
-      .optional()
-      .nullable(),
+    directorPhone: z.preprocess(
+      (val) => (val === '' ? null : val),
+      phoneSchema.nullable()
+    ),
+    otherNotes: z.preprocess(
+      (val) => (val === '' ? null : val),
+      z
+        .string()
+        .max(2000, 'Notes must not exceed 2000 characters')
+        .transform((val) => sanitizeString(val, 2000))
+        .optional()
+        .nullable()
+    ),
   })
   .strict()
   .refine((data) => data.directorEmail === data.confirmEmail, {
@@ -299,7 +311,7 @@ export const createSortSchema = (allowedFields: readonly string[]) =>
 export function validateRequestBody<T extends z.ZodType>(
   body: unknown,
   schema: T
-): { success: true; data: z.infer<T> } | { success: false; error: string; details?: any } {
+): { success: true; data: z.infer<T> } | { success: false; error: string; details?: unknown } {
   try {
     const result = schema.safeParse(body)
     
@@ -318,7 +330,7 @@ export function validateRequestBody<T extends z.ZodType>(
       error: 'Validation failed',
       details: errors,
     }
-  } catch (error) {
+  } catch (_error) {
     // Catch any unexpected errors during validation
     return {
       success: false,
@@ -333,14 +345,14 @@ export function validateRequestBody<T extends z.ZodType>(
 export function validateQueryParams<T extends z.ZodType>(
   params: Record<string, string | string[] | undefined>,
   schema: T
-): { success: true; data: z.infer<T> } | { success: false; error: string; details?: any } {
+): { success: true; data: z.infer<T> } | { success: false; error: string; details?: unknown } {
   return validateRequestBody(params, schema)
 }
 
 /**
  * Create a standardized error response for validation failures
  */
-export function createValidationErrorResponse(error: string, details?: any) {
+export function createValidationErrorResponse(error: string, details?: unknown) {
   return {
     error,
     message: 'Invalid input data. Please check your request and try again.',

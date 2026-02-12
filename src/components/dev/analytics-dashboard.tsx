@@ -21,10 +21,9 @@ import {
   Building2,
   Activity,
   UserPlus,
-  Clock,
 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns'
+import { format } from 'date-fns'
 
 interface AnalyticsData {
   overview: {
@@ -220,7 +219,7 @@ export function AnalyticsDashboard() {
             <ScrollArea className="h-[300px]">
               {data?.userGrowth && data.userGrowth.length > 0 ? (
                 <div className="space-y-2">
-                  {data.userGrowth.map((item, idx) => (
+                  {data.userGrowth.map((item, _idx) => (
                     <div key={item.date} className="flex items-center justify-between p-2 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -258,7 +257,7 @@ export function AnalyticsDashboard() {
             <ScrollArea className="h-[300px]">
               {data?.clubGrowth && data.clubGrowth.length > 0 ? (
                 <div className="space-y-2">
-                  {data.clubGrowth.map((item, idx) => (
+                  {data.clubGrowth.map((item, _idx) => (
                     <div key={item.date} className="flex items-center justify-between p-2 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <Calendar className="h-4 w-4 text-muted-foreground" />

@@ -10,7 +10,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
-  const resolvedParams = await params
+  const _resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -89,7 +89,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
-  const resolvedParams = await params
+  const _resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -209,7 +209,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
-  const resolvedParams = await params
+  const _resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -261,7 +261,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
-  const resolvedParams = await params
+  const _resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {

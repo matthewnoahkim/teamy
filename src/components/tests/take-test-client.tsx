@@ -26,10 +26,69 @@ import { CalculatorButton } from '@/components/tests/calculator'
 import { QuestionPrompt } from '@/components/tests/question-prompt'
 import { NoteSheetViewer } from '@/components/tests/note-sheet-viewer'
 
+interface TestOption {
+  id: string
+  label: string
+  isCorrect: boolean
+}
+
+interface TestQuestion {
+  id: string
+  type: string
+  points: number
+  promptMd: string
+  options: TestOption[]
+}
+
+interface TestData {
+  id: string
+  name: string
+  description: string | null
+  instructions: string | null
+  durationMinutes: number
+  maxAttempts: number | null
+  requireFullscreen: boolean
+  requireOneSitting?: boolean
+  allowCalculator: boolean
+  calculatorType: 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' | null
+  allowNoteSheet: boolean
+  testPasswordHash: string | null
+  questions: TestQuestion[]
+}
+
+interface MembershipData {
+  clubId: string
+}
+
+interface AttemptAnswer {
+  questionId: string
+  answerText: string | null
+  selectedOptionIds: string[] | null
+  numericAnswer: number | null
+  markedForReview: boolean
+}
+
+interface AttemptData {
+  id: string
+  status: string
+  startedAt: string | null
+  answers: AttemptAnswer[]
+  tabSwitchCount: number
+  timeOffPageSeconds: number
+}
+
+interface AnswerData {
+  answerText?: string | null
+  selectedOptionIds?: string[]
+  numericAnswer?: number | null
+  blankAnswers?: string[]
+  markedForReview?: boolean
+}
+
 interface TakeTestClientProps {
-  test: any
-  membership: any
-  existingAttempt: any
+  test: TestData
+  membership: MembershipData
+  existingAttempt: AttemptData | null
   isAdmin: boolean
   tournamentId?: string
   testingPortal?: boolean
@@ -48,15 +107,15 @@ export function TakeTestClient({
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
-  const [attempt, setAttempt] = useState<any>(existingAttempt)
+  const [attempt, setAttempt] = useState<AttemptData | null>(existingAttempt)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [started, setStarted] = useState(!!existingAttempt)
-  const [answers, setAnswers] = useState<Record<string, any>>({})
+  const [answers, setAnswers] = useState<Record<string, AnswerData>>({})
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set())
   const [tabSwitchCount, setTabSwitchCount] = useState(existingAttempt?.tabSwitchCount || 0)
   const [timeOffPageSeconds, setTimeOffPageSeconds] = useState(existingAttempt?.timeOffPageSeconds || 0)
-  const [isPageVisible, setIsPageVisible] = useState(true)
+  const [_isPageVisible, setIsPageVisible] = useState(true)
   const [offPageStartTime, setOffPageStartTime] = useState<number | null>(null)
   const trackingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -78,9 +137,9 @@ export function TakeTestClient({
   // Load existing answers
   useEffect(() => {
     if (existingAttempt?.answers) {
-      const loadedAnswers: Record<string, any> = {}
+      const loadedAnswers: Record<string, AnswerData> = {}
       const markedQuestions = new Set<string>()
-      existingAttempt.answers.forEach((answer: any) => {
+      existingAttempt.answers.forEach((answer: AttemptAnswer) => {
         // For fill-in-the-blank, parse the answerText back into blankAnswers array
         let blankAnswers: string[] | undefined = undefined
         if (answer.answerText && answer.answerText.includes(' | ')) {
@@ -176,7 +235,7 @@ export function TakeTestClient({
 
   // Track page visibility and tab switching
   useEffect(() => {
-    const recordProctorEvent = async (kind: string, meta?: any) => {
+    const recordProctorEvent = async (kind: string, meta?: Record<string, unknown>) => {
       const currentAttempt = attemptRef.current
       if (!currentAttempt || currentAttempt.status !== 'IN_PROGRESS') return
       
@@ -270,7 +329,7 @@ export function TakeTestClient({
 
     // Detect DevTools opening/closing
     const detectDevTools = () => {
-      let devtools = { open: false, orientation: null as string | null }
+      const devtools = { open: false, orientation: null as string | null }
       const threshold = 160
       
       const checkDevTools = () => {
@@ -300,7 +359,7 @@ export function TakeTestClient({
     }
 
     // Handle copy events
-    const handleCopy = (e: ClipboardEvent) => {
+    const handleCopy = (_e: ClipboardEvent) => {
       recordProctorEvent('COPY', { 
         timestamp: Date.now(),
         dataLength: window.getSelection()?.toString().length || 0
@@ -308,7 +367,7 @@ export function TakeTestClient({
     }
 
     // Handle context menu (right-click)
-    const handleContextMenu = (e: MouseEvent) => {
+    const handleContextMenu = (_e: MouseEvent) => {
       recordProctorEvent('CONTEXTMENU', { timestamp: Date.now() })
     }
 
@@ -430,10 +489,10 @@ export function TakeTestClient({
           })
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to start test',
+        description: error instanceof Error ? error.message : 'Failed to start test',
         variant: 'destructive',
       })
     } finally {
@@ -441,7 +500,7 @@ export function TakeTestClient({
     }
   }
 
-  const saveAnswer = useCallback(async (questionId: string, answerData: any) => {
+  const saveAnswer = useCallback(async (questionId: string, answerData: AnswerData) => {
     if (!attempt || attempt.status !== 'IN_PROGRESS') return
 
     try {
@@ -466,17 +525,17 @@ export function TakeTestClient({
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || 'Failed to save answer')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save answer:', error)
       toast({
         title: 'Warning',
-        description: error.message || 'Failed to save answer. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to save answer. Please try again.',
         variant: 'destructive',
       })
     }
   }, [attempt, test.id, toast, markedForReview])
 
-  const handleAnswerChange = (questionId: string, answerData: any) => {
+  const handleAnswerChange = (questionId: string, answerData: AnswerData) => {
     setAnswers((prev) => ({
       ...prev,
       [questionId]: answerData,
@@ -521,7 +580,7 @@ export function TakeTestClient({
 
   // Check if there are unanswered questions - memoized to avoid recalculating on every render
   const unansweredQuestions = useMemo(() => {
-    return test.questions.filter((question: any) => {
+    return test.questions.filter((question: TestQuestion) => {
       // TEXT_BLOCK questions are stored as SHORT_TEXT with 0 points - they don't require answers
       const isTextBlock = question.type === 'SHORT_TEXT' && Number(question.points) === 0
       if (isTextBlock) {
@@ -588,7 +647,7 @@ export function TakeTestClient({
       if (document.fullscreenElement) {
         try {
           await document.exitFullscreen()
-        } catch (error) {
+        } catch (_error) {
           // Ignore fullscreen exit errors
         }
       }
@@ -603,10 +662,10 @@ export function TakeTestClient({
         const clubId = membership?.clubId || window.location.pathname.split('/')[2]
         window.location.href = `/club/${clubId}?tab=tests`
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to submit test',
+        description: error instanceof Error ? error.message : 'Failed to submit test',
         variant: 'destructive',
       })
       setSubmitting(false)
@@ -687,7 +746,7 @@ export function TakeTestClient({
     const testState = { testId: test.id, attemptId: attempt.id, fromTest: true }
     window.history.pushState(testState, '', window.location.href)
 
-    const handlePopState = (event: PopStateEvent) => {
+    const handlePopState = (_event: PopStateEvent) => {
       // When back button is pressed, push state back immediately to prevent navigation
       // This happens synchronously before the browser navigates away
       window.history.pushState(testState, '', window.location.href)
@@ -877,7 +936,7 @@ export function TakeTestClient({
             {test.questions.length === 0 ? (
               <p className="text-muted-foreground">No questions available.</p>
             ) : (
-              test.questions.map((question: any, index: number) => {
+              test.questions.map((question: TestQuestion, index: number) => {
                 // TEXT_BLOCK questions are stored as SHORT_TEXT with 0 points
                 const isTextBlock = question.type === 'SHORT_TEXT' && Number(question.points) === 0
                 
@@ -900,7 +959,7 @@ export function TakeTestClient({
                           if (question.type === 'MCQ_SINGLE') {
                             // Check if it's True/False
                             if (question.options && question.options.length === 2) {
-                              const optionLabels = question.options.map((opt: any) => opt.label.trim().toLowerCase())
+                              const optionLabels = question.options.map((opt: TestOption) => opt.label.trim().toLowerCase())
                               if (optionLabels.includes('true') && optionLabels.includes('false')) {
                                 return 'True or False'
                               }
@@ -975,7 +1034,7 @@ export function TakeTestClient({
                       const tableRegex = /(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|(?:\r?\n(?!\r?\n))?)+)/g
                       
                       // Store images and tables to render separately
-                      const imagesAndTables: string[] = []
+                      const _imagesAndTables: string[] = []
                       let textOnly = promptSection
                       
                       // Extract images
@@ -1110,7 +1169,7 @@ export function TakeTestClient({
                       disabled={submitting}
                       className="space-y-2"
                     >
-                      {question.options.map((option: any) => (
+                      {question.options.map((option: TestOption) => (
                         <div
                           key={option.id}
                           className={`flex items-center gap-2 p-3 rounded border ${submitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted'}`}
@@ -1126,7 +1185,7 @@ export function TakeTestClient({
 
                   {!isTextBlock && question.type === 'MCQ_MULTI' && (
                     <div className="space-y-2">
-                      {question.options.map((option: any) => (
+                      {question.options.map((option: TestOption) => (
                         <div
                           key={option.id}
                           className={`flex items-center gap-2 p-3 rounded border ${submitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted'}`}
@@ -1289,7 +1348,7 @@ export function TakeTestClient({
               )}
             </div>
             <div className="flex items-center gap-3">
-              {((test as any).requireOneSitting === false) && (
+              {(test.requireOneSitting === false) && (
                 <Button
                   variant="outline"
                   onClick={() => {

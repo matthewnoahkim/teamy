@@ -23,10 +23,46 @@ function shouldReleaseScores(releaseScoresAt: Date | null, status: string): bool
   return new Date() >= new Date(releaseScoresAt)
 }
 
+interface ResultOption {
+  id: string
+  label: string
+  isCorrect: boolean
+}
+
+interface ResultQuestion {
+  id: string
+  promptMd: string
+  type: string
+  points: number
+  explanation: string | null
+  options: ResultOption[]
+  order: number
+}
+
+interface ResultAnswer {
+  id: string
+  questionId: string
+  answerText: string | null
+  selectedOptionIds: string[] | null
+  numericAnswer: number | null
+  pointsAwarded: number | null
+  gradedAt: string | null
+  graderNote: string | null
+  question: ResultQuestion
+}
+
+interface ResultAttempt {
+  id: string
+  status: string
+  submittedAt: string | null
+  gradeEarned: number | null
+  answers: ResultAnswer[]
+}
+
 interface ViewResultsClientProps {
   testId: string
   testName: string
-  attempt: any
+  attempt: ResultAttempt | null
   testSettings: {
     releaseScoresAt: Date | null
     scoreReleaseMode: 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST'
@@ -42,7 +78,7 @@ export function ViewResultsClient({
   const router = useRouter()
   // Initialize state immediately with props - no waiting
   const [attempt, setAttempt] = useState(initialAttempt)
-  const [allAttempts, setAllAttempts] = useState<any[]>(initialAttempt ? [initialAttempt] : [])
+  const [allAttempts, setAllAttempts] = useState<ResultAttempt[]>(initialAttempt ? [initialAttempt] : [])
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(initialAttempt?.id || null)
   const [testSettingsState, setTestSettingsState] = useState(testSettings)
 
@@ -62,12 +98,12 @@ export function ViewResultsClient({
             // or if user hasn't manually changed it
             setSelectedAttemptId((currentId) => {
               // If no current selection or current selection not in new list, use first
-              if (!currentId || !attempts.find((a: any) => a.id === currentId)) {
+              if (!currentId || !attempts.find((a: ResultAttempt) => a.id === currentId)) {
                 setAttempt(attempts[0])
                 return attempts[0].id
               }
               // Otherwise keep current selection but update the attempt data
-              const currentAttempt = attempts.find((a: any) => a.id === currentId)
+              const currentAttempt = attempts.find((a: ResultAttempt) => a.id === currentId)
               if (currentAttempt) {
                 setAttempt(currentAttempt)
               }
@@ -138,7 +174,7 @@ export function ViewResultsClient({
   // The API already filters the attempt based on release mode, so we can use it directly
   // But we need to handle the case where answers might be null (SCORE_ONLY mode)
   const sortedAnswers = attempt.answers
-    ? [...(attempt.answers || [])].sort((a: any, b: any) => a.question.order - b.question.order)
+    ? [...(attempt.answers || [])].sort((a: ResultAnswer, b: ResultAnswer) => a.question.order - b.question.order)
     : []
 
   // Calculate grading status
@@ -147,7 +183,7 @@ export function ViewResultsClient({
       return { isFullyGraded: true, hasUngraded: false }
     }
     
-    const hasUngraded = attempt.answers.some((a: any) => a.gradedAt === null)
+    const hasUngraded = attempt.answers.some((a: ResultAnswer) => a.gradedAt === null)
     const isFullyGraded = !hasUngraded
     
     return { isFullyGraded, hasUngraded }
@@ -165,7 +201,7 @@ export function ViewResultsClient({
     let gradedTotalPoints = 0
     let overallTotalPoints = 0
 
-    attempt.answers.forEach((answer: any) => {
+    attempt.answers.forEach((answer: ResultAnswer) => {
       const questionPoints = answer.question?.points || 0
       overallTotalPoints += questionPoints
 
@@ -311,7 +347,7 @@ export function ViewResultsClient({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {sortedAnswers.map((answer: any, index: number) => {
+            {sortedAnswers.map((answer: ResultAnswer, index: number) => {
                 const isCorrect = answer.pointsAwarded !== null && answer.pointsAwarded > 0
                 // In SCORE_WITH_WRONG mode, show questions and correctness (but not answers)
                 // In FULL_TEST mode, show everything including answers
@@ -329,7 +365,7 @@ export function ViewResultsClient({
                               // Parse prompt to hide FRQ_PARTS section in header
                               const promptMd = answer.question.promptMd || ''
                               const frqPartsMatch = promptMd.match(/---FRQ_PARTS---\n\n([\s\S]+)$/)
-                              let mainContent = frqPartsMatch ? promptMd.substring(0, frqPartsMatch.index).trim() : promptMd
+                              const mainContent = frqPartsMatch ? promptMd.substring(0, frqPartsMatch.index).trim() : promptMd
                               
                               // Check if this is a fill-in-the-blank question
                               const hasBlanks = /\[blank\d*\]/.test(mainContent)
@@ -356,7 +392,7 @@ export function ViewResultsClient({
                                         const tableRegex = /(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|(?:\r?\n(?!\r?\n))?)+)/g
                                         
                                         // Remove images and tables from text for blank processing
-                                        let textOnly = promptSection.replace(imageRegex, '').replace(tableRegex, '')
+                                        const textOnly = promptSection.replace(imageRegex, '').replace(tableRegex, '')
                                         
                                         // Split on blank markers
                                         const normalizedText = textOnly.replace(/\[blank\d*\]/g, '[BLANK_MARKER]')
@@ -431,11 +467,11 @@ export function ViewResultsClient({
                           <div className="mt-3">
                             {answer.question.type === 'MCQ_SINGLE' ? (
                               <RadioGroup 
-                                value={answer.question.options.find((opt: any) => opt.isCorrect)?.id || ""} 
+                                value={answer.question.options.find((opt) => opt.isCorrect)?.id || ""} 
                                 disabled 
                                 className="space-y-2"
                               >
-                                {answer.question.options.map((option: any) => (
+                                {answer.question.options.map((option: ResultOption) => (
                                   <div
                                     key={option.id}
                                     className={`flex items-center gap-2 p-3 rounded border ${
@@ -456,7 +492,7 @@ export function ViewResultsClient({
                               </RadioGroup>
                             ) : (
                               <div className="space-y-2">
-                                {answer.question.options.map((option: any) => (
+                                {answer.question.options.map((option: ResultOption) => (
                                   <div
                                     key={option.id}
                                     className={`flex items-center gap-2 p-3 rounded border ${
@@ -531,8 +567,8 @@ export function ViewResultsClient({
                             ) : (
                               <div className="space-y-2">
                                 {answer.question.options
-                                  .filter((option: any) => answer.selectedOptionIds?.includes(option.id))
-                                  .map((option: any) => {
+                                  .filter((option: ResultOption) => answer.selectedOptionIds?.includes(option.id))
+                                  .map((option: ResultOption) => {
                                     const isSelected = answer.selectedOptionIds?.includes(option.id) || false
                                     const isCorrectOption = option.isCorrect
                                     return (

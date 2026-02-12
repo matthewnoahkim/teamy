@@ -23,7 +23,7 @@ interface EditUsernameDialogProps {
 }
 
 export function EditUsernameDialog({ open, onOpenChange, currentName, onNameUpdated }: EditUsernameDialogProps) {
-  const router = useRouter()
+  const _router = useRouter()
   const { toast } = useToast()
   const [name, setName] = useState(currentName || '')
   const [loading, setLoading] = useState(false)
@@ -76,10 +76,10 @@ export function EditUsernameDialog({ open, onOpenChange, currentName, onNameUpda
       
       // Update session without page reload using NextAuth's update method
       // The session will be refreshed on next request, but UI is already updated
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update name',
+        description: error instanceof Error ? error.message : 'Failed to update name',
         variant: 'destructive',
       })
     } finally {

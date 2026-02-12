@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/rbac'
-import { verifyTestPassword } from '@/lib/test-security'
 import { z } from 'zod'
 
 const updateQuestionSchema = z.object({
@@ -60,7 +59,7 @@ export async function PATCH(
     // Update question with options in a transaction
     const question = await prisma.$transaction(async (tx) => {
       // Update question fields
-      const updateData: any = {}
+      const updateData: Record<string, unknown> = {}
       if (validatedData.type !== undefined) updateData.type = validatedData.type
       if (validatedData.promptMd !== undefined) updateData.promptMd = validatedData.promptMd
       if (validatedData.explanation !== undefined) updateData.explanation = validatedData.explanation
@@ -70,7 +69,7 @@ export async function PATCH(
       if (validatedData.shuffleOptions !== undefined) updateData.shuffleOptions = validatedData.shuffleOptions
       if (validatedData.numericTolerance !== undefined) updateData.numericTolerance = validatedData.numericTolerance
 
-      const updatedQuestion = await tx.question.update({
+      const _updatedQuestion = await tx.question.update({
         where: { id: questionId },
         data: updateData,
       })

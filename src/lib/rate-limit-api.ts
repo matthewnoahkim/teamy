@@ -4,7 +4,6 @@ import {
   getRateLimitConfig,
   checkRateLimit,
   getRateLimitHeaders,
-  RATE_LIMITS,
   type RateLimitConfig,
 } from '@/lib/rate-limit'
 
@@ -84,11 +83,11 @@ export function createRateLimitResponse(
  * ```
  */
 export function withRateLimit<T extends NextRequest>(
-  handler: (request: T, ...args: any[]) => Promise<NextResponse>,
+  handler: (request: T, ...args: unknown[]) => Promise<NextResponse>,
   config?: RateLimitConfig,
   getUserId?: (request: T) => string | null | undefined
 ) {
-  return async (request: T, ...args: any[]): Promise<NextResponse> => {
+  return async (request: T, ...args: unknown[]): Promise<NextResponse> => {
     const userId = getUserId ? getUserId(request) : undefined
     const rateLimitConfig = config || getRateLimitConfig(request.method, request.nextUrl.pathname)
     const result = await rateLimitRequest(request, userId, rateLimitConfig)

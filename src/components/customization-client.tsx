@@ -178,7 +178,7 @@ function SortableColorItem({
     listeners,
     setNodeRef,
     transform,
-    transition,
+    transition: _transition,
     isDragging,
   } = useSortable({ id: index })
 
@@ -304,7 +304,7 @@ export function CustomizationClient({ user, preferences, allClubs }: Customizati
     setGradientColors(newColors)
   }
 
-  const handleDragEnd = (event: any) => {
+  const handleDragEnd = (event: { active: { id: string | number }; over: { id: string | number } | null }) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
       setGradientColors((items) => {
@@ -359,8 +359,8 @@ export function CustomizationClient({ user, preferences, allClubs }: Customizati
       window.dispatchEvent(new Event('userBackgroundUpdated'))
       
       router.refresh()
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to upload image', variant: 'destructive' })
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to upload image', variant: 'destructive' })
     } finally {
       setUploadingImage(false)
     }
@@ -387,8 +387,8 @@ export function CustomizationClient({ user, preferences, allClubs }: Customizati
       window.dispatchEvent(new Event('userBackgroundUpdated'))
       
       router.refresh()
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to delete image', variant: 'destructive' })
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to delete image', variant: 'destructive' })
     } finally {
       setUploadingImage(false)
     }
@@ -473,8 +473,8 @@ export function CustomizationClient({ user, preferences, allClubs }: Customizati
       window.dispatchEvent(new Event('userBackgroundUpdated'))
       
       router.refresh()
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to update background', variant: 'destructive' })
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to update background', variant: 'destructive' })
     } finally {
       setSavingBackground(false)
     }

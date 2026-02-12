@@ -251,7 +251,7 @@ export function TournamentRequests() {
                 className="pl-9"
               />
             </div>
-            <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'all' | 'PENDING' | 'APPROVED' | 'REJECTED')}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>

@@ -34,9 +34,9 @@ export default async function TournamentTestResultsPage({
   }
 
   // Safely access new fields that might not exist yet
-  const releaseScoresAt = (esTest as any).releaseScoresAt
-  const scoreReleaseMode = (esTest as any).scoreReleaseMode || 'FULL_TEST'
-  const scoresReleasedField = (esTest as any).scoresReleased
+  const releaseScoresAt = (esTest as unknown as Record<string, unknown>).releaseScoresAt
+  const scoreReleaseMode = (esTest as unknown as Record<string, unknown>).scoreReleaseMode || 'FULL_TEST'
+  const scoresReleasedField = (esTest as unknown as Record<string, unknown>).scoresReleased
 
   // Find user's membership through tournament registration
   const registration = await prisma.tournamentRegistration.findFirst({
@@ -166,18 +166,18 @@ export default async function TournamentTestResultsPage({
   }
 
   // Apply score release mode filtering
-  let filteredAttempt = attemptData
+  let filteredAttempt: typeof attemptData & { answers: typeof attemptData.answers | null } = attemptData
   if (scoreReleaseMode === 'NONE') {
     filteredAttempt = {
       ...attemptData,
       gradeEarned: null,
       proctoringScore: null,
-      answers: null as any,
+      answers: null,
     }
   } else if (scoreReleaseMode === 'SCORE_ONLY') {
     filteredAttempt = {
       ...attemptData,
-      answers: null as any,
+      answers: null,
     }
   } else if (scoreReleaseMode === 'SCORE_WITH_WRONG') {
     filteredAttempt = {

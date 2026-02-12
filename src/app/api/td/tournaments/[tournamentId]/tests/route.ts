@@ -133,11 +133,13 @@ export async function GET(
       },
       orderBy: { updatedAt: 'desc' },
     })
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If requireOneSitting column doesn't exist, try without it
       // P2022 is PrismaClientValidationError for unknown fields
-      if (error?.code === 'P2022' || error?.message?.includes('requireOneSitting') || error?.message?.includes('Unknown field')) {
-        console.warn('requireOneSitting column not found, fetching without it. Error:', error?.message || error)
+      const errMsg = error instanceof Error ? error.message : ''
+      const errCode = (error as Record<string, unknown>)?.code
+      if (errCode === 'P2022' || errMsg.includes('requireOneSitting') || errMsg.includes('Unknown field')) {
+        console.warn('requireOneSitting column not found, fetching without it. Error:', errMsg || error)
         allTests = await prisma.eSTest.findMany({
           where: {
             tournamentId: tournamentId,
@@ -213,7 +215,7 @@ export async function GET(
         // Re-throw if it's a different error
         console.error('Error fetching tests:', error)
         return NextResponse.json(
-          { error: error?.message || 'Failed to fetch tests' },
+          { error: errMsg || 'Failed to fetch tests' },
           { status: 500 }
         )
       }
@@ -231,7 +233,7 @@ export async function GET(
             trialEvents.push(...parsed.map((name: string) => ({ name, division: displayDivision as 'B' | 'C' })))
           } else {
             // New format
-            trialEvents.push(...parsed.map((e: any) => ({ name: e.name, division: e.division || displayDivision })))
+            trialEvents.push(...parsed.map((e: { name: string; division?: string }) => ({ name: e.name, division: (e.division || displayDivision) as 'B' | 'C' })))
           }
         }
       } catch (e) {
@@ -239,7 +241,7 @@ export async function GET(
       }
     }
     const trialEventNames = trialEvents.map(e => e.name)
-    const trialEventDivisionMap = new Map(trialEvents.map(e => [e.name, e.division]))
+    const _trialEventDivisionMap = new Map(trialEvents.map(e => [e.name, e.division]))
 
     // Fetch eventNames from CREATE audit logs for tests with null eventId (trial events)
     const testsWithNullEventId = allTests.filter(t => !t.eventId)
@@ -258,7 +260,7 @@ export async function GET(
       })
       for (const audit of createAudits) {
         if (audit.testId && audit.details && typeof audit.details === 'object' && 'eventName' in audit.details) {
-          const eventName = (audit.details as any).eventName
+          const eventName = (audit.details as Record<string, unknown>).eventName
           if (eventName && typeof eventName === 'string') {
             testEventNameMap.set(audit.testId, eventName)
           }
@@ -382,15 +384,15 @@ export async function GET(
         createdAt: test.createdAt.toISOString(),
         allowNoteSheet: test.allowNoteSheet ?? false,
         autoApproveNoteSheet: test.autoApproveNoteSheet ?? true,
-        requireOneSitting: (test as any).requireOneSitting ?? true, // Default to true if column doesn't exist
-        questions: test.questions.map((q: any) => ({
+        requireOneSitting: (test as Record<string, unknown>).requireOneSitting ?? true, // Default to true if column doesn't exist
+        questions: test.questions.map((q) => ({
           id: q.id,
           type: q.type,
           promptMd: q.promptMd,
           explanation: q.explanation,
           points: Number(q.points),
           order: q.order,
-          options: q.options.map((o: any) => ({
+          options: q.options.map((o) => ({
             id: o.id,
             label: o.label,
             isCorrect: o.isCorrect,
@@ -430,15 +432,15 @@ export async function GET(
         createdAt: test.createdAt.toISOString(),
         allowNoteSheet: test.allowNoteSheet ?? false,
         autoApproveNoteSheet: test.autoApproveNoteSheet ?? true,
-        requireOneSitting: (test as any).requireOneSitting ?? true, // Default to true if column doesn't exist
-        questions: test.questions.map((q: any) => ({
+        requireOneSitting: (test as Record<string, unknown>).requireOneSitting ?? true, // Default to true if column doesn't exist
+        questions: test.questions.map((q) => ({
           id: q.id,
           type: q.type,
           promptMd: q.promptMd,
           explanation: q.explanation,
           points: Number(q.points),
           order: q.order,
-          options: q.options.map((o: any) => ({
+          options: q.options.map((o) => ({
             id: o.id,
             label: o.label,
             isCorrect: o.isCorrect,

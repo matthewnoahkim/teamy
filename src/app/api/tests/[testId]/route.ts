@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { isAdmin, getUserMembership } from '@/lib/rbac'
-import { verifyTestPassword, hashTestPassword } from '@/lib/test-security'
 import { z } from 'zod'
 
 const updateTestSchema = z.object({
@@ -41,7 +40,7 @@ export async function GET(
     }
 
     // First try to find as regular Test
-    let test = await prisma.test.findUnique({
+    const test = await prisma.test.findUnique({
       where: { id: resolvedParams.testId },
       include: {
         sections: {
@@ -258,7 +257,7 @@ export async function PATCH(
     }
 
     // Prepare update data
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (validatedData.name !== undefined) updateData.name = validatedData.name
     if (validatedData.description !== undefined)
       updateData.description = validatedData.description

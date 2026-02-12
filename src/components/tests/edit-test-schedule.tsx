@@ -14,8 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { Clock, Edit } from 'lucide-react'
-import { formatDateTime } from '@/lib/utils'
+import { Edit } from 'lucide-react'
 
 interface EditTestScheduleProps {
   testId: string
@@ -89,10 +88,10 @@ export function EditTestSchedule({
 
       setOpen(false)
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update schedule',
+        description: error instanceof Error ? error.message : 'Failed to update schedule',
         variant: 'destructive',
       })
     } finally {

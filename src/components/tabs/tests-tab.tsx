@@ -9,9 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
-import { Plus, Clock, Users, FileText, AlertCircle, Play, Eye, Trash2, Lock, Search, Edit, Calculator as CalcIcon, FileEdit, Settings, Copy } from 'lucide-react'
+import { Plus, FileText, AlertCircle, Play, Eye, Trash2, Lock, Search, Edit, Calculator as CalcIcon, FileEdit, Settings, Copy } from 'lucide-react'
 import { NoteSheetUpload } from '@/components/tests/note-sheet-upload'
-import { Skeleton } from '@/components/ui/skeleton'
 import { PageLoading } from '@/components/ui/loading-spinner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
@@ -21,7 +20,7 @@ import { format } from 'date-fns'
 interface TestsTabProps {
   clubId: string
   isAdmin: boolean
-  initialTests?: any[]
+  initialTests?: Record<string, unknown>[]
 }
 
 interface Test {
@@ -107,7 +106,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
   const router = useRouter()
   // Ensure initialTests have proper _count structure - memoize to prevent infinite loops
   const normalizedInitialTests = useMemo(() => {
-    return initialTests?.map((test: any) => ({
+    return initialTests?.map((test: Record<string, unknown>) => ({
       ...test,
       _count: {
         questions: test._count?.questions ?? 0,
@@ -176,7 +175,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
       if (response.ok) {
         const data = await response.json()
         // Ensure _count structure exists
-        const testsWithCount = data.tests.map((test: any) => ({
+        const testsWithCount = data.tests.map((test: Record<string, unknown>) => ({
           ...test,
           _count: {
             questions: test._count?.questions ?? 0,
@@ -376,10 +375,10 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
       setDeleteDialogOpen(false)
       setTestToDelete(null)
       await fetchTests()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete test',
+        description: error instanceof Error ? error.message : 'Failed to delete test',
         variant: 'destructive',
       })
     } finally {
@@ -421,11 +420,11 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
 
       // Refresh tests list
       await fetchTests()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to duplicate test:', error)
       toast({
         title: 'Error',
-        description: error.message || 'Failed to duplicate test',
+        description: error instanceof Error ? error.message : 'Failed to duplicate test',
         variant: 'destructive',
       })
     }
@@ -485,7 +484,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     return true
   }
 
-  const getTestTimeInfo = (test: Test): string => {
+  const _getTestTimeInfo = (test: Test): string => {
     if (!test.startAt) {
       return test.status === 'DRAFT' ? 'Set start time when publishing' : 'No start time set'
     }
@@ -935,7 +934,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
               className="pl-11"
             />
           </div>
-          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
             <SelectTrigger className="h-12 w-[180px]">
               <SelectValue placeholder="All Tests" />
             </SelectTrigger>

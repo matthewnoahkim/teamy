@@ -7,7 +7,7 @@ import { hasESAccess, hasESTestAccess } from '@/lib/rbac'
 import { getESTestsForUser } from '@/lib/es-tests'
 
 // Helper to check if user is a tournament director for a tournament
-async function isTournamentDirector(userId: string, userEmail: string, tournamentId: string): Promise<boolean> {
+async function _isTournamentDirector(userId: string, userEmail: string, tournamentId: string): Promise<boolean> {
   // Check if user is tournament admin
   const admin = await prisma.tournamentAdmin.findUnique({
     where: {
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
     // Create the test with questions and audit log in a transaction
     const test = await prisma.$transaction(async (tx) => {
       // Base data without requireOneSitting
-      const baseData: any = {
+      const baseData: Record<string, unknown> = {
         staffId,
         createdByStaffId: staffId, // Track original creator
         tournamentId,
@@ -509,11 +509,11 @@ export async function PUT(request: NextRequest) {
     if (noteSheetInstructions !== undefined && noteSheetInstructions !== existingTest.noteSheetInstructions) changedFields.push('noteSheetInstructions')
     if (autoApproveNoteSheet !== undefined && autoApproveNoteSheet !== existingTest.autoApproveNoteSheet) changedFields.push('autoApproveNoteSheet')
     if (requireOneSitting !== undefined && requireOneSitting !== existingTest.requireOneSitting) changedFields.push('requireOneSitting')
-    if (maxAttempts !== undefined && maxAttempts !== (existingTest as any).maxAttempts) changedFields.push('maxAttempts')
+    if (maxAttempts !== undefined && maxAttempts !== (existingTest as Record<string, unknown>).maxAttempts) changedFields.push('maxAttempts')
     if (questions) changedFields.push('questions')
 
     // If publishing, fetch tournament default settings to apply
-    let tournamentDefaults: any = null
+    let _tournamentDefaults: Record<string, unknown> | null = null
     if (status === 'PUBLISHED') {
       const tournament = await prisma.tournament.findUnique({
         where: { id: existingTest.tournamentId },
@@ -532,13 +532,13 @@ export async function PUT(request: NextRequest) {
           defaultMaxAttempts: true,
         },
       })
-      tournamentDefaults = tournament
+      _tournamentDefaults = tournament
     }
 
     // Use a transaction to update test and questions
-    const updatedTest = await prisma.$transaction(async (tx) => {
+    const _updatedTest = await prisma.$transaction(async (tx) => {
       // Build update data
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         ...(name && { name }),
         ...(description !== undefined && { description }),
         ...(instructions !== undefined && { instructions }),
@@ -602,7 +602,7 @@ export async function PUT(request: NextRequest) {
             },
           })
           if (createAudit && createAudit.details && typeof createAudit.details === 'object' && 'eventName' in createAudit.details) {
-            finalEventName = (createAudit.details as any).eventName || null
+            finalEventName = (createAudit.details as Record<string, unknown>).eventName as string || null
           }
         }
       }
@@ -868,7 +868,7 @@ export async function DELETE(request: NextRequest) {
         },
       })
       if (createAudit && createAudit.details && typeof createAudit.details === 'object' && 'eventName' in createAudit.details) {
-        finalEventName = (createAudit.details as any).eventName || null
+        finalEventName = (createAudit.details as Record<string, unknown>).eventName as string || null
       }
     }
 

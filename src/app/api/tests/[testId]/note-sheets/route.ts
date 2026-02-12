@@ -10,7 +10,7 @@ import { z } from 'zod'
 
 const MAX_PDF_SIZE = 50 * 1024 * 1024 // 50MB for PDFs
 
-const createNoteSheetSchema = z.object({
+const _createNoteSheetSchema = z.object({
   type: z.enum(['CREATED', 'UPLOADED']),
   content: z.string().optional(), // For CREATED type
 })
@@ -28,7 +28,7 @@ export async function POST(
     }
 
     // First try to find as regular Test
-    let test = await prisma.test.findUnique({
+    const test = await prisma.test.findUnique({
       where: { id: resolvedParams.testId },
       include: {
         club: true,
@@ -144,10 +144,12 @@ export async function POST(
         })
 
         // Helper function to delete old note sheet and its file
-        const deleteOldNoteSheet = async (noteSheet: any) => {
+        const deleteOldNoteSheet = async (noteSheet: { id: string; filePath?: string | null }) => {
           if (noteSheet.filePath) {
             try {
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
               const fs = require('fs')
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
               const path = require('path')
               const filePath = path.join(process.cwd(), 'public', noteSheet.filePath)
               if (fs.existsSync(filePath)) {
@@ -443,10 +445,12 @@ export async function POST(
     })
 
     // Helper function to delete old note sheet and its file
-    const deleteOldNoteSheet = async (noteSheet: any) => {
+    const deleteOldNoteSheet = async (noteSheet: { id: string; filePath?: string | null }) => {
       if (noteSheet.filePath) {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const fs = require('fs')
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const path = require('path')
           const filePath = path.join(process.cwd(), 'public', noteSheet.filePath)
           if (fs.existsSync(filePath)) {
@@ -750,7 +754,7 @@ export async function GET(
     const adminView = searchParams.get('admin') === 'true'
 
     // First try to find as regular Test
-    let test = await prisma.test.findUnique({
+    const test = await prisma.test.findUnique({
       where: { id: resolvedParams.testId },
       include: {
         club: true,

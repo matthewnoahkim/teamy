@@ -53,10 +53,10 @@ export async function POST(req: NextRequest) {
       success: true, 
       deletedCount: deleteResult.count 
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error syncing resources:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to sync resources' },
+      { error: error instanceof Error ? error.message : 'Failed to sync resources' },
       { status: 500 }
     )
   }

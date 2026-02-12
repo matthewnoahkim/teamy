@@ -11,9 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { DollarSign, Plus, Edit, Trash2, CheckCircle, XCircle, Clock, ShoppingCart, Download, Settings, AlertTriangle, Wallet, Search, Filter, Cloud, Building2, Briefcase, FileText } from 'lucide-react'
+import { Plus, Edit, Trash2, CheckCircle, XCircle, Clock, ShoppingCart, Download, AlertTriangle, Wallet, Search, Filter, Building2, Briefcase, FileText } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { Skeleton } from '@/components/ui/skeleton'
 import { SaveIndicator } from '@/components/ui/save-indicator'
 import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -242,7 +241,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
   const [saveIndicator, setSaveIndicator] = useState(false)
   const [deleteBudgetDialogOpen, setDeleteBudgetDialogOpen] = useState(false)
   const [budgetToDelete, setBudgetToDelete] = useState<EventBudget | null>(null)
-  const [deletingBudget, setDeletingBudget] = useState(false)
+  const [_deletingBudget, setDeletingBudget] = useState(false)
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('')
@@ -423,7 +422,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
         throw new Error(data.error || 'Failed to add expense')
       }
 
-      const data = await response.json()
+      const _data = await response.json()
       // Always refetch expenses to get full data with addedBy field and user info
       await fetchData()
       setSaveIndicator(true)
@@ -432,10 +431,10 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
         title: 'Expense Added',
         description: 'The expense has been added to the spreadsheet',
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to add expense',
+        description: error instanceof Error ? error.message : 'Failed to add expense',
         variant: 'destructive',
       })
     } finally {
@@ -503,7 +502,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
         throw new Error(data.error || 'Failed to update expense')
       }
 
-      const data = await response.json()
+      const _data = await response.json()
       // Always refetch to get full data with addedBy field and user info
       await fetchData()
       setSaveIndicator(true)
@@ -512,10 +511,10 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
         title: 'Expense Updated',
         description: 'The expense has been updated',
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update expense',
+        description: error instanceof Error ? error.message : 'Failed to update expense',
         variant: 'destructive',
       })
     } finally {
@@ -558,10 +557,10 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
         title: 'Expense Deleted',
         description: 'The expense has been removed',
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete expense',
+        description: error instanceof Error ? error.message : 'Failed to delete expense',
         variant: 'destructive',
       })
     } finally {
@@ -618,12 +617,13 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
       })
       setRequestPurchaseOpen(false)
       setSaveIndicator(true)
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Error already shown via budgetWarning or toast
-      if (!error.message.includes('exceeds remaining budget')) {
+      const errMsg = error instanceof Error ? error.message : 'Failed to submit request'
+      if (!errMsg.includes('exceeds remaining budget')) {
         toast({
           title: 'Error',
-          description: error.message || 'Failed to submit request',
+          description: errMsg,
           variant: 'destructive',
         })
       }
@@ -719,10 +719,10 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
       setReviewRequestOpen(false)
       setReviewingRequest(null)
       setSaveIndicator(true)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to review request',
+        description: error instanceof Error ? error.message : 'Failed to review request',
         variant: 'destructive',
       })
     } finally {
@@ -791,10 +791,10 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
       setBudgetDialogOpen(false)
       setEditingBudget(null)
       setBudgetForm({ eventId: '', subclubId: '', maxBudget: '' })
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to save budget',
+        description: error instanceof Error ? error.message : 'Failed to save budget',
         variant: 'destructive',
       })
     } finally {
@@ -825,7 +825,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
   const displayBalance = useMemo(() => Math.abs(accountBalance), [accountBalance])
   
   // Get current date for display
-  const currentDate = useMemo(() => 
+  const _currentDate = useMemo(() => 
     new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     []
   )
@@ -989,7 +989,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
   }
   
   // Get initials for tags
-  const getInitials = (name: string) => {
+  const _getInitials = (name: string) => {
     return name
       .split(' ')
       .map(n => n[0])
@@ -999,7 +999,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
   }
   
   // Get color for tag
-  const getTagColor = (name: string) => {
+  const _getTagColor = (name: string) => {
     const colors = [
       'bg-blue-500',
       'bg-orange-500',
@@ -2468,10 +2468,10 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
             } else {
               throw new Error('Failed to delete budget')
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
             toast({
               title: 'Error',
-              description: error.message || 'Failed to delete budget',
+              description: error instanceof Error ? error.message : 'Failed to delete budget',
               variant: 'destructive',
             })
           } finally {

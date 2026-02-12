@@ -6,7 +6,7 @@ import { Users, Sparkles } from 'lucide-react'
 interface WelcomeWidgetProps {
   clubName: string
   memberCount: number
-  config?: any
+  config?: Record<string, unknown>
 }
 
 export function WelcomeWidget({ clubName, memberCount, config }: WelcomeWidgetProps) {

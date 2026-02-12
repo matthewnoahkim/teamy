@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -21,9 +21,6 @@ import { signOut } from 'next-auth/react'
 import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import { Pencil, LogOut, ChevronDown } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
 import { 
   Edit, 
   Save, 
@@ -48,7 +45,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { format, isBefore, isAfter } from 'date-fns'
-import { formatDivision, divisionsMatch } from '@/lib/utils'
+import { formatDivision, divisionsMatch as _divisionsMatch } from '@/lib/utils'
 
 interface TournamentHostingRequest {
   id: string
@@ -152,18 +149,18 @@ export function TournamentPageClient({
   const [saving, setSaving] = useState(false)
   
   // Registration state
-  const [registerDialogOpen, setRegisterDialogOpen] = useState(false)
+  const [_registerDialogOpen, setRegisterDialogOpen] = useState(false)
   const [selectedClub, setSelectedClub] = useState<string>('')
   const [selectedTeams, setSelectedTeams] = useState<string[]>([])
-  const [registering, setRegistering] = useState(false)
+  const [_registering, setRegistering] = useState(false)
 
   // Events not being run - use initial data from server (always provided now)
   const [eventsNotRun, setEventsNotRun] = useState<Array<{ id: string; name: string; division: string }>>(initialEventsNotRun)
   const [eventsNotRunLoading, setEventsNotRunLoading] = useState(false)
 
   // Check if user is registered and tests are available (use initial values from server)
-  const [isRegistered, setIsRegistered] = useState(initialIsRegistered)
-  const [hasAvailableTests, setHasAvailableTests] = useState(initialHasAvailableTests)
+  const [isRegistered, _setIsRegistered] = useState(initialIsRegistered)
+  const [hasAvailableTests, _setHasAvailableTests] = useState(initialHasAvailableTests)
 
   // Update events not run if tournament data changes (fallback for client-side updates)
   useEffect(() => {
@@ -253,7 +250,7 @@ export function TournamentPageClient({
         description: 'Your tournament page has been updated.',
       })
       setIsEditing(false)
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to save tournament page.',
@@ -312,7 +309,7 @@ export function TournamentPageClient({
     ? isAfter(now, new Date(tournament.lateFeeStartDate)) 
     : false
 
-  const calculatePrice = (teamCount: number) => {
+  const _calculatePrice = (teamCount: number) => {
     if (!tournament) return 0
     let basePrice = 0
     
@@ -333,9 +330,9 @@ export function TournamentPageClient({
   }
 
   const selectedClubData = userClubs.find(c => c.id === selectedClub)
-  const eligibleTeams = selectedClubData?.teams || []
+  const _eligibleTeams = selectedClubData?.teams || []
 
-  const handleRegister = async () => {
+  const _handleRegister = async () => {
     if (!tournament || !selectedClub || selectedTeams.length === 0) return
 
     setRegistering(true)

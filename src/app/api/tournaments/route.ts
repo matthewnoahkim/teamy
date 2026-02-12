@@ -7,7 +7,6 @@ import { Division } from '@prisma/client'
 import {
   sanitizeSearchQuery,
   validateId,
-  validateInteger,
   validateBoolean,
   validateEnum,
 } from '@/lib/input-validation'
@@ -79,7 +78,7 @@ export async function GET(req: NextRequest) {
     // Filter by tournaments pending approval (created by user but not approved)
     const pendingApproval = pendingApprovalParam === true
 
-    const where: any = {}
+    const where: Record<string, unknown> = {}
     
     // Check if we should include unapproved tournaments (for dev panel)
     const includeUnapproved = searchParams.get('includeUnapproved') === 'true'
@@ -193,7 +192,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Determine orderBy based on sortBy parameter
-    let orderBy: any = { startDate: 'asc' } // default
+    let orderBy: Record<string, unknown> = { startDate: 'asc' } // default
     
     if (sortBy === 'date-asc') {
       orderBy = { startDate: 'asc' }
@@ -329,7 +328,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Send Discord webhook notification
-    const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1444884965656498297/cYFv5fCpclifIVFzyi4a6tN3a5u_hpGE2AZGfPCT8hyJkfo96hcCdcYmBL-YvG2LOjXU'
+    const DISCORD_WEBHOOK_URL = process.env.TOURNAMENT_SUBMISSION_DISCORD_WEBHOOK_URL || ''
     
     try {
       const discordPayload = {

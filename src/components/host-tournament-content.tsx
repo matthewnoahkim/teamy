@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { 
-  Trophy, 
   Plus, 
   Loader2, 
   CheckCircle2, 
@@ -13,7 +12,6 @@ import {
   CreditCard, 
   BarChart3, 
   Mail,
-  CheckCircle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -178,7 +176,7 @@ export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated 
     // Validate phone number format if provided
     if (formData.directorPhone && formData.directorPhone.trim()) {
       // Allow various phone number formats: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890, +1 123 456 7890, etc.
-      const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}[-\s\.]?[0-9]{1,9}$/
+      const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}[-\s.]?[0-9]{1,9}$/
       const digitsOnly = formData.directorPhone.replace(/\D/g, '')
       if (digitsOnly.length < 10 || digitsOnly.length > 15 || !phoneRegex.test(formData.directorPhone)) {
         setPhoneError('Please enter a valid phone number (e.g., (555) 123-4567 or 555-123-4567)')
@@ -754,7 +752,7 @@ export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated 
                                     setFormData({ ...formData, directorPhone: phone })
                                     // Validate phone number format if provided
                                     if (phone.trim()) {
-                                      const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}[-\s\.]?[0-9]{1,9}$/
+                                      const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}[-\s.]?[0-9]{1,9}$/
                                       const digitsOnly = phone.replace(/\D/g, '')
                                       if (digitsOnly.length < 10 || digitsOnly.length > 15 || !phoneRegex.test(phone)) {
                                         setPhoneError('Please enter a valid phone number (e.g., (555) 123-4567 or 555-123-4567)')

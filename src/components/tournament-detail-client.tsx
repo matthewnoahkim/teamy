@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -18,10 +18,33 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Calendar, MapPin, Users, DollarSign, ArrowLeft, Settings, Trophy, CheckCircle2, Plus, X, AlertCircle, CreditCard, Monitor, UserCheck, Shield } from 'lucide-react'
+import { Calendar, MapPin, Users, DollarSign, ArrowLeft, Settings, Trophy, CheckCircle2, Plus, X, AlertCircle, CreditCard, Monitor, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { groupEventsByCategory, categoryOrder, type EventCategory } from '@/lib/event-categories'
 import { formatDivision, divisionsMatch } from '@/lib/utils'
+
+interface TournamentRegistration {
+  id: string
+  paid: boolean
+  clubId?: string
+  subclubId?: string | null
+  team: {
+    id: string
+    name: string
+  } | null
+  club?: {
+    id: string
+    name: string
+    memberships?: Array<{
+      user: {
+        id: string
+        name: string | null
+        email: string
+        image: string | null
+      }
+    }>
+  }
+}
 
 interface Tournament {
   id: string
@@ -43,26 +66,7 @@ interface Tournament {
     name: string | null
     email: string
   }
-  registrations?: Array<{
-    id: string
-    paid: boolean
-    team: {
-      id: string
-      name: string
-    } | null
-    club?: {
-      id: string
-      name: string
-      memberships?: Array<{
-        user: {
-          id: string
-          name: string | null
-          email: string
-          image: string | null
-        }
-      }>
-    }
-  }>
+  registrations?: TournamentRegistration[]
   _count: {
     registrations: number
   }
@@ -106,8 +110,8 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
   const [selectedTeams, setSelectedTeams] = useState<Array<{ clubId: string; subclubId?: string; subclubIds?: string[]; eventIds: string[] }>>([])
   const [submitting, setSubmitting] = useState(false)
   const [registeredTeams, setRegisteredTeams] = useState<Array<{ id: string; clubId: string; subclubId?: string | null; teamName: string | null; clubName: string | null; paid: boolean }>>([])
-  const [totalRegisteredTeams, setTotalRegisteredTeams] = useState(0)
-  const [totalCost, setTotalCost] = useState(0)
+  const [_totalRegisteredTeams, setTotalRegisteredTeams] = useState(0)
+  const [_totalCost, setTotalCost] = useState(0)
   const [deregisterDialogOpen, setDeregisterDialogOpen] = useState(false)
   const [registrationToDeregister, setRegistrationToDeregister] = useState<{ id: string; teamName: string | null; clubName: string | null } | null>(null)
   const [deregistering, setDeregistering] = useState(false)
@@ -132,11 +136,11 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
       setTournament(tournamentData)
       // Track which of user's teams are registered
       const userRegisteredTeams = (tournamentData.registrations || [])
-        .filter((r: any) => userTeams.some(t => t.id === r.clubId))
-        .map((r: any) => ({
+        .filter((r: TournamentRegistration) => userTeams.some(t => t.id === r.clubId))
+        .map((r: TournamentRegistration) => ({
           id: r.id,
-          clubId: r.clubId,
-          subclubId: r.teamId || null,
+          clubId: r.clubId || '',
+          subclubId: r.subclubId || null,
           teamName: r.team?.name || null,
           clubName: r.club?.name || null,
           paid: r.paid || false,
@@ -148,10 +152,10 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
       const calculatedCost = totalTeamsCount * (data.tournament.price || 0)
       setTotalRegisteredTeams(totalTeamsCount)
       setTotalCost(calculatedCost)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load tournament',
+        description: error instanceof Error ? error.message : 'Failed to load tournament',
         variant: 'destructive',
       })
     } finally {
@@ -177,7 +181,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
         // Combine and deduplicate by slug (in case there are any duplicates)
         const combinedEvents = [...(bData.events || []), ...(cData.events || [])]
         const uniqueEvents = Array.from(
-          new Map(combinedEvents.map((e: any) => [e.slug, e])).values()
+          new Map(combinedEvents.map((e: Event) => [e.slug, e])).values()
         )
         setEvents(uniqueEvents)
       } else {
@@ -186,7 +190,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
         const data = await response.json()
         setEvents(data.events || [])
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load events:', error)
     }
   }
@@ -312,10 +316,10 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
       setSignupDialogOpen(false)
       setSelectedTeams([])
       loadTournament()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to register',
+        description: error instanceof Error ? error.message : 'Failed to register',
         variant: 'destructive',
       })
     } finally {
@@ -333,7 +337,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
     })
   }
 
-  const formatDateShort = (dateString: string) => {
+  const _formatDateShort = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { 
       weekday: 'long',
@@ -372,7 +376,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
   // For B&C tournaments, group events by C (since C has more events and better categorization)
   // This is a workaround since groupEventsByCategory only accepts 'B' | 'C'
   const divisionForGrouping = tournament?.division.includes('C') ? 'C' : (tournament?.division.includes('B') ? 'B' : undefined)
-  const groupedEvents = tournament && divisionForGrouping ? groupEventsByCategory(events, divisionForGrouping) : {} as Record<EventCategory, any[]>
+  const groupedEvents = tournament && divisionForGrouping ? groupEventsByCategory(events, divisionForGrouping) : {} as Record<EventCategory, Event[]>
 
   if (loading) {
     return (
@@ -535,10 +539,10 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                     <div className="flex-1">
                       {(() => {
                         // Filter registrations to only show teams where user is an admin of the club
-                        const visibleRegistrations = (tournament.registrations || []).filter((reg: any) => {
+                        const visibleRegistrations = (tournament.registrations || []).filter((reg: TournamentRegistration) => {
                           if (!reg.club?.memberships) return false
                           // Check if current user is an admin of this club
-                          const isUserAdmin = reg.club.memberships.some((m: any) => m.user.id === user.id)
+                          const isUserAdmin = reg.club.memberships.some((m) => m.user.id === user.id)
                           return isUserAdmin
                         })
                         
@@ -549,7 +553,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                             </p>
                             {visibleRegistrations.length > 0 && (
                               <div className="flex flex-wrap gap-2">
-                                {visibleRegistrations.map((reg: any) => (
+                                {visibleRegistrations.map((reg: TournamentRegistration) => (
                                   <Badge key={reg.id} variant="secondary" className="text-xs">
                                     {reg.club?.name 
                                       ? (reg.team?.name ? `${reg.club.name} - ${reg.team.name}` : reg.club.name)
@@ -587,10 +591,10 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                   <div className="space-y-4">
                     {(() => {
                       // Filter registrations to only show teams where user is an admin of the club
-                      const visibleRegistrations = (tournament.registrations || []).filter((reg: any) => {
+                      const visibleRegistrations = (tournament.registrations || []).filter((reg: TournamentRegistration) => {
                         if (!reg.club?.memberships) return false
                         // Check if current user is an admin of this club
-                        const isUserAdmin = reg.club.memberships.some((m: any) => m.user.id === user.id)
+                        const isUserAdmin = reg.club.memberships.some((m) => m.user.id === user.id)
                         return isUserAdmin
                       })
                       
@@ -600,12 +604,12 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                         <>
                           <div className="space-y-2">
                             <p className="text-sm font-medium">Registered Teams:</p>
-                            {visibleRegistrations.map((reg: any) => {
+                            {visibleRegistrations.map((reg: TournamentRegistration) => {
                               const teamDisplayName = reg.club?.name 
                                 ? (reg.team?.name ? `${reg.club.name} - ${reg.team.name}` : reg.club.name)
                                 : (reg.team?.name || 'Unknown Team')
                               const admins = reg.club?.memberships || []
-                              const isUserTeam = registeredTeams.some((rt: any) => rt.id === reg.id)
+                              const isUserTeam = registeredTeams.some((rt) => rt.id === reg.id)
                               
                               return (
                                 <div key={reg.id} className="flex items-start justify-between group p-2 rounded-md border bg-card">
@@ -621,7 +625,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                                         <Shield className="h-3 w-3 mt-0.5 shrink-0" />
                                         <span className="font-medium">Admins: </span>
                                         <span>
-                                          {admins.map((m: any, idx: number) => (
+                                          {admins.map((m, idx: number) => (
                                             <span key={m.user.id}>
                                               {m.user.name || m.user.email}
                                               {idx < admins.length - 1 ? ', ' : ''}
@@ -677,7 +681,7 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                                   <span className="font-medium">${(visibleRegistrations.length * tournament.price).toFixed(2)}</span>
                                 </div>
                                 {visibleRegistrations.length > 0 && (() => {
-                                  const paidCount = visibleRegistrations.filter((r: any) => r.paid).length
+                                  const paidCount = visibleRegistrations.filter((r: TournamentRegistration) => r.paid).length
                                   const unpaidCount = visibleRegistrations.length - paidCount
                                   return (
                                     <>
@@ -752,8 +756,8 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                 // Get already registered team IDs for this team
                 const alreadyRegisteredSubclubIds = new Set(
                   tournament.registrations
-                    ?.filter((r: any) => r.clubId === teamReg.clubId && r.subclubId)
-                    .map((r: any) => r.subclubId) || []
+                    ?.filter((r: TournamentRegistration) => r.clubId === teamReg.clubId && r.subclubId)
+                    .map((r: TournamentRegistration) => r.subclubId) || []
                 )
 
                 return (
@@ -1055,10 +1059,10 @@ export function TournamentDetailClient({ tournamentId, userTeams, user }: Tourna
                     
                     // Reload tournament data to update the list
                     loadTournament()
-                  } catch (error: any) {
+                  } catch (error: unknown) {
                     toast({
                       title: 'Error',
-                      description: error.message || 'Failed to deregister',
+                      description: error instanceof Error ? error.message : 'Failed to deregister',
                       variant: 'destructive',
                     })
                   } finally {

@@ -33,7 +33,7 @@ interface TestDetailWrapperProps {
 export function TestDetailWrapper({
   testId,
   testName,
-  test,
+  test: _test,
   overviewContent,
   instructionsContent,
   deliverySettingsContent,

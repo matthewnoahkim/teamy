@@ -7,7 +7,7 @@ export async function logActivity(data: {
   logType?: 'USER_ACTION' | 'ADMIN_ACTION' | 'SYSTEM_EVENT' | 'API_USAGE' | 'ERROR' | 'WARNING'
   severity?: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
   route?: string
-  metadata?: any
+  metadata?: Record<string, unknown>
 }) {
   try {
     await prisma.activityLog.create({

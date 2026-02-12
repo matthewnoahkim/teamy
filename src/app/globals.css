@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Quicksand:wght@500;600;700&display=swap');
-
 @config "../../tailwind.config.ts";
 @import "tailwindcss";
 
@@ -74,7 +72,7 @@
   
   body {
     @apply text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -97,7 +95,7 @@
   }
   
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font-nunito), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-weight: 700;
     text-rendering: optimizeLegibility;
   }
@@ -121,24 +119,6 @@
     background-attachment: fixed;
   }
 
-  /* Teamy Brand Hero Background */
-  .teamy-hero-bg {
-    background: linear-gradient(180deg, #0056C7 0%, #003A8C 100%);
-  }
-  
-  .teamy-hero-bg-light {
-    background: linear-gradient(180deg, #0056C7 0%, #1A6FEA 100%);
-  }
-
-  /* App shell backgrounds */
-  .app-shell-light {
-    @apply bg-background;
-  }
-  
-  .app-shell-dark {
-    @apply bg-background;
-  }
-  
   /* Sidebar styles */
   .teamy-sidebar {
     background: var(--sidebar-bg);
@@ -158,15 +138,6 @@
     @apply text-white;
   }
 
-  /* Legacy utilities for compatibility */
-  .bg-gradient-apple-light {
-    background: linear-gradient(135deg, #F5F7FB 0%, #EEF2F7 100%);
-  }
-  
-  .bg-gradient-apple-dark {
-    background: linear-gradient(135deg, #0C1222 0%, #1E293B 100%);
-  }
-  
   .bg-gradient-card-light {
     @apply bg-card;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
@@ -177,19 +148,6 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   }
 
-  /* Glass effects */
-  .glass-effect-light {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-  }
-  
-  .glass-effect-dark {
-    background: rgba(30, 41, 59, 0.8);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-  
   /* Animations */
   .apple-transition {
     transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -420,54 +378,9 @@
     }
   }
 
-  @keyframes gentleFloat {
-    0%, 100% {
-      transform: translateY(0px) translateX(0px);
-    }
-    50% {
-      transform: translateY(-12px) translateX(6px);
-    }
-  }
-
-  .animate-gentle-float {
-    animation: gentleFloat 10s ease-in-out infinite;
-  }
-
-  /* Smooth scroll-driven transitions */
-  .scroll-smooth-transition {
-    transition: all 1000ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  /* Glass morphism enhancement */
-  .glass-modern {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-  }
-
-  .dark .glass-modern {
-    background: rgba(30, 41, 59, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
   /* Dark mode card glow effect */
   .dark .shadow-card {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(111, 214, 255, 0.1);
   }
 
-  /* Elegant gradient animations */
-  @keyframes gradientShift {
-    0%, 100% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
-    }
-  }
-
-  .animate-gradient-shift {
-    background-size: 200% 200%;
-    animation: gradientShift 8s ease infinite;
-  }
 }

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import {
   DndContext,
-  closestCenter,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -23,7 +23,6 @@ import {
   DragEndEvent,
   rectIntersection,
   DragStartEvent,
-  DragOverlay,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -32,7 +31,6 @@ import {
   useSortable,
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import {
   Dialog,
   DialogContent,
@@ -50,9 +48,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Card } from '@/components/ui/card'
 import { PageLoading } from '@/components/ui/loading-spinner'
 
 // Import all widget components
@@ -64,15 +59,44 @@ import { QuickActionsWidget } from '@/components/widgets/quick-actions-widget'
 import { UpcomingTestsWidget } from '@/components/widgets/upcoming-tests-widget'
 import { CustomTextWidget } from '@/components/widgets/custom-text-widget'
 import { ImportantLinksWidget } from '@/components/widgets/important-links-widget'
+import type { SessionUser } from '@/types/models'
+
+// ---------------------------------------------------------------------------
+// Local interfaces for homepage widget data
+// ---------------------------------------------------------------------------
+
+interface Widget {
+  id: string
+  widgetType: string
+  title?: string | null
+  config: Record<string, unknown>
+  isVisible: boolean
+  width: string
+  height: string
+  position: number
+}
+
+interface WidgetData {
+  widgetType: string
+  title?: string
+  width: string
+  height: string
+  config: Record<string, unknown>
+}
+
+interface ClubData {
+  name: string
+  memberships?: unknown[]
+}
 
 interface HomePageTabProps {
   clubId: string
-  club: any
+  club: ClubData
   isAdmin: boolean
-  user: any
-  initialEvents?: any[]
-  initialAnnouncements?: any[]
-  initialTests?: any[]
+  user: SessionUser
+  initialEvents?: Record<string, unknown>[]
+  initialAnnouncements?: Record<string, unknown>[]
+  initialTests?: Record<string, unknown>[]
 }
 
 // Sortable Widget Item Component
@@ -86,12 +110,12 @@ function SortableWidgetItem({
   setEditWidgetOpen,
   handleDeleteWidget,
 }: {
-  widget: any
+  widget: Widget
   isConfigMode: boolean
-  getWidgetClassName: (widget: any) => string
-  renderWidget: (widget: any) => React.ReactNode
-  toggleVisibility: (widget: any) => void
-  setSelectedWidget: (widget: any) => void
+  getWidgetClassName: (widget: Widget) => string
+  renderWidget: (widget: Widget) => React.ReactNode
+  toggleVisibility: (widget: Widget) => void
+  setSelectedWidget: (widget: Widget | null) => void
   setEditWidgetOpen: (open: boolean) => void
   handleDeleteWidget: (id: string) => void
 }) {
@@ -200,19 +224,19 @@ function SortableWidgetItem({
 
 export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initialAnnouncements, initialTests }: HomePageTabProps) {
   const { toast } = useToast()
-  const [widgets, setWidgets] = useState<any[]>([])
+  const [widgets, setWidgets] = useState<Widget[]>([])
   const [loading, setLoading] = useState(true)
   const [isConfigMode, setIsConfigMode] = useState(false)
   const [addWidgetOpen, setAddWidgetOpen] = useState(false)
   const [editWidgetOpen, setEditWidgetOpen] = useState(false)
-  const [selectedWidget, setSelectedWidget] = useState<any>(null)
+  const [selectedWidget, setSelectedWidget] = useState<Widget | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const gridContainerRef = useRef<HTMLDivElement>(null)
   
   // Data for widgets - use initial data if provided
-  const [announcements, setAnnouncements] = useState<any[]>(initialAnnouncements || [])
-  const [events, setEvents] = useState<any[]>(initialEvents || [])
-  const [tests, setTests] = useState<any[]>(initialTests || [])
+  const [announcements, setAnnouncements] = useState<Record<string, unknown>[]>(initialAnnouncements || [])
+  const [events, setEvents] = useState<Record<string, unknown>[]>(initialEvents || [])
+  const [tests, setTests] = useState<Record<string, unknown>[]>(initialTests || [])
   const [stats, setStats] = useState({
     memberCount: club.memberships?.length || 0,
     announcementCount: initialAnnouncements?.length || 0,
@@ -296,7 +320,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       await Promise.all(promises)
 
       // Calculate stats - use current state values
-      setStats(prev => ({
+      setStats(_prev => ({
         memberCount: club.memberships?.length || 0,
         announcementCount: announcements.length,
         eventCount: events.length,
@@ -307,7 +331,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
     }
   }
 
-  const handleAddWidget = async (widgetData: any) => {
+  const handleAddWidget = async (widgetData: WidgetData) => {
     try {
       // Set position to the end of the list
       const newPosition = widgets.length
@@ -331,7 +355,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
 
       fetchWidgets()
       setAddWidgetOpen(false)
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to add widget',
@@ -340,7 +364,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
     }
   }
 
-  const handleUpdateWidget = async (widgetId: string, updates: any) => {
+  const handleUpdateWidget = async (widgetId: string, updates: Record<string, unknown>) => {
     try {
       const response = await fetch(`/api/widgets/${widgetId}`, {
         method: 'PATCH',
@@ -356,7 +380,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       })
 
       fetchWidgets()
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to update widget',
@@ -379,7 +403,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       })
 
       fetchWidgets()
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to delete widget',
@@ -388,7 +412,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
     }
   }
 
-  const toggleVisibility = async (widget: any) => {
+  const toggleVisibility = async (widget: Widget) => {
     await handleUpdateWidget(widget.id, { isVisible: !widget.isVisible })
   }
 
@@ -464,7 +488,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
           handleUpdateWidget(update.id, { position: update.position })
         )
       )
-    } catch (error) {
+    } catch (_error) {
       // Revert on error
       fetchWidgets()
       toast({
@@ -482,7 +506,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
     })
   )
 
-  const renderWidget = (widget: any) => {
+  const renderWidget = (widget: Widget) => {
     const widgetProps = {
       config: widget.config,
     }
@@ -724,7 +748,13 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
 }
 
 // Add Widget Dialog Component
-function AddWidgetDialog({ open, onOpenChange, onAdd }: any) {
+interface AddWidgetDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onAdd: (data: WidgetData) => void
+}
+
+function AddWidgetDialog({ open, onOpenChange, onAdd }: AddWidgetDialogProps) {
   const [widgetType, setWidgetType] = useState('')
   const [title, setTitle] = useState('')
   const [width, setWidth] = useState('MEDIUM')
@@ -845,7 +875,14 @@ function AddWidgetDialog({ open, onOpenChange, onAdd }: any) {
 }
 
 // Edit Widget Dialog Component
-function EditWidgetDialog({ open, onOpenChange, widget, onUpdate }: any) {
+interface EditWidgetDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  widget: Widget
+  onUpdate: (updates: Record<string, unknown>) => void
+}
+
+function EditWidgetDialog({ open, onOpenChange, widget, onUpdate }: EditWidgetDialogProps) {
   const [title, setTitle] = useState(widget.title || '')
   const [width, setWidth] = useState(widget.width)
   const [height, setHeight] = useState(widget.height)

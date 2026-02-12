@@ -1,6 +1,5 @@
 import { PublicPageLayout } from '@/components/public-page-layout'
 import { Mail } from 'lucide-react'
-import Link from 'next/link'
 import { ContactForm } from '@/components/contact-form'
 
 export default function ContactPage() {

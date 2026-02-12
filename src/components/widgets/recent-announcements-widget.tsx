@@ -7,10 +7,24 @@ import { MessageSquare, Star, Inbox } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
 
+interface Announcement {
+  id: string
+  title: string
+  content: string
+  important: boolean
+  createdAt: string
+  author?: {
+    user?: {
+      name?: string
+      image?: string
+    }
+  }
+}
+
 interface RecentAnnouncementsWidgetProps {
-  announcements: any[]
+  announcements: Announcement[]
   clubId: string
-  config?: any
+  config?: Record<string, unknown>
 }
 
 export function RecentAnnouncementsWidget({ 

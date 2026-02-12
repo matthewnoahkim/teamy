@@ -51,8 +51,7 @@ export async function POST(req: NextRequest) {
 
       console.log('Refresh subscription - User:', { 
         userId: session.user.id, 
-        email: user?.email, 
-        stripeCustomerId: user?.stripeCustomerId 
+        hasStripeCustomerId: !!user?.stripeCustomerId 
       })
 
       let subscriptions: Stripe.Subscription[] = []
@@ -74,14 +73,14 @@ export async function POST(req: NextRequest) {
 
       // If no subscriptions found by customer ID, try searching by email
       if (subscriptions.length === 0 && user?.email) {
-        console.log(`No subscriptions found by customer ID, searching by email: ${user.email}`)
+        console.log('No subscriptions found by customer ID, searching by email')
         try {
           // Search for customers by email
           const customers = await stripe.customers.list({
             email: user.email,
             limit: 10,
           })
-          console.log(`Found ${customers.data.length} customers with email ${user.email}`)
+          console.log(`Found ${customers.data.length} customers matching user`)
 
           // Check subscriptions for each customer found
           for (const customer of customers.data) {
@@ -116,10 +115,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { 
             error: 'No subscription found. Please complete a subscription first.',
-            debug: {
-              hasCustomerId: !!user?.stripeCustomerId,
-              email: user?.email,
-            }
           },
           { status: 404 }
         )
@@ -204,7 +199,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Prepare update data
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       subscriptionStatus: subscription.status,
       subscriptionType: subscriptionType,
       stripeCustomerId: customerId,
@@ -212,7 +207,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Only set subscriptionEndsAt if current_period_end exists and is valid
-    const currentPeriodEnd = (subscription as any).current_period_end
+    const currentPeriodEnd = (subscription as unknown as Record<string, unknown>).current_period_end
     if (currentPeriodEnd && typeof currentPeriodEnd === 'number') {
       updateData.subscriptionEndsAt = new Date(currentPeriodEnd * 1000)
       console.log(`Setting subscriptionEndsAt to: ${updateData.subscriptionEndsAt.toISOString()}`)
@@ -229,7 +224,6 @@ export async function POST(req: NextRequest) {
       console.log(`Successfully updated user ${session.user.id} subscription status to ${subscription.status}`)
     } catch (dbError) {
       console.error('Database update error:', dbError)
-      console.error('Update data:', JSON.stringify(updateData, null, 2))
       throw dbError
     }
 
@@ -243,22 +237,8 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Verify subscription error:', error)
     
-    if (error && typeof error === 'object' && 'message' in error) {
-      return NextResponse.json(
-        { 
-          error: 'Failed to verify subscription',
-          message: (error as any).message,
-          details: error
-        },
-        { status: 500 }
-      )
-    }
-    
     return NextResponse.json(
-      { 
-        error: 'Failed to verify subscription',
-        message: 'An unexpected error occurred'
-      },
+      { error: 'Failed to verify subscription' },
       { status: 500 }
     )
   }

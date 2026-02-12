@@ -6,7 +6,6 @@ import { requireMember, isAdmin, getUserMembership } from '@/lib/rbac'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
-import { z } from 'zod'
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const ALLOWED_TYPES = [
@@ -34,7 +33,7 @@ export async function GET(req: NextRequest) {
 
     await requireMember(session.user.id, clubId)
 
-    const membership = await getUserMembership(session.user.id, clubId)
+    const _membership = await getUserMembership(session.user.id, clubId)
 
     const forms = await prisma.form.findMany({
       where: { clubId },

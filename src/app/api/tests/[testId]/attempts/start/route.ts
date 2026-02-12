@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getUserMembership, isAdmin } from '@/lib/rbac'
-import { isTestAvailable, getClientIp, generateClientFingerprint, verifyTestPassword } from '@/lib/test-security'
+import { isTestAvailable, getClientIp, verifyTestPassword } from '@/lib/test-security'
 
 // POST /api/tests/[testId]/attempts/start
 export async function POST(
@@ -47,8 +47,8 @@ export async function POST(
       },
     })
 
-    let test: any = null
-    let membership: any = null
+    let test: { id: string; clubId: string; status: string; testPasswordHash: string | null; maxAttempts: number | null; startAt: Date | null; endAt: Date | null; allowLateUntil: Date | null; assignments: Array<{ assignedScope: string; teamId: string | null; targetMembershipId: string | null; eventId: string | null }>; [key: string]: unknown } | null = null
+    let membership: { id: string; teamId?: string | null; clubId: string; rosterAssignments?: Array<{ eventId: string | null }>; [key: string]: unknown } | null = null
     let isAdminUser = false
     let isTournamentTest = false
 
@@ -337,7 +337,7 @@ export async function POST(
         )
       }
       const isValid = await verifyTestPassword(
-        test.testPasswordHash,
+        test.testPasswordHash as string,
         testPassword
       )
       if (!isValid) {
@@ -360,11 +360,11 @@ export async function POST(
     // Check assignment (admins bypass this check, tournament tests bypass this check)
     if (!isAdminUser && !isTournamentTest) {
       const hasAccess = test.assignments.some(
-        (a: any) =>
+        (a) =>
           a.assignedScope === 'CLUB' ||
-          (a.teamId && membership.teamId && a.teamId === membership.teamId) ||
-          a.targetMembershipId === membership.id ||
-          (a.eventId && membership.rosterAssignments?.some((ra: any) => ra.eventId === a.eventId))
+          (a.teamId && membership!.teamId && a.teamId === membership!.teamId) ||
+          a.targetMembershipId === membership!.id ||
+          (a.eventId && membership!.rosterAssignments?.some((ra) => ra.eventId === a.eventId))
       )
 
       if (!hasAccess) {

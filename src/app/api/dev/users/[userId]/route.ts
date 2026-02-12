@@ -71,7 +71,7 @@ export async function DELETE(
               await tx.club.delete({
                 where: { id: club.id },
               })
-            } catch (e) {
+            } catch (_e) {
               // If club deletion fails, we can't proceed with user deletion
               throw new Error(`Cannot delete user: club "${club.name}" has no other members and cannot be transferred`)
             }

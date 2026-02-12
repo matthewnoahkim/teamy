@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useToast } from '@/components/ui/use-toast'
@@ -11,7 +11,6 @@ import {
   Plus, 
   Trash2, 
   Edit, 
-  Calendar as CalendarIcon,
   CheckCircle2,
   Circle,
   AlertTriangle,
@@ -44,9 +43,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Skeleton } from '@/components/ui/skeleton'
 import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { format, isPast, isToday, isTomorrow } from 'date-fns'
 
 interface TodoTabProps {
@@ -110,7 +108,7 @@ const PRIORITY_CONFIG = {
   URGENT: { label: 'Urgent', color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300', icon: AlertTriangle },
 }
 
-export function TodoTab({ clubId, currentMembershipId, user, isAdmin, initialTodos }: TodoTabProps) {
+export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, initialTodos }: TodoTabProps) {
   const { toast } = useToast()
   const [todos, setTodos] = useState<Todo[]>(initialTodos || [])
   const [allTodos, setAllTodos] = useState<Todo[]>([])
@@ -324,7 +322,7 @@ export function TodoTab({ clubId, currentMembershipId, user, isAdmin, initialTod
       if (!response.ok) {
         throw new Error('Failed to update todo')
       }
-    } catch (error) {
+    } catch (_error) {
       // Revert on error by refetching
       toast({
         title: 'Error',
@@ -354,7 +352,7 @@ export function TodoTab({ clubId, currentMembershipId, user, isAdmin, initialTod
       setDeleteDialogOpen(false)
       setSelectedTodo(null)
       fetchTodos()
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to delete todo',
@@ -395,7 +393,7 @@ export function TodoTab({ clubId, currentMembershipId, user, isAdmin, initialTod
     })
   }
 
-  const getDueDateDisplay = (dueDate: string | null) => {
+  const _getDueDateDisplay = (dueDate: string | null) => {
     if (!dueDate) return null
     const date = new Date(dueDate)
     if (isToday(date)) return { text: 'Today', color: 'text-orange-600 dark:text-orange-400' }

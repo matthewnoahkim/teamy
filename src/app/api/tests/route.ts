@@ -3,8 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { isAdmin, getUserMembership } from '@/lib/rbac'
-import { hashTestPassword } from '@/lib/test-security'
-import { Prisma } from '@prisma/client'
+import { Prisma, ScoreReleaseMode } from '@prisma/client'
 import { z } from 'zod'
 
 const questionOptionSchema = z.object({
@@ -49,7 +48,6 @@ const assignmentSchema = z
   })
 
 type AssignmentInput = z.infer<typeof assignmentSchema>
-type QuestionInput = z.infer<typeof questionSchema>
 
 const createTestSchema = z.object({
   clubId: z.string(),
@@ -161,7 +159,7 @@ export async function GET(req: NextRequest) {
     // Admins see everything
     if (isAdminUser) {
       // Remove assignments from response and add createdByMembership
-      const tests = allTests.map(({ assignments, ...test }) => ({
+      const tests = allTests.map(({ assignments: _assignments, ...test }) => ({
         ...test,
         createdByMembership: test.createdByMembershipId ? membershipMap.get(test.createdByMembershipId) : undefined,
       }))
@@ -213,15 +211,15 @@ export async function GET(req: NextRequest) {
     })
 
     // Remove assignments from response and add createdByMembership
-    const tests = filteredTests.map(({ assignments, ...test }) => ({
+    const tests = filteredTests.map(({ assignments: _assignments, ...test }) => ({
       ...test,
       createdByMembership: test.createdByMembershipId ? membershipMap.get(test.createdByMembershipId) : undefined,
     }))
 
     // Batch fetch user attempts for all tests (non-admins only, admins don't need this)
     const testIds = tests.map(t => t.id)
-    let userAttemptsMap = new Map<string, { attemptsUsed: number; maxAttempts: number | null; hasReachedLimit: boolean }>()
-    let noteSheetsMap = new Map<string, { status: string; rejectionReason: string | null }>()
+    const userAttemptsMap = new Map<string, { attemptsUsed: number; maxAttempts: number | null; hasReachedLimit: boolean }>()
+    const noteSheetsMap = new Map<string, { status: string; rejectionReason: string | null }>()
 
     if (!isAdminUser && testIds.length > 0) {
       // Batch fetch all user attempts in one query
@@ -357,7 +355,7 @@ export async function POST(req: NextRequest) {
           requireOneSitting: requireOneSitting ?? true,
           releaseScoresAt: releaseScoresAt ? new Date(releaseScoresAt) : null,
           maxAttempts: maxAttempts ?? null,
-          scoreReleaseMode: (scoreReleaseMode ?? 'FULL_TEST') as any,
+          scoreReleaseMode: (scoreReleaseMode ?? 'FULL_TEST') as ScoreReleaseMode,
           createdByMembershipId: membership.id,
         },
       })

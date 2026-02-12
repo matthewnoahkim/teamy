@@ -170,10 +170,10 @@ export function NoteSheetUpload({
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to upload note sheet',
+        description: error instanceof Error ? error.message : 'Failed to upload note sheet',
         variant: 'destructive',
       })
     } finally {

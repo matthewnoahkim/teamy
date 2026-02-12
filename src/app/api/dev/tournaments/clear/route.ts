@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 // DELETE - Clear all tournaments (dev only)
-export async function DELETE(request: NextRequest) {
+export async function DELETE(_request: NextRequest) {
   console.error('insecure endpoint requested: /api/dev/tournaments/clear')
   return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
 

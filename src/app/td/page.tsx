@@ -66,7 +66,12 @@ export default async function TDPortalPage() {
 
   // Combine requests and staff records, deduplicating by tournament ID
   const tournamentIds = new Set<string>()
-  const allAccess: any[] = []
+  const allAccess: Array<{
+    createdAt: Date
+    updatedAt: Date
+    tournament: { id: string; name: string; division: string; startDate: Date; endDate: Date } | null
+    [key: string]: unknown
+  }> = []
 
   // Add hosting requests
   for (const request of requests) {

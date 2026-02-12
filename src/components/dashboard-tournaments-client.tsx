@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AppHeader } from '@/components/app-header'
 import { useToast } from '@/components/ui/use-toast'
 import { PageLoading } from '@/components/ui/loading-spinner'
-import { Search, Calendar, MapPin, Trophy, Monitor, User, Mail, ExternalLink } from 'lucide-react'
-import { Label } from '@/components/ui/label'
+import { Search, MapPin, Trophy, Monitor, User, Mail, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import { formatDivision } from '@/lib/utils'
 
@@ -63,10 +61,10 @@ export function DashboardTournamentsClient({ user }: DashboardTournamentsClientP
       
       const data = await response.json()
       setTournaments(data.requests || [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load tournaments',
+        description: error instanceof Error ? error.message : 'Failed to load tournaments',
         variant: 'destructive',
       })
     } finally {

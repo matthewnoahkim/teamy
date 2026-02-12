@@ -8,7 +8,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const resolvedParams = await params
+  const _resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -65,10 +65,10 @@ export async function DELETE(
     })
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting resource:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete resource' },
+      { error: error instanceof Error ? error.message : 'Failed to delete resource' },
       { status: 500 }
     )
   }

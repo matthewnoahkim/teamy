@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     const action = validateEnum(searchParams.get('action'), ['CREATE', 'UPDATE', 'DELETE', 'READ'] as const)
     const userEmail = sanitizeSearchQuery(searchParams.get('userEmail'), 200)
 
-    const where: any = {}
+    const where: Record<string, unknown> = {}
     if (action) where.action = action
     if (userEmail) where.userEmail = { contains: userEmail, mode: 'insensitive' }
 

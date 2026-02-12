@@ -34,9 +34,9 @@ export async function GET(
     }
 
     // Safely access new fields that might not exist yet
-    const releaseScoresAt = (test as any).releaseScoresAt
-    const scoreReleaseMode = (test as any).scoreReleaseMode || 'FULL_TEST'
-    const scoresReleasedField = (test as any).scoresReleased
+    const releaseScoresAt = (test as unknown as Record<string, unknown>).releaseScoresAt
+    const scoreReleaseMode = (test as unknown as Record<string, unknown>).scoreReleaseMode || 'FULL_TEST'
+    const scoresReleasedField = (test as unknown as Record<string, unknown>).scoresReleased
 
     // Find user's membership through tournament registration
     const registration = await prisma.tournamentRegistration.findFirst({
@@ -168,13 +168,13 @@ export async function GET(
         ...attemptData,
         gradeEarned: null,
         proctoringScore: null,
-        answers: null as any,
+        answers: null,
       }
     } else if (scoreReleaseMode === 'SCORE_ONLY') {
       // SCORE_ONLY - show only the score
       filteredAttempt = {
         ...attemptData,
-        answers: null as any,
+        answers: null,
       }
     } else if (scoreReleaseMode === 'SCORE_WITH_WRONG') {
       // SCORE_WITH_WRONG - show score and wrong answers only

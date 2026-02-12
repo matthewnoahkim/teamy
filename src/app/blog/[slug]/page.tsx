@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, User } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Logo } from '@/components/logo'
 import { HomeNav } from '@/components/home-nav'
 import { format } from 'date-fns'
@@ -63,8 +64,8 @@ export default async function BlogPostPage({ params }: Props) {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground grid-pattern">
       {/* Header */}
-      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
-        <div className="container mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-2 overflow-x-auto">
+      <header className="sticky top-4 z-50 mx-2 sm:mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
+        <div className="container mx-auto px-3 sm:px-6 py-4 flex items-center justify-between gap-2">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">
             <HomeNav 
@@ -98,10 +99,14 @@ export default async function BlogPostPage({ params }: Props) {
           {/* Cover Image */}
           {post.coverImage && (
             <div className="mb-8 rounded-2xl overflow-hidden shadow-card">
-              <img
+              <Image
                 src={post.coverImage}
                 alt={post.title}
+                width={1200}
+                height={640}
+                sizes="(max-width: 768px) 100vw, 768px"
                 className="w-full h-64 md:h-80 object-cover"
+                priority
               />
             </div>
           )}

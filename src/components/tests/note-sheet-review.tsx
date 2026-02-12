@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -16,6 +16,23 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { CheckCircle2, XCircle, FileText, User, Clock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+function sanitizeNoteSheetHtml(html: string): string {
+  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+  sanitized = sanitized.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  sanitized = sanitized.replace(/(href|src)\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, '$1=""')
+  return sanitized
+}
+
+function SanitizedHtml({ html, className }: { html: string; className?: string }) {
+  const sanitized = useMemo(() => sanitizeNoteSheetHtml(html), [html])
+  return (
+    <div
+      dangerouslySetInnerHTML={{ __html: sanitized }}
+      className={className}
+    />
+  )
+}
 
 interface NoteSheetReviewProps {
   open: boolean
@@ -91,10 +108,10 @@ export function NoteSheetReview({
       }
       const data = await response.json()
       setNoteSheets(data.noteSheets || [])
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load note sheets',
+        description: error instanceof Error ? error.message : 'Failed to load note sheets',
         variant: 'destructive',
       })
     } finally {
@@ -149,10 +166,10 @@ export function NoteSheetReview({
       setRejectionReason('')
       setReviewingId(null)
       await fetchNoteSheets()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to review note sheet',
+        description: error instanceof Error ? error.message : 'Failed to review note sheet',
         variant: 'destructive',
       })
     } finally {
@@ -231,10 +248,7 @@ export function NoteSheetReview({
                   <CardContent className="space-y-4">
                     {noteSheet.type === 'CREATED' ? (
                       <div className="border rounded-lg p-4 bg-muted/50 max-h-96 overflow-auto">
-                        <div
-                          dangerouslySetInnerHTML={{ __html: noteSheet.content || '' }}
-                          className="prose prose-sm max-w-none"
-                        />
+                        <SanitizedHtml html={noteSheet.content || ''} className="prose prose-sm max-w-none" />
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">

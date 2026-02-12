@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const division = searchParams.get('division') as 'B' | 'C' | null
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       approved: true,
       published: true, // Only show published tournaments
       // Show all tournaments (past and upcoming)
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     // Use hosting request division for display if available (supports "B&C")
     const tournamentsWithDisplayDivision = tournaments.map(t => ({
       ...t,
-      division: (t.hostingRequest?.division || t.division) as any,
+      division: (t.hostingRequest?.division || t.division) as string,
     }))
 
     return NextResponse.json({ tournaments: tournamentsWithDisplayDivision })

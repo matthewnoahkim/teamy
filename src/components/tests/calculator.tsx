@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { X, Minimize2, Calculator as CalcIcon, GripVertical, Maximize2 } from 'lucide-react'
+import { X, Minimize2, Calculator as CalcIcon, GripVertical } from 'lucide-react'
 
 type CalculatorType = 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING'
 
@@ -23,13 +23,17 @@ interface Position {
 const DESMOS_API_KEY = process.env.NEXT_PUBLIC_DESMOS_API_KEY || ''
 
 // TypeScript declaration for Desmos
+interface DesmosCalculatorInstance {
+  destroy: () => void
+  getState: () => Record<string, unknown>
+  setState: (state: Record<string, unknown>) => void
+  [key: string]: unknown
+}
+
 declare global {
   interface Window {
     Desmos?: {
-      GraphingCalculator: (element: HTMLElement, options?: any) => {
-        destroy: () => void
-        [key: string]: any
-      }
+      GraphingCalculator: (element: HTMLElement, options?: Record<string, unknown>) => DesmosCalculatorInstance
     }
   }
 }
@@ -45,11 +49,11 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
   // Track last operation and operand for repeating equals
   const [lastOperation, setLastOperation] = useState<string | null>(null)
   const [lastOperand, setLastOperand] = useState<number | null>(null)
-  const desmosCalculatorRef = useRef<any>(null)
+  const desmosCalculatorRef = useRef<DesmosCalculatorInstance | null>(null)
   const desmosContainerRef = useRef<HTMLDivElement>(null)
   const [desmosLoaded, setDesmosLoaded] = useState(false)
   const [desmosInitialized, setDesmosInitialized] = useState(false)
-  const savedDesmosStateRef = useRef<any>(null)
+  const savedDesmosStateRef = useRef<Record<string, unknown> | null>(null)
   const [desmosLoadStartTime, setDesmosLoadStartTime] = useState<number | null>(null)
   const [showScientificFallback, setShowScientificFallback] = useState(false)
   const [calculatorSize, setCalculatorSize] = useState<{ width: number; height: number }>(() => {
@@ -454,7 +458,7 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
         return
       }
 
-      const startTime = Date.now()
+      const _startTime = Date.now()
       const script = document.createElement('script')
       // Use the latest API version and add cache-busting only if needed
       script.src = `https://www.desmos.com/api/v1.8/calculator.js?apiKey=${DESMOS_API_KEY}`
@@ -909,10 +913,11 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
         if (b === 0) return 'Error'
         return a / b
       case '^': 
-      case 'xʸ': 
+      case 'xʸ': {
         const result = Math.pow(a, b)
         if (isNaN(result) || !isFinite(result)) return 'Error'
         return result
+      }
       default: return b
     }
   }
@@ -1092,7 +1097,7 @@ export function Calculator({ type, open, onOpenChange }: CalculatorProps) {
     setNewNumber(true)
   }
 
-  const memoryClear = () => {
+  const _memoryClear = () => {
     setMemory(0)
   }
 

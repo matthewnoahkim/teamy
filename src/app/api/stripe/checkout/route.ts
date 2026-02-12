@@ -116,43 +116,16 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Stripe checkout error:', error)
     
-    // Handle Stripe-specific errors
+    // Handle Stripe-specific errors without leaking internal details
     if (error && typeof error === 'object') {
-      const err = error as any
+      const err = error as { type?: string; message?: string; code?: string }
       
-      // Check if it's a Stripe error
-      if (err.type && err.message) {
-        // Common Stripe errors
-        if (err.code === 'resource_missing' || err.message.includes('No such price')) {
-          return NextResponse.json(
-            { 
-              error: 'Invalid Price ID',
-              message: 'The Price ID is invalid. Please create a product in Stripe Dashboard and update NEXT_PUBLIC_STRIPE_PRO_PRICE_ID in your .env.local file.'
-            },
-            { status: 400 }
-          )
-        }
-        
+      if (err.code === 'resource_missing' || err.message?.includes('No such price')) {
         return NextResponse.json(
-          { 
-            error: 'Stripe error occurred',
-            message: err.message || 'Unknown Stripe error',
-            type: err.type,
-            code: err.code
-          },
-          { status: 500 }
+          { error: 'Invalid pricing configuration. Please contact support.' },
+          { status: 400 }
         )
       }
-    }
-    
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { 
-          error: 'Failed to create checkout session',
-          message: error.message
-        },
-        { status: 500 }
-      )
     }
     
     return NextResponse.json(

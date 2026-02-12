@@ -3,8 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getUserMembership } from '@/lib/rbac'
-import { Prisma } from '@prisma/client'
-import { Role } from '@prisma/client'
+import { Prisma, Role, ScoreReleaseMode } from '@prisma/client'
 import { z } from 'zod'
 
 // Reuse the exact same schemas from /api/tests/route.ts
@@ -45,7 +44,7 @@ const createTestSchema = z.object({
   questions: z.array(questionSchema).optional(),
 })
 
-type QuestionInput = z.infer<typeof questionSchema>
+type _QuestionInput = z.infer<typeof questionSchema>
 
 // Helper to check if user is tournament admin
 async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
@@ -171,7 +170,7 @@ export async function POST(
           autoApproveNoteSheet: allowNoteSheet ? (autoApproveNoteSheet ?? true) : true,
           releaseScoresAt: releaseScoresAt ? new Date(releaseScoresAt) : null,
           maxAttempts: maxAttempts ?? null,
-          scoreReleaseMode: (scoreReleaseMode ?? 'FULL_TEST') as any,
+          scoreReleaseMode: (scoreReleaseMode ?? 'FULL_TEST') as ScoreReleaseMode,
           createdByMembershipId: membership.id,
         },
       })

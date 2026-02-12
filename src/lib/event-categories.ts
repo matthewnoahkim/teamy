@@ -89,10 +89,10 @@ export function getEventCategory(slug: string, division: 'B' | 'C'): EventCatego
   return categories[slug] || null
 }
 
-export function groupEventsByCategory(events: any[], division: 'B' | 'C') {
+export function groupEventsByCategory<T extends { slug: string }>(events: T[], division: 'B' | 'C') {
   const categories = division === 'B' ? divisionBCategories : divisionCCategories
   
-  const grouped: Record<EventCategory, any[]> = {
+  const grouped: Record<EventCategory, T[]> = {
     'Life, Personal & Social Science': [],
     'Earth and Space Science': [],
     'Physical Science & Chemistry': [],

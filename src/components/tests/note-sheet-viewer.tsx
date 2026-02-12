@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,7 +10,26 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { FileText, X } from 'lucide-react'
+import { FileText } from 'lucide-react'
+
+function sanitizeNoteSheetHtml(html: string): string {
+  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+  sanitized = sanitized.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  sanitized = sanitized.replace(/(href|src)\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, '$1=""')
+  return sanitized
+}
+
+function NoteSheetContent({ content }: { content: string }) {
+  const sanitized = useMemo(() => sanitizeNoteSheetHtml(content), [content])
+  return (
+    <div className="border rounded-lg p-6 bg-white">
+      <div
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+        className="prose prose-sm max-w-none"
+      />
+    </div>
+  )
+}
 
 interface NoteSheetViewerProps {
   testId: string
@@ -19,7 +38,13 @@ interface NoteSheetViewerProps {
 export function NoteSheetViewer({ testId }: NoteSheetViewerProps) {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
-  const [noteSheet, setNoteSheet] = useState<any>(null)
+  const [noteSheet, setNoteSheet] = useState<{
+    type: string
+    content?: string
+    filePath?: string
+    filename?: string
+    status: string
+  } | null>(null)
   const [loading, setLoading] = useState(false)
 
   const fetchNoteSheet = async () => {
@@ -57,10 +82,10 @@ export function NoteSheetViewer({ testId }: NoteSheetViewerProps) {
           variant: 'destructive',
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load note sheet',
+        description: error instanceof Error ? error.message : 'Failed to load note sheet',
         variant: 'destructive',
       })
     } finally {
@@ -89,12 +114,8 @@ export function NoteSheetViewer({ testId }: NoteSheetViewerProps) {
 
           <div className="flex-1 overflow-auto">
             {noteSheet?.type === 'CREATED' ? (
-              <div className="border rounded-lg p-6 bg-white">
-                <div
-                  dangerouslySetInnerHTML={{ __html: noteSheet.content || '' }}
-                  className="prose prose-sm max-w-none"
-                />
-              </div>
+              <NoteSheetContent content={noteSheet.content || ''} />
+            
             ) : noteSheet?.type === 'UPLOADED' ? (
               <div className="w-full h-full">
                 {noteSheet.filePath ? (

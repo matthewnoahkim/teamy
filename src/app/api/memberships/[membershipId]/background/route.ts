@@ -66,7 +66,7 @@ export async function PATCH(
 
     const targetType = validated.backgroundType ?? 'grid'
 
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       backgroundType: targetType,
     }
 

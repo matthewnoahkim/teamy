@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { Download, X, File } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 interface Attachment {
   id: string

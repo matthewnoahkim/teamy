@@ -43,9 +43,9 @@ interface Tournament {
   } | null
 }
 
-export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournamentsPageProps) {
+export function HostingTournamentsPage({ isLoggedIn: _isLoggedIn = false }: HostingTournamentsPageProps) {
   const { toast } = useToast()
-  const router = useRouter()
+  const _router = useRouter()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -175,7 +175,7 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
     // Validate phone number format if provided
     if (formData.directorPhone && formData.directorPhone.trim()) {
       // Allow various phone number formats: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890, +1 123 456 7890, etc.
-      const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}[-\s\.]?[0-9]{1,9}$/
+      const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}[-\s.]?[0-9]{1,9}$/
       const digitsOnly = formData.directorPhone.replace(/\D/g, '')
       if (digitsOnly.length < 10 || digitsOnly.length > 15 || !phoneRegex.test(formData.directorPhone)) {
         setPhoneError('Please enter a valid phone number (e.g., (555) 123-4567 or 555-123-4567)')
@@ -792,7 +792,7 @@ export function HostingTournamentsPage({ isLoggedIn = false }: HostingTournament
                                       setFormData({ ...formData, directorPhone: phone })
                                       // Validate phone number format if provided
                                       if (phone.trim()) {
-                                        const phoneRegex = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}[-\s\.]?[0-9]{1,9}$/
+                                        const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}[-\s.]?[0-9]{1,9}$/
                                         const digitsOnly = phone.replace(/\D/g, '')
                                         if (digitsOnly.length < 10 || digitsOnly.length > 15 || !phoneRegex.test(phone)) {
                                           setPhoneError('Please enter a valid phone number (e.g., (555) 123-4567 or 555-123-4567)')

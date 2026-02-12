@@ -1,7 +1,6 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LogOut, Pencil, Settings, CreditCard, ChevronDown, Plus, Users as UsersIcon } from 'lucide-react'
@@ -43,7 +42,7 @@ interface AppHeaderProps {
   currentPath?: string // Current path for highlighting active button
 }
 
-export function AppHeader({ user, showBackButton = false, backHref, title, clubId, clubs, allClubs, onClubChange, showCustomizationBilling: showCustomizationBillingProp, currentPath }: AppHeaderProps) {
+export function AppHeader({ user, showBackButton: _showBackButton = false, backHref: _backHref, title, clubId, clubs, allClubs, onClubChange: _onClubChange, showCustomizationBilling: showCustomizationBillingProp, currentPath }: AppHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
@@ -59,6 +58,15 @@ export function AppHeader({ user, showBackButton = false, backHref, title, clubI
   const currentClub = clubs?.find(c => c.id === clubId)
   const effectiveClubs = clubs || allClubs || []
   const effectivePath = currentPath || pathname
+
+  useEffect(() => {
+    // Warm route cache for quick club switching.
+    for (const club of effectiveClubs) {
+      if (club.id !== clubId) {
+        router.prefetch(`/club/${club.id}`)
+      }
+    }
+  }, [effectiveClubs, clubId, router])
 
   const handleSignOut = async () => {
     try {
@@ -78,8 +86,8 @@ export function AppHeader({ user, showBackButton = false, backHref, title, clubI
 
   return (
     <>
-      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl" suppressHydrationWarning>
-        <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
+      <header className="sticky top-4 z-50 mx-2 sm:mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl" suppressHydrationWarning>
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 md:gap-4 min-w-0">
             <Logo size="md" className="flex-shrink-0" href="/" variant="light" />
             

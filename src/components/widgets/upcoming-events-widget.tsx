@@ -6,10 +6,18 @@ import { Calendar, MapPin, Clock, CalendarDays } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 
+interface CalendarEvent {
+  id: string
+  title: string
+  startUTC: string
+  location?: string
+  scope?: string
+}
+
 interface UpcomingEventsWidgetProps {
-  events: any[]
+  events: CalendarEvent[]
   clubId: string
-  config?: any
+  config?: Record<string, unknown>
 }
 
 export function UpcomingEventsWidget({ 

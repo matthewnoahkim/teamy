@@ -16,7 +16,7 @@ if (stripeSecretKey) {
 }
 
 // Stripe webhook secret for verifying webhook signatures
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
 // Disable body parsing for webhook - Stripe needs raw body for signature verification
 export const runtime = 'nodejs'
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
             try {
               const subscription = await stripe.subscriptions.retrieve(subscriptionId)
               
-              const updateData: any = {
+              const updateData: Record<string, unknown> = {
                 subscriptionStatus: subscription.status,
                 subscriptionType: subscriptionType,
                 stripeCustomerId: session.customer as string,
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
               }
 
               // Only set subscriptionEndsAt if current_period_end exists and is valid
-              const currentPeriodEnd = (subscription as any).current_period_end
+              const currentPeriodEnd = (subscription as unknown as Record<string, unknown>).current_period_end
               if (currentPeriodEnd && typeof currentPeriodEnd === 'number') {
                 updateData.subscriptionEndsAt = new Date(currentPeriodEnd * 1000)
               }
@@ -128,12 +128,12 @@ export async function POST(req: NextRequest) {
         })
         
         if (user) {
-          const updateData: any = {
+          const updateData: Record<string, unknown> = {
             subscriptionStatus: subscription.status,
           }
 
           // Only set subscriptionEndsAt if current_period_end exists and is valid
-          const currentPeriodEnd = (subscription as any).current_period_end
+          const currentPeriodEnd = (subscription as unknown as Record<string, unknown>).current_period_end
           if (currentPeriodEnd && typeof currentPeriodEnd === 'number') {
             updateData.subscriptionEndsAt = new Date(currentPeriodEnd * 1000)
           }
@@ -158,12 +158,12 @@ export async function POST(req: NextRequest) {
         })
         
         if (user) {
-          const updateData: any = {
+          const updateData: Record<string, unknown> = {
             subscriptionStatus: 'canceled',
           }
 
           // Only set subscriptionEndsAt if current_period_end exists and is valid
-          const currentPeriodEnd = (subscription as any).current_period_end
+          const currentPeriodEnd = (subscription as unknown as Record<string, unknown>).current_period_end
           if (currentPeriodEnd && typeof currentPeriodEnd === 'number') {
             updateData.subscriptionEndsAt = new Date(currentPeriodEnd * 1000)
           }

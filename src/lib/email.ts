@@ -4,6 +4,18 @@ const resendApiKey = process.env.RESEND_API_KEY
 const resend = resendApiKey ? new Resend(resendApiKey) : null
 
 /**
+ * Escape HTML special characters to prevent XSS/injection in email templates
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+/**
  * Get the base URL for the app.
  * Uses NEXTAUTH_URL if set, otherwise VERCEL_URL for production, or localhost for development.
  */
@@ -62,13 +74,13 @@ export async function sendStaffInviteEmail({
       : `${baseUrl}/td?token=${inviteToken}`
 
     const roleLabel = role === 'EVENT_SUPERVISOR' ? 'Event Supervisor' : 'Tournament Director'
-    const greeting = staffName ? `Hi ${staffName},` : 'Hello,'
+    const greeting = staffName ? `Hi ${escapeHtml(staffName)},` : 'Hello,'
 
     const eventsSection = events.length > 0 ? `
       <div style="background-color: #f3f4f6; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0; border-radius: 4px;">
         <h3 style="color: #1f2937; font-size: 14px; margin-top: 0; margin-bottom: 8px;">Assigned Events:</h3>
         <ul style="color: #374151; font-size: 14px; margin: 0; padding-left: 20px;">
-          ${events.map(e => `<li style="margin: 4px 0;">${e}</li>`).join('')}
+          ${events.map(e => `<li style="margin: 4px 0;">${escapeHtml(e)}</li>`).join('')}
         </ul>
       </div>
     ` : ''
@@ -86,7 +98,7 @@ export async function sendStaffInviteEmail({
       html: `
         <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-top: 0;">
-            ${roleLabel} Invitation
+            ${escapeHtml(roleLabel)} Invitation
           </h1>
           
           <p style="color: #374151; font-size: 16px; line-height: 1.6;">
@@ -94,7 +106,7 @@ export async function sendStaffInviteEmail({
           </p>
           
           <p style="color: #374151; font-size: 16px; line-height: 1.6;">
-            <strong>${inviterName}</strong> has invited you to join <strong>${tournamentName}</strong> as a ${roleLabel}.
+            <strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${escapeHtml(tournamentName)}</strong> as a ${escapeHtml(roleLabel)}.
           </p>
           
           ${eventsSection}
@@ -223,7 +235,7 @@ export async function sendAnnouncementEmail({
   clubName,
   title,
   content,
-  announcementId,
+  announcementId: _announcementId,
   calendarEvent,
 }: SendAnnouncementEmailParams): Promise<{ messageId: string | null }> {
   try {
@@ -251,8 +263,8 @@ export async function sendAnnouncementEmail({
         <div style="background-color: #f3f4f6; border-left: 4px solid #3b82f6; padding: 16px; margin-bottom: 24px; border-radius: 4px;">
           <h2 style="color: #1f2937; font-size: 16px; margin-top: 0; margin-bottom: 12px;">📅 Event Details</h2>
           <div style="color: #374151; font-size: 14px; line-height: 1.8;">
-            <p style="margin: 8px 0;"><strong>When:</strong> ${formattedTime}</p>
-            ${calendarEvent.location ? `<p style="margin: 8px 0;"><strong>Where:</strong> ${calendarEvent.location}</p>` : ''}
+            <p style="margin: 8px 0;"><strong>When:</strong> ${escapeHtml(formattedTime)}</p>
+            ${calendarEvent.location ? `<p style="margin: 8px 0;"><strong>Where:</strong> ${escapeHtml(calendarEvent.location)}</p>` : ''}
           </div>
           ${calendarEvent.rsvpEnabled ? `
           <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #d1d5db;">
@@ -282,16 +294,16 @@ export async function sendAnnouncementEmail({
       html: `
         <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-top: 0;">
-            ${title}
+            ${escapeHtml(title)}
           </h1>
           <p style="color: #6b7280; font-size: 14px; margin-bottom: 24px;">
-            Posted in <strong>${clubName}</strong>
+            Posted in <strong>${escapeHtml(clubName)}</strong>
           </p>
           
           ${eventDetailsHtml}
           
           <div style="color: #374151; line-height: 1.6; white-space: pre-wrap; margin-bottom: 32px;">
-            ${content}
+            ${escapeHtml(content)}
           </div>
           
           <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;" />

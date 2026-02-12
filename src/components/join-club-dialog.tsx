@@ -61,10 +61,10 @@ export function JoinClubDialog({ open, onOpenChange, initialCode = '' }: JoinClu
       router.refresh()
       // Navigate to the club
       router.push(`/club/${data.membership.club.id}`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to join club. Please check the invite code.',
+        description: error instanceof Error ? error.message : 'Failed to join club. Please check the invite code.',
         variant: 'destructive',
       })
     } finally {

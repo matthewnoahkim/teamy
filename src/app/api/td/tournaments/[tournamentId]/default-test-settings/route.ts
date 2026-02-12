@@ -133,7 +133,7 @@ export async function PATCH(
     const validated = updateDefaultTestSettingsSchema.parse(processedBody)
 
     // Build update data
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (validated.defaultDurationMinutes !== undefined) {
       updateData.defaultDurationMinutes = validated.defaultDurationMinutes
     }

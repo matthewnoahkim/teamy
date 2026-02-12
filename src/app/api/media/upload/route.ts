@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, getUserMembership } from '@/lib/rbac'
+import { requireMember } from '@/lib/rbac'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
@@ -56,10 +56,23 @@ export async function POST(req: NextRequest) {
 
     const mediaType = isImage ? 'IMAGE' : 'VIDEO'
 
+    // Derive extension from validated MIME type (not user-supplied filename) to prevent path traversal
+    const MIME_TO_EXT: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'video/mp4': 'mp4',
+      'video/webm': 'webm',
+      'video/quicktime': 'mov',
+      'video/x-msvideo': 'avi',
+    }
+
     // Generate unique filename
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 15)
-    const extension = file.name.split('.').pop()
+    const extension = MIME_TO_EXT[file.type] || 'bin'
     const filename = `${timestamp}-${randomString}.${extension}`
 
     // Create uploads directory if it doesn't exist

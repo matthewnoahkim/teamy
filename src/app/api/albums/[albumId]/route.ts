@@ -16,7 +16,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ albumId: string }> }
 ) {
-  const resolvedParams = await params
+  const _resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -75,7 +75,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ albumId: string }> }
 ) {
-  const resolvedParams = await params
+  const _resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {

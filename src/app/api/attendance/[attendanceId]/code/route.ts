@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/rbac'
-import { isWithinMeetingWindow, generateAttendanceCode, hashAttendanceCode } from '@/lib/attendance'
+import { isWithinMeetingWindow } from '@/lib/attendance'
 
 // GET /api/attendance/[attendanceId]/code
 // Reveal the attendance code (admins only, during meeting window)

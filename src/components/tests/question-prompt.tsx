@@ -14,7 +14,7 @@ function parseMarkdownTable(markdown: string): { headers: string[]; rows: string
 }
 
 // Component to render markdown prompt with images and tables
-export function QuestionPrompt({ promptMd, className = '', imageLayout = 'stacked' }: { promptMd: string | null | undefined; className?: string; imageLayout?: 'stacked' | 'side-by-side' }) {
+export function QuestionPrompt({ promptMd, className: _className = '', imageLayout = 'stacked' }: { promptMd: string | null | undefined; className?: string; imageLayout?: 'stacked' | 'side-by-side' }) {
   // Handle null/undefined promptMd
   if (!promptMd) {
     return null
@@ -22,8 +22,8 @@ export function QuestionPrompt({ promptMd, className = '', imageLayout = 'stacke
 
   // Split content into text, image, and table parts
   const parseContent = (content: string) => {
-    const imageRegex = /!\[([^\]]*)\]\((data:image\/[^)]+)\)/g
-    const tableRegex = /(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|(?:\r?\n(?!\r?\n))?)+)/g
+    const _imageRegex = /!\[([^\]]*)\]\((data:image\/[^)]+)\)/g
+    const _tableRegex = /(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|(?:\r?\n(?!\r?\n))?)+)/g
     const parts: Array<{ type: 'text' | 'image' | 'table'; content: string; src?: string; alt?: string; tableMarkdown?: string }> = []
     
     // Create a combined regex to find both images and tables in order

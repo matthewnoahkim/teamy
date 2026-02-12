@@ -30,31 +30,25 @@ import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
-  AlertCircle,
   ChevronDown,
   ChevronUp,
   Eye,
   Image as ImageIcon,
-  Lock,
-  Play,
   Plus,
-  ShieldAlert,
   Trash2,
-  Users,
   Send,
   ArrowUp,
   ArrowDown,
   GripVertical,
   LayoutGrid,
   LayoutList,
-  Upload,
   Sparkles,
   Table as TableIcon,
 } from 'lucide-react'
 import { DuplicateTestButton } from '@/components/tests/duplicate-test-button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { QuestionPrompt } from '@/components/tests/question-prompt'
-import { ImportedQuestion, ImportedQuestionType } from '@/lib/import-types'
+import { ImportedQuestion } from '@/lib/import-types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 type QuestionType = 'MCQ_SINGLE' | 'MCQ_MULTI' | 'LONG_TEXT' | 'FILL_BLANK' | 'TEXT_BLOCK' | 'TRUE_FALSE'
@@ -127,6 +121,11 @@ interface NewTestBuilderProps {
     allowNoteSheet: boolean
     noteSheetInstructions: string | null
     status: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
+    startAt?: Date | string | null
+    endAt?: Date | string | null
+    allowLateUntil?: Date | string | null
+    autoApproveNoteSheet?: boolean
+    requireOneSitting?: boolean
     assignments: Array<{
       assignedScope: 'CLUB' | 'TEAM' | 'PERSONAL'
       teamId: string | null
@@ -147,6 +146,21 @@ interface NewTestBuilderProps {
       }>
     }>
   }
+}
+
+interface DefaultTestSettings {
+  defaultStartAt?: string | null
+  defaultEndAt?: string | null
+  defaultReleaseScoresAt?: string | null
+  defaultMaxAttempts?: number | null
+  defaultScoreReleaseMode?: 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST'
+  defaultRequireFullscreen?: boolean | null
+  defaultDurationMinutes?: number | null
+  defaultRequireOneSitting?: boolean | null
+  defaultAllowCalculator?: boolean | null
+  defaultCalculatorType?: 'FOUR_FUNCTION' | 'SCIENTIFIC' | 'GRAPHING' | null
+  defaultAllowNoteSheet?: boolean | null
+  defaultAutoApproveNoteSheet?: boolean | null
 }
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024 // 2MB
@@ -298,7 +312,7 @@ function removeImageMarkdown(content: string): string {
 }
 
 // Remove table markdown from content for textarea display
-function removeTableMarkdown(content: string): string {
+function _removeTableMarkdown(content: string): string {
   return content.replace(/(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|[\r\n]*)+)/g, '').trim()
 }
 
@@ -321,7 +335,7 @@ function reconstructMarkdown(
 function generateMarkdownTable(rows: number, cols: number): string {
   const header = '| ' + Array(cols).fill('').join(' | ') + ' |'
   const separator = '| ' + Array(cols).fill('---').join(' | ') + ' |'
-  const body = Array(rows - 1).fill(0).map((_, rowIdx) => 
+  const body = Array(rows - 1).fill(0).map((_, _rowIdx) => 
     '| ' + Array(cols).fill('').join(' | ') + ' |'
   ).join('\n')
   return `${header}\n${separator}\n${body}`
@@ -334,7 +348,7 @@ export function NewTestBuilder({
   teams, 
   tournamentId, 
   tournamentName, 
-  tournamentDivision, 
+  tournamentDivision: _tournamentDivision, 
   esMode,
   staffMembershipId,
   eventId: initialEventId,
@@ -355,7 +369,7 @@ export function NewTestBuilder({
   const [addToCalendar, setAddToCalendar] = useState(false)
   const [events, setEvents] = useState<Array<{ id: string; name: string }>>([])
   const [loadingEvents, setLoadingEvents] = useState(false)
-  const [defaultTestSettings, setDefaultTestSettings] = useState<any>(null)
+  const [defaultTestSettings, setDefaultTestSettings] = useState<DefaultTestSettings | null>(null)
   const [loadingDefaults, setLoadingDefaults] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importStartTime, setImportStartTime] = useState<number | null>(null)
@@ -376,8 +390,8 @@ export function NewTestBuilder({
   }
 
   const [publishFormData, setPublishFormData] = useState({
-    startAt: (test as any)?.startAt ? formatDateTimeLocal((test as any).startAt) : '',
-    endAt: (test as any)?.endAt ? formatDateTimeLocal((test as any).endAt) : '',
+    startAt: test?.startAt ? formatDateTimeLocal(test.startAt) : '',
+    endAt: test?.endAt ? formatDateTimeLocal(test.endAt) : '',
     testPassword: '',
     testPasswordConfirm: '',
     releaseScoresAt: '',
@@ -387,7 +401,7 @@ export function NewTestBuilder({
       ? Boolean(test.requireFullscreen)
       : Boolean(tournamentId),
   })
-  const [hasFixedWindow, setHasFixedWindow] = useState((test as any)?.startAt !== null && (test as any)?.startAt !== undefined && (test as any)?.endAt !== null && (test as any)?.endAt !== undefined)
+  const [hasFixedWindow, setHasFixedWindow] = useState(test?.startAt !== null && test?.startAt !== undefined && test?.endAt !== null && test?.endAt !== undefined)
   const [dateTimeErrors, setDateTimeErrors] = useState<{ startAt?: string; endAt?: string }>({})
 
   const isEditMode = !!test
@@ -424,9 +438,9 @@ export function NewTestBuilder({
     calculatorType: test?.calculatorType || null,
     allowNoteSheet: test?.allowNoteSheet || false,
     noteSheetInstructions: test?.noteSheetInstructions || '',
-    autoApproveNoteSheet: (test as any)?.autoApproveNoteSheet ?? true,
-    requireOneSitting: (test as any)?.requireOneSitting !== undefined && (test as any).requireOneSitting !== null 
-      ? (test as any).requireOneSitting 
+    autoApproveNoteSheet: test?.autoApproveNoteSheet ?? true,
+    requireOneSitting: test?.requireOneSitting !== undefined && test?.requireOneSitting !== null 
+      ? test.requireOneSitting 
       : (tournamentId ? true : false),
   })
 
@@ -748,11 +762,11 @@ export function NewTestBuilder({
           title: 'Questions imported successfully!',
           description: `Imported ${mappedQuestions.length} question${mappedQuestions.length === 1 ? '' : 's'} from ${file.name}. Please review and check for any mistakes or formatting issues before publishing.`,
         })
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error importing docx:', error)
         toast({
           title: 'Import failed',
-          description: error.message || 'Failed to import questions from docx',
+          description: error instanceof Error ? error.message : 'Failed to import questions from docx',
           variant: 'destructive',
         })
       } finally {
@@ -764,7 +778,7 @@ export function NewTestBuilder({
     input.click()
   }
 
-  const handleImageEmbed = (questionId: string, field: 'context' | 'prompt', file: File, cursorPosition: number | null = null) => {
+  const handleImageEmbed = (questionId: string, field: 'context' | 'prompt', file: File, _cursorPosition: number | null = null) => {
     if (file.size > MAX_IMAGE_SIZE) {
       toast({
         title: 'Image too large',
@@ -779,7 +793,7 @@ export function NewTestBuilder({
       const dataUrl = reader.result as string
       updateQuestion(questionId, (question) => {
         const existing = question[field]
-        const imageMarkdown = `![${file.name}](${dataUrl})`
+        const _imageMarkdown = `![${file.name}](${dataUrl})`
         
         // Get existing images BEFORE we modify anything
         const existingImages = extractImages(existing)
@@ -881,7 +895,7 @@ export function NewTestBuilder({
 
     // Update test details with defaults
     setDetails(prev => {
-      const updates: any = {}
+      const updates: Partial<typeof prev> = {}
       
       // Duration
       if (defaultTestSettings.defaultDurationMinutes && (!prev.durationMinutes || prev.durationMinutes === 60)) {
@@ -1036,7 +1050,7 @@ export function NewTestBuilder({
   }, [draftValidation.errors, assignmentMode, selectedTeams, selectedEventId])
 
   // Use publish validation for backward compatibility with existing code that references validationSummary
-  const validationSummary = publishValidation
+  const _validationSummary = publishValidation
 
   const composePrompt = (question: QuestionDraft) => {
     const context = question.context.trim()
@@ -1115,11 +1129,13 @@ export function NewTestBuilder({
       assignments,
       questions: questions.map((question, index) => {
         // Map frontend types to backend types
-        let backendType: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'LONG_TEXT' | 'SHORT_TEXT' | 'NUMERIC' = question.type as any
+        let backendType: 'MCQ_SINGLE' | 'MCQ_MULTI' | 'LONG_TEXT' | 'SHORT_TEXT' | 'NUMERIC'
         if (question.type === 'TRUE_FALSE') {
           backendType = 'MCQ_SINGLE'
         } else if (question.type === 'FILL_BLANK' || question.type === 'TEXT_BLOCK') {
           backendType = 'SHORT_TEXT'
+        } else {
+          backendType = question.type
         }
         
         // For fill-in-the-blank, store blankAnswers and blankPoints in explanation field as JSON
@@ -1170,7 +1186,7 @@ export function NewTestBuilder({
         // Use ES API if in ES mode, otherwise use regular test API
         let updateUrl: string
         let updateMethod: string
-        let updatePayload: any
+        let updatePayload: Record<string, unknown>
         
         if (esMode && staffMembershipId) {
           // ES Mode - use ES API with PUT method
@@ -1183,16 +1199,15 @@ export function NewTestBuilder({
           // Build questions array for ES API
           // When andPublish is true, don't set dates yet - they'll be set when the publish dialog's "Publish" button is clicked
           // When andPublish is false, preserve existing dates from the test
-          const testWithDates = test as any
           const startAtISO = andPublish 
             ? undefined // Don't set dates when opening publish dialog - wait for actual publish
-            : (testWithDates.startAt ? new Date(testWithDates.startAt).toISOString() : undefined)
+            : (test.startAt ? new Date(test.startAt).toISOString() : undefined)
           const endAtISO = andPublish 
             ? undefined // Don't set dates when opening publish dialog - wait for actual publish
-            : (testWithDates.endAt ? new Date(testWithDates.endAt).toISOString() : undefined)
+            : (test.endAt ? new Date(test.endAt).toISOString() : undefined)
           const allowLateUntilISO = andPublish 
             ? undefined // Don't set dates when opening publish dialog - wait for actual publish
-            : (testWithDates.allowLateUntil ? new Date(testWithDates.allowLateUntil).toISOString() : undefined)
+            : (test.allowLateUntil ? new Date(test.allowLateUntil).toISOString() : undefined)
 
           updatePayload = {
             testId: test.id,
@@ -1210,8 +1225,8 @@ export function NewTestBuilder({
             calculatorType: payload.allowCalculator ? payload.calculatorType : undefined,
             allowNoteSheet: payload.allowNoteSheet,
             noteSheetInstructions: payload.allowNoteSheet ? payload.noteSheetInstructions : undefined,
-            autoApproveNoteSheet: payload.allowNoteSheet ? ((payload as any).autoApproveNoteSheet ?? true) : undefined,
-            requireOneSitting: (payload as any).requireOneSitting,
+            autoApproveNoteSheet: payload.allowNoteSheet ? (payload.autoApproveNoteSheet ?? true) : undefined,
+            requireOneSitting: payload.requireOneSitting,
             questions: questions.map((question, index) => {
               // For fill-in-the-blank, store blankAnswers and blankPoints in explanation field as JSON
               let explanationValue: string | undefined = undefined
@@ -1229,7 +1244,7 @@ export function NewTestBuilder({
                 explanationValue = question.explanation.trim() || undefined
               }
               
-              const questionPayload: any = {
+              const questionPayload: Record<string, unknown> = {
                 ...(existingQuestionIds.has(question.id) ? { id: question.id } : {}),
                 type: question.type === 'TRUE_FALSE' ? 'MCQ_SINGLE' : 
                       question.type === 'FILL_BLANK' || question.type === 'TEXT_BLOCK' ? 'SHORT_TEXT' : 
@@ -1422,7 +1437,7 @@ export function NewTestBuilder({
       } else {
         // Create new test - use appropriate API based on mode
         let apiUrl: string
-        let createPayload: any
+        let createPayload: Record<string, unknown>
 
         if (esMode && staffMembershipId && tournamentId) {
           // ES Mode - use ES API
@@ -1443,11 +1458,11 @@ export function NewTestBuilder({
             calculatorType: payload.allowCalculator ? payload.calculatorType : undefined,
             allowNoteSheet: payload.allowNoteSheet,
             noteSheetInstructions: payload.allowNoteSheet ? payload.noteSheetInstructions : undefined,
-            autoApproveNoteSheet: payload.allowNoteSheet ? ((payload as any).autoApproveNoteSheet ?? true) : undefined,
-            requireOneSitting: (payload as any).requireOneSitting,
+            autoApproveNoteSheet: payload.allowNoteSheet ? (payload.autoApproveNoteSheet ?? true) : undefined,
+            requireOneSitting: payload.requireOneSitting,
             ...(maxAttempts && !isNaN(maxAttempts) ? { maxAttempts } : {}),
-            questions: payload.questions.map((q: any) => {
-              const questionPayload: any = {
+            questions: payload.questions.map((q) => {
+              const questionPayload: Record<string, unknown> = {
                 type: q.type,
                 promptMd: q.promptMd,
                 explanation: q.explanation,
@@ -1533,10 +1548,10 @@ export function NewTestBuilder({
           router.refresh()
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: isEditMode ? 'Failed to update test' : 'Failed to save test',
-        description: error.message || 'Something went wrong while saving the test.',
+        description: error instanceof Error ? error.message : 'Something went wrong while saving the test.',
         variant: 'destructive',
       })
     } finally {
@@ -1613,11 +1628,11 @@ export function NewTestBuilder({
     try {
       // For ES mode (ESTest), use the PUT endpoint to update status to PUBLISHED
       if (esMode) {
-        const publishFormDataWithDates = publishFormData as any
+        const publishFormDataExtended = publishFormData as typeof publishFormData & { allowLateUntil?: string }
         const startAtISO = publishFormData.startAt ? new Date(publishFormData.startAt).toISOString() : undefined
         const endAtISO = publishFormData.endAt ? new Date(publishFormData.endAt).toISOString() : undefined
-        const allowLateUntilISO = publishFormDataWithDates.allowLateUntil && publishFormDataWithDates.allowLateUntil.trim()
-          ? new Date(publishFormDataWithDates.allowLateUntil).toISOString()
+        const allowLateUntilISO = publishFormDataExtended.allowLateUntil && publishFormDataExtended.allowLateUntil.trim()
+          ? new Date(publishFormDataExtended.allowLateUntil).toISOString()
           : undefined
 
         const maxAttemptsValue = publishFormData.maxAttempts?.trim()
@@ -1643,7 +1658,7 @@ export function NewTestBuilder({
           }),
         })
 
-        let data: any = null
+        let data: { error?: string; details?: string; message?: string } | null = null
         try {
           const text = await response.text()
           data = text ? JSON.parse(text) : {}
@@ -1653,11 +1668,11 @@ export function NewTestBuilder({
         }
 
         if (!response.ok) {
-          const errorMsg = data.error || data.details || 'Failed to publish test'
+          const errorMsg = data?.error || data?.details || 'Failed to publish test'
           throw new Error(errorMsg)
         }
 
-        const savedTournamentId = sessionStorage.getItem('tournamentId') || tournamentId
+        const _savedTournamentId = sessionStorage.getItem('tournamentId') || tournamentId
 
         toast({
           title: 'Test Published',
@@ -1711,7 +1726,7 @@ export function NewTestBuilder({
         }),
       })
 
-      let data: any = null
+      let data: { error?: string; details?: string; message?: string } | null = null
       try {
         const text = await response.text()
         data = text ? JSON.parse(text) : {}
@@ -1721,9 +1736,9 @@ export function NewTestBuilder({
       }
 
       if (!response.ok) {
-        const errorMsg = data.message 
+        const errorMsg = data?.message 
           ? `${data.error}: ${data.message}` 
-          : data.error || data.details || 'Failed to publish test'
+          : data?.error || data?.details || 'Failed to publish test'
         throw new Error(errorMsg)
       }
 
@@ -1759,10 +1774,10 @@ export function NewTestBuilder({
         router.push(`/club/${clubId}?tab=tests`)
       }
       router.refresh()
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to publish test',
+        description: error instanceof Error ? error.message : 'Failed to publish test',
         variant: 'destructive',
       })
     } finally {
@@ -2717,7 +2732,7 @@ function QuestionCard({
   const promptInputRef = useRef<HTMLInputElement>(null)
   const contextTextareaRef = useRef<HTMLTextAreaElement>(null)
   const promptTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const [cursorPositions, setCursorPositions] = useState<{ context: number | null; prompt: number | null }>({
+  const [_cursorPositions, setCursorPositions] = useState<{ context: number | null; prompt: number | null }>({
     context: null,
     prompt: null,
   })
@@ -2868,7 +2883,7 @@ function QuestionCard({
 
   // FRQ Parts handlers
   const addFRQPart = () => {
-    const existingParts = question.frqParts || []
+    const _existingParts = question.frqParts || []
     const newPart: FRQPart = {
       id: nanoid(),
       label: '', // Will be set dynamically based on index
@@ -2927,8 +2942,8 @@ function QuestionCard({
   const promptTables = question.promptTables || []
   
   // Remove only images from text (tables are stored separately now)
-  let contextText = removeImageMarkdown(question.context)
-  let promptText = removeImageMarkdown(question.prompt)
+  const contextText = removeImageMarkdown(question.context)
+  const promptText = removeImageMarkdown(question.prompt)
   
   // Don't normalize here - it causes re-renders that interfere with typing
   // Normalization happens in handlePromptTextChange when user types
@@ -4100,7 +4115,7 @@ function QuestionCard({
               <div className="space-y-2 pt-2">
                 {(question.type === 'MCQ_SINGLE' || question.type === 'TRUE_FALSE') ? (
                   <RadioGroup className="space-y-2">
-                    {question.options.filter(opt => opt.label.trim()).map((option, idx) => (
+                    {question.options.filter(opt => opt.label.trim()).map((option, _idx) => (
                       <div key={option.id} className="flex items-center gap-2">
                         <RadioGroupItem value={option.id} id={`preview-${question.id}-${option.id}`} disabled />
                         <Label htmlFor={`preview-${question.id}-${option.id}`} className="cursor-default font-normal">
@@ -4111,7 +4126,7 @@ function QuestionCard({
                   </RadioGroup>
                 ) : (
                   <div className="space-y-2">
-                    {question.options.filter(opt => opt.label.trim()).map((option, idx) => (
+                    {question.options.filter(opt => opt.label.trim()).map((option, _idx) => (
                       <div key={option.id} className="flex items-center gap-2">
                         <Checkbox id={`preview-${question.id}-${option.id}`} disabled />
                         <Label htmlFor={`preview-${question.id}-${option.id}`} className="cursor-default font-normal">
@@ -4131,7 +4146,7 @@ function QuestionCard({
               if (hasBlanks) {
                 // Parse the prompt to extract context and prompt sections
                 const parts = promptText.split('---')
-                const contextSection = parts.length > 1 ? parts[0].trim() : ''
+                const _contextSection = parts.length > 1 ? parts[0].trim() : ''
                 const promptSection = parts.length > 1 ? parts[1].trim() : promptText.trim()
                 
                 // Extract images and tables temporarily (similar to take-test-client)
@@ -4156,7 +4171,7 @@ function QuestionCard({
                 // Split on blank markers
                 const normalizedText = textOnly.replace(/\[blank\d*\]/g, '[BLANK_MARKER]')
                 const textSegments = normalizedText.split('[BLANK_MARKER]')
-                const blankCount = textSegments.length - 1
+                const _blankCount = textSegments.length - 1
                 
                 return (
                   <div className="pt-2 space-y-4">
@@ -4327,8 +4342,8 @@ function SortableTableItem({
     if (!editingCell) return
     
     const { row, col } = editingCell
-    let newHeaders = [...headers]
-    let newRows = rows.map(r => [...r])
+    const newHeaders = [...headers]
+    const newRows = rows.map(r => [...r])
     
     if (row === -1) {
       // Editing header
