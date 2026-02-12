@@ -29,8 +29,9 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * Note: Exclusions are handled in the middleware function itself
      */
-    '/((?!_next|favicon|.*\\.(ico|png|jpg|jpeg|svg|gif|webp|css|js|woff|woff2|ttf|eot|json)$).*)',
+    '/:path*',
   ],
 }
 
