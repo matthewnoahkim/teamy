@@ -2,26 +2,25 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const pathname = request.nextUrl.pathname
 
-  // Allow access to:
-  // - Home page (/)
-  // - Static files and Next.js internals
-  // - Public assets (images, fonts, etc.)
+  // Skip middleware for static files and Next.js internals
   if (
-    pathname === '/' ||
-    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
     pathname.startsWith('/favicon') ||
-    pathname.startsWith('/static/') ||
-    pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp|css|js|woff|woff2|ttf|eot|json)$/i)
+    pathname.startsWith('/static') ||
+    pathname.includes('.')
   ) {
     return NextResponse.next()
   }
 
-  // Redirect all other routes to home page (maintenance mode)
+  // Allow home page
+  if (pathname === '/') {
+    return NextResponse.next()
+  }
+
+  // Redirect everything else to home (maintenance mode)
   return NextResponse.redirect(new URL('/', request.url))
 }
-
-// No matcher config needed - Next.js automatically matches all routes
-// All exclusions are handled in the middleware function above
 
