@@ -86,7 +86,7 @@ export function QuickActionsWidget({ clubId, isAdmin, config }: QuickActionsWidg
           <div className="p-1.5 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg">
             <Zap className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
           </div>
-          {config?.title || 'Quick Actions'}
+          {(config?.title as string) || 'Quick Actions'}
         </CardTitle>
       </CardHeader>
       <CardContent>

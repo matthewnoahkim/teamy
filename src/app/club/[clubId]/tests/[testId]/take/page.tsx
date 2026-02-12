@@ -273,9 +273,9 @@ export default async function TakeTestPage({
           // CLUB scope - everyone in the club gets access
           a.assignedScope === 'CLUB' ||
           // Team-based - user's primary team matches assignment's team
-          (a.teamId && membership.teamId && a.teamId === membership.teamId) ||
+          (a.teamId && membership!.teamId && a.teamId === membership!.teamId) ||
           // PERSONAL scope - directly assigned to this user
-          a.targetMembershipId === membership.id ||
+          a.targetMembershipId === membership!.id ||
           // Event-based assignments - user must have the event in their roster
           (a.eventId && userEventIds.includes(a.eventId))
       )
@@ -361,9 +361,9 @@ export default async function TakeTestPage({
 
   return (
     <TakeTestClient
-      test={test}
-      membership={membership}
-      existingAttempt={existingAttempt}
+      test={test as any}
+      membership={membership as any}
+      existingAttempt={existingAttempt as any}
       isAdmin={isAdminUser}
       tournamentId={tournamentTest?.tournament.id}
     />

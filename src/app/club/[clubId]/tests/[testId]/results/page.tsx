@@ -132,10 +132,10 @@ export default async function TestResultsPage({
     <ViewResultsClient
       testId={test.id}
       testName={test.name}
-      attempt={filteredAttemptData}
+      attempt={filteredAttemptData as any}
       testSettings={{
         releaseScoresAt: test.releaseScoresAt,
-        scoreReleaseMode: test.scoreReleaseMode || 'FULL_TEST',
+        scoreReleaseMode: (test.scoreReleaseMode || 'FULL_TEST') as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',
       }}
     />
   )

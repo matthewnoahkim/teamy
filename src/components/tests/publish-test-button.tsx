@@ -146,9 +146,9 @@ export function PublishTestButton({
       }
 
       if (!response.ok) {
-        const errorMsg = data.message 
+        const errorMsg = data?.message 
           ? `${data.error}: ${data.message}` 
-          : data.error || data.details || 'Failed to publish test'
+          : data?.error || data?.details || 'Failed to publish test'
         throw new Error(errorMsg)
       }
 

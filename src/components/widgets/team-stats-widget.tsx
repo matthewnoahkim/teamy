@@ -62,7 +62,7 @@ export function TeamStatsWidget({ stats, config }: TeamStatsWidgetProps) {
           <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
             <TrendingUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
           </div>
-          {config?.title || 'Team Stats'}
+          {(config?.title as string) || 'Team Stats'}
         </CardTitle>
       </CardHeader>
       <CardContent>

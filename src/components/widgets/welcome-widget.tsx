@@ -10,7 +10,7 @@ interface WelcomeWidgetProps {
 }
 
 export function WelcomeWidget({ clubName, memberCount, config }: WelcomeWidgetProps) {
-  const customMessage = config?.message || `Welcome to ${clubName}!`
+  const customMessage = (config?.message as string) || `Welcome to ${clubName}!`
   const showMemberCount = config?.showMemberCount !== false
 
   return (
@@ -25,7 +25,7 @@ export function WelcomeWidget({ clubName, memberCount, config }: WelcomeWidgetPr
             <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-pulse" />
           </div>
           <span className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-            {config?.title || 'Welcome'}
+            {(config?.title as string) || 'Welcome'}
           </span>
         </CardTitle>
       </CardHeader>

@@ -53,7 +53,7 @@ export function CustomTextWidget({ config }: CustomTextWidgetProps) {
             <div className="p-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg">
               <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
             </div>
-            {config?.title || 'Custom Widget'}
+            {(config?.title as string) || 'Custom Widget'}
           </CardTitle>
         </CardHeader>
       )}

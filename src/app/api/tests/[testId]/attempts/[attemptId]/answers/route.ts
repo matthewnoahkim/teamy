@@ -140,9 +140,9 @@ export async function POST(
         return NextResponse.json({ error: 'Not registered for this tournament' }, { status: 403 })
       }
 
-      membership = registration.teamId
+      membership = (registration.teamId
         ? userMemberships.find((m) => m.clubId === registration.clubId && m.teamId === registration.teamId)
-        : userMemberships.find((m) => m.clubId === registration.clubId)
+        : userMemberships.find((m) => m.clubId === registration.clubId)) ?? null
 
       if (!membership || membership.id !== esAttempt.membershipId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })

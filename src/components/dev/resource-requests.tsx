@@ -347,7 +347,7 @@ export function ResourceRequests() {
                 className="pl-9"
               />
             </div>
-            <Select value={statusFilter} onValueChange={(v: string) => setStatusFilter(v)}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>

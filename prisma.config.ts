@@ -1,5 +1,4 @@
 import "dotenv/config";
-// @ts-expect-error - prisma/config may not have type definitions
 import { defineConfig } from "prisma/config";
 
 export default defineConfig({

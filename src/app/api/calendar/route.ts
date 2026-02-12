@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
 import { generateAttendanceCode, hashAttendanceCode } from '@/lib/attendance'
 import { z } from 'zod'
-import { CalendarScope } from '@prisma/client'
+import { CalendarScope, Prisma } from '@prisma/client'
 
 // Helper function to generate recurring event occurrences
 function generateRecurrenceInstances(
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
     }
 
     const event = await prisma.calendarEvent.create({
-      data: eventData,
+      data: eventData as Prisma.CalendarEventCreateInput,
       include: {
         creator: {
           include: {

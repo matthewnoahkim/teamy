@@ -26,7 +26,7 @@ export function UpcomingTestsWidget({
   clubId,
   config 
 }: UpcomingTestsWidgetProps) {
-  const limit = config?.limit || 5
+  const limit = (config?.limit as number) || 5
   
   // Filter to published tests with upcoming start dates
   const now = new Date()
@@ -42,7 +42,7 @@ export function UpcomingTestsWidget({
           <div className="p-1.5 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
             <FileText className="h-5 w-5 text-orange-600 dark:text-orange-400" />
           </div>
-          {config?.title || 'Upcoming Tests'}
+          {(config?.title as string) || 'Upcoming Tests'}
         </CardTitle>
       </CardHeader>
       <CardContent>

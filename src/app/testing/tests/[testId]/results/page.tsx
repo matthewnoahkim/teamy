@@ -110,7 +110,7 @@ export default async function TournamentTestResultsPage({
   if (scoresReleasedField === true) {
     scoresReleased = true
   } else if (releaseScoresAt) {
-    const releaseDate = releaseScoresAt instanceof Date ? releaseScoresAt : new Date(releaseScoresAt)
+    const releaseDate = releaseScoresAt instanceof Date ? releaseScoresAt : new Date(releaseScoresAt as string)
     scoresReleased = now >= releaseDate
   }
 
@@ -121,7 +121,7 @@ export default async function TournamentTestResultsPage({
           <h1 className="text-2xl font-bold mb-4">Results Not Yet Available</h1>
           <p className="text-muted-foreground">
             {releaseScoresAt
-              ? `Results will be released on ${new Date(releaseScoresAt).toLocaleString()}.`
+              ? `Results will be released on ${new Date(releaseScoresAt as string | Date).toLocaleString()}.`
               : 'Results will be released once the tournament director makes them available.'}
           </p>
         </div>
@@ -166,7 +166,7 @@ export default async function TournamentTestResultsPage({
   }
 
   // Apply score release mode filtering
-  let filteredAttempt: typeof attemptData & { answers: typeof attemptData.answers | null } = attemptData
+  let filteredAttempt: any = attemptData
   if (scoreReleaseMode === 'NONE') {
     filteredAttempt = {
       ...attemptData,
@@ -195,10 +195,10 @@ export default async function TournamentTestResultsPage({
     <ViewResultsClient
       testId={esTest.id}
       testName={esTest.name}
-      attempt={filteredAttempt}
+      attempt={filteredAttempt as any}
       testSettings={{
-        releaseScoresAt: releaseScoresAt ? (typeof releaseScoresAt === 'string' ? releaseScoresAt : releaseScoresAt.toISOString()) : null,
-        scoreReleaseMode: scoreReleaseMode,
+        releaseScoresAt: (releaseScoresAt ?? null) as Date | null,
+        scoreReleaseMode: (scoreReleaseMode || 'FULL_TEST') as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',
       }}
     />
   )

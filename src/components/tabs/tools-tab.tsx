@@ -1296,9 +1296,9 @@ function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, i
     const club = clubResources
       .filter(r => r.category === categorySlug)
       .map(r => ({
-        id: r.id,
-        title: r.name,
-        url: r.url || null,
+        id: r.id as string,
+        title: r.name as string,
+        url: (r.url as string) || null,
         type: r.tag as Resource['type'],
         isClubResource: r.scope === 'CLUB',
         isApproved: r.scope === 'PUBLIC',

@@ -343,7 +343,7 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
     }
   }
 
-  const formatDateTime = (date: string) => {
+  const formatDateTime = (date: string | Date) => {
     const d = new Date(date)
     return d.toLocaleString('en-US', {
       weekday: 'short',

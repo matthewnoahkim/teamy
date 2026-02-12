@@ -883,7 +883,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
       color: event.color || '#3b82f6', // Preserve existing color or default to blue
       rsvpEnabled: event.rsvpEnabled !== undefined ? event.rsvpEnabled : true,
       important: event.important || false,
-      scope: event.scope,
+      scope: event.scope as 'PERSONAL' | 'TEAM' | 'CLUB',
       teamId: event.teamId || '',
       attendeeId: event.attendeeId || currentMembership.id,
       targetRoles: event.targetRoles || [],
@@ -2346,7 +2346,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
                   <div className="border-t pt-4">
                     <p className="text-sm font-medium text-muted-foreground mb-2">Attachments</p>
                     <AttachmentDisplay
-                      attachments={selectedEvent.attachments}
+                      attachments={selectedEvent.attachments as any}
                       canDelete={canEditEvent(selectedEvent)}
                       onDelete={async (attachmentId) => {
                         try {
@@ -2773,7 +2773,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
           onOpenChange={setShowAnnouncementModal}
           onConfirm={handleAnnouncementConfirm}
           eventTitle={createdEvent.title}
-          eventScope={createdEvent.scope}
+          eventScope={createdEvent.scope as 'CLUB' | 'TEAM'}
           teamName={createdEvent.team?.name}
         />
       )}

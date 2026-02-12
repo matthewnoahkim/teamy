@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 
 const addReactionSchema = z.object({
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
       update: {
         emoji,
       },
-      create: reactionData,
+      create: reactionData as Prisma.ReactionCreateInput,
       include: {
         user: {
           select: {

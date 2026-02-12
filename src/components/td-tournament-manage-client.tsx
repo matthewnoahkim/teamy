@@ -3108,10 +3108,10 @@ export function TDTournamentManageClient({
                                   <div className="text-sm text-muted-foreground">
                                     {log.details.changes && Array.isArray(log.details.changes) ? (
                                       <span>Changed: {log.details.changes.join(', ')}</span>
-                                    ) : log.details.testName ? (
-                                      <span>Test: {log.details.testName}</span>
-                                    ) : log.details.eventName ? (
-                                      <span>Event: {log.details.eventName}</span>
+                                    ) : (log.details as Record<string, unknown>).testName ? (
+                                      <span>Test: {String((log.details as Record<string, unknown>).testName)}</span>
+                                    ) : (log.details as Record<string, unknown>).eventName ? (
+                                      <span>Event: {String((log.details as Record<string, unknown>).eventName)}</span>
                                     ) : (
                                       <span>-</span>
                                     )}

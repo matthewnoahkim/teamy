@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import {
   sanitizeSearchQuery,
   validateId,
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // Build where clause - all inputs are now validated
-    const where: Record<string, unknown> = {}
+    const where: Prisma.ErrorLogWhereInput = {}
 
     if (errorType) {
       where.errorType = { contains: errorType, mode: 'insensitive' }
@@ -81,13 +82,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (startDate || endDate) {
-      where.timestamp = {}
-      if (startDate) {
-        where.timestamp.gte = startDate
-      }
-      if (endDate) {
-        where.timestamp.lte = endDate
-      }
+      const timestampFilter: Record<string, Date> = {}
+      if (startDate) timestampFilter.gte = startDate!
+      if (endDate) timestampFilter.lte = endDate!
+      where.timestamp = timestampFilter
     }
 
     const [logs, total] = await Promise.all([

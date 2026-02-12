@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { CalculatorType } from '@prisma/client'
+import { CalculatorType, Prisma } from '@prisma/client'
 import { hasESAccess, hasESTestAccess } from '@/lib/rbac'
 import { getESTestsForUser } from '@/lib/es-tests'
 
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
       
       const createdTest = await tx.eSTest.create({
         data: {
-          ...baseData,
+          ...(baseData as Prisma.ESTestCreateInput),
           requireOneSitting: requireOneSitting ?? true,
           questions: questions && questions.length > 0
             ? {

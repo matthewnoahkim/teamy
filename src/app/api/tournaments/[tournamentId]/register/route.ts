@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { getUserMembership } from '@/lib/rbac'
 import { Role } from '@prisma/client'
 import { z } from 'zod'
 
@@ -77,7 +76,22 @@ export async function POST(
       const teamId = reg.teamId
       
       // Verify user is an admin of the club
-      const membership = await getUserMembership(session.user.id, reg.clubId)
+      const membership = await prisma.membership.findUnique({
+        where: {
+          userId_clubId: {
+            userId: session.user.id,
+            clubId: reg.clubId,
+          },
+        },
+        select: {
+          id: true,
+          role: true,
+          userId: true,
+          clubId: true,
+          teamId: true,
+          club: { select: { name: true } },
+        },
+      })
       if (!membership) {
         return NextResponse.json({ error: `You must be a member of club ${reg.clubId}` }, { status: 403 })
       }

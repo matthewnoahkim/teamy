@@ -24,14 +24,18 @@ export async function POST(request: Request) {
 
     // Build the where clause for filtering
     const where: Record<string, unknown> = {}
+    const createdAtFilter: { lte?: Date; gte?: Date } = {}
 
     if (filters.minMemberDays) {
       const minDate = subDays(new Date(), parseInt(filters.minMemberDays))
-      where.createdAt = { ...where.createdAt, lte: minDate }
+      createdAtFilter.lte = minDate
     }
     if (filters.maxMemberDays) {
       const maxDate = subDays(new Date(), parseInt(filters.maxMemberDays))
-      where.createdAt = { ...where.createdAt, gte: maxDate }
+      createdAtFilter.gte = maxDate
+    }
+    if (Object.keys(createdAtFilter).length > 0) {
+      where.createdAt = createdAtFilter
     }
 
     // Get all matching users

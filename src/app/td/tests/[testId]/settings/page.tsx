@@ -217,7 +217,7 @@ export default async function TDTestSettingsPage({ params }: Props) {
               <InfoItem
                 icon={<Clock className="h-4 w-4 text-muted-foreground" />}
                 label="Scores Released At"
-                value={releaseScoresAt ? formatDateTime(releaseScoresAt instanceof Date ? releaseScoresAt.toISOString() : releaseScoresAt) : (scoresReleased ? 'Manually released' : 'Not released')}
+                value={releaseScoresAt ? formatDateTime(releaseScoresAt instanceof Date ? releaseScoresAt.toISOString() : releaseScoresAt as string) : (scoresReleased ? 'Manually released' : 'Not released')}
               />
               {esTest.updatedAt && esTest.updatedAt !== esTest.createdAt && (
                 <InfoItem

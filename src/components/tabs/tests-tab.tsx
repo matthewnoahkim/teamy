@@ -109,12 +109,12 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     return initialTests?.map((test: Record<string, unknown>) => ({
       ...test,
       _count: {
-        questions: test._count?.questions ?? 0,
-        attempts: test._count?.attempts ?? 0,
+        questions: (test._count as Record<string, number> | undefined)?.questions ?? 0,
+        attempts: (test._count as Record<string, number> | undefined)?.attempts ?? 0,
       },
     })) || []
   }, [initialTests])
-  const [tests, setTests] = useState<Test[]>(normalizedInitialTests)
+  const [tests, setTests] = useState<Test[]>(normalizedInitialTests as Test[])
   const [loading, setLoading] = useState(!initialTests) // Only show loading if we don't have initial data
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'opened' | 'completed'>('all')
@@ -178,8 +178,8 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
         const testsWithCount = data.tests.map((test: Record<string, unknown>) => ({
           ...test,
           _count: {
-            questions: test._count?.questions ?? 0,
-            attempts: test._count?.attempts ?? 0,
+            questions: (test._count as Record<string, number> | undefined)?.questions ?? 0,
+            attempts: (test._count as Record<string, number> | undefined)?.attempts ?? 0,
           },
         }))
         setTests(testsWithCount)

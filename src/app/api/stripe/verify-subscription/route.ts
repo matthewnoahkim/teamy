@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
     const currentPeriodEnd = (subscription as unknown as Record<string, unknown>).current_period_end
     if (currentPeriodEnd && typeof currentPeriodEnd === 'number') {
       updateData.subscriptionEndsAt = new Date(currentPeriodEnd * 1000)
-      console.log(`Setting subscriptionEndsAt to: ${updateData.subscriptionEndsAt.toISOString()}`)
+      console.log(`Setting subscriptionEndsAt to: ${(updateData.subscriptionEndsAt as Date).toISOString()}`)
     } else {
       console.warn(`Subscription ${subscription.id} has invalid current_period_end:`, currentPeriodEnd)
     }

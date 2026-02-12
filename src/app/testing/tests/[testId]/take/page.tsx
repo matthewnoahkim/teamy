@@ -178,7 +178,7 @@ export default async function TournamentTakeTestPage({
 
   if (tournamentTest && tournamentTest.test) {
     // Regular Test linked via TournamentTest
-    test = tournamentTest.test
+    test = tournamentTest.test as any
     tournamentId = tournamentTest.tournament.id
     eventId = tournamentTest.eventId
     } else {
@@ -627,11 +627,11 @@ export default async function TournamentTakeTestPage({
 
   return (
     <TakeTestClient
-      test={test}
-      membership={membership}
-      existingAttempt={existingAttempt}
+      test={test as any}
+      membership={membership as any}
+      existingAttempt={existingAttempt as any}
       isAdmin={false} // Tournament tests don't have admin bypass
-      tournamentId={tournamentId}
+      tournamentId={tournamentId!}
       testingPortal={true}
     />
   )

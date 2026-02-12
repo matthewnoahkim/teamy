@@ -579,7 +579,7 @@ export default async function ClubDetailPage({
   }
 
   // Remove assignments from tests (not needed by client)
-  const tests = filteredTests.map(({ _assignments, ...test }) => test)
+  const tests = filteredTests.map(({ assignments: _assignments, ...test }) => test)
 
   return (
     <Suspense fallback={

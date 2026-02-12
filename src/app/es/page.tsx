@@ -355,7 +355,7 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
     <Suspense fallback={<div className="min-h-screen bg-background grid-pattern" />}>
       <ESPortalClient 
         user={session.user} 
-        staffMemberships={serializedStaffMemberships} 
+        staffMemberships={serializedStaffMemberships as any} 
         initialTimelines={initialTimelines}
         initialTournamentId={tournament || null}
       />

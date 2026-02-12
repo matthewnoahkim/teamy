@@ -135,7 +135,7 @@ export async function GET(
     
     // Add condition for existing tests if we have any
     if (allTestIds.length > 0) {
-      testAuditWhere.OR.unshift({
+      (testAuditWhere.OR as unknown[]).unshift({
         testId: {
           in: allTestIds,
         },
@@ -263,7 +263,7 @@ export async function GET(
     const esTestAuditsRaw = allESTestAuditsRaw.filter(audit => {
       if (audit.test) {
         // Test still exists - check tournament
-        return audit.test.tournamentId === tournamentId
+        return (audit.test as Record<string, unknown>).tournamentId === tournamentId
       } else if (audit.testId === null) {
         // Test was deleted - check tournamentId in details
         const details = audit.details as Record<string, unknown> | null
@@ -279,25 +279,27 @@ export async function GET(
     const esTestAudits = esTestAuditsRaw
       .filter(audit => audit.actorStaff) // Filter out any audits with missing staff
       .map(audit => {
-        const testName = audit.test?.name || 
+        const test = audit.test as { id?: string; name?: string; event?: { name?: string } } | null | undefined
+        const staff = audit.actorStaff as { id?: string; name?: string | null; email?: string } | null | undefined
+        const testName = test?.name || 
                         (audit.details && typeof audit.details === 'object' && 'testName' in audit.details 
                           ? (audit.details as Record<string, unknown>).testName 
                           : 'Deleted Test')
         
-        const eventName = audit.test?.event?.name ||
+        const eventName = test?.event?.name ||
                          (audit.details && typeof audit.details === 'object' && 'eventName' in audit.details
                            ? (audit.details as Record<string, unknown>).eventName
                            : null)
         
         return {
           id: audit.id,
-          testId: audit.test?.id || audit.testId,
+          testId: test?.id || audit.testId,
           testName: testName,
           eventName: eventName,
           testType: 'ESTest' as const,
           action: audit.action,
-          actorName: audit.actorStaff!.name || audit.actorStaff!.email,
-          actorEmail: audit.actorStaff!.email,
+          actorName: staff!.name || staff!.email,
+          actorEmail: staff!.email,
           createdAt: audit.createdAt,
           details: audit.details,
         }
@@ -329,7 +331,7 @@ export async function GET(
 
     // Combine all audit logs and sort by date
     const allAudits = [...formattedTestAudits, ...esTestAudits].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a, b) => new Date(b.createdAt as string | number).getTime() - new Date(a.createdAt as string | number).getTime()
     )
 
     return NextResponse.json({ auditLogs: allAudits })

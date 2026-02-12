@@ -356,6 +356,6 @@ export function createValidationErrorResponse(error: string, details?: unknown) 
   return {
     error,
     message: 'Invalid input data. Please check your request and try again.',
-    ...(details && { details }),
+    ...(details ? { details } : {}),
   }
 }

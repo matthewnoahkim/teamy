@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 
 /**
@@ -47,7 +48,7 @@ export async function logApiCall(params: LogApiCallParams) {
             userId: params.userId,
             ipAddress: params.ipAddress,
             userAgent: params.userAgent,
-            requestBody: params.requestBody ? redactSensitiveData(JSON.parse(JSON.stringify(params.requestBody))) : null,
+            requestBody: params.requestBody ? redactSensitiveData(JSON.parse(JSON.stringify(params.requestBody))) as Prisma.InputJsonValue : Prisma.JsonNull,
             responseSize: params.responseSize,
             error: params.error?.substring(0, 500), // Limit error message length
           },

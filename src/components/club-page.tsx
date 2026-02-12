@@ -111,7 +111,9 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
     backgroundColor: '#f8fafc',
     gradientStartColor: '#e0e7ff',
     gradientEndColor: '#fce7f3',
-    backgroundImageUrl: null,
+    gradientColors: [] as string[],
+    gradientDirection: null as string | null,
+    backgroundImageUrl: null as string | null,
   }
   const isAdmin = currentMembership.role === 'ADMIN'
 
@@ -681,9 +683,9 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 club={club}
                 isAdmin={isAdmin}
                 user={user}
-                initialEvents={initialData?.calendarEvents}
-                initialAnnouncements={initialData?.announcements}
-                initialTests={initialData?.tests}
+                initialEvents={initialData?.calendarEvents as Record<string, unknown>[] | undefined}
+                initialAnnouncements={initialData?.announcements as Record<string, unknown>[] | undefined}
+                initialTests={initialData?.tests as Record<string, unknown>[] | undefined}
               />
             )}
 
@@ -712,7 +714,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 currentMembership={currentMembership}
                 isAdmin={isAdmin}
                 user={user}
-                initialEvents={initialData?.calendarEvents}
+                initialEvents={initialData?.calendarEvents as any}
               />
             )}
 
@@ -732,10 +734,10 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 currentMembershipId={currentMembership.id}
                 currentMembershipTeamId={currentMembership.teamId}
                 division={club.division}
-                initialExpenses={initialData?.expenses}
-                initialPurchaseRequests={initialData?.purchaseRequests}
-                initialBudgets={initialData?.eventBudgets}
-                initialTeams={club.teams}
+                initialExpenses={initialData?.expenses as any}
+                initialPurchaseRequests={initialData?.purchaseRequests as any}
+                initialBudgets={initialData?.eventBudgets as any}
+                initialTeams={club.teams as any}
               />
             )}
 
@@ -743,7 +745,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
               <TestsTab
                 clubId={club.id}
                 isAdmin={isAdmin}
-                initialTests={initialData?.tests}
+                initialTests={initialData?.tests as Record<string, unknown>[] | undefined}
               />
             )}
 
@@ -752,8 +754,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 clubId={club.id}
                 user={user}
                 isAdmin={isAdmin}
-                initialMediaItems={initialData?.mediaItems}
-                initialAlbums={initialData?.albums}
+                initialMediaItems={initialData?.mediaItems as any}
+                initialAlbums={initialData?.albums as any}
               />
             )}
 
@@ -762,7 +764,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 clubId={club.id}
                 user={user}
                 isAdmin={isAdmin}
-                initialForms={initialData?.forms}
+                initialForms={initialData?.forms as any}
               />
             )}
 
@@ -772,7 +774,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 currentMembershipId={currentMembership.id}
                 user={user}
                 isAdmin={isAdmin}
-                initialTodos={initialData?.todos}
+                initialTodos={initialData?.todos as any}
               />
             )}
 
@@ -789,7 +791,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
               <StatsTab
                 clubId={club.id}
                 division={club.division}
-                initialStats={initialData?.stats}
+                initialStats={initialData?.stats as any}
               />
             )}
 
@@ -798,8 +800,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 club={club}
                 currentMembership={currentMembership}
                 isAdmin={isAdmin}
-                personalBackground={personalBackground}
-                onBackgroundUpdate={handleBackgroundUpdate}
+                personalBackground={personalBackground as any}
+                onBackgroundUpdate={handleBackgroundUpdate as any}
               />
             )}
           </div>

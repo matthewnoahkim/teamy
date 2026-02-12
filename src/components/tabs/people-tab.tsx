@@ -35,6 +35,7 @@ type RosterAssignmentWithMembership = BaseRosterAssignment & {
 interface SciOlyEvent {
   id: string
   name: string
+  slug: string
   maxCompetitors: number
   selfScheduled?: boolean
 }

@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
         
         if (tournamentIds.length > 0) {
           // Combine with existing id filter if present, otherwise set it
-          if (where.id && 'in' in where.id) {
+          if (where.id && typeof where.id === 'object' && where.id !== null && 'in' in where.id) {
             // Intersect the arrays
             const existingIds = Array.isArray(where.id.in) ? where.id.in : []
             where.id = { in: tournamentIds.filter(id => existingIds.includes(id)) }

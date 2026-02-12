@@ -101,7 +101,7 @@ export async function GET(
     if (scoresReleasedField === true) {
       scoresReleased = true
     } else if (releaseScoresAt) {
-      const releaseDate = releaseScoresAt instanceof Date ? releaseScoresAt : new Date(releaseScoresAt)
+      const releaseDate = releaseScoresAt instanceof Date ? releaseScoresAt : new Date(releaseScoresAt as string | number)
       scoresReleased = now >= releaseDate
     }
 
@@ -142,7 +142,7 @@ export async function GET(
     }
 
     // Apply score release mode filtering
-    let filteredAttempt: typeof attemptData & { answers: typeof attemptData.answers | null } = attemptData
+    let filteredAttempt: Omit<typeof attemptData, 'answers'> & { answers: typeof attemptData.answers | null } = attemptData
     if (!scoresReleased) {
       // Hide all score-related information
       filteredAttempt = {
@@ -192,7 +192,7 @@ export async function GET(
     return NextResponse.json({
       attempt: filteredAttempt,
       test: {
-        releaseScoresAt: releaseScoresAt ? (typeof releaseScoresAt === 'string' ? releaseScoresAt : releaseScoresAt.toISOString()) : null,
+        releaseScoresAt: releaseScoresAt ? (typeof releaseScoresAt === 'string' ? releaseScoresAt : (releaseScoresAt as Date).toISOString()) : null,
         scoreReleaseMode: scoreReleaseMode,
         scoresReleased: scoresReleased,
       },

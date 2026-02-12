@@ -1,3 +1,4 @@
+import type OpenAI from 'openai'
 import type { ChatCompletionMessageParam } from 'openai/resources/index.mjs'
 import { getOpenAIClient, ensureOpenAIConfigured } from './ai'
 
@@ -91,7 +92,7 @@ export async function requestFrqSuggestion(input: FrqSuggestionInput): Promise<F
   const completion = await client.chat.completions.create({
     model: DEFAULT_FRQ_MODEL,
     temperature: 0.2,
-    response_format: responseFormat as unknown as Record<string, unknown>,
+    response_format: responseFormat as OpenAI.Chat.ChatCompletionCreateParams['response_format'],
     messages,
   })
 
@@ -107,16 +108,16 @@ export async function requestFrqSuggestion(input: FrqSuggestionInput): Promise<F
     throw new Error('Failed to parse AI response')
   }
 
-  const suggestedScore = clampNumber(parsed.suggestedScore, 0, input.maxPoints)
-  const maxScore = clampNumber(parsed.maxScore ?? input.maxPoints, 0, input.maxPoints)
+  const suggestedScore = clampNumber(parsed.suggestedScore as number, 0, input.maxPoints)
+  const maxScore = clampNumber((parsed.maxScore as number | undefined) ?? input.maxPoints, 0, input.maxPoints)
 
   return {
     suggestedScore,
     maxScore,
-    summary: parsed.summary || 'No summary provided.',
-    strengths: parsed.strengths || '',
-    gaps: parsed.gaps || '',
-    rubricAlignment: parsed.rubricAlignment || '',
+    summary: (parsed.summary as string) || 'No summary provided.',
+    strengths: (parsed.strengths as string) || '',
+    gaps: (parsed.gaps as string) || '',
+    rubricAlignment: (parsed.rubricAlignment as string) || '',
     rawResponse: completion,
   }
 }

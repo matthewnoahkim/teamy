@@ -26,13 +26,15 @@ export async function GET(request: Request) {
     const where: Record<string, unknown> = {}
 
     // Member duration filters - only use if validation passed
+    const createdAtFilter: { lte?: Date; gte?: Date } = {}
     if (minMemberDays !== null) {
-      const minDate = subDays(new Date(), minMemberDays as number)
-      where.createdAt = { ...where.createdAt, lte: minDate }
+      createdAtFilter.lte = subDays(new Date(), minMemberDays as number)
     }
     if (maxMemberDays !== null) {
-      const maxDate = subDays(new Date(), maxMemberDays as number)
-      where.createdAt = { ...where.createdAt, gte: maxDate }
+      createdAtFilter.gte = subDays(new Date(), maxMemberDays as number)
+    }
+    if (Object.keys(createdAtFilter).length > 0) {
+      where.createdAt = createdAtFilter
     }
 
     // Get all users first, then filter by complex conditions

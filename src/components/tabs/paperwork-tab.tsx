@@ -449,7 +449,7 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
                             </Badge>
                           )}
                           <span className="text-sm text-gray-600 dark:text-gray-400">
-                            Submitted {formatDateTime(status.submittedAt)}
+                            Submitted {formatDateTime(status.submittedAt!)}
                           </span>
                         </div>
                       ) : (

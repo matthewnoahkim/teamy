@@ -567,7 +567,7 @@ export async function getESTestsForUser(
         const eventMap = testsByTournament.get(membership.tournament.id) || new Map()
         const eventTests = eventMap.get(eventKey) || []
         
-        const filteredEventTests = eventTests.filter((test) => {
+        const filteredEventTests = eventTests.filter((test: any) => {
           if (test.tournamentId !== membership.tournament.id) {
             console.error(`CRITICAL ERROR: Test ${test.id} has tournamentId ${test.tournamentId} but is being shown for tournament ${membership.tournament.id}`)
             return false
@@ -581,7 +581,7 @@ export async function getESTestsForUser(
             name: e.event.name,
             division: e.event.division,
           },
-          tests: filteredEventTests.map((test) => ({
+          tests: filteredEventTests.map((test: any) => ({
             id: test.id,
             name: test.name,
             status: test.status,
@@ -603,13 +603,13 @@ export async function getESTestsForUser(
               name: test.createdBy.name,
               email: test.createdBy.email,
             } : undefined,
-            questions: includeQuestions && test.questions ? test.questions.map((q) => ({
+            questions: includeQuestions && test.questions ? test.questions.map((q: any) => ({
               id: q.id,
               type: q.type,
               promptMd: q.promptMd,
               points: Number(q.points),
               order: q.order,
-              options: q.options.map((o) => ({
+              options: q.options.map((o: any) => ({
                 id: o.id,
                 label: o.label,
                 isCorrect: o.isCorrect,

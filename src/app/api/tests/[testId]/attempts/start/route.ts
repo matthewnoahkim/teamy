@@ -99,11 +99,11 @@ export async function POST(
       }
 
       // Find the membership that matches this registration
-      membership = registration.teamId
+      membership = (registration.teamId
         ? userMemberships.find(
             (m) => m.clubId === registration.clubId && m.teamId === registration.teamId
           )
-        : userMemberships.find((m) => m.clubId === registration.clubId)
+        : userMemberships.find((m) => m.clubId === registration.clubId)) ?? null
 
       if (!membership) {
         return NextResponse.json({ error: 'Membership not found' }, { status: 403 })
@@ -228,11 +228,11 @@ export async function POST(
           }
 
           // Find the membership that matches this registration
-          membership = registration.teamId
+          membership = (registration.teamId
             ? userMemberships.find(
                 (m) => m.clubId === registration.clubId && m.teamId === registration.teamId
               )
-            : userMemberships.find((m) => m.clubId === registration.clubId)
+            : userMemberships.find((m) => m.clubId === registration.clubId)) ?? null
 
           if (!membership) {
             return NextResponse.json({ error: 'Membership not found' }, { status: 403 })

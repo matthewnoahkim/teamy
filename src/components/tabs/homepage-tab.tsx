@@ -523,7 +523,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       case 'RECENT_ANNOUNCEMENTS':
         return (
           <RecentAnnouncementsWidget
-            announcements={announcements}
+            announcements={announcements as any}
             clubId={clubId}
             {...widgetProps}
           />
@@ -531,7 +531,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       case 'UPCOMING_EVENTS':
         return (
           <UpcomingEventsWidget
-            events={events}
+            events={events as any}
             clubId={clubId}
             {...widgetProps}
           />
@@ -549,7 +549,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       case 'UPCOMING_TESTS':
         return (
           <UpcomingTestsWidget
-            tests={tests}
+            tests={tests as any}
             clubId={clubId}
             {...widgetProps}
           />

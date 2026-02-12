@@ -25,8 +25,8 @@ export function UpcomingEventsWidget({
   clubId,
   config 
 }: UpcomingEventsWidgetProps) {
-  const limit = config?.limit || 5
-  const daysAhead = config?.daysAhead || 30
+  const limit = (config?.limit as number) || 5
+  const daysAhead = (config?.daysAhead as number) || 30
   
   // Filter to upcoming events within the next X days
   const now = new Date()
@@ -48,7 +48,7 @@ export function UpcomingEventsWidget({
           <div className="p-1.5 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
             <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
           </div>
-          {config?.title || 'Upcoming Events'}
+          {(config?.title as string) || 'Upcoming Events'}
         </CardTitle>
       </CardHeader>
       <CardContent>

@@ -15,6 +15,18 @@ const requestSchema = z.object({
 
 import { hasESTestAccess } from '@/lib/rbac'
 
+interface PartSuggestion {
+  partIndex: number
+  partLabel: string
+  partPoints: number
+  suggestedScore: number | null
+  maxScore: number
+  summary: string | null
+  strengths: string | null | undefined
+  gaps: string | null | undefined
+  rubricAlignment: string | null | undefined
+}
+
 // Helper to check if user has access to grade an ES test
 async function hasESGradingAccess(userId: string, userEmail: string, testId: string): Promise<boolean> {
   return hasESTestAccess(userId, userEmail, testId)
@@ -130,18 +142,18 @@ export async function POST(
           })
           
           // Get existing part suggestions if any
-          let existingPartSuggestions: Array<Record<string, unknown>> = []
+          let existingPartSuggestions: PartSuggestion[] = []
           if (existingSuggestion?.rawResponse && typeof existingSuggestion.rawResponse === 'object' && 'isMultipart' in existingSuggestion.rawResponse && existingSuggestion.rawResponse.isMultipart) {
             const rawResponse = existingSuggestion.rawResponse as Record<string, unknown>
             if (rawResponse.partSuggestions && Array.isArray(rawResponse.partSuggestions)) {
-              existingPartSuggestions = rawResponse.partSuggestions
+              existingPartSuggestions = rawResponse.partSuggestions as PartSuggestion[]
             }
           }
           
           // Create a map of existing part suggestions by index
           const existingByIndex = new Map(existingPartSuggestions.map((p) => [p.partIndex, p]))
           
-          const partSuggestions: Array<Record<string, unknown>> = []
+          const partSuggestions: PartSuggestion[] = []
           
           // Grade all parts or just the specified part
           for (let i = 0; i < frqParts.length; i++) {
@@ -152,7 +164,7 @@ export async function POST(
             if (validated.partIndex !== undefined && i !== validated.partIndex) {
               // Use existing suggestion for this part if available
               if (existingByIndex.has(i)) {
-                partSuggestions.push(existingByIndex.get(i))
+                partSuggestions.push(existingByIndex.get(i)!)
               } else {
                 // No existing suggestion, create a placeholder
                 partSuggestions.push({
@@ -220,7 +232,7 @@ export async function POST(
                     acc[`part${idx}`] = p
                     return acc
                   }, {} as Record<string, unknown>),
-                } as Prisma.JsonObject,
+                } as unknown as Prisma.JsonObject,
               },
             })
           } else {
@@ -246,7 +258,7 @@ export async function POST(
                     acc[`part${idx}`] = p
                     return acc
                   }, {} as Record<string, unknown>),
-                } as Prisma.JsonObject,
+                } as unknown as Prisma.JsonObject,
               },
             })
           }
@@ -288,7 +300,7 @@ export async function POST(
               strengths: aiSuggestion.strengths,
               gaps: aiSuggestion.gaps,
               rubricAlignment: aiSuggestion.rubricAlignment,
-              rawResponse: aiSuggestion.rawResponse,
+              rawResponse: aiSuggestion.rawResponse as Prisma.InputJsonValue,
             },
           })
 
@@ -329,7 +341,7 @@ export async function POST(
             strengths: aiSuggestion.strengths,
             gaps: aiSuggestion.gaps,
             rubricAlignment: aiSuggestion.rubricAlignment,
-            rawResponse: aiSuggestion.rawResponse,
+            rawResponse: aiSuggestion.rawResponse as Prisma.InputJsonValue,
           },
         })
 

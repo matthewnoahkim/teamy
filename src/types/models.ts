@@ -202,6 +202,11 @@ export interface ClubPageInitialData {
   calendarEvents: CalendarEventFull[]
   announcements: AnnouncementFull[]
   tests: TestSummary[]
+  mediaItems?: unknown[]
+  albums?: unknown[]
+  forms?: unknown[]
+  todos?: unknown[]
+  stats?: unknown
 }
 
 // ---------------------------------------------------------------------------

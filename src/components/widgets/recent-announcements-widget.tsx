@@ -32,7 +32,7 @@ export function RecentAnnouncementsWidget({
   clubId,
   config 
 }: RecentAnnouncementsWidgetProps) {
-  const limit = config?.limit || 5
+  const limit = (config?.limit as number) || 5
   const showImportantOnly = config?.showImportantOnly || false
   
   const filteredAnnouncements = showImportantOnly
@@ -48,7 +48,7 @@ export function RecentAnnouncementsWidget({
           <div className="p-1.5 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
             <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
-          {config?.title || 'Recent Announcements'}
+          {(config?.title as string) || 'Recent Announcements'}
         </CardTitle>
       </CardHeader>
       <CardContent>

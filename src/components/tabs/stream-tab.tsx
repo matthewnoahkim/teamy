@@ -243,7 +243,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     }
 
     // Optimistically add announcement to the top of the list
-    setAnnouncements((prev) => [tempAnnouncement as AnnouncementFull, ...prev])
+    setAnnouncements((prev) => [tempAnnouncement as unknown as AnnouncementFull, ...prev])
 
     // Clear form immediately
     setTitle('')
@@ -447,7 +447,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
         announcement.id === announcementId
           ? {
               ...announcement,
-              replies: [...(announcement.replies || []), tempReply as AnnouncementReply],
+              replies: [...(announcement.replies || []), tempReply as unknown as AnnouncementReply],
             }
           : announcement
       )
@@ -866,7 +866,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     setIsEditing(true)
 
     try {
-      const response = await fetch(`/api/announcements/${editingAnnouncement.id}`, {
+      const response = await fetch(`/api/announcements/${editingAnnouncement!.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1264,8 +1264,8 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                                   <Button
                                     size="sm"
                                     variant={userRsvp?.status === 'YES' ? 'default' : 'outline'}
-                                    onClick={() => handleRSVP(announcement.calendarEvent.id, 'YES')}
-                                    disabled={rsvping[announcement.calendarEvent.id]}
+                                    onClick={() => handleRSVP(announcement.calendarEvent!.id, 'YES')}
+                                    disabled={rsvping[announcement.calendarEvent!.id]}
                                   >
                                     <Check className="mr-2 h-4 w-4" />
                                     Going
@@ -1273,8 +1273,8 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                                   <Button
                                     size="sm"
                                     variant={userRsvp?.status === 'NO' ? 'default' : 'outline'}
-                                    onClick={() => handleRSVP(announcement.calendarEvent.id, 'NO')}
-                                    disabled={rsvping[announcement.calendarEvent.id]}
+                                    onClick={() => handleRSVP(announcement.calendarEvent!.id, 'NO')}
+                                    disabled={rsvping[announcement.calendarEvent!.id]}
                                   >
                                     <XIcon className="mr-2 h-4 w-4" />
                                     Not Going
@@ -1283,8 +1283,8 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => handleRemoveRSVP(announcement.calendarEvent.id)}
-                                      disabled={rsvping[announcement.calendarEvent.id]}
+                                      onClick={() => handleRemoveRSVP(announcement.calendarEvent!.id)}
+                                      disabled={rsvping[announcement.calendarEvent!.id]}
                                     >
                                       Clear
                                     </Button>

@@ -23,7 +23,7 @@ export function ImportantLinksWidget({ config }: ImportantLinksWidgetProps) {
           <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
             <LinkIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
           </div>
-          {config?.title || 'Important Links'}
+          {(config?.title as string) || 'Important Links'}
         </CardTitle>
       </CardHeader>
       <CardContent>

@@ -600,10 +600,10 @@ export function HealthTools() {
     // User Basic Information
     const userSection = [
       ['User Information'],
-      ['User ID', user.id],
-      ['Name', user.name || 'No name'],
-      ['Email', user.email],
-      ['Created At', new Date(user.createdAt).toLocaleString()],
+      ['User ID', user.id as string],
+      ['Name', (user.name as string) || 'No name'],
+      ['Email', user.email as string],
+      ['Created At', new Date(user.createdAt as string).toLocaleString()],
       [''],
       ['Memberships'],
       ['Club Name', 'Club ID', 'Team Name', 'Team ID', 'Role', 'Division', 'Joined At']
@@ -615,8 +615,8 @@ export function HealthTools() {
       escapeCSV((m.club as Record<string, unknown>)?.id || 'N/A'),
       escapeCSV((m.team as Record<string, unknown>)?.name || 'N/A'),
       escapeCSV((m.team as Record<string, unknown>)?.id || 'N/A'),
-      escapeCSV(m.role || 'N/A'),
-      escapeCSV((m.club as Record<string, unknown>)?.division || 'None'),
+      escapeCSV((m.role as string) || 'N/A'),
+      escapeCSV(((m.club as Record<string, unknown>)?.division as string) || 'None'),
       escapeCSV(new Date(m.createdAt as string).toLocaleString()),
     ])
 
@@ -635,8 +635,8 @@ export function HealthTools() {
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
-    const safeName = (user.name || user.email || 'user').replace(/[^a-z0-9]/gi, '-').toLowerCase()
-    link.download = `${safeName}-${user.id.substring(0, 8)}-export-${new Date().toISOString().split('T')[0]}.csv`
+    const safeName = ((user.name as string) || (user.email as string) || 'user').replace(/[^a-z0-9]/gi, '-').toLowerCase()
+    link.download = `${safeName}-${(user.id as string).substring(0, 8)}-export-${new Date().toISOString().split('T')[0]}.csv`
     link.href = url
     document.body.appendChild(link)
     link.click()
@@ -1196,27 +1196,27 @@ export function HealthTools() {
                   <div className="space-y-2">
                     {users.map((user) => (
                       <div
-                        key={user.id}
+                        key={user.id as string}
                         className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/50 transition-all duration-200 hover:shadow-md apple-hover"
                       >
                         <div className="flex items-center gap-3 flex-1">
                           <Avatar>
-                            <AvatarImage src={user.image || ''} />
+                            <AvatarImage src={(user.image as string) || ''} />
                             <AvatarFallback>
-                              {user.name?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                              {(user.name as string)?.charAt(0) || (user.email as string).charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1">
-                            <p className="font-medium">{highlightText(user.name || 'No name', userSearch)}</p>
-                            <p className="text-sm text-muted-foreground">{highlightText(user.email, userSearch)}</p>
-                            <p className="text-xs text-muted-foreground mt-1">ID: {highlightText(user.id, userSearch)}</p>
-                            {user.memberships && user.memberships.length > 0 && (
+                            <p className="font-medium">{highlightText((user.name as string) || 'No name', userSearch)}</p>
+                            <p className="text-sm text-muted-foreground">{highlightText(user.email as string, userSearch)}</p>
+                            <p className="text-xs text-muted-foreground mt-1">ID: {highlightText(user.id as string, userSearch)}</p>
+                            {!!(user.memberships) && (user.memberships as unknown[]).length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-2">
                                 {(user.memberships as Array<Record<string, unknown>>).map((membership) => (
                                   <Badge key={membership.id as string} variant="outline">
                                     {(membership.club as Record<string, unknown>)?.name 
-                                      ? ((membership.team as Record<string, unknown>)?.name ? `${(membership.club as Record<string, unknown>).name} - ${(membership.team as Record<string, unknown>).name}` : (membership.club as Record<string, unknown>).name)
-                                      : ((membership.team as Record<string, unknown>)?.name || 'No club/team')} ({membership.role as string})
+                                      ? ((membership.team as Record<string, unknown>)?.name ? `${(membership.club as Record<string, unknown>).name} - ${(membership.team as Record<string, unknown>).name}` : String((membership.club as Record<string, unknown>).name))
+                                      : (String((membership.team as Record<string, unknown>)?.name || 'No club/team'))} ({membership.role as string})
                                   </Badge>
                                 ))}
                               </div>
@@ -1365,7 +1365,7 @@ export function HealthTools() {
           <DialogHeader>
             <DialogTitle>Delete User</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {userToDelete?.name || userToDelete?.email}?
+              Are you sure you want to delete {String(userToDelete?.name || userToDelete?.email)}?
               This will permanently delete all their data including memberships, events, and posts.
               This action cannot be undone.
             </DialogDescription>

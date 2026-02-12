@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 
@@ -39,7 +40,7 @@ export async function createAuditLog({
         userName: userName || null,
         action,
         target: target || null,
-        details: details || undefined,
+        details: details as Prisma.InputJsonValue | undefined,
         ipAddress,
         userAgent,
       },
