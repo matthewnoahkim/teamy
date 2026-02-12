@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+export const runtime = 'edge'
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -30,6 +32,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * Note: Exclusions are handled in the middleware function itself
+     * Using a simple pattern without capturing groups for Vercel compatibility
      */
     '/:path*',
   ],
