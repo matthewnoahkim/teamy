@@ -62,16 +62,22 @@ export function Logo({
   const textStyle = getTextStyle()
   
   const content = (
-    <div className={cn(
-      'flex items-center gap-3 flex-shrink-0', 
-      href && 'cursor-pointer hover:opacity-90 transition-opacity', 
-      className
-    )}>
-      <div className={cn(
-        'flex items-center justify-center rounded-xl overflow-hidden',
-        sizes.container,
-        iconClassName
-      )}>
+    <div
+      className={cn(
+        'flex items-center gap-3 flex-shrink-0',
+        href && 'cursor-pointer hover:opacity-90 transition-opacity',
+        className
+      )}
+      suppressHydrationWarning
+    >
+      <div
+        className={cn(
+          'flex items-center justify-center rounded-xl overflow-hidden',
+          sizes.container,
+          iconClassName
+        )}
+        suppressHydrationWarning
+      >
         {!imageError ? (
           <Image
             src="/logo.png"

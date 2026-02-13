@@ -127,9 +127,9 @@ export function AnalyticsDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data?.overview.totalUsers.toLocaleString() || 0}</div>
+            <div className="text-2xl font-bold">{(data?.overview?.totalUsers ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {data?.overview.activeUsersLast7Days || 0} active in last 7 days
+              {data?.overview?.activeUsersLast7Days ?? 0} active in last 7 days
             </p>
           </CardContent>
         </Card>
@@ -140,9 +140,9 @@ export function AnalyticsDashboard() {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data?.overview.totalClubs.toLocaleString() || 0}</div>
+            <div className="text-2xl font-bold">{(data?.overview?.totalClubs ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {data?.overview.totalMemberships || 0} total memberships
+              {data?.overview?.totalMemberships ?? 0} total memberships
             </p>
           </CardContent>
         </Card>
@@ -153,7 +153,7 @@ export function AnalyticsDashboard() {
             <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data?.overview.totalTournaments.toLocaleString() || 0}</div>
+            <div className="text-2xl font-bold">{(data?.overview?.totalTournaments ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               Approved tournaments
             </p>
@@ -166,9 +166,9 @@ export function AnalyticsDashboard() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data?.overview.activeUsersLast30Days.toLocaleString() || 0}</div>
+            <div className="text-2xl font-bold">{(data?.overview?.activeUsersLast30Days ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {data?.overview.totalUsers ? Math.round((data.overview.activeUsersLast30Days / data.overview.totalUsers) * 100) : 0}% of total users
+              {data?.overview?.totalUsers ? Math.round(((data.overview.activeUsersLast30Days ?? 0) / data.overview.totalUsers) * 100) : 0}% of total users
             </p>
           </CardContent>
         </Card>
@@ -186,19 +186,19 @@ export function AnalyticsDashboard() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-4">
             <div className="p-4 border rounded-lg text-center">
-              <div className="text-3xl font-bold text-blue-600">{data?.roleDistribution.clubAdmins || 0}</div>
+              <div className="text-3xl font-bold text-blue-600">{data?.roleDistribution?.clubAdmins ?? 0}</div>
               <p className="text-sm text-muted-foreground mt-1">Club Admins</p>
             </div>
             <div className="p-4 border rounded-lg text-center">
-              <div className="text-3xl font-bold text-purple-600">{data?.roleDistribution.tournamentDirectors || 0}</div>
+              <div className="text-3xl font-bold text-purple-600">{data?.roleDistribution?.tournamentDirectors ?? 0}</div>
               <p className="text-sm text-muted-foreground mt-1">Tournament Directors</p>
             </div>
             <div className="p-4 border rounded-lg text-center">
-              <div className="text-3xl font-bold text-green-600">{data?.roleDistribution.eventSupervisors || 0}</div>
+              <div className="text-3xl font-bold text-green-600">{data?.roleDistribution?.eventSupervisors ?? 0}</div>
               <p className="text-sm text-muted-foreground mt-1">Event Supervisors</p>
             </div>
             <div className="p-4 border rounded-lg text-center">
-              <div className="text-3xl font-bold text-slate-600">{data?.roleDistribution.regularMembers || 0}</div>
+              <div className="text-3xl font-bold text-slate-600">{data?.roleDistribution?.regularMembers ?? 0}</div>
               <p className="text-sm text-muted-foreground mt-1">Regular Members</p>
             </div>
           </div>

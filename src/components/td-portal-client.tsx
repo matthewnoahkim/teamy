@@ -206,7 +206,7 @@ export function TDPortalClient({ user, requests }: TDPortalClientProps) {
                       {currentUserName?.charAt(0) || user.email.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="hidden sm:block text-left max-w-[120px] md:max-w-none">
+                  <div className="hidden sm:block text-left max-w-[120px] md:max-w-none" suppressHydrationWarning>
                     <p className="text-xs sm:text-sm font-medium text-white truncate">
                       {currentUserName || user.email}
                     </p>
