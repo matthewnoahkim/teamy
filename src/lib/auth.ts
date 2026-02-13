@@ -9,6 +9,8 @@ import type { Adapter } from 'next-auth/adapters'
 // ============================================================================
 // Fail fast if the secret is missing or still a known placeholder.
 // A weak/missing secret means JWTs can be forged → full account takeover.
+// Skip during next build (npm_lifecycle_event === 'build') so static analysis
+// and page data collection succeed; validation still runs at runtime.
 const KNOWN_WEAK_SECRETS = [
   'quick-preview-secret-replace-this-in-production',
   'change-me',
@@ -16,7 +18,11 @@ const KNOWN_WEAK_SECRETS = [
   'development-secret',
 ]
 
-if (process.env.NODE_ENV === 'production') {
+const isBuildPhase = process.env.npm_lifecycle_event === 'build'
+if (
+  process.env.NODE_ENV === 'production' &&
+  !isBuildPhase
+) {
   if (!process.env.NEXTAUTH_SECRET) {
     throw new Error(
       'CRITICAL: NEXTAUTH_SECRET is not set. The application cannot start without a secure secret in production.'
