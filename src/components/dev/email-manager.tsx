@@ -309,7 +309,7 @@ export function EmailManager() {
       </Card>
 
       {/* Matching Users Preview */}
-      {filterStats && filterStats.users.length > 0 && (
+      {filterStats?.users?.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Matching Users Preview</CardTitle>
