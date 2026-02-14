@@ -72,6 +72,13 @@ import type {
   SessionUser,
   ClubPageInitialData,
 } from '@/types/models'
+import type { CalendarEvent } from '@/components/tabs/calendar-tab'
+import type { Expense, PurchaseRequest, EventBudget, Team } from '@/components/tabs/finance-tab'
+import type { MediaItem, Album } from '@/components/tabs/gallery-tab'
+import type { PaperworkForm } from '@/components/tabs/paperwork-tab'
+import type { Todo } from '@/components/tabs/todo-tab'
+import type { BackgroundPreferences } from '@/components/tabs/settings-tab'
+import type { StatsTabInitialStats } from '@/components/tabs/stats-tab'
 
 /** Pulsing notification dot for tab buttons with unread content */
 const NotificationDot = memo(function NotificationDot() {
@@ -714,7 +721,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 currentMembership={currentMembership}
                 isAdmin={isAdmin}
                 user={user}
-                initialEvents={initialData?.calendarEvents as any}
+                initialEvents={initialData?.calendarEvents as CalendarEvent[] | undefined}
               />
             )}
 
@@ -734,10 +741,10 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 currentMembershipId={currentMembership.id}
                 currentMembershipTeamId={currentMembership.teamId}
                 division={club.division}
-                initialExpenses={initialData?.expenses as any}
-                initialPurchaseRequests={initialData?.purchaseRequests as any}
-                initialBudgets={initialData?.eventBudgets as any}
-                initialTeams={club.teams as any}
+                initialExpenses={initialData?.expenses as Expense[] | undefined}
+                initialPurchaseRequests={initialData?.purchaseRequests as PurchaseRequest[] | undefined}
+                initialBudgets={initialData?.eventBudgets as EventBudget[] | undefined}
+                initialTeams={club.teams as Team[]}
               />
             )}
 
@@ -754,8 +761,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 clubId={club.id}
                 user={user}
                 isAdmin={isAdmin}
-                initialMediaItems={initialData?.mediaItems as any}
-                initialAlbums={initialData?.albums as any}
+                initialMediaItems={initialData?.mediaItems as MediaItem[] | undefined}
+                initialAlbums={initialData?.albums as Album[] | undefined}
               />
             )}
 
@@ -764,7 +771,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 clubId={club.id}
                 user={user}
                 isAdmin={isAdmin}
-                initialForms={initialData?.forms as any}
+                initialForms={initialData?.forms as PaperworkForm[] | undefined}
               />
             )}
 
@@ -774,7 +781,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 currentMembershipId={currentMembership.id}
                 user={user}
                 isAdmin={isAdmin}
-                initialTodos={initialData?.todos as any}
+                initialTodos={initialData?.todos as Todo[] | undefined}
               />
             )}
 
@@ -791,7 +798,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
               <StatsTab
                 clubId={club.id}
                 division={club.division}
-                initialStats={initialData?.stats as any}
+                initialStats={initialData?.stats as StatsTabInitialStats | null | undefined}
               />
             )}
 
@@ -800,8 +807,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 club={club}
                 currentMembership={currentMembership}
                 isAdmin={isAdmin}
-                personalBackground={personalBackground as any}
-                onBackgroundUpdate={handleBackgroundUpdate as any}
+                personalBackground={personalBackground as BackgroundPreferences | null | undefined}
+                onBackgroundUpdate={handleBackgroundUpdate as ((preferences: BackgroundPreferences | null) => void) | undefined}
               />
             )}
           </div>

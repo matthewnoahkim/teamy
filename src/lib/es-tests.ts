@@ -5,6 +5,30 @@ interface GetESTestsOptions {
   includeQuestions?: boolean
 }
 
+interface EventTestQuestion {
+  id: string
+  type: string
+  promptMd: string
+  points: number
+  order: number
+  options: Array<{ id: string; label: string; isCorrect: boolean; order: number }>
+}
+
+interface EventTestWithTournament {
+  id: string
+  name: string
+  status: string
+  tournamentId: string
+  eventId: string | null
+  createdAt: Date
+  updatedAt: Date
+  allowNoteSheet: boolean
+  event?: { id: string; name: string } | null
+  staff?: { id: string; name: string; email: string }
+  createdBy?: { id: string; name: string; email: string }
+  questions?: EventTestQuestion[]
+}
+
 interface StaffMembershipWithTests {
   id: string
   email: string
@@ -567,7 +591,7 @@ export async function getESTestsForUser(
         const eventMap = testsByTournament.get(membership.tournament.id) || new Map()
         const eventTests = eventMap.get(eventKey) || []
         
-        const filteredEventTests = eventTests.filter((test: any) => {
+        const filteredEventTests = eventTests.filter((test: EventTestWithTournament) => {
           if (test.tournamentId !== membership.tournament.id) {
             console.error(`CRITICAL ERROR: Test ${test.id} has tournamentId ${test.tournamentId} but is being shown for tournament ${membership.tournament.id}`)
             return false
@@ -581,7 +605,7 @@ export async function getESTestsForUser(
             name: e.event.name,
             division: e.event.division,
           },
-          tests: filteredEventTests.map((test: any) => ({
+          tests: filteredEventTests.map((test: EventTestWithTournament) => ({
             id: test.id,
             name: test.name,
             status: test.status,
@@ -603,13 +627,13 @@ export async function getESTestsForUser(
               name: test.createdBy.name,
               email: test.createdBy.email,
             } : undefined,
-            questions: includeQuestions && test.questions ? test.questions.map((q: any) => ({
+            questions: includeQuestions && test.questions ? test.questions.map((q: EventTestQuestion) => ({
               id: q.id,
               type: q.type,
               promptMd: q.promptMd,
               points: Number(q.points),
               order: q.order,
-              options: q.options.map((o: any) => ({
+              options: q.options.map((o: { id: string; label: string; isCorrect: boolean; order: number }) => ({
                 id: o.id,
                 label: o.label,
                 isCorrect: o.isCorrect,

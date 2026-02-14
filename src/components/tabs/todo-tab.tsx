@@ -60,7 +60,7 @@ interface TodoTabProps {
   initialTodos?: Todo[]
 }
 
-interface Todo {
+export interface Todo {
   id: string
   title: string
   description: string | null

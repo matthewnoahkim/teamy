@@ -88,7 +88,7 @@ interface Test {
   }>
 }
 
-interface StaffMembership {
+export interface StaffMembership {
   id: string
   email: string
   name: string | null

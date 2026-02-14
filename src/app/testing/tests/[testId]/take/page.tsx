@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { isTestAvailable } from '@/lib/test-security'
-import { TakeTestClient } from '@/components/tests/take-test-client'
+import { TakeTestClient, type TestData, type MembershipData, type AttemptData } from '@/components/tests/take-test-client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, ArrowLeft } from 'lucide-react'
@@ -178,7 +178,7 @@ export default async function TournamentTakeTestPage({
 
   if (tournamentTest && tournamentTest.test) {
     // Regular Test linked via TournamentTest
-    test = tournamentTest.test as any
+    test = tournamentTest.test as typeof test
     tournamentId = tournamentTest.tournament.id
     eventId = tournamentTest.eventId
     } else {
@@ -627,9 +627,9 @@ export default async function TournamentTakeTestPage({
 
   return (
     <TakeTestClient
-      test={test as any}
-      membership={membership as any}
-      existingAttempt={existingAttempt as any}
+      test={test as TestData}
+      membership={membership as MembershipData}
+      existingAttempt={existingAttempt as AttemptData}
       isAdmin={false} // Tournament tests don't have admin bypass
       tournamentId={tournamentId!}
       testingPortal={true}

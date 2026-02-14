@@ -40,7 +40,7 @@ interface TestQuestion {
   options: TestOption[]
 }
 
-interface TestData {
+export interface TestData {
   id: string
   name: string
   description: string | null
@@ -56,7 +56,7 @@ interface TestData {
   questions: TestQuestion[]
 }
 
-interface MembershipData {
+export interface MembershipData {
   clubId: string
 }
 
@@ -68,7 +68,7 @@ interface AttemptAnswer {
   markedForReview: boolean
 }
 
-interface AttemptData {
+export interface AttemptData {
   id: string
   status: string
   startedAt: string | null

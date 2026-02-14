@@ -7,7 +7,7 @@ import { MessageSquare, Star, Inbox } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
 
-interface Announcement {
+export interface Announcement {
   id: string
   title: string
   content: string

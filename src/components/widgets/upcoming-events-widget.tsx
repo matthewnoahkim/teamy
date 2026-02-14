@@ -6,7 +6,7 @@ import { Calendar, MapPin, Clock, CalendarDays } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 
-interface CalendarEvent {
+export interface CalendarEvent {
   id: string
   title: string
   startUTC: string

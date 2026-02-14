@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { ViewResultsClient } from '@/components/tests/view-results-client'
+import { ViewResultsClient, type ResultAttempt } from '@/components/tests/view-results-client'
 
 export default async function TournamentTestResultsPage({
   params,
@@ -166,7 +166,7 @@ export default async function TournamentTestResultsPage({
   }
 
   // Apply score release mode filtering
-  let filteredAttempt: any = attemptData
+  let filteredAttempt: unknown = attemptData
   if (scoreReleaseMode === 'NONE') {
     filteredAttempt = {
       ...attemptData,
@@ -195,7 +195,7 @@ export default async function TournamentTestResultsPage({
     <ViewResultsClient
       testId={esTest.id}
       testName={esTest.name}
-      attempt={filteredAttempt as any}
+      attempt={filteredAttempt as ResultAttempt}
       testSettings={{
         releaseScoresAt: (releaseScoresAt ?? null) as Date | null,
         scoreReleaseMode: (scoreReleaseMode || 'FULL_TEST') as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',

@@ -51,7 +51,7 @@ interface ResultAnswer {
   question: ResultQuestion
 }
 
-interface ResultAttempt {
+export interface ResultAttempt {
   id: string
   status: string
   submittedAt: string | null

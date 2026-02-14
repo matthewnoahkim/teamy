@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { Download, X, File } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-interface Attachment {
+export interface Attachment {
   id: string
   filename: string
   originalFilename: string

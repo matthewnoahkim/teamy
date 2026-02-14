@@ -47,16 +47,18 @@ import { PageLoading } from '@/components/ui/loading-spinner'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 
+export interface StatsTabInitialStats {
+  clubId: string
+  division: 'B' | 'C'
+  events: Event[]
+  teams: { id: string; name: string }[]
+  members: MemberStats[]
+}
+
 interface StatsTabProps {
   clubId: string
   division: 'B' | 'C'
-  initialStats?: {
-    clubId: string
-    division: 'B' | 'C'
-    events: Event[]
-    teams: { id: string; name: string }[]
-    members: MemberStats[]
-  } | null
+  initialStats?: StatsTabInitialStats | null
 }
 
 interface MemberStats {

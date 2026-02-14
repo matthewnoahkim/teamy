@@ -45,7 +45,7 @@ interface FormSubmission {
   user: { id: string; name?: string | null; email: string; image?: string | null }
 }
 
-interface PaperworkForm {
+export interface PaperworkForm {
   id: string
   title: string
   description?: string | null

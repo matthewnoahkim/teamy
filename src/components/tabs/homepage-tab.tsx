@@ -52,11 +52,11 @@ import { PageLoading } from '@/components/ui/loading-spinner'
 
 // Import all widget components
 import { WelcomeWidget } from '@/components/widgets/welcome-widget'
-import { RecentAnnouncementsWidget } from '@/components/widgets/recent-announcements-widget'
-import { UpcomingEventsWidget } from '@/components/widgets/upcoming-events-widget'
+import { RecentAnnouncementsWidget, type Announcement } from '@/components/widgets/recent-announcements-widget'
+import { UpcomingEventsWidget, type CalendarEvent } from '@/components/widgets/upcoming-events-widget'
 import { TeamStatsWidget } from '@/components/widgets/team-stats-widget'
 import { QuickActionsWidget } from '@/components/widgets/quick-actions-widget'
-import { UpcomingTestsWidget } from '@/components/widgets/upcoming-tests-widget'
+import { UpcomingTestsWidget, type UpcomingTest } from '@/components/widgets/upcoming-tests-widget'
 import { CustomTextWidget } from '@/components/widgets/custom-text-widget'
 import { ImportantLinksWidget } from '@/components/widgets/important-links-widget'
 import type { SessionUser } from '@/types/models'
@@ -523,7 +523,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       case 'RECENT_ANNOUNCEMENTS':
         return (
           <RecentAnnouncementsWidget
-            announcements={announcements as any}
+            announcements={announcements as Announcement[]}
             clubId={clubId}
             {...widgetProps}
           />
@@ -531,7 +531,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       case 'UPCOMING_EVENTS':
         return (
           <UpcomingEventsWidget
-            events={events as any}
+            events={events as CalendarEvent[]}
             clubId={clubId}
             {...widgetProps}
           />
@@ -549,7 +549,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       case 'UPCOMING_TESTS':
         return (
           <UpcomingTestsWidget
-            tests={tests as any}
+            tests={tests as UpcomingTest[]}
             clubId={clubId}
             {...widgetProps}
           />

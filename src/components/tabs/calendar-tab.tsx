@@ -22,7 +22,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Plus, Trash2, Pencil, Check, X 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { EventAnnouncementModal } from '@/components/event-announcement-modal'
-import { AttachmentDisplay } from '@/components/ui/attachment-display'
+import { AttachmentDisplay, type Attachment } from '@/components/ui/attachment-display'
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 import type { MembershipWithPreferences } from '@/types/models'
 
@@ -62,7 +62,7 @@ interface CalendarTeam {
   name: string
 }
 
-interface CalendarEvent {
+export interface CalendarEvent {
   id: string
   title: string
   description?: string | null
@@ -2346,7 +2346,7 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
                   <div className="border-t pt-4">
                     <p className="text-sm font-medium text-muted-foreground mb-2">Attachments</p>
                     <AttachmentDisplay
-                      attachments={selectedEvent.attachments as any}
+                      attachments={selectedEvent.attachments as Attachment[]}
                       canDelete={canEditEvent(selectedEvent)}
                       onDelete={async (attachmentId) => {
                         try {

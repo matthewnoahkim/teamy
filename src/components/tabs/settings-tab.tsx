@@ -45,7 +45,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import type { ClubWithMembers, MembershipWithPreferences } from '@/types/models'
 
-interface BackgroundPreferences {
+export interface BackgroundPreferences {
   backgroundType?: string
   backgroundColor?: string
   gradientStartColor?: string

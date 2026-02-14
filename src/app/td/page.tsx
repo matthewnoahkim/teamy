@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { TDPortalClient } from '@/components/td-portal-client'
+import { TDPortalClient, type TournamentRequest } from '@/components/td-portal-client'
 import { TDLoginClient } from '@/components/td-login-client'
 
 export default async function TDPortalPage() {
@@ -125,6 +125,6 @@ export default async function TDPortalPage() {
     } : null,
   }))
 
-  return <TDPortalClient user={session.user} requests={serializedRequests as any} />
+  return <TDPortalClient user={session.user} requests={serializedRequests as TournamentRequest[]} />
 }
 

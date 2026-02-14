@@ -34,7 +34,7 @@ import { formatDateTime } from '@/lib/utils'
 import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
 import type { SessionUser } from '@/types/models'
 
-interface MediaItem {
+export interface MediaItem {
   id: string
   mediaType: string
   filePath: string
@@ -46,7 +46,7 @@ interface MediaItem {
   album?: { id: string; name: string } | null
 }
 
-interface Album {
+export interface Album {
   id: string
   name: string
   createdById: string

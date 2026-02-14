@@ -6,7 +6,7 @@ import { FileText, Clock, AlertCircle, BookOpen } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 
-interface UpcomingTest {
+export interface UpcomingTest {
   id: string
   name: string
   status: string

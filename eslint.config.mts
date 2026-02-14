@@ -6,6 +6,19 @@ import css from "@eslint/css";
 import { defineConfig } from "eslint/config";
 
 export default defineConfig([
+  {
+    ignores: [
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/out/**",
+      "**/build/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "*.config.*",
+      "package-lock.json",
+      "pnpm-lock.yaml",
+    ],
+  },
   { files: ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"], plugins: { js }, extends: ["js/recommended"], languageOptions: { globals: { ...globals.browser, ...globals.node } } },
   tseslint.configs.recommended,
   {
@@ -31,4 +44,12 @@ export default defineConfig([
     },
   },
   { files: ["**/*.css"], plugins: { css }, language: "css/css", extends: ["css/recommended"] },
+  {
+    files: ["src/app/globals.css"],
+    rules: {
+      "css/no-invalid-at-rules": "off",
+      "css/no-invalid-at-rule-placement": "off",
+      "css/no-invalid-properties": "off",
+    },
+  },
 ]);

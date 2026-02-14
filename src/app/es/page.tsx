@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { ESPortalClient } from '@/components/es-portal-client'
+import { ESPortalClient, type StaffMembership } from '@/components/es-portal-client'
 import { ESLoginClient } from '@/components/es-login-client'
 import { Suspense } from 'react'
 import { getESTestsForUser } from '@/lib/es-tests'
@@ -355,7 +355,7 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
     <Suspense fallback={<div className="min-h-screen bg-background grid-pattern" />}>
       <ESPortalClient 
         user={session.user} 
-        staffMemberships={serializedStaffMemberships as any} 
+        staffMemberships={serializedStaffMemberships as StaffMembership[]} 
         initialTimelines={initialTimelines}
         initialTournamentId={tournament || null}
       />

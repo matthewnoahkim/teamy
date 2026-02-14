@@ -34,7 +34,7 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { formatDivision } from '@/lib/utils'
 
-interface TournamentRequest {
+export interface TournamentRequest {
   id: string
   tournamentName: string
   tournamentLevel: string

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getUserMembership, isAdmin } from '@/lib/rbac'
-import { ViewResultsClient } from '@/components/tests/view-results-client'
+import { ViewResultsClient, type ResultAttempt } from '@/components/tests/view-results-client'
 import { filterAttemptByReleaseMode } from '@/lib/test-security'
 
 export default async function TestResultsPage({
@@ -132,7 +132,7 @@ export default async function TestResultsPage({
     <ViewResultsClient
       testId={test.id}
       testName={test.name}
-      attempt={filteredAttemptData as any}
+      attempt={filteredAttemptData as ResultAttempt}
       testSettings={{
         releaseScoresAt: test.releaseScoresAt,
         scoreReleaseMode: (test.scoreReleaseMode || 'FULL_TEST') as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',

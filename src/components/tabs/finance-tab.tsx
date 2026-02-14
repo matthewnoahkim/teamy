@@ -30,7 +30,7 @@ interface FinanceTabProps {
   initialTeams?: Team[]
 }
 
-interface Expense {
+export interface Expense {
   id: string
   description: string
   category: string | null
@@ -68,7 +68,7 @@ interface Expense {
   } | null
 }
 
-interface PurchaseRequest {
+export interface PurchaseRequest {
   id: string
   clubId: string
   eventId: string | null
@@ -114,13 +114,13 @@ interface Event {
   division: 'B' | 'C'
 }
 
-interface Team {
+export interface Team {
   id: string
   name: string
   clubId: string
 }
 
-interface EventBudget {
+export interface EventBudget {
   id: string
   clubId: string
   eventId: string
