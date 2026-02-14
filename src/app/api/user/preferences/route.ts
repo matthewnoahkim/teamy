@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -49,7 +50,7 @@ export async function PATCH(request: Request) {
 
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
-      data: { preferences: updatedPreferences },
+      data: { preferences: updatedPreferences as Prisma.InputJsonValue },
       select: { preferences: true },
     })
 

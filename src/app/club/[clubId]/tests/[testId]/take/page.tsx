@@ -361,9 +361,9 @@ export default async function TakeTestPage({
 
   return (
     <TakeTestClient
-      test={test as TestData}
-      membership={membership as MembershipData}
-      existingAttempt={existingAttempt as AttemptData}
+      test={test as unknown as TestData}
+      membership={membership as unknown as MembershipData}
+      existingAttempt={existingAttempt as unknown as AttemptData}
       isAdmin={isAdminUser}
       tournamentId={tournamentTest?.tournament.id}
     />

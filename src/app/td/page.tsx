@@ -125,6 +125,6 @@ export default async function TDPortalPage() {
     } : null,
   }))
 
-  return <TDPortalClient user={session.user} requests={serializedRequests as TournamentRequest[]} />
+  return <TDPortalClient user={session.user} requests={serializedRequests as unknown as TournamentRequest[]} />
 }
 

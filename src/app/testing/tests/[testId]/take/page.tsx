@@ -178,7 +178,7 @@ export default async function TournamentTakeTestPage({
 
   if (tournamentTest && tournamentTest.test) {
     // Regular Test linked via TournamentTest
-    test = tournamentTest.test as typeof test
+    test = tournamentTest.test as unknown as typeof test
     tournamentId = tournamentTest.tournament.id
     eventId = tournamentTest.eventId
     } else {

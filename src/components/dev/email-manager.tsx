@@ -309,7 +309,7 @@ export function EmailManager() {
       </Card>
 
       {/* Matching Users Preview */}
-      {filterStats?.users?.length > 0 && (
+      {(filterStats?.users?.length ?? 0) > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Matching Users Preview</CardTitle>
@@ -318,7 +318,7 @@ export function EmailManager() {
           <CardContent>
             <ScrollArea className="h-[200px]">
               <div className="space-y-2">
-                {filterStats.users.slice(0, 50).map((user) => (
+                {(filterStats?.users ?? []).slice(0, 50).map((user) => (
                   <div key={user.id} className="flex items-center justify-between p-2 border rounded-lg text-sm">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8 flex-shrink-0">
