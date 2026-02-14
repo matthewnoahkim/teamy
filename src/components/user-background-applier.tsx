@@ -2,9 +2,11 @@
 
 import { useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { useTheme } from 'next-themes'
 
 export function UserBackgroundApplier() {
   const { data: session, status } = useSession()
+  const { setTheme } = useTheme()
 
   useEffect(() => {
     // Use the same style element that was created by the server-side script, or create a new one
@@ -116,6 +118,12 @@ export function UserBackgroundApplier() {
 
         const data = await response.json()
         const preferences = data.preferences as Record<string, unknown> | null
+
+        // Sync theme from account preferences so it follows the user across browser profiles/devices
+        const savedTheme = preferences?.theme as string | undefined
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          setTheme(savedTheme)
+        }
 
         if (!preferences || !preferences.backgroundType) {
           styleEl!.textContent = headerCss + `

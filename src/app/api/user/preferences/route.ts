@@ -30,24 +30,22 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
-    const { backgroundType, backgroundColor, gradientColors, gradientDirection, backgroundImageUrl } = body
+    const { backgroundType, backgroundColor, gradientColors, gradientDirection, backgroundImageUrl, theme } = body
 
-    // Get current preferences and merge with new values
+    // Get current preferences and merge with new values (only include defined fields so partial updates don't wipe others)
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { preferences: true },
     })
 
     const currentPreferences = (user?.preferences as Record<string, unknown>) || {}
-    
-    const updatedPreferences = {
-      ...currentPreferences,
-      backgroundType,
-      backgroundColor,
-      gradientColors,
-      gradientDirection,
-      backgroundImageUrl,
-    }
+    const updatedPreferences = { ...currentPreferences }
+    if (backgroundType !== undefined) updatedPreferences.backgroundType = backgroundType
+    if (backgroundColor !== undefined) updatedPreferences.backgroundColor = backgroundColor
+    if (gradientColors !== undefined) updatedPreferences.gradientColors = gradientColors
+    if (gradientDirection !== undefined) updatedPreferences.gradientDirection = gradientDirection
+    if (backgroundImageUrl !== undefined) updatedPreferences.backgroundImageUrl = backgroundImageUrl
+    if (theme !== undefined) updatedPreferences.theme = theme
 
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import {
   Toast,
   ToastClose,
@@ -11,7 +12,19 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 
 export function Toaster() {
+  const [mounted, setMounted] = useState(false)
   const { toasts, dismiss } = useToast()
+
+  // Render toasts only after mount to avoid hydration mismatch when browser
+  // extensions (e.g. password managers) inject attributes into Radix's
+  // VisuallyHidden div before React hydrates.
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
 
   return (
     <ToastProvider>

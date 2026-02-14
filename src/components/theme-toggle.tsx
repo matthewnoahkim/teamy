@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useSession } from "next-auth/react"
 
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
@@ -13,7 +14,20 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ variant = 'default' }: ThemeToggleProps) {
   const { theme: _theme, setTheme, resolvedTheme } = useTheme()
+  const { status } = useSession()
   const [mounted, setMounted] = React.useState(false)
+
+  const handleThemeChange = React.useCallback((checked: boolean) => {
+    const newTheme = checked ? "dark" : "light"
+    setTheme(newTheme)
+    if (status === 'authenticated') {
+      fetch('/api/user/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: newTheme }),
+      }).catch(() => {})
+    }
+  }, [setTheme, status])
 
   // Prevent hydration mismatch
   React.useEffect(() => {
@@ -43,7 +57,7 @@ export function ThemeToggle({ variant = 'default' }: ThemeToggleProps) {
         </div>
         <Switch
           checked={isDark}
-          onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+          onCheckedChange={handleThemeChange}
           suppressHydrationWarning
           aria-label="Toggle theme"
         />
@@ -63,7 +77,7 @@ export function ThemeToggle({ variant = 'default' }: ThemeToggleProps) {
       />
       <Switch
         checked={isDark}
-        onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+        onCheckedChange={handleThemeChange}
         suppressHydrationWarning
         aria-label="Toggle theme"
       />
