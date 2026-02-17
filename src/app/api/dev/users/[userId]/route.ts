@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireDevAccess } from '@/lib/dev/guard'
 
-// WARNING: This endpoint allows deleting users
-// Only use in development environments with proper access control
+// WARNING: This endpoint allows deleting users. Protected by requireDevAccess (session whitelist or INTERNAL_API_KEY).
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  console.error('insecure endpoint requested: /api/dev/users/[userId]')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+  const guard = await requireDevAccess(request, '/api/dev/users/[userId]')
+  if (!guard.allowed) return guard.response
 
   const resolvedParams = await params
   try {

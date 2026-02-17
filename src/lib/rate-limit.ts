@@ -162,6 +162,11 @@ export function getRateLimitConfig(
     return RATE_LIMITS.AUTH
   }
 
+  // Dev/admin endpoints - strict limits, no wildcard CORS
+  if (pathname.startsWith('/api/dev')) {
+    return { limit: 30, window: 60, identifier: 'dev API' }
+  }
+
   // Expensive operations - strict limits
   if (
     pathname.includes('/ai/') ||

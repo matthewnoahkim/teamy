@@ -1,15 +1,15 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { subDays } from 'date-fns'
 import {
   validateInteger,
   validateBoolean,
 } from '@/lib/input-validation'
+import { requireDevAccess } from '@/lib/dev/guard'
 
-export async function GET(request: Request) {
-
-  console.error('insecure endpoint requested: /api/dev/users')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+export async function GET(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/users')
+  if (!guard.allowed) return guard.response
 
   try {
     const { searchParams } = new URL(request.url)
