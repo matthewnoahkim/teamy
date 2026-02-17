@@ -208,22 +208,32 @@ export function HealthTools() {
         fetch(`/api/dev/error-logs?${params.toString()}${resolvedFilter !== 'all' ? `&resolved=${resolvedFilter === 'resolved'}` : ''}`),
       ])
 
+      const parseLogsResponse = async (res: Response): Promise<{ logs: LogEntry[] }> => {
+        if (!res.ok) return { logs: [] }
+        try {
+          const data = await res.json()
+          return { logs: data.logs ?? [] }
+        } catch {
+          return { logs: [] }
+        }
+      }
+
       const [activityData, apiData, errorData] = await Promise.all([
-        activityRes.json(),
-        apiRes.json(),
-        errorRes.json(),
+        parseLogsResponse(activityRes),
+        parseLogsResponse(apiRes),
+        parseLogsResponse(errorRes),
       ])
 
-      setActivityLogs(activityData.logs || [])
-      setApiLogs(apiData.logs || [])
-      setErrorLogs(errorData.logs || [])
+      setActivityLogs(activityData.logs)
+      setApiLogs(apiData.logs)
+      setErrorLogs(errorData.logs)
 
       // Combine all logs
       const combined = [
-        ...(activityData.logs || []).map((log: LogEntry) => ({ ...log, source: 'activity' })),
-        ...(apiData.logs || []).map((log: LogEntry) => ({ ...log, source: 'api' })),
-        ...(errorData.logs || []).map((log: LogEntry) => ({ ...log, source: 'error' })),
-      ].sort((a, b) => 
+        ...activityData.logs.map((log: LogEntry) => ({ ...log, source: 'activity' })),
+        ...apiData.logs.map((log: LogEntry) => ({ ...log, source: 'api' })),
+        ...errorData.logs.map((log: LogEntry) => ({ ...log, source: 'error' })),
+      ].sort((a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )
 
@@ -231,13 +241,14 @@ export function HealthTools() {
 
       // Apply search filter
       if (searchQuery) {
-        const filtered = combined.filter(log => 
-          log.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          log.message?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          log.route?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          log.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          log.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          log.user?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        const filtered = combined.filter(
+          (log) =>
+            log.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            log.message?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            log.route?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            log.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            log.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            log.user?.name?.toLowerCase().includes(searchQuery.toLowerCase())
         )
         setAllLogs(filtered)
       }
@@ -265,7 +276,7 @@ export function HealthTools() {
   // Fetch users
   const fetchUsers = useCallback(async () => {
     if (activeTab !== 'users') return
-    
+
     setUserLoading(true)
     try {
       const params = new URLSearchParams()
@@ -273,10 +284,19 @@ export function HealthTools() {
       params.append('limit', '50')
 
       const response = await fetch(`/api/dev/users?${params.toString()}`)
-      const data = await response.json()
-      setUsers(data.users || [])
+      if (!response.ok) {
+        setUsers([])
+        return
+      }
+      try {
+        const data = await response.json()
+        setUsers(data.users ?? [])
+      } catch {
+        setUsers([])
+      }
     } catch (error) {
       console.error('Failed to fetch users:', error)
+      setUsers([])
     } finally {
       setUserLoading(false)
     }

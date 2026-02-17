@@ -8,11 +8,11 @@ import {
   validateDate,
   validateEnum,
 } from '@/lib/input-validation'
+import { requireDevAccess } from '@/lib/dev/guard'
 
 export async function GET(request: NextRequest) {
-
-  console.error('insecure endpoint requested: /api/dev/logs')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+  const guard = await requireDevAccess(request, '/api/dev/logs')
+  if (!guard.allowed) return guard.response
 
   try {
     const { searchParams } = new URL(request.url)

@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireDevAccess } from '@/lib/dev/guard'
 
 // PATCH /api/dev/tournaments/[tournamentId]/approve
-// Allows dev panel users to approve tournaments without requiring tournament admin status
+// Allows dev panel users to approve tournaments without requiring tournament admin status. Protected by requireDevAccess.
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
+  const guard = await requireDevAccess(req, '/api/dev/tournaments/[tournamentId]/approve')
+  if (!guard.allowed) return guard.response
+
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Handle both sync and async params (Next.js 13 vs 15)
-
     const tournamentId = resolvedParams.tournamentId
     
     const body = await req.json()

@@ -1,14 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { subDays } from 'date-fns'
+import { requireDevAccess } from '@/lib/dev/guard'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
-export async function POST(request: Request) {
-
-  console.error('insecure endpoint requested: /api/dev/send-email')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+export async function POST(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/send-email')
+  if (!guard.allowed) return guard.response
 
   try {
     const body = await request.json()

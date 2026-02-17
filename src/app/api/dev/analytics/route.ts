@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { subDays, subMonths, startOfDay, format, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval } from 'date-fns'
+import { requireDevAccess } from '@/lib/dev/guard'
 
-export async function GET(request: Request) {
-
-  console.error('insecure endpoint requested: /api/dev/analytics')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+export async function GET(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/analytics')
+  if (!guard.allowed) return guard.response
 
   try {
     const { searchParams } = new URL(request.url)

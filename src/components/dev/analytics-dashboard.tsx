@@ -75,10 +75,20 @@ export function AnalyticsDashboard() {
     setLoading(true)
     try {
       const response = await fetch(`/api/dev/analytics?range=${timeRange}`)
-      const result = await response.json()
-      setData(result)
+      if (!response.ok) {
+        setData(null)
+        setLoading(false)
+        return
+      }
+      try {
+        const result = await response.json()
+        setData(result)
+      } catch {
+        setData(null)
+      }
     } catch (error) {
       console.error('Failed to fetch analytics:', error)
+      setData(null)
     } finally {
       setLoading(false)
     }
@@ -92,6 +102,18 @@ export function AnalyticsDashboard() {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-12 text-center text-muted-foreground">
+        <p>Failed to load analytics. Ensure you’re logged in with dev panel access.</p>
+        <Button variant="outline" size="sm" onClick={fetchAnalytics} disabled={loading}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
       </div>
     )
   }

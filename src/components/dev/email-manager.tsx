@@ -87,10 +87,20 @@ export function EmailManager() {
       if (isEventSupervisor !== null) params.append('isEventSupervisor', String(isEventSupervisor))
 
       const response = await fetch(`/api/dev/users?${params.toString()}`)
-      const data = await response.json()
-      setFilterStats(data)
+      if (!response.ok) {
+        setFilterStats(null)
+        setLoading(false)
+        return
+      }
+      try {
+        const data = await response.json()
+        setFilterStats(data)
+      } catch {
+        setFilterStats(null)
+      }
     } catch (error) {
       console.error('Failed to fetch users:', error)
+      setFilterStats(null)
     } finally {
       setLoading(false)
     }
@@ -127,14 +137,19 @@ export function EmailManager() {
         }),
       })
 
-      const data = await response.json()
-      
+      let data: { sent?: number; error?: string } = {}
+      try {
+        data = await response.json()
+      } catch {
+        // 404 may have empty body
+      }
+
       if (response.ok) {
         setSendResult({ success: true, message: 'Emails sent successfully!', count: data.sent })
         setSubject('')
         setHtmlContent('')
       } else {
-        setSendResult({ success: false, message: data.error || 'Failed to send emails' })
+        setSendResult({ success: false, message: data.error || (response.status === 403 || response.status === 404 ? 'Access denied' : 'Failed to send emails') })
       }
     } catch (error) {
       console.error('Error sending emails:', error)

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireDevAccess } from '@/lib/dev/guard'
 
-// DELETE - Clear all tournaments (dev only)
-export async function DELETE(_request: NextRequest) {
-  console.error('insecure endpoint requested: /api/dev/tournaments/clear')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+// DELETE - Clear all tournaments (dev only). Protected by requireDevAccess.
+export async function DELETE(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/tournaments/clear')
+  if (!guard.allowed) return guard.response
 
   try {
     // Delete related records first due to foreign key constraints
