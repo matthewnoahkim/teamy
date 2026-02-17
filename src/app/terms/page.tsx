@@ -7,7 +7,7 @@ export default function TermsOfServicePage() {
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-12">
         <div className="prose prose-slate dark:prose-invert max-w-none bg-card border border-border rounded-2xl p-8 md:p-12 shadow-card">
           <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Terms of Service</h1>
-          <p className="text-muted-foreground mb-8">Last updated: February 11, 2026</p>
+          <p className="text-muted-foreground mb-8">Last updated: February 16, 2026</p>
 
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Acceptance of Terms</h2>
@@ -25,17 +25,17 @@ export default function TermsOfServicePage() {
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">2. Description of Service</h2>
             <p>
-              Teamy is a web-based platform designed to help Science Olympiad teams manage their activities, including but not limited to:
+              Teamy is a web-based platform for Science Olympiad teams. It provides:
             </p>
             <ul>
-              <li>Team and member management</li>
-              <li>Event scheduling and calendar management</li>
-              <li>Announcements and communication</li>
-              <li>Attendance tracking</li>
-              <li>Financial management and budgeting</li>
-              <li>Test administration, grading, and AI-assisted scoring</li>
-              <li>Tournament hosting and management</li>
-              <li>Resource sharing and collaboration</li>
+              <li>Clubs, teams, and member management</li>
+              <li>Calendar events and scheduling</li>
+              <li>Announcements</li>
+              <li>Attendance tracking and check-ins</li>
+              <li>Expenses, event budgets, and purchase requests</li>
+              <li>Tests (creation, administration, grading, and optional AI-assisted grading)</li>
+              <li>Tournament hosting, registration, and event-supervisor tools</li>
+              <li>Resources, forms, and todos</li>
             </ul>
           </section>
 
@@ -59,7 +59,7 @@ export default function TermsOfServicePage() {
               <li>Your parent or legal guardian has provided verifiable consent for your use of the Service</li>
             </ul>
             <p className="mt-4">
-              We comply with the Children&apos;s Online Privacy Protection Act (COPPA) and do not knowingly collect personal information from children under 13 without proper authorization or parental consent.
+              We implement measures designed to support compliance with the Children&apos;s Online Privacy Protection Act (COPPA) and do not knowingly collect personal information from children under 13 without proper authorization or parental consent.
             </p>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">3.3 Account Security</h3>
@@ -161,29 +161,21 @@ export default function TermsOfServicePage() {
               . Please review our Privacy Policy to understand our practices regarding your information.
             </p>
 
-            <h3 className="text-lg font-semibold mb-3 mt-6">6.1 FERPA Compliance</h3>
+            <h3 className="text-lg font-semibold mb-3 mt-6">6.1 FERPA</h3>
             <p>
-              When used by educational institutions, Teamy acts as a &quot;school official&quot; with &quot;legitimate educational interests&quot; under the Family Educational Rights and Privacy Act (FERPA). We agree to:
+              When used by schools or educational institutions, Teamy is designed to handle data in a manner consistent with the Family Educational Rights and Privacy Act (FERPA). We do not sign separate &quot;school official&quot; agreements; institutions remain responsible for their own FERPA compliance. We aim to:
             </p>
             <ul>
-              <li>Use education records only for authorized educational purposes</li>
-              <li>Not disclose education records except as permitted by FERPA</li>
-              <li>Maintain the confidentiality and security of education records</li>
-              <li>Allow educational institutions to review, correct, and delete education records</li>
-              <li>Return or destroy education records upon termination of service</li>
+              <li>Use education-related data only to provide the Service</li>
+              <li>Not disclose such data except as needed to operate the Service or as required by law</li>
+              <li>Maintain reasonable confidentiality and security of data we store</li>
+              <li>Support institutions&apos; ability to review, correct, or delete data upon request</li>
             </ul>
 
-            <h3 className="text-lg font-semibold mb-3 mt-6">6.2 COPPA Compliance</h3>
+            <h3 className="text-lg font-semibold mb-3 mt-6">6.2 COPPA</h3>
             <p>
-              We comply with the Children&apos;s Online Privacy Protection Act (COPPA) by:
+              We do not knowingly collect personal information from children under 13 without proper authorization (e.g., school authorization or verifiable parental consent as permitted by COPPA). We do not use user data for advertising or marketing. Parents may contact us to review, correct, or delete their child&apos;s information.
             </p>
-            <ul>
-              <li>Not knowingly collecting personal information from children under 13 without proper authorization</li>
-              <li>Obtaining school authorization or verifiable parental consent before collecting information from children under 13</li>
-              <li>Allowing parents to review, modify, or delete their child&apos;s information</li>
-              <li>Not using student information for advertising or marketing purposes</li>
-              <li>Collecting only the minimum information necessary to provide the Service</li>
-            </ul>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">6.3 Educational Institution Responsibilities</h3>
             <p>
@@ -201,15 +193,10 @@ export default function TermsOfServicePage() {
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">7. Subscriptions and Payments</h2>
             <p>
-              Certain features of the Service may require a paid subscription. By subscribing, you agree to:
+              Certain features may require a paid subscription (e.g., club boosts). By subscribing, you agree to pay the fees described at the time of purchase and to provide accurate billing information. Recurring charges apply where stated for your plan.
             </p>
-            <ul>
-              <li>Pay all applicable fees as described at the time of purchase</li>
-              <li>Provide accurate and complete billing information</li>
-              <li>Authorize recurring charges as applicable to your subscription plan</li>
-            </ul>
             <p className="mt-4">
-              Subscription payments are processed through Stripe. We do not store your full credit card information on our servers. Refunds and cancellations are handled in accordance with our billing policies available on the billing page.
+              Payments are processed by Stripe. We do not store your full credit card number on our servers. Refunds and cancellations are at our discretion; contact us at teamysite@gmail.com for requests.
             </p>
           </section>
 
@@ -238,9 +225,9 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="font-heading text-xl font-semibold mb-4">10. Geographic Restrictions</h2>
+            <h2 className="font-heading text-xl font-semibold mb-4">10. Geographic Scope</h2>
             <p>
-              This service is intended for use only by individuals located in the United States. By accessing or using the service, you represent and warrant that you are a U.S. resident. We do not permit access to users outside the United States.
+              The Service is intended for users in the United States. We do not target or market to users outside the United States. If you access the Service from outside the U.S., you do so on your own initiative and are responsible for compliance with local laws.
             </p>
           </section>
 
@@ -250,7 +237,7 @@ export default function TermsOfServicePage() {
               THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
             </p>
             <p className="mt-4">
-              While we strive to maintain FERPA and COPPA compliance, we make no warranties regarding the absolute security of data or the prevention of unauthorized access. Educational institutions and users are responsible for implementing their own security measures and policies.
+              We do not guarantee that the Service is error-free, secure, or that unauthorized access will never occur. Educational institutions and users are responsible for their own compliance with FERPA, COPPA, and other applicable laws.
             </p>
           </section>
 
@@ -279,14 +266,8 @@ export default function TermsOfServicePage() {
             
             <h3 className="text-lg font-semibold mb-3 mt-6">14.1 Data Upon Termination</h3>
             <p>
-              Upon termination of service:
+              Upon account or service termination you may request deletion of your data by contacting us. We will delete or return data as reasonably practicable and in line with applicable law. Some data may be retained where required by law or for legitimate business purposes (e.g., fraud prevention, legal compliance).
             </p>
-            <ul>
-              <li>You may request export of your data within 30 days</li>
-              <li>We will delete or return education records as directed by educational institutions</li>
-              <li>Student data will be securely deleted in accordance with FERPA and COPPA requirements</li>
-              <li>Some data may be retained as required by law or for legitimate business purposes</li>
-            </ul>
           </section>
 
           <section className="mb-8">
@@ -299,15 +280,7 @@ export default function TermsOfServicePage() {
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">16. Changes to Terms</h2>
             <p>
-              We may modify these Terms at any time. We will notify users of material changes by:
-            </p>
-            <ul>
-              <li>Posting updated Terms on our website with a new &quot;Last Updated&quot; date</li>
-              <li>Sending email notifications for significant changes</li>
-              <li>For changes affecting student data or FERPA/COPPA compliance, providing advance notice to educational institutions</li>
-            </ul>
-            <p className="mt-4">
-              Your continued use of the Service after changes constitutes acceptance of the updated Terms.
+              We may update these Terms at any time. The updated version will be posted on this page with a new &quot;Last updated&quot; date. We may, but are not obligated to, notify users of significant changes by email. Your continued use of the Service after changes constitutes acceptance of the updated Terms.
             </p>
           </section>
 

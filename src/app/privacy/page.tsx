@@ -7,7 +7,7 @@ export default function PrivacyPolicyPage() {
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-12">
         <div className="prose prose-slate dark:prose-invert max-w-none bg-card border border-border rounded-2xl p-8 md:p-12 shadow-card">
           <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
-          <p className="text-muted-foreground mb-8">Last updated: February 11, 2026</p>
+          <p className="text-muted-foreground mb-8">Last updated: February 16, 2026</p>
 
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Introduction</h2>
@@ -19,7 +19,7 @@ export default function PrivacyPolicyPage() {
               .
             </p>
             <p className="mt-4">
-              <strong>Teamy is FERPA and COPPA compliant.</strong> We are committed to protecting student privacy and complying with all applicable federal education privacy laws, including the Family Educational Rights and Privacy Act (FERPA) and the Children&apos;s Online Privacy Protection Act (COPPA).
+              When the Service is used in educational settings, we aim to handle data in a way that is consistent with the Family Educational Rights and Privacy Act (FERPA) and the Children&apos;s Online Privacy Protection Act (COPPA). We do not sign separate agreements with schools; educational institutions remain responsible for their own compliance with applicable laws.
             </p>
           </section>
 
@@ -59,17 +59,7 @@ export default function PrivacyPolicyPage() {
 
             <h3 className="text-lg font-semibold mb-3 mt-6">2.4 Information Collected from Children</h3>
             <p>
-              When authorized by a school or with verifiable parental consent, we may collect from children under 13:
-            </p>
-            <ul>
-              <li>Name and email address (through Google OAuth with school/parent authorization)</li>
-              <li>Profile picture (optional)</li>
-              <li>Team membership and event participation information</li>
-              <li>Test submissions and scores (for educational purposes only)</li>
-              <li>Attendance records</li>
-            </ul>
-            <p className="mt-4">
-              We do not collect more information than is reasonably necessary for participation in the Service.
+              When use by a child under 13 is authorized (e.g., by school or parent), the same types of data as for other users may be collected in the course of using the Service: name, email, and profile picture from Google sign-in; club/team membership; content they create (e.g., test submissions, attendance check-ins). We do not collect more than is reasonably necessary to provide the Service.
             </p>
           </section>
 
@@ -77,7 +67,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-heading text-xl font-semibold mb-4">3. FERPA Compliance (Education Records)</h2>
             <h3 className="text-lg font-semibold mb-3 mt-6">3.1 Educational Records Protection</h3>
             <p>
-              When Teamy is used by educational institutions, we act as a &quot;school official&quot; with &quot;legitimate educational interests&quot; as defined by FERPA. We protect education records in accordance with FERPA requirements.
+              When the Service is used by schools, we handle data in a manner intended to be consistent with FERPA. We do not sign separate &quot;school official&quot; agreements. Schools remain responsible for their own FERPA compliance and for determining who has access to education records within the Service.
             </p>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">3.2 Use of Education Records</h3>
@@ -119,37 +109,35 @@ export default function PrivacyPolicyPage() {
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">4. Information We Collect</h2>
             <h3 className="text-lg font-semibold mb-3 mt-6">4.1 Information You Provide</h3>
-            <p>We collect information that you provide directly to us, including:</p>
+            <p>We collect information you provide when using the Service, including:</p>
             <ul>
-              <li>Account information (name, email address, profile picture) through Google OAuth</li>
-              <li>Team and membership information</li>
-              <li>Content you create (announcements, calendar events, test submissions)</li>
-              <li>Financial data (expenses, purchase requests) if applicable</li>
-              <li>Attendance records and check-in data</li>
-              <li>Contact form submissions</li>
-              <li>Tournament hosting requests and related information</li>
+              <li>Account information (name, email address, profile picture) when you sign in with Google OAuth</li>
+              <li>Club and team membership, roles, and related data you add</li>
+              <li>Content you create (announcements, calendar events, test answers, form responses, etc.)</li>
+              <li>Expenses, event budgets, and purchase requests you submit</li>
+              <li>Attendance check-ins</li>
+              <li>Information you submit through our contact form (name, email, subject, message)—we use this to respond and do not store it in our primary database; it may be sent to our internal notification systems</li>
+              <li>Tournament hosting requests and tournament-related information</li>
             </ul>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">4.2 Automatically Collected Information</h3>
-            <p>We automatically collect certain information when you use our Service:</p>
+            <p>When you use the Service we or our hosting/analytics providers may receive:</p>
             <ul>
-              <li>Usage data and interaction patterns</li>
-              <li>Device information and browser type</li>
-              <li>IP address and approximate location data</li>
-              <li>Cookies and similar tracking technologies</li>
-              <li>API request logs for security and performance monitoring</li>
+              <li>Usage data (e.g., page views) via Vercel Analytics</li>
+              <li>Information your browser sends (e.g., IP address, user agent) as part of normal web requests</li>
+              <li>Session and preference data stored in cookies (e.g., sign-in session, theme preference, last-visited club)</li>
+              <li>Logs of API requests and certain in-app actions for operation and security</li>
             </ul>
             <p className="mt-4">
-              <strong>Note:</strong> We do not use tracking technologies to build advertising profiles of students or for behavioral advertising purposes.
+              We do not use this data to build advertising profiles or for behavioral advertising.
             </p>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">4.3 Payment Information</h3>
             <p>
-              Payment processing is handled by Stripe. We do not store your full credit card details on our servers. We may store your Stripe customer ID and subscription status for account management purposes. Please refer to{' '}
+              Payments are processed by Stripe. We do not store your full credit card number. We store your Stripe customer ID, subscription status, and related billing metadata (e.g., subscription type, end date) to manage your account. For how Stripe handles payment data, see{' '}
               <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
                 Stripe&apos;s Privacy Policy
-              </a>{' '}
-              for information on how they handle your payment data.
+              </a>.
             </p>
           </section>
 
@@ -157,15 +145,18 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-heading text-xl font-semibold mb-4">5. How We Use Your Information</h2>
             <p>We use the information we collect to:</p>
             <ul>
-              <li>Provide, maintain, and improve our Service</li>
-              <li>Authenticate users and manage accounts</li>
-              <li>Send notifications and communications related to your teams</li>
-              <li>Process and manage team activities</li>
-              <li>Process payments and manage subscriptions</li>
-              <li>Provide AI-assisted features (such as test grading) using anonymized data</li>
-              <li>Detect and prevent fraud, abuse, or security incidents</li>
-              <li>Comply with legal obligations</li>
-              <li>Monitor and analyze usage trends to improve the Service</li>
+              <li>Provide, operate, and improve the Service</li>
+              <li>Authenticate you and manage your account (e.g., via Google OAuth, session cookies)</li>
+              <li>Send emails and in-app communications related to your clubs, tournaments, and use of the Service (e.g., via Resend)</li>
+              <li>Process payments and manage subscriptions (via Stripe)</li>
+              <li>Provide optional AI-assisted features (test grading, roster suggestions, document import/parsing, and AI chat). When you use these, the relevant content (e.g., test responses, member/roster data, document text) is sent to OpenAI&apos;s API for processing. Per OpenAI&apos;s policy, API data is not used to train their models. See{' '}
+                <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
+                  OpenAI&apos;s Privacy Policy
+                </a>.
+              </li>
+              <li>Respond to contact form and other inquiries</li>
+              <li>Comply with law and protect our rights (e.g., fraud prevention, security)</li>
+              <li>Understand usage (e.g., via Vercel Analytics) to improve the Service</li>
             </ul>
             <p className="mt-4">
               <strong>Student Data:</strong> Student information is used solely for educational purposes and to provide the Service. We do not use student personal information for advertising or marketing purposes.
@@ -174,72 +165,53 @@ export default function PrivacyPolicyPage() {
 
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">6. Information Sharing</h2>
-            <p>We do not sell, rent, or trade your personal information. We may share your information only with:</p>
+            <p>We do not sell or rent your personal information. We may share it only as follows:</p>
             <ul>
-              <li><strong>Within Your Teams:</strong> Information you post is visible to members of your teams and clubs</li>
-              <li><strong>Tournament Participants:</strong> Tournament-related information may be visible to tournament administrators, event supervisors, and registered participants as necessary for tournament operations</li>
-              <li><strong>Service Providers:</strong> Trusted third-party services that help us operate the Service, including:
-                <ul>
-                  <li>Google (authentication)</li>
-                  <li>Stripe (payment processing)</li>
-                  <li>Resend (email delivery)</li>
-                  <li>OpenAI (AI-assisted features)</li>
-                  <li>Vercel (hosting and infrastructure)</li>
-                </ul>
-                These providers are contractually obligated to protect your data and use it only for providing services to us.
-              </li>
-              <li><strong>Legal Requirements:</strong> When required by law, court order, or to protect our rights and the safety of our users</li>
-              <li><strong>School Officials:</strong> With educational institutions for students under their authority, as permitted by FERPA</li>
+              <li><strong>Within the Service:</strong> Content you create (e.g., announcements, roster data) is visible to other members of your clubs/teams and, where applicable, to tournament staff and participants as needed for tournament operation</li>
+              <li><strong>Service providers we use to run the Service:</strong> Google (sign-in), Stripe (payments), Resend (transactional email), OpenAI (AI features), Vercel (hosting and analytics). They process data on our behalf to provide these services</li>
+              <li><strong>Contact form:</strong> Submissions may be sent to our internal notification systems (e.g., webhooks) so we can respond; we do not store them in our main database</li>
+              <li><strong>Law and safety:</strong> When required by law, court order, or to protect our or others&apos; rights and safety</li>
             </ul>
           </section>
 
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">7. Data Security</h2>
             <p>
-              We implement appropriate technical and organizational measures to protect your personal information, including:
+              We use practices intended to protect your information, including:
             </p>
             <ul>
-              <li>Encryption of data in transit (TLS/SSL) and at rest</li>
-              <li>Regular security assessments and code audits</li>
-              <li>Role-based access controls and authentication measures</li>
-              <li>Input validation and sanitization to prevent injection attacks</li>
-              <li>Rate limiting to prevent abuse</li>
-              <li>Audit logging for security-sensitive operations</li>
-              <li>Secure password hashing using industry-standard algorithms</li>
-              <li>Content Security Policy (CSP) headers</li>
-              <li>Incident response procedures for data breaches</li>
+              <li>Encryption in transit (HTTPS) and, where applicable, at rest (e.g., database)</li>
+              <li>Authentication via Google OAuth and session management (e.g., secure cookies)</li>
+              <li>Access control so that data is visible only to authorized users (e.g., club members, tournament staff) as designed by the product</li>
+              <li>Input validation and rate limiting on APIs where implemented</li>
+              <li>Hashing of sensitive codes (e.g., invite codes, attendance codes) where applicable</li>
+              <li>Content Security Policy and other security headers where configured</li>
+              <li>Logging of certain operations (e.g., test changes, API use) for operation and security</li>
             </ul>
             <p className="mt-4">
-              <strong>Student Data Security:</strong> We take additional measures to protect student data, including restricting access to only those personnel with legitimate educational interests and implementing enhanced monitoring for unauthorized access attempts.
-            </p>
-            <p className="mt-4">
-              In the event of a data breach involving student information, we will promptly notify affected educational institutions and comply with all applicable breach notification requirements.
+              We do not guarantee that the Service or our systems are immune to unauthorized access, and we do not maintain a formal incident-response program beyond responding to issues as we become aware of them. In the event of a data breach, we will comply with applicable breach notification laws.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">8. Data Retention</h2>
             <p>
-              We retain your personal information for as long as your account is active or as needed to provide you with the Service. Specifically:
+              We retain data for as long as needed to provide the Service and as required by law. In practice:
             </p>
             <ul>
-              <li><strong>Account data:</strong> Retained until you request account deletion</li>
-              <li><strong>API and security logs:</strong> Retained for up to 90 days for security monitoring, then automatically purged</li>
-              <li><strong>Audit logs:</strong> Retained for up to 1 year for compliance purposes</li>
-              <li><strong>Education records:</strong> Retained only as long as needed to provide the Service, and deleted upon request from the educational institution</li>
-              <li><strong>Payment records:</strong> Retained as required by applicable financial regulations</li>
+              <li><strong>Account and user-generated data:</strong> Kept while your account is active; you may request deletion by contacting us</li>
+              <li><strong>Logs (e.g., API, actions):</strong> Kept for a limited time for operation and security</li>
+              <li><strong>Payment-related data:</strong> Subscription and billing metadata retained as needed; we rely on Stripe for payment processing and their retention policies apply to payment details</li>
             </ul>
           </section>
 
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">9. Your Rights</h2>
-            <p>You have the right to:</p>
+            <p>You may:</p>
             <ul>
-              <li><strong>Access:</strong> Request a copy of your personal information</li>
-              <li><strong>Correction:</strong> Correct inaccurate information</li>
-              <li><strong>Deletion:</strong> Request deletion of your account and data</li>
-              <li><strong>Portability:</strong> Export your data in a commonly used format</li>
-              <li><strong>Opt-Out:</strong> Opt out of certain data collection practices</li>
+              <li><strong>Access/correction:</strong> Request a copy of your data or correction of inaccuracies by contacting us</li>
+              <li><strong>Deletion:</strong> Request deletion of your account and associated data; we will do so as reasonably practicable and where not prevented by law</li>
+              <li><strong>Portability:</strong> Request an export of your data where feasible; we do not guarantee a specific format</li>
             </ul>
             
             <h3 className="text-lg font-semibold mb-3 mt-6">9.1 Student and Parent Rights</h3>
@@ -260,22 +232,14 @@ export default function PrivacyPolicyPage() {
               <a href="mailto:teamysite@gmail.com" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
                 teamysite@gmail.com
               </a>
-              . For students, please have your parent/guardian or school administrator contact us on your behalf. We will respond to all legitimate requests within 30 days.
+              . For students, a parent/guardian or school administrator may contact us on their behalf. We aim to respond to legitimate requests within a reasonable time (e.g., 30 days).
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">10. Cookies and Tracking</h2>
             <p>
-              We use cookies and similar technologies to:
-            </p>
-            <ul>
-              <li>Maintain your authentication session</li>
-              <li>Remember your preferences (such as theme settings)</li>
-              <li>Analyze usage patterns to improve the Service</li>
-            </ul>
-            <p className="mt-4">
-              We do not use cookies for third-party advertising or cross-site tracking. You can control cookie settings through your browser preferences.
+              We use cookies to keep you signed in (session cookie), remember preferences (e.g., theme, last-visited club), and for analytics (e.g., Vercel Analytics). We do not use cookies for third-party advertising or cross-site tracking. You can change cookie settings in your browser.
             </p>
           </section>
 
@@ -289,15 +253,7 @@ export default function PrivacyPolicyPage() {
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">12. Changes to This Privacy Policy</h2>
             <p>
-              We may update this Privacy Policy from time to time to reflect changes in our practices or legal requirements. We will notify users of any material changes by:
-            </p>
-            <ul>
-              <li>Posting the updated Privacy Policy on our website with a new &quot;Last Updated&quot; date</li>
-              <li>Sending email notifications to registered users for significant changes</li>
-              <li>For changes affecting student data, notifying educational institutions directly</li>
-            </ul>
-            <p className="mt-4">
-              Your continued use of the Service after any changes indicates your acceptance of the updated Privacy Policy.
+              We may update this Privacy Policy from time to time. The current version will be posted here with an updated &quot;Last updated&quot; date. We may notify users of significant changes by email when practicable. Continued use of the Service after changes constitutes acceptance of the updated policy.
             </p>
           </section>
 

@@ -120,17 +120,12 @@ export const authOptions: NextAuthOptions = {
           where: { email: user.email },
         })
 
-        if (!existingUser && user.id) {
-          // ── New user: create record ──
-          await prisma.user.create({
-            data: {
-              id: user.id,
-              email: user.email,
-              name: user.name,
-              image: user.image,
-            },
-          })
-        } else if (existingUser && account) {
+        // Do not create the user here for new sign-ups. NextAuth's callback-handler
+        // will create the user via the adapter and link the OAuth account. Creating
+        // the user here causes OAuthAccountNotLinked: the handler finds this user
+        // by email but no Account exists yet, so it treats it as "existing user without
+        // linked account" and throws.
+        if (existingUser && account) {
           // ── Returning user: link OAuth account if not already linked ──
           const existingAccount = await prisma.account.findUnique({
             where: {
