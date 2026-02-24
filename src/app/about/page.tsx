@@ -2,11 +2,7 @@ import { PublicPageLayout } from '@/components/public-page-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { 
-  Github, 
-  Heart, 
-  ExternalLink,
-} from 'lucide-react'
+import { Heart } from 'lucide-react'
 
 export const metadata = {
   title: 'About | Teamy',
@@ -92,34 +88,6 @@ export default function AboutPage() {
                 Teamy is the platform we wish we had when we first took on Science Olympiad leadership.
                 Now, we&apos;re sharing it with the entire community.
               </p>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* Open Source */}
-        <section className="mb-16">
-          <Card className="overflow-hidden bg-slate-900 dark:bg-slate-800 text-white">
-            <CardContent className="p-8 md:p-12">
-              <h2 className="text-2xl font-bold mb-6">Open Source</h2>
-              <p className="text-base text-slate-300 leading-normal mb-4">
-                Teamy is open source because we believe in transparency and community. You can view 
-                our code, suggest improvements, report bugs, or even contribute new features.
-              </p>
-              <p className="text-base text-slate-300 leading-normal mb-8">
-                We&apos;re building this in the open because Science Olympiad is a community, and 
-                Teamy should be one too.
-              </p>
-              <Link 
-                href="https://github.com/matthewnoahkim/teamy" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <Button variant="secondary" size="lg" className="gap-2">
-                  <Github className="h-5 w-5" />
-                  View on GitHub
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </Link>
             </CardContent>
           </Card>
         </section>
