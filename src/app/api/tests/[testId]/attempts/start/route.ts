@@ -359,12 +359,23 @@ export async function POST(
 
     // Check assignment (admins bypass this check, tournament tests bypass this check)
     if (!isAdminUser && !isTournamentTest) {
+      const userEventAssignments = await prisma.rosterAssignment.findMany({
+        where: {
+          membershipId: membership.id,
+          team: {
+            clubId: test.clubId,
+          },
+        },
+        select: { eventId: true },
+      })
+      const userEventIds = userEventAssignments.map((ra) => ra.eventId)
+
       const hasAccess = test.assignments.some(
         (a) =>
           a.assignedScope === 'CLUB' ||
-          (a.teamId && membership!.teamId && a.teamId === membership!.teamId) ||
-          a.targetMembershipId === membership!.id ||
-          (a.eventId && membership!.rosterAssignments?.some((ra) => ra.eventId === a.eventId))
+          (a.teamId && membership.teamId && a.teamId === membership.teamId) ||
+          a.targetMembershipId === membership.id ||
+          (a.eventId && userEventIds.includes(a.eventId))
       )
 
       if (!hasAccess) {

@@ -366,6 +366,7 @@ export default async function TakeTestPage({
       existingAttempt={existingAttempt as unknown as AttemptData}
       isAdmin={isAdminUser}
       tournamentId={tournamentTest?.tournament.id}
+      isESTest={false}
     />
   )
 }

@@ -633,6 +633,7 @@ export default async function TournamentTakeTestPage({
       isAdmin={false} // Tournament tests don't have admin bypass
       tournamentId={tournamentId!}
       testingPortal={true}
+      isESTest={isESTest}
     />
   )
 }

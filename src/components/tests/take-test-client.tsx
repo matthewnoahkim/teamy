@@ -92,6 +92,7 @@ interface TakeTestClientProps {
   isAdmin: boolean
   tournamentId?: string
   testingPortal?: boolean
+  isESTest?: boolean
 }
 
 
@@ -102,6 +103,7 @@ export function TakeTestClient({
   isAdmin,
   tournamentId,
   testingPortal,
+  isESTest = false,
 }: TakeTestClientProps) {
   const { toast } = useToast()
   const router = useRouter()
@@ -133,6 +135,7 @@ export function TakeTestClient({
   const offPageStartTimeRef = useRef(offPageStartTime) // Ref for off page start time to avoid dependency
   const testIdRef = useRef(test.id) // Ref for test ID to avoid dependency
   const tournamentIdRef = useRef(tournamentId) // Ref for tournament ID to avoid dependency
+  const isESTestRef = useRef(isESTest) // Ref for test model (regular vs ES)
 
   // Load existing answers
   useEffect(() => {
@@ -206,7 +209,7 @@ export function TakeTestClient({
     } else {
       setNeedsFullscreenPrompt(false)
     }
-  }, [started, test.requireFullscreen, attempt, existingAttempt, toast])
+  }, [started, test.requireFullscreen, attempt, existingAttempt])
 
   // Handler for user-initiated fullscreen entry (required for resume)
   const handleEnterFullscreen = async () => {
@@ -231,7 +234,8 @@ export function TakeTestClient({
     offPageStartTimeRef.current = offPageStartTime
     testIdRef.current = test.id
     tournamentIdRef.current = tournamentId
-  }, [attempt, tabSwitchCount, timeOffPageSeconds, offPageStartTime, test.id, tournamentId])
+    isESTestRef.current = isESTest
+  }, [attempt, tabSwitchCount, timeOffPageSeconds, offPageStartTime, test.id, tournamentId, isESTest])
 
   // Track page visibility and tab switching
   useEffect(() => {
@@ -240,8 +244,8 @@ export function TakeTestClient({
       if (!currentAttempt || currentAttempt.status !== 'IN_PROGRESS') return
       
       try {
-        // Use ES endpoint if tournamentId is present (ES test), otherwise use regular endpoint
-        const endpoint = tournamentIdRef.current 
+        // Use endpoint based on underlying test model, not tournament context
+        const endpoint = isESTestRef.current
           ? `/api/es/tests/${testIdRef.current}/attempts/${currentAttempt.id}/proctor-events`
           : `/api/tests/${testIdRef.current}/attempts/${currentAttempt.id}/proctor-events`
         
@@ -260,53 +264,47 @@ export function TakeTestClient({
       }
     }
 
+    const beginOffPage = () => {
+      // Guard against duplicate blur/visibility events for the same switch.
+      if (offPageStartTimeRef.current !== null) return
+      const leftAt = Date.now()
+      setOffPageStartTime(leftAt)
+      setTabSwitchCount((prev: number) => prev + 1)
+    }
+
+    const endOffPage = () => {
+      const currentOffPageStartTime = offPageStartTimeRef.current
+      if (currentOffPageStartTime === null) return
+
+      const timeOff = Math.floor((Date.now() - currentOffPageStartTime) / 1000)
+      setTimeOffPageSeconds((prev: number) => prev + timeOff)
+      recordProctorEvent('TAB_SWITCH', {
+        timeOffSeconds: timeOff,
+        leftAt: new Date(currentOffPageStartTime).toISOString(),
+        returnedAt: new Date().toISOString(),
+      })
+      setOffPageStartTime(null)
+    }
+
     const handleVisibilityChange = () => {
       const isVisible = !document.hidden
       setIsPageVisible(isVisible)
 
       if (!isVisible) {
-        // User switched away - record when they left
-        const leftAt = Date.now()
-        setOffPageStartTime(leftAt)
-        setTabSwitchCount((prev: number) => prev + 1)
+        beginOffPage()
       } else {
-        // User returned - record TAB_SWITCH with time off site
-        const currentOffPageStartTime = offPageStartTimeRef.current
-        if (currentOffPageStartTime) {
-          const timeOff = Math.floor((Date.now() - currentOffPageStartTime) / 1000)
-          setTimeOffPageSeconds((prev: number) => prev + timeOff)
-          recordProctorEvent('TAB_SWITCH', { 
-            timeOffSeconds: timeOff,
-            leftAt: new Date(currentOffPageStartTime).toISOString(),
-            returnedAt: new Date().toISOString()
-          })
-          setOffPageStartTime(null)
-        }
+        endOffPage()
       }
     }
 
     const handleBlur = () => {
       if (document.hidden) {
-        // User switched away - record when they left
-        const leftAt = Date.now()
-        setOffPageStartTime(leftAt)
-        setTabSwitchCount((prev: number) => prev + 1)
+        beginOffPage()
       }
     }
 
     const handleFocus = () => {
-      const currentOffPageStartTime = offPageStartTimeRef.current
-      if (currentOffPageStartTime) {
-        const timeOff = Math.floor((Date.now() - currentOffPageStartTime) / 1000)
-        setTimeOffPageSeconds((prev: number) => prev + timeOff)
-        // Record the time off site in the meta when returning
-        recordProctorEvent('TAB_SWITCH', { 
-          timeOffSeconds: timeOff,
-          leftAt: new Date(currentOffPageStartTime).toISOString(),
-          returnedAt: new Date().toISOString()
-        })
-        setOffPageStartTime(null)
-      }
+      endOffPage()
     }
 
     // Handle fullscreen changes - show prompt when user exits fullscreen
@@ -388,8 +386,8 @@ export function TakeTestClient({
         const currentAttempt = attemptRef.current
         if (currentAttempt && currentAttempt.status === 'IN_PROGRESS') {
           try {
-            // Use ES endpoint if tournamentId is present (ES test), otherwise use regular endpoint
-            const endpoint = tournamentIdRef.current 
+            // Use endpoint based on underlying test model, not tournament context
+            const endpoint = isESTestRef.current
               ? `/api/es/tests/${testIdRef.current}/attempts/${currentAttempt.id}/tab-tracking`
               : `/api/tests/${testIdRef.current}/attempts/${currentAttempt.id}/tab-tracking`
             
@@ -674,7 +672,7 @@ export function TakeTestClient({
         document.documentElement.requestFullscreen().catch(() => {})
       }
     }
-  }, [attempt, test.id, membership.clubId, test.requireFullscreen, toast, router, answers, saveAnswer, tournamentId, testingPortal])
+  }, [attempt, test.id, membership.clubId, test.requireFullscreen, toast, answers, saveAnswer, tournamentId, testingPortal])
 
   // Countdown timer
   useEffect(() => {
@@ -694,9 +692,8 @@ export function TakeTestClient({
       const startTime = new Date(attempt.startedAt).getTime()
       const now = Date.now()
       const elapsedSeconds = Math.floor((now - startTime) / 1000)
-      // Account for time spent off-page (tab switches)
-      // Account for time spent paused (save & exit)
-      const adjustedElapsed = elapsedSeconds - (timeOffPageSeconds || 0) - totalPausedSecondsRef.current
+      // Timer should continue while tab is hidden; only subtract explicit save/exit pauses.
+      const adjustedElapsed = elapsedSeconds - totalPausedSecondsRef.current
       const totalDurationSeconds = test.durationMinutes * 60
       const remaining = Math.max(0, totalDurationSeconds - adjustedElapsed)
       
@@ -734,7 +731,7 @@ export function TakeTestClient({
         timerIntervalRef.current = null
       }
     }
-  }, [started, attempt, test.durationMinutes, timeOffPageSeconds, toast, handleSubmit])
+  }, [started, attempt, test.durationMinutes, toast, handleSubmit])
 
   // Handle browser back button - auto-submit test
   useEffect(() => {
@@ -1340,7 +1337,7 @@ export function TakeTestClient({
                   {markedForReview.size > 0 && (
                     <span>{markedForReview.size} marked for review</span>
                   )}
-                  {markedForReview.size > 0 && unansweredQuestions.length > 0 && <span> • </span>}
+                  {markedForReview.size > 0 && unansweredQuestions.length > 0 && <span> | </span>}
                   {unansweredQuestions.length > 0 && (
                     <span>{unansweredQuestions.length} unanswered</span>
                   )}
@@ -1437,10 +1434,15 @@ export function TakeTestClient({
                 
                 // Navigate away - fullscreen will NOT be re-entered
                 setShowSaveExitDialog(false)
-                // Use window.location for full page navigation to ensure tab parameter is preserved
-                // Extract clubId from membership or current URL path
-                const clubId = membership?.clubId || window.location.pathname.split('/')[2]
-                window.location.href = `/club/${clubId}?tab=tests`
+                // Use full page navigation to preserve query params/state consistently.
+                if (testingPortal) {
+                  window.location.href = '/testing'
+                } else if (tournamentIdRef.current) {
+                  window.location.href = `/tournaments/${tournamentIdRef.current}/tests`
+                } else {
+                  const clubId = membership?.clubId || window.location.pathname.split('/')[2]
+                  window.location.href = `/club/${clubId}?tab=tests`
+                }
               }}
             >
               Save & Exit

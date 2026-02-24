@@ -19,7 +19,14 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
       },
     },
   })
-  return !!admin
+  if (admin) return true
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { createdById: true },
+  })
+
+  return tournament?.createdById === userId
 }
 
 // POST /api/tournaments/[tournamentId]/assign-tests
@@ -87,20 +94,9 @@ export async function POST(
           },
         },
       },
-      include: {
-        club: {
-          include: {
-            memberships: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                  },
-                },
-              },
-            },
-          },
-        },
+      select: {
+        teamId: true,
+        clubId: true,
       },
     })
 
@@ -111,48 +107,80 @@ export async function POST(
       })
     }
 
-    // For each registered team, assign the test to all members who have this event in their roster
-    let totalAssignments = 0
+    const teamIds = registrations
+      .map((registration) => registration.teamId)
+      .filter((id): id is string => id !== null)
+    const clubIds = registrations
+      .filter((registration) => registration.teamId === null)
+      .map((registration) => registration.clubId)
 
-    await prisma.$transaction(async (tx) => {
-      for (const registration of registrations) {
-        // Get all memberships for this team that have this event in their roster
-        const membershipsWithEvent = await tx.membership.findMany({
-          where: {
-            teamId: registration.teamId,
-            rosterAssignments: {
-              some: {
-                eventId: validated.eventId,
-              },
-            },
+    if (teamIds.length === 0 && clubIds.length === 0) {
+      return NextResponse.json({
+        message: 'No eligible registrations found for this event',
+        assigned: 0,
+        teams: registrations.length,
+      })
+    }
+
+    const membershipScopeWhere =
+      teamIds.length > 0 && clubIds.length > 0
+        ? { OR: [{ teamId: { in: teamIds } }, { clubId: { in: clubIds } }] }
+        : teamIds.length > 0
+          ? { teamId: { in: teamIds } }
+          : { clubId: { in: clubIds } }
+
+    // Pull all eligible memberships in one query instead of N+1 per registration.
+    const membershipsWithEvent = await prisma.membership.findMany({
+      where: {
+        ...membershipScopeWhere,
+        rosterAssignments: {
+          some: {
+            eventId: validated.eventId,
           },
-        })
-
-        // Create test assignments for each membership
-        for (const membership of membershipsWithEvent) {
-          // Check if assignment already exists
-          const existing = await tx.testAssignment.findFirst({
-            where: {
-              testId: validated.testId,
-              targetMembershipId: membership.id,
-              eventId: validated.eventId,
-            },
-          })
-
-          if (!existing) {
-            await tx.testAssignment.create({
-              data: {
-                testId: validated.testId,
-                assignedScope: 'PERSONAL',
-                targetMembershipId: membership.id,
-                eventId: validated.eventId,
-              },
-            })
-            totalAssignments++
-          }
-        }
-      }
+        },
+      },
+      select: { id: true },
     })
+
+    const membershipIds = membershipsWithEvent.map((membership) => membership.id)
+    if (membershipIds.length === 0) {
+      return NextResponse.json({
+        message: 'No rostered members found for this event',
+        assigned: 0,
+        teams: registrations.length,
+      })
+    }
+
+    const existingAssignments = await prisma.testAssignment.findMany({
+      where: {
+        testId: validated.testId,
+        eventId: validated.eventId,
+        targetMembershipId: { in: membershipIds },
+      },
+      select: { targetMembershipId: true },
+    })
+    const existingMembershipIds = new Set(
+      existingAssignments
+        .map((assignment) => assignment.targetMembershipId)
+        .filter((id): id is string => id !== null)
+    )
+
+    const assignmentsToCreate = membershipIds
+      .filter((membershipId) => !existingMembershipIds.has(membershipId))
+      .map((membershipId) => ({
+        testId: validated.testId,
+        assignedScope: 'PERSONAL' as const,
+        targetMembershipId: membershipId,
+        eventId: validated.eventId,
+      }))
+
+    if (assignmentsToCreate.length > 0) {
+      await prisma.testAssignment.createMany({
+        data: assignmentsToCreate,
+      })
+    }
+
+    const totalAssignments = assignmentsToCreate.length
 
     return NextResponse.json({ 
       message: `Test assigned to ${totalAssignments} team members`,

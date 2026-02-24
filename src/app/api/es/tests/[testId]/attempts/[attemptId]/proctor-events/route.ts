@@ -25,7 +25,7 @@ export async function POST(
 
     const attempt = await prisma.eSTestAttempt.findUnique({
       where: { id: resolvedParams.attemptId },
-      select: { membershipId: true, testId: true },
+      select: { membershipId: true, testId: true, status: true },
     })
 
     if (!attempt) {
@@ -35,6 +35,10 @@ export async function POST(
     // Verify the attempt belongs to the test
     if (attempt.testId !== resolvedParams.testId) {
       return NextResponse.json({ error: 'Attempt does not belong to this test' }, { status: 400 })
+    }
+
+    if (attempt.status !== 'IN_PROGRESS') {
+      return NextResponse.json({ error: 'Attempt is not in progress' }, { status: 400 })
     }
 
     // Verify the user owns this attempt

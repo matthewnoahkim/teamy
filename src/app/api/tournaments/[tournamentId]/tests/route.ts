@@ -19,7 +19,14 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
       },
     },
   })
-  return !!admin
+  if (admin) return true
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { createdById: true },
+  })
+
+  return tournament?.createdById === userId
 }
 
 // GET /api/tournaments/[tournamentId]/tests

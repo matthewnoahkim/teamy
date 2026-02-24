@@ -26,23 +26,25 @@ export async function PATCH(
 
     const attempt = await prisma.testAttempt.findUnique({
       where: { id: resolvedParams.attemptId },
-      select: { membershipId: true, testId: true },
+      select: { membershipId: true, testId: true, status: true },
     })
 
     if (!attempt) {
       return NextResponse.json({ error: 'Attempt not found' }, { status: 404 })
     }
 
+    if (attempt.testId !== resolvedParams.testId) {
+      return NextResponse.json({ error: 'Attempt does not belong to this test' }, { status: 400 })
+    }
+
+    if (attempt.status !== 'IN_PROGRESS') {
+      return NextResponse.json({ error: 'Attempt is not in progress' }, { status: 400 })
+    }
+
     const membership = await prisma.membership.findFirst({
       where: {
         userId: session.user.id,
-        club: {
-          tests: {
-            some: {
-              id: resolvedParams.testId,
-            },
-          },
-        },
+        id: attempt.membershipId,
       },
     })
 

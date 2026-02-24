@@ -48,6 +48,10 @@ export async function POST(
     let membership: { id: string; [key: string]: unknown } | null = null
 
     if (attempt) {
+      if (attempt.testId !== resolvedParams.testId) {
+        return NextResponse.json({ error: 'Attempt does not belong to this test' }, { status: 400 })
+      }
+
       // Verify ownership - check if user is a member of the club and owns this attempt
       membership = await getUserMembership(session.user.id, attempt.test.clubId)
       if (!membership || membership.id !== attempt.membershipId) {
@@ -76,6 +80,10 @@ export async function POST(
 
       if (!esAttempt) {
         return NextResponse.json({ error: 'Attempt not found' }, { status: 404 })
+      }
+
+      if (esAttempt.testId !== resolvedParams.testId) {
+        return NextResponse.json({ error: 'Attempt does not belong to this test' }, { status: 400 })
       }
 
       isESTest = true
