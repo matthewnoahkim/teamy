@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireDevAccess } from '@/lib/dev/guard'
 
 // GET /api/blog - Get all published blog posts (public)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const includeUnpublished = searchParams.get('all') === 'true'
+
+    if (includeUnpublished) {
+      const guard = await requireDevAccess(request, '/api/blog?all=true')
+      if (!guard.allowed) return guard.response
+    }
 
     const posts = await prisma.blogPost.findMany({
       where: includeUnpublished ? {} : { published: true },

@@ -6,6 +6,7 @@ import { requireMember, isAdmin, getUserMembership } from '@/lib/rbac'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { extensionForMime } from '@/lib/upload-security'
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const ALLOWED_TYPES = [
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
     // Generate unique filename
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 15)
-    const extension = file.name.split('.').pop()
+    const extension = extensionForMime(file.type)
     const filename = `form-${timestamp}-${randomString}.${extension}`
 
     // Create uploads directory if it doesn't exist

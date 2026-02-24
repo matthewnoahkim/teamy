@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireDevAccess } from '@/lib/dev/guard'
 
 // GET /api/blog/[slug] - Get a single blog post
 export async function GET(
@@ -14,6 +15,12 @@ export async function GET(
 
     if (!post) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+    }
+
+    // Unpublished posts are only visible to dev-authorized users.
+    if (!post.published) {
+      const guard = await requireDevAccess(request, `/api/blog/${resolvedParams.slug}`)
+      if (!guard.allowed) return guard.response
     }
 
     return NextResponse.json({ post })

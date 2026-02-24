@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -17,21 +17,8 @@ import { Label } from '@/components/ui/label'
 import { CheckCircle2, XCircle, FileText, User, Clock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-function sanitizeNoteSheetHtml(html: string): string {
-  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-  sanitized = sanitized.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-  sanitized = sanitized.replace(/(href|src)\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, '$1=""')
-  return sanitized
-}
-
-function SanitizedHtml({ html, className }: { html: string; className?: string }) {
-  const sanitized = useMemo(() => sanitizeNoteSheetHtml(html), [html])
-  return (
-    <div
-      dangerouslySetInnerHTML={{ __html: sanitized }}
-      className={className}
-    />
-  )
+function NoteSheetText({ text, className }: { text: string; className?: string }) {
+  return <div className={className}>{text}</div>
 }
 
 interface NoteSheetReviewProps {
@@ -248,7 +235,10 @@ export function NoteSheetReview({
                   <CardContent className="space-y-4">
                     {noteSheet.type === 'CREATED' ? (
                       <div className="border rounded-lg p-4 bg-muted/50 max-h-96 overflow-auto">
-                        <SanitizedHtml html={noteSheet.content || ''} className="prose prose-sm max-w-none" />
+                        <NoteSheetText
+                          text={noteSheet.content || ''}
+                          className="whitespace-pre-wrap break-words text-sm leading-6"
+                        />
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">

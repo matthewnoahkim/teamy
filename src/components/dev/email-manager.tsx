@@ -55,6 +55,30 @@ interface FilterStats {
   users: FilteredUser[]
 }
 
+function EmailPreviewFrame({ htmlContent }: { htmlContent: string }) {
+  const safeHtml = htmlContent || '<p style="color:#6b7280">(No content)</p>'
+  const srcDoc = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { margin: 0; padding: 12px; font-family: system-ui, -apple-system, sans-serif; }
+    </style>
+  </head>
+  <body>${safeHtml}</body>
+</html>`
+
+  return (
+    <iframe
+      title="Email HTML preview"
+      sandbox=""
+      srcDoc={srcDoc}
+      className="w-full min-h-[260px] rounded border"
+    />
+  )
+}
+
 export function EmailManager() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -445,10 +469,7 @@ export function EmailManager() {
                   <p className="text-sm text-muted-foreground">Subject:</p>
                   <p className="font-semibold">{subject || '(No subject)'}</p>
                 </div>
-                <div 
-                  className="prose dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: htmlContent || '<p class="text-muted-foreground">(No content)</p>' }}
-                />
+                <EmailPreviewFrame htmlContent={htmlContent} />
               </div>
             </TabsContent>
           </Tabs>
@@ -470,10 +491,7 @@ export function EmailManager() {
               <p className="text-sm text-muted-foreground">To: {filterStats?.matchingUsers || 0} recipients</p>
               <p className="font-semibold mt-2">Subject: {subject}</p>
             </div>
-            <div 
-              className="prose dark:prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: htmlContent }}
-            />
+            <EmailPreviewFrame htmlContent={htmlContent} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>

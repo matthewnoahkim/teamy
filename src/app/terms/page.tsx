@@ -7,7 +7,7 @@ export default function TermsOfServicePage() {
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-12">
         <div className="prose prose-slate dark:prose-invert max-w-none bg-card border border-border rounded-2xl p-8 md:p-12 shadow-card">
           <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Terms of Service</h1>
-          <p className="text-muted-foreground mb-8">Last updated: February 16, 2026</p>
+          <p className="text-muted-foreground mb-8">Last updated: February 24, 2026</p>
 
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Acceptance of Terms</h2>
@@ -90,6 +90,7 @@ export default function TermsOfServicePage() {
               <li>Only share student information with authorized individuals who have legitimate educational interests</li>
               <li>Not post student education records or personally identifiable information in public areas</li>
               <li>Follow your institution&apos;s policies regarding student data privacy</li>
+              <li>Avoid uploading sensitive personal data to files that may be shared by URL</li>
             </ul>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">4.2 Prohibited Content</h3>
@@ -207,6 +208,7 @@ export default function TermsOfServicePage() {
             </p>
             <ul>
               <li>Provide accurate tournament information</li>
+              <li>Only provide organizer contact information you are authorized to publish</li>
               <li>Comply with all applicable Science Olympiad rules and regulations</li>
               <li>Handle participant data in accordance with FERPA, COPPA, and our Privacy Policy</li>
               <li>Obtain all necessary permissions and approvals before hosting</li>

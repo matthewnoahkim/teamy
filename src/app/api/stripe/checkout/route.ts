@@ -17,6 +17,15 @@ if (stripeSecretKey) {
   }
 }
 
+const PRO_PRICE_IDS = [
+  process.env.STRIPE_PRO_PRICE_ID,
+  process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
+].filter((value): value is string => !!value && value.trim().length > 0)
+
+const PRICE_ID_TO_TYPE = new Map<string, 'pro'>(
+  PRO_PRICE_IDS.map((priceId) => [priceId.trim(), 'pro'])
+)
+
 export async function POST(req: NextRequest) {
   try {
     // Check if Stripe is configured
@@ -42,19 +51,24 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { priceId, type } = body // type: 'pro' or 'boost'
+    const { priceId } = body
 
-    if (!priceId) {
+    if (typeof priceId !== 'string' || priceId.trim().length === 0) {
       return NextResponse.json({ error: 'Price ID is required' }, { status: 400 })
     }
 
-    // Check if using placeholder price ID
-    if (priceId === 'price_1234567890' || priceId.startsWith('price_123')) {
+    if (PRICE_ID_TO_TYPE.size === 0) {
       return NextResponse.json(
-        { 
-          error: 'Invalid Price ID',
-          message: 'Please create a product in Stripe Dashboard and update NEXT_PUBLIC_STRIPE_PRO_PRICE_ID in your .env.local file with the actual Price ID.'
-        },
+        { error: 'No valid subscription price IDs are configured on the server.' },
+        { status: 500 }
+      )
+    }
+
+    const normalizedPriceId = priceId.trim()
+    const subscriptionType = PRICE_ID_TO_TYPE.get(normalizedPriceId)
+    if (!subscriptionType) {
+      return NextResponse.json(
+        { error: 'Invalid pricing option selected.' },
         { status: 400 }
       )
     }
@@ -96,14 +110,14 @@ export async function POST(req: NextRequest) {
       customer: customerId, // Use customer ID instead of customer_email
       line_items: [
         {
-          price: priceId,
+          price: normalizedPriceId,
           quantity: 1,
         },
       ],
       client_reference_id: session.user.id,
       metadata: {
         userId: session.user.id,
-        type: type || 'pro',
+        type: subscriptionType,
       },
       success_url: `${baseUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,

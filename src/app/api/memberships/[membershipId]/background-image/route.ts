@@ -6,6 +6,7 @@ import { getUserMembership, isAdmin } from '@/lib/rbac'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
+import { extensionForMime, resolveSafePublicUploadPath } from '@/lib/upload-security'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
@@ -37,7 +38,8 @@ async function ensureAccess(sessionUserId: string, membershipId: string) {
 
 async function deleteExistingFile(filePath?: string | null) {
   if (!filePath) return
-  const absolute = join(process.cwd(), 'public', filePath)
+  const absolute = resolveSafePublicUploadPath(filePath)
+  if (!absolute) return
   if (existsSync(absolute)) {
     try {
       await unlink(absolute)
@@ -92,7 +94,7 @@ export async function POST(
 
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 15)
-    const extension = file.name.split('.').pop() || 'jpg'
+    const extension = extensionForMime(file.type, 'jpg')
     const filename = `member-${membership.id}-${timestamp}-${randomString}.${extension}`
     const filePath = join(uploadsDir, filename)
 

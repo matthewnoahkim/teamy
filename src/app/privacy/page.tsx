@@ -7,7 +7,7 @@ export default function PrivacyPolicyPage() {
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-12">
         <div className="prose prose-slate dark:prose-invert max-w-none bg-card border border-border rounded-2xl p-8 md:p-12 shadow-card">
           <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
-          <p className="text-muted-foreground mb-8">Last updated: February 16, 2026</p>
+          <p className="text-muted-foreground mb-8">Last updated: February 24, 2026</p>
 
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Introduction</h2>
@@ -116,7 +116,7 @@ export default function PrivacyPolicyPage() {
               <li>Content you create (announcements, calendar events, test answers, form responses, etc.)</li>
               <li>Expenses, event budgets, and purchase requests you submit</li>
               <li>Attendance check-ins</li>
-              <li>Information you submit through our contact form (name, email, subject, message)—we use this to respond and do not store it in our primary database; it may be sent to our internal notification systems</li>
+              <li>Information you submit through our contact form (name, email, subject, message) - we use this to respond and do not store it in our primary database; it may be sent to our internal notification systems</li>
               <li>Tournament hosting requests and tournament-related information</li>
             </ul>
 
@@ -167,7 +167,9 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-heading text-xl font-semibold mb-4">6. Information Sharing</h2>
             <p>We do not sell or rent your personal information. We may share it only as follows:</p>
             <ul>
+              <li><strong>Public tournament pages:</strong> Approved and published tournaments may display organizer-provided information (such as director name and email) for registration and communication purposes</li>
               <li><strong>Within the Service:</strong> Content you create (e.g., announcements, roster data) is visible to other members of your clubs/teams and, where applicable, to tournament staff and participants as needed for tournament operation</li>
+              <li><strong>Uploaded files:</strong> Files uploaded to the Service are hosted at URL paths and may be accessible to anyone who has the link</li>
               <li><strong>Service providers we use to run the Service:</strong> Google (sign-in), Stripe (payments), Resend (transactional email), OpenAI (AI features), Vercel (hosting and analytics). They process data on our behalf to provide these services</li>
               <li><strong>Contact form:</strong> Submissions may be sent to our internal notification systems (e.g., webhooks) so we can respond; we do not store them in our main database</li>
               <li><strong>Law and safety:</strong> When required by law, court order, or to protect our or others&apos; rights and safety</li>
@@ -246,7 +248,7 @@ export default function PrivacyPolicyPage() {
           <section className="mb-8">
             <h2 className="font-heading text-xl font-semibold mb-4">11. International Users</h2>
             <p>
-              We do not target, market to, or knowingly collect personal information from individuals outside the United States. If we become aware that we have collected information from a non-U.S. resident, we will delete it promptly.
+              Our Service is operated from the United States and is primarily intended for U.S.-based teams. If you access the Service from outside the United States, your information may be processed and stored in the United States.
             </p>
           </section>
 

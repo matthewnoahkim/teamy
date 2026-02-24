@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { Division } from '@prisma/client'
+import { requireDevAccess } from '@/lib/dev/guard'
 import {
   sanitizeSearchQuery,
   validateId,
@@ -80,8 +81,14 @@ export async function GET(req: NextRequest) {
 
     const where: Record<string, unknown> = {}
     
-    // Check if we should include unapproved tournaments (for dev panel)
-    const includeUnapproved = searchParams.get('includeUnapproved') === 'true'
+    // Check if we should include unapproved tournaments (dev-only)
+    const requestedIncludeUnapproved = searchParams.get('includeUnapproved') === 'true'
+    let includeUnapproved = false
+    if (requestedIncludeUnapproved) {
+      const guard = await requireDevAccess(req, '/api/tournaments?includeUnapproved=true')
+      if (!guard.allowed) return guard.response
+      includeUnapproved = true
+    }
     
     // Only show approved tournaments on the tournaments wall (unless filtering by createdBy/managedBy, pendingApproval, or includeUnapproved is true)
     // This allows creators/admins to see their own tournaments even if not approved

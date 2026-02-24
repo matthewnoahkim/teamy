@@ -7,6 +7,7 @@ import { writeFile, mkdir, unlink } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { revalidatePath } from 'next/cache'
+import { extensionForMime, resolveSafePublicUploadPath } from '@/lib/upload-security'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB for background images
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
@@ -61,8 +62,8 @@ export async function POST(
     // Delete old background image if it exists
     if (club.backgroundImageUrl) {
       try {
-        const oldFilePath = join(process.cwd(), 'public', club.backgroundImageUrl)
-        if (existsSync(oldFilePath)) {
+        const oldFilePath = resolveSafePublicUploadPath(club.backgroundImageUrl)
+        if (oldFilePath && existsSync(oldFilePath)) {
           await unlink(oldFilePath)
         }
       } catch (err) {
@@ -74,7 +75,7 @@ export async function POST(
     // Generate unique filename
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 15)
-    const extension = file.name.split('.').pop() || 'jpg'
+    const extension = extensionForMime(file.type, 'jpg')
     const filename = `background-${timestamp}-${randomString}.${extension}`
 
     // Create uploads directory if it doesn't exist
@@ -139,8 +140,8 @@ export async function DELETE(
     // Delete file from filesystem
     if (club.backgroundImageUrl) {
       try {
-        const filePath = join(process.cwd(), 'public', club.backgroundImageUrl)
-        if (existsSync(filePath)) {
+        const filePath = resolveSafePublicUploadPath(club.backgroundImageUrl)
+        if (filePath && existsSync(filePath)) {
           await unlink(filePath)
         }
       } catch (err) {

@@ -6,8 +6,29 @@ import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { extensionForMime, resolveSafePublicUploadPath } from '@/lib/upload-security'
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+const ALLOWED_ATTACHMENT_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
+]
 
 // POST - Upload attachment
 export async function POST(req: NextRequest) {
@@ -37,6 +58,13 @@ export async function POST(req: NextRequest) {
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { error: 'File size exceeds 100MB limit' },
+        { status: 400 }
+      )
+    }
+
+    if (!ALLOWED_ATTACHMENT_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Unsupported file type' },
         { status: 400 }
       )
     }
@@ -124,7 +152,7 @@ export async function POST(req: NextRequest) {
     // Generate unique filename
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 15)
-    const extension = file.name.split('.').pop()
+    const extension = extensionForMime(file.type)
     const filename = `${timestamp}-${randomString}.${extension}`
 
     // Create uploads directory if it doesn't exist
@@ -261,8 +289,12 @@ export async function DELETE(req: NextRequest) {
 
     // Delete file from filesystem
     try {
-      const filePath = join(process.cwd(), 'public', attachment.filePath)
-      await unlink(filePath)
+      const safePath = resolveSafePublicUploadPath(attachment.filePath)
+      if (safePath) {
+        await unlink(safePath)
+      } else {
+        console.warn('Skipped deleting attachment with invalid path:', attachment.filePath)
+      }
     } catch (err) {
       console.error('Failed to delete file:', err)
       // Continue even if file deletion fails

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,21 +12,12 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { FileText } from 'lucide-react'
 
-function sanitizeNoteSheetHtml(html: string): string {
-  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-  sanitized = sanitized.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-  sanitized = sanitized.replace(/(href|src)\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, '$1=""')
-  return sanitized
-}
-
 function NoteSheetContent({ content }: { content: string }) {
-  const sanitized = useMemo(() => sanitizeNoteSheetHtml(content), [content])
   return (
     <div className="border rounded-lg p-6 bg-white">
-      <div
-        dangerouslySetInnerHTML={{ __html: sanitized }}
-        className="prose prose-sm max-w-none"
-      />
+      <div className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-900">
+        {content}
+      </div>
     </div>
   )
 }

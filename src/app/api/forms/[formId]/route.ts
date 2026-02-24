@@ -4,8 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/rbac'
 import { unlink } from 'fs/promises'
-import { join } from 'path'
 import { z } from 'zod'
+import { resolveSafePublicUploadPath } from '@/lib/upload-security'
 
 const updateFormSchema = z.object({
   title: z.string().optional(),
@@ -111,8 +111,10 @@ export async function DELETE(
 
     // Delete file from filesystem
     try {
-      const filePath = join(process.cwd(), 'public', existingForm.filePath)
-      await unlink(filePath)
+      const filePath = resolveSafePublicUploadPath(existingForm.filePath)
+      if (filePath) {
+        await unlink(filePath)
+      }
     } catch (err) {
       console.error('Failed to delete file:', err)
       // Continue even if file deletion fails
