@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireMember, isAdmin } from '@/lib/rbac'
+import { logApiTiming } from '@/lib/api-timing'
 import { z } from 'zod'
 
 const createExpenseSchema = z.object({
@@ -17,6 +18,7 @@ const createExpenseSchema = z.object({
 
 // GET /api/expenses?clubId=xxx
 export async function GET(req: NextRequest) {
+  const startedAtMs = performance.now()
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -123,6 +125,11 @@ export async function GET(req: NextRequest) {
         ...expense,
         addedBy: addedByMap.get(expense.addedById) || null,
       }
+    })
+
+    logApiTiming('/api/expenses', startedAtMs, {
+      clubId,
+      resultCount: expensesWithPurchaser.length,
     })
 
     return NextResponse.json({ expenses: expensesWithPurchaser })

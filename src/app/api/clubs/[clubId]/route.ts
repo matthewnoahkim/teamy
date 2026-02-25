@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireMember, requireAdmin } from '@/lib/rbac'
+import { logApiTiming } from '@/lib/api-timing'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 
@@ -19,6 +20,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ clubId: string }> }
 ) {
+  const startedAtMs = performance.now()
   const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
@@ -71,6 +73,12 @@ export async function GET(
     if (!club) {
       return NextResponse.json({ error: 'Club not found' }, { status: 404 })
     }
+
+    logApiTiming('/api/clubs/[clubId]', startedAtMs, {
+      clubId: resolvedParams.clubId,
+      membershipCount: club.memberships.length,
+      teamCount: club.teams.length,
+    })
 
     return NextResponse.json({ club })
   } catch (error) {

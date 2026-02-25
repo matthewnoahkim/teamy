@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
+import * as rbac from '@/lib/rbac'
 import { sendAnnouncementEmail } from '@/lib/email'
+import { logApiTiming } from '@/lib/api-timing'
+import { hasAnnouncementTargetAccess } from '@/lib/club-authz'
+import { serverSession } from '@/lib/server-session'
 import { z } from 'zod'
 import { AnnouncementScope } from '@prisma/client'
 
@@ -22,7 +23,7 @@ const createAnnouncementSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     const validated = createAnnouncementSchema.parse(body)
 
     // Only admins can create announcements
-    const isAdminUser = await isAdmin(session.user.id, validated.clubId)
+    const isAdminUser = await rbac.isAdmin(session.user.id, validated.clubId)
     if (!isAdminUser) {
       return NextResponse.json(
         { error: 'Only admins can create announcements' },
@@ -39,9 +40,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    await requireMember(session.user.id, validated.clubId)
+    await rbac.requireMember(session.user.id, validated.clubId)
 
-    const membership = await getUserMembership(session.user.id, validated.clubId)
+    const membership = await rbac.getUserMembership(session.user.id, validated.clubId)
     if (!membership) {
       return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
     }
@@ -334,8 +335,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  const startedAtMs = performance.now()
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -347,19 +349,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID required' }, { status: 400 })
     }
 
-    await requireMember(session.user.id, clubId)
+    await rbac.requireMember(session.user.id, clubId)
 
-    const membership = await getUserMembership(session.user.id, clubId)
+    const membership = await rbac.getUserMembership(session.user.id, clubId)
     if (!membership) {
       return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
     }
 
     // Check if user is an admin
-    const isAdminUser = await isAdmin(session.user.id, clubId)
+    const isAdminUser = await rbac.isAdmin(session.user.id, clubId)
+    const userEventIds = !isAdminUser
+      ? (await prisma.rosterAssignment.findMany({
+          where: {
+            membershipId: membership.id,
+            team: { clubId },
+          },
+          select: {
+            eventId: true,
+          },
+        })).map(assignment => assignment.eventId)
+      : []
 
     // Get announcements visible to this user
     // Admins can see all announcements, regular members only see club-wide and their team
-    const announcements = await prisma.announcement.findMany({
+    const allVisibleAnnouncements = await prisma.announcement.findMany({
       where: {
         clubId,
         // Admins see all announcements for the club
@@ -487,6 +500,24 @@ export async function GET(req: NextRequest) {
       orderBy: {
         createdAt: 'desc',
       },
+    })
+
+    const announcements = isAdminUser
+      ? allVisibleAnnouncements
+      : allVisibleAnnouncements.filter((announcement) => {
+          const targets = announcement.visibilities
+            .filter(visibility => visibility.targetRole || visibility.eventId)
+            .map(visibility => ({
+              targetRole: visibility.targetRole,
+              eventId: visibility.eventId,
+            }))
+          return hasAnnouncementTargetAccess(targets, membership, userEventIds)
+        })
+
+    logApiTiming('/api/announcements', startedAtMs, {
+      clubId,
+      isAdmin: isAdminUser,
+      resultCount: announcements.length,
     })
 
     return NextResponse.json({ announcements })

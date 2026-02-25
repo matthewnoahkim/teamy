@@ -39,6 +39,7 @@ interface StreamEvent {
 
 interface StreamTabProps {
   clubId: string
+  division: string
   currentMembership: MembershipWithPreferences
   teams: StreamTeam[]
   isAdmin: boolean
@@ -70,7 +71,7 @@ async function performRequest(url: string, options: RequestInit = {}, fallbackMe
   return response
 }
 
-export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, initialAnnouncements }: StreamTabProps) {
+export function StreamTab({ clubId, division, currentMembership, teams, isAdmin, user, initialAnnouncements }: StreamTabProps) {
   const { toast } = useToast()
   const [announcements, setAnnouncements] = useState<AnnouncementFull[]>(initialAnnouncements || [])
   const [loading, setLoading] = useState(!initialAnnouncements)
@@ -171,19 +172,10 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     const timer = setTimeout(() => {
       const fetchEvents = async () => {
         try {
-          // Get team's division from first membership
-          const teamResponse = await fetch(`/api/clubs/${clubId}`)
-          if (teamResponse.ok) {
-            const teamData = await teamResponse.json()
-            const division = teamData.team?.division
-            
-            if (division) {
-              const eventsResponse = await fetch(`/api/events?division=${division}`)
-              if (eventsResponse.ok) {
-                const eventsData = await eventsResponse.json()
-                setAvailableEvents(eventsData.events || [])
-              }
-            }
+          const eventsResponse = await fetch(`/api/events?division=${division}`)
+          if (eventsResponse.ok) {
+            const eventsData = await eventsResponse.json()
+            setAvailableEvents(eventsData.events || [])
           }
         } catch (error) {
           console.error('Failed to fetch events:', error)
@@ -194,7 +186,7 @@ export function StreamTab({ clubId, currentMembership, teams, isAdmin, user, ini
     }, 200) // Small delay to not block initial render
     
     return () => clearTimeout(timer)
-  }, [clubId])
+  }, [division])
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault()

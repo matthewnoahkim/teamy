@@ -6,6 +6,8 @@ import { ClubPage } from '@/components/club-page'
 import { Suspense } from 'react'
 import { PageLoading } from '@/components/ui/loading-spinner'
 import { CalendarScope, AnnouncementScope, Role } from '@prisma/client'
+import { userSelectFields } from '@/types/models'
+import { hasAnnouncementTargetAccess, hasTestAssignmentAccess } from '@/lib/club-authz'
 
 // This page requires authentication (getServerSession), so ISR/static caching
 // cannot be used. Force dynamic rendering for correct per-user data.
@@ -43,6 +45,7 @@ export default async function ClubDetailPage({
   const needsCalendarData = activeTab === 'home' || activeTab === 'calendar'
   const needsAnnouncementsData = activeTab === 'home' || activeTab === 'stream'
   const needsTestsData = activeTab === 'home' || activeTab === 'tests'
+  const needsFullPeopleData = activeTab === 'people'
 
   const session = await getServerSession(authOptions)
 
@@ -50,7 +53,88 @@ export default async function ClubDetailPage({
     redirect('/login')
   }
 
-  // Wave 1: Fetch membership, user clubs, and full club in parallel (no extra isAdmin() call).
+  // Wave 1: Fetch membership, user clubs, and club data in parallel.
+  // People tab needs full roster/membership payload; other tabs use a lighter shape.
+  const clubPromise = needsFullPeopleData
+    ? prisma.club.findUnique({
+        where: { id: resolvedParams.clubId },
+        include: {
+          memberships: {
+            include: {
+              user: {
+                select: userSelectFields,
+              },
+              team: true,
+              rosterAssignments: {
+                include: { event: true },
+              },
+              preferences: true,
+            },
+          },
+          teams: {
+            include: {
+              members: {
+                include: {
+                  user: {
+                    select: userSelectFields,
+                  },
+                },
+              },
+              _count: {
+                select: { rosterAssignments: true },
+              },
+            },
+          },
+        },
+      })
+    : prisma.club.findUnique({
+        where: { id: resolvedParams.clubId },
+        select: {
+          id: true,
+          name: true,
+          division: true,
+          backgroundType: true,
+          backgroundColor: true,
+          gradientStartColor: true,
+          gradientEndColor: true,
+          gradientColors: true,
+          gradientDirection: true,
+          backgroundImageUrl: true,
+          createdAt: true,
+          updatedAt: true,
+          memberships: {
+            select: {
+              id: true,
+              userId: true,
+              clubId: true,
+              role: true,
+              roles: true,
+              teamId: true,
+              createdAt: true,
+              updatedAt: true,
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              user: {
+                select: userSelectFields,
+              },
+            },
+          },
+          teams: {
+            select: {
+              id: true,
+              clubId: true,
+              name: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      })
+
   const [membership, userClubs, club] = await Promise.all([
     prisma.membership.findUnique({
       where: {
@@ -70,47 +154,7 @@ export default async function ClubDetailPage({
       },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.club.findUnique({
-      where: { id: resolvedParams.clubId },
-      include: {
-        memberships: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-              },
-            },
-            team: true,
-            rosterAssignments: {
-              include: { event: true },
-            },
-            preferences: true,
-          },
-        },
-        teams: {
-          include: {
-            members: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    image: true,
-                  },
-                },
-              },
-            },
-            _count: {
-              select: { rosterAssignments: true },
-            },
-          },
-        },
-      },
-    }),
+    clubPromise,
   ])
 
   if (!membership) {
@@ -123,7 +167,8 @@ export default async function ClubDetailPage({
   const clubs = userClubs.map(m => m.club)
   const isAdminUser = membership.role === Role.ADMIN
 
-  // Wave 2: Attendance, finance, and roster in one parallel batch (roster needed for calendar/tests filter).
+  // Wave 2: Attendance, finance, and roster in one parallel batch.
+  // Roster is also needed for announcement event-target visibility checks.
   const [
     attendances,
     expenses,
@@ -246,7 +291,7 @@ export default async function ClubDetailPage({
           },
         })
       : Promise.resolve([]),
-    (needsCalendarData || needsTestsData)
+    (needsCalendarData || needsTestsData || needsAnnouncementsData)
       ? prisma.rosterAssignment.findMany({
           where: {
             membershipId: membership.id,
@@ -265,7 +310,7 @@ export default async function ClubDetailPage({
   const userTeamIds = [...new Set(rosterList.map(ra => ra.teamId))]
 
   // Wave 3: Calendar, announcements, tests in parallel (depend on userTeamIds / userEventIds only for in-memory filter).
-  const [calendarEvents, announcements, allTests] = await Promise.all([
+  const [calendarEvents, allAnnouncements, allTests] = await Promise.all([
     needsCalendarData
       ? prisma.calendarEvent.findMany({
           where: {
@@ -549,37 +594,24 @@ export default async function ClubDetailPage({
   const allTestsList = Array.isArray(allTests) ? allTests : []
   let filteredTests = allTestsList
   if (!isAdminUser && needsTestsData) {
-    filteredTests = allTestsList.filter(test => {
-      // If test has no assignments, user cannot see it
-      if (test.assignments.length === 0) {
-        return false
-      }
-
-      // Check if any assignment grants access
-      return test.assignments.some(a => {
-        // CLUB scope - everyone gets access
-        if (a.assignedScope === 'CLUB') {
-          return true
-        }
-        // Team assignment - user must be in that team
-        if (a.teamId && membership.teamId && a.teamId === membership.teamId) {
-          return true
-        }
-        // Personal assignment - must be assigned to this user
-        if (a.targetMembershipId === membership.id) {
-          return true
-        }
-        // Event assignment - user must have this event in their roster
-        if (a.eventId && userEventIds.includes(a.eventId)) {
-          return true
-        }
-        return false
-      })
-    })
+    filteredTests = allTestsList.filter(test =>
+      hasTestAssignmentAccess(test.assignments, membership, userEventIds),
+    )
   }
 
   // Remove assignments from tests (not needed by client)
   const tests = filteredTests.map(({ assignments: _assignments, ...test }) => test)
+  const announcements = isAdminUser || !needsAnnouncementsData
+    ? (allAnnouncements ?? [])
+    : (allAnnouncements ?? []).filter((announcement) => {
+        const targets = announcement.visibilities
+          .filter(visibility => visibility.targetRole || visibility.eventId)
+          .map(visibility => ({
+            targetRole: visibility.targetRole,
+            eventId: visibility.eventId,
+          }))
+        return hasAnnouncementTargetAccess(targets, membership, userEventIds)
+      })
 
   return (
     <Suspense fallback={

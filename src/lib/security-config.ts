@@ -194,14 +194,17 @@ export const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   
   // Content Security Policy - gradually tighten as needed
-  // Start permissive and add restrictions incrementally
+  // Keep inline scripts for theme/bootstrap logic, but disallow eval.
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+    "script-src 'self' 'unsafe-inline' https://js.stripe.com https://va.vercel-scripts.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     "font-src 'self' data:",
-    "connect-src 'self' https://api.stripe.com",
+    "connect-src 'self' ws: wss: https://api.stripe.com https://vitals.vercel-insights.com https://vitals.vercel-analytics.com",
     "frame-src 'self' https://js.stripe.com",
   ].join('; '),
 } as const

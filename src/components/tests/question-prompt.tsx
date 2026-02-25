@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+
 // Helper to parse markdown table
 function parseMarkdownTable(markdown: string): { headers: string[]; rows: string[][] } {
   const lines = markdown.trim().split('\n').filter(line => line.trim())
@@ -13,6 +15,59 @@ function parseMarkdownTable(markdown: string): { headers: string[]; rows: string
   return { headers, rows }
 }
 
+function parsePromptContent(content: string) {
+  const parts: Array<{ type: 'text' | 'image' | 'table'; content: string; src?: string; alt?: string; tableMarkdown?: string }> = []
+  
+  // Create a combined regex to find both images and tables in order
+  const combinedRegex = /(?:(!\[([^\]]*)\]\((data:image\/[^)]+)\)))|(?:(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|(?:\r?\n(?!\r?\n))?)+))/g
+  let lastIndex = 0
+  let match
+
+  while ((match = combinedRegex.exec(content)) !== null) {
+    // Add text before match
+    if (match.index > lastIndex) {
+      const text = content.substring(lastIndex, match.index).trim()
+      if (text) {
+        parts.push({ type: 'text', content: text })
+      }
+    }
+    
+    if (match[1]) {
+      // It's an image
+      parts.push({
+        type: 'image',
+        content: '',
+        src: match[3],
+        alt: match[2] || 'Image'
+      })
+    } else if (match[4]) {
+      // It's a table
+      parts.push({
+        type: 'table',
+        content: '',
+        tableMarkdown: match[4]
+      })
+    }
+    
+    lastIndex = combinedRegex.lastIndex
+  }
+
+  // Add remaining text
+  if (lastIndex < content.length) {
+    const text = content.substring(lastIndex).trim()
+    if (text) {
+      parts.push({ type: 'text', content: text })
+    }
+  }
+
+  // If no images or tables found, return the whole content as text
+  if (parts.length === 0) {
+    return [{ type: 'text' as const, content: content.trim() }]
+  }
+
+  return parts
+}
+
 // Component to render markdown prompt with images and tables
 export function QuestionPrompt({ promptMd, className: _className = '', imageLayout = 'stacked' }: { promptMd: string | null | undefined; className?: string; imageLayout?: 'stacked' | 'side-by-side' }) {
   // Handle null/undefined promptMd
@@ -20,70 +75,18 @@ export function QuestionPrompt({ promptMd, className: _className = '', imageLayo
     return null
   }
 
-  // Split content into text, image, and table parts
-  const parseContent = (content: string) => {
-    const _imageRegex = /!\[([^\]]*)\]\((data:image\/[^)]+)\)/g
-    const _tableRegex = /(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|(?:\r?\n(?!\r?\n))?)+)/g
-    const parts: Array<{ type: 'text' | 'image' | 'table'; content: string; src?: string; alt?: string; tableMarkdown?: string }> = []
-    
-    // Create a combined regex to find both images and tables in order
-    const combinedRegex = /(?:(!\[([^\]]*)\]\((data:image\/[^)]+)\)))|(?:(\|.+\|[\r\n]+\|[-:\s|]+\|[\r\n]+(?:\|.+\|(?:\r?\n(?!\r?\n))?)+))/g
-    let lastIndex = 0
-    let match
+  const { contextParts, promptParts } = useMemo(() => {
+    // Handle context/prompt split (separated by ---)
+    const parts = promptMd.split('---')
+    const hasContext = parts.length === 2
+    const contextContent = hasContext ? parts[0].trim() : ''
+    const promptContent = hasContext ? parts[1].trim() : promptMd.trim()
 
-    while ((match = combinedRegex.exec(content)) !== null) {
-      // Add text before match
-      if (match.index > lastIndex) {
-        const text = content.substring(lastIndex, match.index).trim()
-        if (text) {
-          parts.push({ type: 'text', content: text })
-        }
-      }
-      
-      if (match[1]) {
-        // It's an image
-        parts.push({
-          type: 'image',
-          content: '',
-          src: match[3],
-          alt: match[2] || 'Image'
-        })
-      } else if (match[4]) {
-        // It's a table
-        parts.push({
-          type: 'table',
-          content: '',
-          tableMarkdown: match[4]
-        })
-      }
-      
-      lastIndex = combinedRegex.lastIndex
+    return {
+      contextParts: contextContent ? parsePromptContent(contextContent) : [],
+      promptParts: parsePromptContent(promptContent),
     }
-
-    // Add remaining text
-    if (lastIndex < content.length) {
-      const text = content.substring(lastIndex).trim()
-      if (text) {
-        parts.push({ type: 'text', content: text })
-      }
-    }
-
-    // If no images or tables found, return the whole content as text
-    if (parts.length === 0) {
-      return [{ type: 'text' as const, content: content.trim() }]
-    }
-
-    return parts
-  }
-
-  // Handle context/prompt split (separated by ---)
-  const parts = promptMd.split('---')
-  const hasContext = parts.length === 2
-  const contextContent = hasContext ? parts[0].trim() : ''
-  const promptContent = hasContext ? parts[1].trim() : promptMd.trim()
-
-  const contextParts = contextContent ? parseContent(contextContent) : []
-  const promptParts = parseContent(promptContent)
+  }, [promptMd])
 
   const renderParts = (partsToRender: typeof promptParts, className = '') => {
     // Group consecutive images for side-by-side layout

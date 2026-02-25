@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { isAdmin, getUserMembership } from '@/lib/rbac'
+import * as rbac from '@/lib/rbac'
+import { logApiTiming } from '@/lib/api-timing'
+import { hasTestAssignmentAccess } from '@/lib/club-authz'
+import { serverSession } from '@/lib/server-session'
 import { Prisma, ScoreReleaseMode } from '@prisma/client'
 import { z } from 'zod'
 
@@ -73,8 +74,9 @@ const createTestSchema = z.object({
 
 // GET /api/tests?clubId=xxx
 export async function GET(req: NextRequest) {
+  const startedAtMs = performance.now()
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -86,12 +88,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID is required' }, { status: 400 })
     }
 
-    const membership = await getUserMembership(session.user.id, clubId)
+    const membership = await rbac.getUserMembership(session.user.id, clubId)
     if (!membership) {
       return NextResponse.json({ error: 'Not a club member' }, { status: 403 })
     }
 
-    const isAdminUser = await isAdmin(session.user.id, clubId)
+    const isAdminUser = await rbac.isAdmin(session.user.id, clubId)
 
     // Fetch all tests with their assignments
     const allTests = await prisma.test.findMany({
@@ -163,6 +165,11 @@ export async function GET(req: NextRequest) {
         ...test,
         createdByMembership: test.createdByMembershipId ? membershipMap.get(test.createdByMembershipId) : undefined,
       }))
+      logApiTiming('/api/tests', startedAtMs, {
+        clubId,
+        isAdmin: true,
+        resultCount: tests.length,
+      })
       return NextResponse.json({ 
         tests,
         userAttempts: {},
@@ -182,33 +189,9 @@ export async function GET(req: NextRequest) {
     const userEventIds = userEventAssignments.map(ra => ra.eventId)
 
     // Filter tests - user can see a test if ANY assignment matches
-    const filteredTests = allTests.filter(test => {
-      // If test has no assignments, user cannot see it
-      if (test.assignments.length === 0) {
-        return false
-      }
-
-      // Check if any assignment grants access
-      return test.assignments.some(a => {
-        // CLUB scope - everyone gets access
-        if (a.assignedScope === 'CLUB') {
-          return true
-        }
-        // Team assignment - user must be in that team
-        if (a.teamId && membership.teamId && a.teamId === membership.teamId) {
-          return true
-        }
-        // Personal assignment - must be assigned to this user
-        if (a.targetMembershipId === membership.id) {
-          return true
-        }
-        // Event assignment - user must have this event in their roster
-        if (a.eventId && userEventIds.includes(a.eventId)) {
-          return true
-        }
-        return false
-      })
-    })
+    const filteredTests = allTests.filter(test =>
+      hasTestAssignmentAccess(test.assignments, membership, userEventIds),
+    )
 
     // Remove assignments from response and add createdByMembership
     const tests = filteredTests.map(({ assignments: _assignments, ...test }) => ({
@@ -276,6 +259,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    logApiTiming('/api/tests', startedAtMs, {
+      clubId,
+      isAdmin: false,
+      resultCount: tests.length,
+    })
+
     return NextResponse.json({ 
       tests,
       userAttempts: Object.fromEntries(userAttemptsMap),
@@ -290,7 +279,7 @@ export async function GET(req: NextRequest) {
 // POST /api/tests
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -299,7 +288,7 @@ export async function POST(req: NextRequest) {
     const validatedData = createTestSchema.parse(body)
 
     // Check if user is an admin
-    const isAdminUser = await isAdmin(session.user.id, validatedData.clubId)
+    const isAdminUser = await rbac.isAdmin(session.user.id, validatedData.clubId)
     if (!isAdminUser) {
       return NextResponse.json(
         { error: 'Only admins can create tests' },
@@ -308,7 +297,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get membership ID
-    const membership = await getUserMembership(session.user.id, validatedData.clubId)
+    const membership = await rbac.getUserMembership(session.user.id, validatedData.clubId)
     if (!membership) {
       return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
     }

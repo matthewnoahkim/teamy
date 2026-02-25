@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, memo } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Home, MessageSquare, Users, Calendar, Settings, ClipboardCheck, DollarSign, FileText, Pencil, Image, File, Menu, CheckSquare, BarChart3, Wrench } from 'lucide-react'
@@ -68,6 +68,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { useFaviconBadge } from '@/hooks/use-favicon-badge'
 import type {
   ClubWithMembers,
+  ClubWithMembersLite,
   MembershipWithPreferences,
   SessionUser,
   ClubPageInitialData,
@@ -93,7 +94,7 @@ const NotificationDot = memo(function NotificationDot() {
 })
 
 interface ClubPageProps {
-  club: ClubWithMembers
+  club: ClubWithMembers | ClubWithMembersLite
   currentMembership: MembershipWithPreferences
   user: SessionUser
   clubs?: Array<{ id: string; name: string }>
@@ -101,7 +102,6 @@ interface ClubPageProps {
 }
 
 export function ClubPage({ club, currentMembership, user, clubs, initialData }: ClubPageProps) {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'home')
@@ -159,218 +159,57 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
     })
   }, [club.id, user.id])
 
-  // Check for new content in each tab (from anyone, not just other users)
-  // Optimized: Only check tabs that aren't active, batch API calls, and cache announcements/calendar data
+  // Keep active tab in a ref so polling interval doesn't restart during navigation.
+  const activeTabRef = useRef(activeTab)
+  useEffect(() => {
+    activeTabRef.current = activeTab
+  }, [activeTab])
+
+  // Check for new content with a single lightweight API call.
   useEffect(() => {
     let isMounted = true
-    let timeoutId: NodeJS.Timeout | null = null
-    
+    const notificationTabs = ['stream', 'calendar', 'attendance', 'finance', 'tests', 'people']
+
     const checkForNewContent = async () => {
       if (!isMounted) return
-      
-      const notifications: Record<string, boolean> = {}
-      const tabsToCheck = ['stream', 'calendar', 'attendance', 'finance', 'tests', 'people'].filter(tab => tab !== activeTab)
-      
-      // Batch fetch shared data once (announcements and calendar are used by multiple tabs)
-      let announcementsData: Record<string, unknown> | null = null
-      let calendarData: Record<string, unknown> | null = null
-      
-      if (tabsToCheck.includes('stream') || tabsToCheck.includes('calendar') || tabsToCheck.includes('attendance')) {
-        try {
-          const [announcementsResponse, calendarResponse] = await Promise.all([
-            fetch(`/api/announcements?clubId=${club.id}`),
-            fetch(`/api/calendar?clubId=${club.id}`)
-          ])
-          
-          if (announcementsResponse.ok) {
-            announcementsData = await announcementsResponse.json()
-          }
-          if (calendarResponse.ok) {
-            calendarData = await calendarResponse.json()
-          }
-        } catch (error) {
-          console.error('Failed to fetch shared data:', error)
-        }
+      const tabsToCheck = notificationTabs.filter(tab => tab !== activeTabRef.current)
+      if (tabsToCheck.length === 0) return
+
+      const query = new URLSearchParams()
+      query.set('tabs', tabsToCheck.join(','))
+      for (const tab of tabsToCheck) {
+        query.set(`${tab}Since`, getLastClearedTime(tab).toISOString())
       }
 
-      // Stream: Check for new announcements
-      if (tabsToCheck.includes('stream') && announcementsData) {
-        try {
-          const lastCleared = getLastClearedTime('stream')
-          const hasNewAnnouncement = (announcementsData.announcements as Array<Record<string, unknown>> | undefined)?.some((announcement) => {
-            const isNew = new Date(announcement.createdAt as string) > lastCleared
-            const isFromOtherUser = (announcement.author as Record<string, unknown>)?.user && ((announcement.author as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
-            return isNew && isFromOtherUser
-          })
-          
-          const hasNewCalendarPost = (announcementsData.announcements as Array<Record<string, unknown>> | undefined)?.some((announcement) => {
-            const announcementCreated = new Date(announcement.createdAt as string)
-            const isNew = announcementCreated > lastCleared
-            const isFromOtherUser = (announcement.author as Record<string, unknown>)?.user && ((announcement.author as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
-            return isNew && announcement.calendarEventId && isFromOtherUser
-          })
-          
-          notifications.stream = !!(hasNewAnnouncement || hasNewCalendarPost)
-        } catch (error) {
-          console.error('Failed to check stream notifications:', error)
-        }
-      }
+      try {
+        const response = await fetch(`/api/clubs/${club.id}/notifications?${query.toString()}`, {
+          cache: 'no-store',
+        })
+        if (!response.ok) return
 
-      // Calendar: Check for new events
-      if (tabsToCheck.includes('calendar') && calendarData) {
-        try {
-          const lastCleared = getLastClearedTime('calendar')
-          const events = (calendarData.events || []) as Array<Record<string, unknown>>
-          const hasNewEvent = events.some((event) => {
-            const isNew = new Date(event.createdAt as string) > lastCleared
-            const isFromOtherUser = (event.creator as Record<string, unknown>)?.user && ((event.creator as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
-            return isNew && isFromOtherUser
-          })
-          
-          const hasNewEventFromAnnouncement = (announcementsData?.announcements as Array<Record<string, unknown>> | undefined)?.some((announcement) => {
-            const announcementCreated = new Date(announcement.createdAt as string)
-            const isNew = announcementCreated > lastCleared
-            const isFromOtherUser = (announcement.author as Record<string, unknown>)?.user && ((announcement.author as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
-            return isNew && announcement.calendarEventId && isFromOtherUser
-          })
-          
-          notifications.calendar = !!(hasNewEvent || hasNewEventFromAnnouncement)
-        } catch (error) {
-          console.error('Failed to check calendar notifications:', error)
-        }
-      }
+        const data = (await response.json()) as { notifications?: Record<string, boolean> }
+        const notifications = data.notifications ?? {}
 
-      // Attendance: Check for new attendance records
-      if (tabsToCheck.includes('attendance')) {
-        try {
-          const attendanceResponse = await fetch(`/api/attendance?clubId=${club.id}`)
-          if (attendanceResponse.ok) {
-            const attendanceData = await attendanceResponse.json()
-            const lastCleared = getLastClearedTime('attendance')
-            const hasNewAttendance = (attendanceData.attendance as Array<Record<string, unknown>> | undefined)?.some((record) => {
-              const isNew = new Date(record.createdAt as string) > lastCleared
-              const isFromOtherUser = record.createdById !== currentMembership.id
-              return isNew && isFromOtherUser
-            })
-            
-            const hasNewCalendarEvent = (calendarData?.events as Array<Record<string, unknown>> | undefined)?.some((event) => {
-              const isNew = new Date(event.createdAt as string) > lastCleared
-              const isFromOtherUser = (event.creator as Record<string, unknown>)?.user && ((event.creator as Record<string, unknown>).user as Record<string, unknown>)?.id !== user.id
-              return isNew && isFromOtherUser
-            })
-            
-            notifications.attendance = !!(hasNewAttendance || hasNewCalendarEvent)
-          }
-        } catch (error) {
-          console.error('Failed to check attendance notifications:', error)
-        }
-      }
-
-      // Finance: Check for new purchase requests or expenses
-      if (tabsToCheck.includes('finance')) {
-        try {
-          const lastCleared = getLastClearedTime('finance')
-          
-          const [financeResponse, expensesResponse] = await Promise.all([
-            fetch(`/api/purchase-requests?clubId=${club.id}`),
-            fetch(`/api/expenses?clubId=${club.id}`)
-          ])
-          
-          let hasNewRequest = false
-          let hasNewExpense = false
-          let hasNewApproval = false
-          
-          if (financeResponse.ok) {
-            const financeData = await financeResponse.json()
-            const purchaseRequests = financeData.purchaseRequests || []
-            hasNewRequest = purchaseRequests.some((item: Record<string, unknown>) => {
-              const isNew = new Date(item.createdAt as string) > lastCleared
-              const isFromOtherUser = item.requesterId !== currentMembership.id
-              return isNew && isFromOtherUser
-            })
-            
-            hasNewApproval = purchaseRequests.some((request: Record<string, unknown>) => {
-              if (request.status === 'APPROVED' && request.reviewedAt) {
-                const isNew = new Date(request.reviewedAt as string) > lastCleared
-                const isFromOtherUser = request.requesterId !== currentMembership.id
-                return isNew && isFromOtherUser
-              }
-              return false
-            })
-          }
-          
-          if (expensesResponse.ok) {
-            const expensesData = await expensesResponse.json()
-            const expenses = expensesData.expenses || []
-            hasNewExpense = expenses.some((item: Record<string, unknown>) => {
-              const isNew = new Date(item.createdAt as string) > lastCleared
-              const isFromOtherUser = item.addedById !== currentMembership.id
-              return isNew && isFromOtherUser
-            })
-          }
-          
-          notifications.finance = !!(hasNewRequest || hasNewExpense || hasNewApproval)
-        } catch (error) {
-          console.error('Failed to check finance notifications:', error)
-        }
-      }
-
-      // Tests: Check for new tests
-      if (tabsToCheck.includes('tests')) {
-        try {
-          const testsResponse = await fetch(`/api/tests?clubId=${club.id}`)
-          if (testsResponse.ok) {
-            const testsData = await testsResponse.json()
-            const lastCleared = getLastClearedTime('tests')
-            const hasNew = (testsData.tests as Array<Record<string, unknown>> | undefined)?.some((test) => {
-              const isNew = new Date(test.createdAt as string) > lastCleared
-              const isFromOtherUser = test.createdById !== currentMembership.id
-              return isNew && isFromOtherUser
-            })
-            notifications.tests = !!hasNew
-          }
-        } catch (error) {
-          console.error('Failed to check tests notifications:', error)
-        }
-      }
-
-      // People: Check for new members (no API call needed - uses existing club.memberships)
-      if (tabsToCheck.includes('people')) {
-        try {
-          const lastCleared = getLastClearedTime('people')
-          const hasNew = club.memberships?.some((membership) => {
-            const isNew = new Date(membership.createdAt) > lastCleared
-            return isNew
-          })
-          notifications.people = !!hasNew
-        } catch (error) {
-          console.error('Failed to check people notifications:', error)
-        }
-      }
-
-      if (isMounted) {
+        if (!isMounted) return
         setTabNotifications(prev => {
           const updated = { ...prev, ...notifications }
           const totalCount = Object.values(updated).filter(Boolean).length
           setTotalUnreadCount(totalCount)
           return updated
         })
+      } catch (error) {
+        console.error('Failed to fetch tab notifications:', error)
       }
     }
 
-    // Debounce initial check slightly to avoid running on every activeTab change
-    timeoutId = setTimeout(() => {
-      checkForNewContent()
-    }, 100)
-    
+    checkForNewContent()
     const interval = setInterval(checkForNewContent, 30000)
-    
+
     return () => {
       isMounted = false
-      if (timeoutId) clearTimeout(timeoutId)
       clearInterval(interval)
     }
-  }, [club.id, club.memberships, user.id, currentMembership.id, activeTab, getLastClearedTime])
+  }, [club.id, getLastClearedTime])
 
   // Clear notification when tab is opened
   useEffect(() => {
@@ -390,10 +229,12 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
     clearTabNotification(newTab)
     setActiveTab(newTab)
     setMobileMenuOpen(false)
-    const url = new URL(window.location.href)
-    url.searchParams.set('tab', newTab)
-    router.replace(url.pathname + url.search, { scroll: false })
-  }, [clearTabNotification, router])
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', newTab)
+      window.history.replaceState(window.history.state, '', url.pathname + url.search)
+    }
+  }, [clearTabNotification])
 
   const handleUpdateClubName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -699,6 +540,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
             {activeTab === 'stream' && (
               <StreamTab
                 clubId={club.id}
+                division={club.division}
                 currentMembership={currentMembership}
                 teams={club.teams}
                 isAdmin={isAdmin}
@@ -718,6 +560,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
             {activeTab === 'calendar' && (
               <CalendarTab
                 clubId={club.id}
+                division={club.division}
                 currentMembership={currentMembership}
                 isAdmin={isAdmin}
                 user={user}

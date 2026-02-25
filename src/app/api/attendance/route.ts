@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireMember, isAdmin } from '@/lib/rbac'
 import { updateAttendanceStatuses } from '@/lib/attendance'
+import { logApiTiming } from '@/lib/api-timing'
 import { z } from 'zod'
 
 const _getAttendanceSchema = z.object({
@@ -13,6 +14,7 @@ const _getAttendanceSchema = z.object({
 // GET /api/attendance?clubId=xxx
 // List all attendance events for a club
 export async function GET(req: NextRequest) {
+  const startedAtMs = performance.now()
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -96,6 +98,12 @@ export async function GET(req: NextRequest) {
         }
       }
       return attendance
+    })
+
+    logApiTiming('/api/attendance', startedAtMs, {
+      clubId,
+      isAdmin: isAdminUser,
+      resultCount: sanitizedAttendances.length,
     })
 
     return NextResponse.json({ attendances: sanitizedAttendances, isAdmin: isAdminUser })

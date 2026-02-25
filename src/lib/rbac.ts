@@ -15,6 +15,7 @@ export async function getUserMembership(userId: string, clubId: string) {
     select: {
       id: true,
       role: true,
+      roles: true,
       userId: true,
       clubId: true,
       teamId: true,

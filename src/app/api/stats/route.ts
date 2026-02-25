@@ -3,9 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireMember, isAdmin } from '@/lib/rbac'
+import { logApiTiming } from '@/lib/api-timing'
 
 // GET /api/stats?clubId=xxx - Get comprehensive stats for all club members
 export async function GET(req: NextRequest) {
+  const startedAtMs = performance.now()
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -81,66 +83,92 @@ export async function GET(req: NextRequest) {
       console.log('MemberPreferences table not available')
     }
 
-    // Get all test attempts for the club
-    const testAttempts = await prisma.testAttempt.findMany({
-      where: {
-        test: { clubId },
-        status: { in: ['SUBMITTED', 'GRADED'] },
-      },
-      select: {
-        id: true,
-        membershipId: true,
-        gradeEarned: true,
-        submittedAt: true,
-        test: {
-          select: {
-            id: true,
-            name: true,
+    // Load stats datasets in parallel to minimize API latency.
+    const [testAttempts, attendanceRecords, todos, events] = await Promise.all([
+      prisma.testAttempt.findMany({
+        where: {
+          test: { clubId },
+          status: { in: ['SUBMITTED', 'GRADED'] },
+        },
+        select: {
+          id: true,
+          membershipId: true,
+          gradeEarned: true,
+          submittedAt: true,
+          test: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
-    })
+      }),
+      prisma.attendanceCheckIn.findMany({
+        where: {
+          attendance: { clubId },
+        },
+        select: {
+          id: true,
+          membershipId: true,
+          createdAt: true,
+          attendanceId: true,
+        },
+      }),
+      prisma.todo.findMany({
+        where: { clubId },
+        select: {
+          id: true,
+          membershipId: true,
+          completed: true,
+          priority: true,
+        },
+      }),
+      prisma.event.findMany({
+        where: { division: club.division },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          maxCompetitors: true,
+        },
+        orderBy: { name: 'asc' },
+      }),
+    ])
 
-    // Get attendance records  
-    const attendanceRecords = await prisma.attendanceCheckIn.findMany({
-      where: {
-        attendance: { clubId },
-      },
-      select: {
-        id: true,
-        membershipId: true,
-        createdAt: true,
-        attendanceId: true,
-      },
-    })
+    const attemptsByMembership = new Map<string, typeof testAttempts>()
+    for (const attempt of testAttempts) {
+      const bucket = attemptsByMembership.get(attempt.membershipId)
+      if (bucket) {
+        bucket.push(attempt)
+      } else {
+        attemptsByMembership.set(attempt.membershipId, [attempt])
+      }
+    }
 
-    // Get todos for completion stats
-    const todos = await prisma.todo.findMany({
-      where: { clubId },
-      select: {
-        id: true,
-        membershipId: true,
-        completed: true,
-        priority: true,
-      },
-    })
+    const attendanceByMembership = new Map<string, typeof attendanceRecords>()
+    for (const record of attendanceRecords) {
+      const bucket = attendanceByMembership.get(record.membershipId)
+      if (bucket) {
+        bucket.push(record)
+      } else {
+        attendanceByMembership.set(record.membershipId, [record])
+      }
+    }
 
-    // Get events for the division
-    const events = await prisma.event.findMany({
-      where: { division: club.division },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        maxCompetitors: true,
-      },
-      orderBy: { name: 'asc' },
-    })
+    const todoStatsByMembership = new Map<string, { completed: number; total: number }>()
+    for (const todo of todos) {
+      const current = todoStatsByMembership.get(todo.membershipId) ?? { completed: 0, total: 0 }
+      current.total += 1
+      if (todo.completed) {
+        current.completed += 1
+      }
+      todoStatsByMembership.set(todo.membershipId, current)
+    }
 
     // Aggregate stats per member
     const memberStats = memberships.map(membership => {
       // Test stats
-      const memberAttempts = testAttempts.filter(a => a.membershipId === membership.id)
+      const memberAttempts = attemptsByMembership.get(membership.id) ?? []
       const testScores = memberAttempts.map(a => ({
         testId: a.test.id,
         testName: a.test.name,
@@ -154,13 +182,13 @@ export async function GET(req: NextRequest) {
         : null
 
       // Attendance stats
-      const memberAttendance = attendanceRecords.filter(a => a.membershipId === membership.id)
+      const memberAttendance = attendanceByMembership.get(membership.id) ?? []
       const attendanceCount = memberAttendance.length
 
       // Todo stats
-      const memberTodos = todos.filter(t => t.membershipId === membership.id)
-      const completedTodos = memberTodos.filter(t => t.completed).length
-      const totalTodos = memberTodos.length
+      const todoStats = todoStatsByMembership.get(membership.id) ?? { completed: 0, total: 0 }
+      const completedTodos = todoStats.completed
+      const totalTodos = todoStats.total
       const todoCompletionRate = totalTodos > 0 ? (completedTodos / totalTodos) * 100 : null
 
       // Current roster assignments
@@ -203,6 +231,13 @@ export async function GET(req: NextRequest) {
         name: true,
       },
       orderBy: { name: 'asc' },
+    })
+
+    logApiTiming('/api/stats', startedAtMs, {
+      clubId,
+      memberCount: memberStats.length,
+      eventCount: events.length,
+      teamCount: teams.length,
     })
 
     return NextResponse.json({

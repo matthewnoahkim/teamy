@@ -21,6 +21,14 @@ import { getSecurityHeaders } from '@/lib/security-config'
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const securityHeaders = getSecurityHeaders()
+
+  const applySecurityHeaders = (response: NextResponse): NextResponse => {
+    Object.entries(securityHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value)
+    })
+    return response
+  }
 
   // Skip rate limiting for certain paths
   const skipPaths = [
@@ -32,12 +40,12 @@ export default async function proxy(request: NextRequest) {
   ]
 
   if (skipPaths.some(path => pathname.startsWith(path))) {
-    return NextResponse.next()
+    return applySecurityHeaders(NextResponse.next())
   }
 
-  // Only apply rate limiting to API routes
+  // Apply security headers to all non-API routes without rate limiting.
   if (!pathname.startsWith('/api')) {
-    return NextResponse.next()
+    return applySecurityHeaders(NextResponse.next())
   }
 
   try {
@@ -75,19 +83,12 @@ export default async function proxy(request: NextRequest) {
     Object.entries(rateLimitHeaders).forEach(([key, value]) => {
       response.headers.set(key, String(value))
     })
-
-    // Add security headers to all responses (OWASP best practices)
-    const securityHeaders = getSecurityHeaders()
-    Object.entries(securityHeaders).forEach(([key, value]) => {
-      response.headers.set(key, value)
-    })
-
-    return response
+    return applySecurityHeaders(response)
   } catch (error) {
     // If rate limiting fails, allow the request through (fail open)
     // Log the error but don't block legitimate traffic
     console.error('Rate limiting error:', error)
-    return NextResponse.next()
+    return applySecurityHeaders(NextResponse.next())
   }
 }
 

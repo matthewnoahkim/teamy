@@ -43,7 +43,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { ClubWithMembers, MembershipWithPreferences } from '@/types/models'
+import type { ClubWithMembers, ClubWithMembersLite, MembershipWithPreferences } from '@/types/models'
 
 export interface BackgroundPreferences {
   backgroundType?: string
@@ -271,7 +271,7 @@ function SortableColorItem({
 }
 
 interface SettingsTabProps {
-  club: ClubWithMembers
+  club: ClubWithMembers | ClubWithMembersLite
   currentMembership: MembershipWithPreferences
   isAdmin: boolean
   personalBackground?: BackgroundPreferences | null

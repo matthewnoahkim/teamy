@@ -109,6 +109,7 @@ interface EventInterval {
 
 interface CalendarTabProps {
   clubId: string
+  division: string
   currentMembership: MembershipWithPreferences
   isAdmin: boolean
   user: {
@@ -122,7 +123,7 @@ interface CalendarTabProps {
 
 type ViewMode = 'month' | 'week'
 
-export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialEvents }: CalendarTabProps) {
+export function CalendarTab({ clubId, division, currentMembership, isAdmin, user, initialEvents }: CalendarTabProps) {
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -269,24 +270,15 @@ export function CalendarTab({ clubId, currentMembership, isAdmin, user, initialE
 
   const fetchAvailableEvents = useCallback(async () => {
     try {
-      // Get team info to determine division
-      const teamResponse = await fetch(`/api/clubs/${clubId}`)
-      if (teamResponse.ok) {
-        const teamData = await teamResponse.json()
-        const division = teamData.team?.division
-        
-        if (division) {
-          const eventsResponse = await fetch(`/api/events?division=${division}`)
-          if (eventsResponse.ok) {
-            const eventsData = await eventsResponse.json()
-            setAvailableEvents(eventsData.events || [])
-          }
-        }
+      const eventsResponse = await fetch(`/api/events?division=${division}`)
+      if (eventsResponse.ok) {
+        const eventsData = await eventsResponse.json()
+        setAvailableEvents(eventsData.events || [])
       }
     } catch (error) {
       console.error('Failed to fetch Science Olympiad events:', error)
     }
-  }, [clubId])
+  }, [division])
 
   useEffect(() => {
     // Fetch missing data in parallel

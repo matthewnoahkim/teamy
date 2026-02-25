@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
 import { generateAttendanceCode, hashAttendanceCode } from '@/lib/attendance'
+import { logApiTiming } from '@/lib/api-timing'
+import { hasAnnouncementTargetAccess, hasTestAssignmentAccess } from '@/lib/club-authz'
 import { z } from 'zod'
 import { CalendarScope, Prisma } from '@prisma/client'
 
@@ -369,6 +371,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  const startedAtMs = performance.now()
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -528,35 +531,7 @@ export async function GET(req: NextRequest) {
           // This applies to both CLUB and TEAM scope events
           if (event.testId && event.test) {
             const testAssignments = event.test.assignments
-            
-            // If test has no assignments, hide it
-            if (testAssignments.length === 0) {
-              return false
-            }
-
-            // Check if user has access to this test based on assignments
-            // This logic must match the test visibility logic in /api/tests
-            const hasTestAccess = testAssignments.some(a => {
-              // CLUB scope - everyone gets access
-              if (a.assignedScope === 'CLUB') {
-                return true
-              }
-              // Team-based - user's primary team matches assignment's team
-              if (a.teamId && membership.teamId && a.teamId === membership.teamId) {
-                return true
-              }
-              // PERSONAL scope - directly assigned to this user
-              if (a.targetMembershipId === membership.id) {
-                return true
-              }
-              // Event-based assignments - user must have the event in their roster
-              if (a.eventId && userEventIds.includes(a.eventId)) {
-                return true
-              }
-              return false
-            })
-
-            return hasTestAccess
+            return hasTestAssignmentAccess(testAssignments, membership, userEventIds)
           }
 
           // For non-test TEAM events, already filtered by the query
@@ -578,29 +553,17 @@ export async function GET(req: NextRequest) {
           }
 
           // Check if user matches any target
-          return targets.some(target => {
-            // Role-based targeting
-            if (target.targetRole) {
-              // Map membership role to target role format
-              const userRole = membership.role === 'ADMIN' ? 'COACH' : 'MEMBER'
-              if (target.targetRole === userRole) {
-                return true
-              }
-              // Also check membership.roles array for CAPTAIN etc.
-              if ((membership as unknown as { roles?: string[] }).roles?.includes(target.targetRole)) {
-                return true
-              }
-            }
-            // Event-based targeting (Science Olympiad events)
-            if (target.eventId && userEventIds.includes(target.eventId)) {
-              return true
-            }
-            return false
-          })
+          return hasAnnouncementTargetAccess(targets, membership, userEventIds)
         })
 
     // Remove internal fields from response
     const cleanedEvents = filteredEvents.map(({ test: _test, targets: _targets, ...event }) => event)
+
+    logApiTiming('/api/calendar', startedAtMs, {
+      clubId,
+      isAdmin: isAdminUser,
+      resultCount: cleanedEvents.length,
+    })
 
     return NextResponse.json({ events: cleanedEvents })
   } catch (error) {

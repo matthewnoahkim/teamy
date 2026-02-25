@@ -249,10 +249,13 @@ export function getRateLimitHeaders(result: {
   resetAt: number
   limit: number
 }): Record<string, string> {
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  const retryAfterSeconds = Math.max(0, result.resetAt - nowSeconds)
+
   return {
     'X-RateLimit-Limit': result.limit.toString(),
     'X-RateLimit-Remaining': Math.max(0, result.remaining).toString(),
     'X-RateLimit-Reset': result.resetAt.toString(),
-    'Retry-After': result.resetAt.toString(),
+    'Retry-After': retryAfterSeconds.toString(),
   }
 }

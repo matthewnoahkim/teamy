@@ -54,6 +54,54 @@ export type ClubWithMembers = Prisma.ClubGetPayload<{
 }>
 
 // ---------------------------------------------------------------------------
+// Club with lightweight memberships/teams for fast initial club page loads
+// ---------------------------------------------------------------------------
+export type ClubWithMembersLite = Prisma.ClubGetPayload<{
+  select: {
+    id: true
+    name: true
+    division: true
+    backgroundType: true
+    backgroundColor: true
+    gradientStartColor: true
+    gradientEndColor: true
+    gradientColors: true
+    gradientDirection: true
+    backgroundImageUrl: true
+    createdAt: true
+    updatedAt: true
+    memberships: {
+      select: {
+        id: true
+        userId: true
+        clubId: true
+        role: true
+        roles: true
+        teamId: true
+        createdAt: true
+        updatedAt: true
+        team: {
+          select: {
+            id: true
+            name: true
+          }
+        }
+        user: { select: typeof userSelectFields }
+      }
+    }
+    teams: {
+      select: {
+        id: true
+        clubId: true
+        name: true
+        createdAt: true
+        updatedAt: true
+      }
+    }
+  }
+}>
+
+// ---------------------------------------------------------------------------
 // Calendar event (full include from page.tsx wave 3)
 // ---------------------------------------------------------------------------
 export type CalendarEventFull = Prisma.CalendarEventGetPayload<{

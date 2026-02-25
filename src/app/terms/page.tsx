@@ -15,6 +15,9 @@ export default function TermsOfServicePage() {
               By accessing and using Teamy (&quot;the Service&quot;), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
             </p>
             <p className="mt-4">
+              These Terms describe contractual rules for using the Service. They are not legal advice, and you are responsible for obtaining your own legal guidance where needed.
+            </p>
+            <p className="mt-4">
               <strong>For Educational Institutions:</strong> By using this Service on behalf of an educational institution, you represent that you have the authority to bind the institution to these Terms and that the institution agrees to comply with all applicable laws, including FERPA and COPPA.
             </p>
             <p className="mt-4">
@@ -164,7 +167,7 @@ export default function TermsOfServicePage() {
 
             <h3 className="text-lg font-semibold mb-3 mt-6">6.1 FERPA</h3>
             <p>
-              When used by schools or educational institutions, Teamy is designed to handle data in a manner consistent with the Family Educational Rights and Privacy Act (FERPA). We do not sign separate &quot;school official&quot; agreements; institutions remain responsible for their own FERPA compliance. We aim to:
+              When used by schools or educational institutions, Teamy is designed to support FERPA-aware workflows. However, using Teamy alone does not make an institution FERPA-compliant. We do not currently sign separate &quot;school official&quot; agreements by default, and institutions remain responsible for their own FERPA compliance. We aim to:
             </p>
             <ul>
               <li>Use education-related data only to provide the Service</li>
@@ -175,7 +178,7 @@ export default function TermsOfServicePage() {
 
             <h3 className="text-lg font-semibold mb-3 mt-6">6.2 COPPA</h3>
             <p>
-              We do not knowingly collect personal information from children under 13 without proper authorization (e.g., school authorization or verifiable parental consent as permitted by COPPA). We do not use user data for advertising or marketing. Parents may contact us to review, correct, or delete their child&apos;s information.
+              We do not knowingly collect personal information from children under 13 without proper authorization (e.g., school authorization or verifiable parental consent as permitted by COPPA). We do not use student personal data for targeted advertising. Parents may contact us to request review, correction, or deletion of their child&apos;s information.
             </p>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">6.3 Educational Institution Responsibilities</h3>
@@ -268,7 +271,7 @@ export default function TermsOfServicePage() {
             
             <h3 className="text-lg font-semibold mb-3 mt-6">14.1 Data Upon Termination</h3>
             <p>
-              Upon account or service termination you may request deletion of your data by contacting us. We will delete or return data as reasonably practicable and in line with applicable law. Some data may be retained where required by law or for legitimate business purposes (e.g., fraud prevention, legal compliance).
+              Upon account or service termination you may request deletion of your data by contacting us. We will handle deletion requests as reasonably practicable and in line with applicable law. Some data may be retained where required by law or for legitimate business purposes (e.g., fraud prevention, legal compliance), and backup copies may persist for a limited period before deletion.
             </p>
           </section>
 

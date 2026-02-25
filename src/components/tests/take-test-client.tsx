@@ -95,6 +95,107 @@ interface TakeTestClientProps {
   isESTest?: boolean
 }
 
+interface CountdownTimerProps {
+  started: boolean
+  attempt: AttemptData | null
+  durationMinutes: number
+  pausedSecondsRef: { current: number }
+  onTimeUp: () => void
+}
+
+function formatTime(seconds: number): string {
+  if (seconds < 0) return '00:00'
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+}
+
+function CountdownTimer({
+  started,
+  attempt,
+  durationMinutes,
+  pausedSecondsRef,
+  onTimeUp,
+}: CountdownTimerProps) {
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null)
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const onTimeUpRef = useRef(onTimeUp)
+
+  useEffect(() => {
+    onTimeUpRef.current = onTimeUp
+  }, [onTimeUp])
+
+  useEffect(() => {
+    if (!started || !attempt || attempt.status !== 'IN_PROGRESS') {
+      setTimeRemaining(null)
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+      return
+    }
+
+    const calculateRemainingTime = (): number => {
+      if (!attempt.startedAt) return durationMinutes * 60
+
+      const startTime = new Date(attempt.startedAt).getTime()
+      const now = Date.now()
+      const elapsedSeconds = Math.floor((now - startTime) / 1000)
+      // Timer continues while hidden; only subtract explicit save/exit pauses.
+      const adjustedElapsed = elapsedSeconds - pausedSecondsRef.current
+      const totalDurationSeconds = durationMinutes * 60
+      return Math.max(0, totalDurationSeconds - adjustedElapsed)
+    }
+
+    const tick = () => {
+      const remaining = calculateRemainingTime()
+      setTimeRemaining((prev) => (prev === remaining ? prev : remaining))
+
+      if (remaining <= 0) {
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current)
+          timerIntervalRef.current = null
+        }
+        onTimeUpRef.current()
+      }
+    }
+
+    tick()
+    timerIntervalRef.current = setInterval(tick, 1000)
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+    }
+  }, [started, attempt?.id, attempt?.status, attempt?.startedAt, durationMinutes, pausedSecondsRef])
+
+  if (timeRemaining === null) {
+    return (
+      <span className="text-muted-foreground">
+        <Clock className="inline h-4 w-4 mr-1" />
+        {durationMinutes} min
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className={`font-mono font-semibold ${
+        timeRemaining <= 60
+          ? 'text-red-600 dark:text-red-400'
+          : timeRemaining <= 300
+            ? 'text-amber-600 dark:text-amber-400'
+            : 'text-foreground'
+      }`}
+    >
+      <Clock className="inline h-4 w-4 mr-1" />
+      {formatTime(timeRemaining)}
+    </span>
+  )
+}
+
 
 export function TakeTestClient({
   test,
@@ -121,12 +222,10 @@ export function TakeTestClient({
   const [offPageStartTime, setOffPageStartTime] = useState<number | null>(null)
   const trackingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isExitingRef = useRef(false) // Track when we're intentionally exiting (Save & Exit)
   const [needsFullscreenPrompt, setNeedsFullscreenPrompt] = useState(false) // Track if we need user interaction to enter fullscreen
   const [showSaveExitDialog, setShowSaveExitDialog] = useState(false)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null) // Time remaining in seconds
   const pausedAtRef = useRef<number | null>(null) // Timestamp when user saved and exited
   const totalPausedSecondsRef = useRef<number>(0) // Total seconds paused (accumulated)
   const attemptRef = useRef(attempt) // Keep ref to latest attempt for back button handler
@@ -568,14 +667,6 @@ export function TakeTestClient({
     })
   }
 
-  // Format time remaining as MM:SS
-  const formatTime = (seconds: number): string => {
-    if (seconds < 0) return '00:00'
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
   // Check if there are unanswered questions - memoized to avoid recalculating on every render
   const unansweredQuestions = useMemo(() => {
     return test.questions.filter((question: TestQuestion) => {
@@ -674,64 +765,23 @@ export function TakeTestClient({
     }
   }, [attempt, test.id, membership.clubId, test.requireFullscreen, toast, answers, saveAnswer, tournamentId, testingPortal])
 
-  // Countdown timer
-  useEffect(() => {
-    if (!started || !attempt || attempt.status !== 'IN_PROGRESS') {
-      setTimeRemaining(null)
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current)
-        timerIntervalRef.current = null
-      }
+  const handleTimeUp = useCallback(() => {
+    const currentAttempt = attemptRef.current
+    if (!currentAttempt || currentAttempt.status !== 'IN_PROGRESS' || isExitingRef.current) {
       return
     }
 
-    // Calculate initial remaining time
-    const calculateRemainingTime = (): number => {
-      if (!attempt.startedAt) return test.durationMinutes * 60
-      
-      const startTime = new Date(attempt.startedAt).getTime()
-      const now = Date.now()
-      const elapsedSeconds = Math.floor((now - startTime) / 1000)
-      // Timer should continue while tab is hidden; only subtract explicit save/exit pauses.
-      const adjustedElapsed = elapsedSeconds - totalPausedSecondsRef.current
-      const totalDurationSeconds = test.durationMinutes * 60
-      const remaining = Math.max(0, totalDurationSeconds - adjustedElapsed)
-      
-      return remaining
-    }
-
-    // Set initial time
-    setTimeRemaining(calculateRemainingTime())
-
-    // Update timer every second
-    timerIntervalRef.current = setInterval(() => {
-      const remaining = calculateRemainingTime()
-      setTimeRemaining(remaining)
-
-      // Auto-submit when time runs out
-      if (remaining <= 0 && attempt.status === 'IN_PROGRESS') {
-        if (timerIntervalRef.current) {
-          clearInterval(timerIntervalRef.current)
-          timerIntervalRef.current = null
-        }
-        toast({
-          title: 'Time Up',
-          description: 'Your test is being submitted automatically.',
-          variant: 'destructive',
-        })
-        // Mark that we're intentionally exiting
-        isExitingRef.current = true
-        handleSubmit()
-      }
-    }, 1000)
-
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current)
-        timerIntervalRef.current = null
-      }
-    }
-  }, [started, attempt, test.durationMinutes, toast, handleSubmit])
+    toast({
+      title: 'Time Up',
+      description: 'Your test is being submitted automatically.',
+      variant: 'destructive',
+    })
+    isExitingRef.current = true
+    handleSubmit().catch((error) => {
+      console.error('Failed to auto-submit test after time expired:', error)
+      isExitingRef.current = false
+    })
+  }, [handleSubmit, toast])
 
   // Handle browser back button - auto-submit test
   useEffect(() => {
@@ -905,21 +955,13 @@ export function TakeTestClient({
               {test.allowCalculator && test.calculatorType && (
                 <CalculatorButton calculatorType={test.calculatorType} />
               )}
-              {timeRemaining !== null ? (
-                <span className={`font-mono font-semibold ${
-                  timeRemaining <= 60 ? 'text-red-600 dark:text-red-400' : 
-                  timeRemaining <= 300 ? 'text-amber-600 dark:text-amber-400' : 
-                  'text-foreground'
-                }`}>
-                  <Clock className="inline h-4 w-4 mr-1" />
-                  {formatTime(timeRemaining)}
-                </span>
-              ) : (
-                <span className="text-muted-foreground">
-                  <Clock className="inline h-4 w-4 mr-1" />
-                  {test.durationMinutes} min
-                </span>
-              )}
+              <CountdownTimer
+                started={started}
+                attempt={attempt}
+                durationMinutes={test.durationMinutes}
+                pausedSecondsRef={totalPausedSecondsRef}
+                onTimeUp={handleTimeUp}
+              />
             </div>
           </div>
         </div>

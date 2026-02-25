@@ -16,11 +16,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { ButtonLoading } from '@/components/ui/loading-spinner'
+import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
 import { Plus, Pencil, Trash2, ArrowLeft, X, FileSpreadsheet, Mail, Grid3x3, Layers } from 'lucide-react'
 import { groupEventsByCategory, categoryOrder, type EventCategory } from '@/lib/event-categories'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { ClubWithMembers, MembershipWithPreferences } from '@/types/models'
+import type { ClubWithMembers, ClubWithMembersLite, MembershipWithPreferences } from '@/types/models'
 
 // ---------------------------------------------------------------------------
 // Derived sub-types from ClubWithMembers
@@ -28,6 +28,7 @@ import type { ClubWithMembers, MembershipWithPreferences } from '@/types/models'
 type ClubMembership = ClubWithMembers['memberships'][number]
 type ClubTeam = ClubWithMembers['teams'][number]
 type BaseRosterAssignment = ClubMembership['rosterAssignments'][number]
+type ClubInput = ClubWithMembers | ClubWithMembersLite
 type RosterAssignmentWithMembership = BaseRosterAssignment & {
   membership: ClubMembership
 }
@@ -46,16 +47,46 @@ interface ConflictGroup {
 }
 
 interface PeopleTabProps {
-  club: ClubWithMembers
+  club: ClubInput
   currentMembership: MembershipWithPreferences
   isAdmin: boolean
 }
 
-export function PeopleTab({ club: initialClub, currentMembership: _currentMembership, isAdmin }: PeopleTabProps) {
+function hasFullPeopleData(club: ClubInput): club is ClubWithMembers {
+  const hasRosterAssignments = club.memberships.every((membership) =>
+    Array.isArray((membership as ClubMembership).rosterAssignments),
+  )
+  const hasTeamMembers = club.teams.every((team) =>
+    Array.isArray((team as ClubTeam).members),
+  )
+  return hasRosterAssignments && hasTeamMembers
+}
+
+function normalizePeopleClub(club: ClubInput): ClubWithMembers {
+  return {
+    ...club,
+    memberships: club.memberships.map((membership) => ({
+      ...(membership as ClubMembership),
+      team: (membership as ClubMembership).team ?? null,
+      rosterAssignments: Array.isArray((membership as ClubMembership).rosterAssignments)
+        ? (membership as ClubMembership).rosterAssignments
+        : [],
+      preferences: (membership as ClubMembership).preferences ?? null,
+    })),
+    teams: club.teams.map((team) => ({
+      ...(team as ClubTeam),
+      members: Array.isArray((team as ClubTeam).members) ? (team as ClubTeam).members : [],
+      _count: (team as ClubTeam)._count ?? { rosterAssignments: 0 },
+    })),
+  } as ClubWithMembers
+}
+
+export function PeopleTab({ club: initialClubInput, currentMembership: _currentMembership, isAdmin }: PeopleTabProps) {
   const { toast } = useToast()
   
   // Local club state for immediate updates
-  const [club, setClub] = useState<ClubWithMembers>(initialClub)
+  const [club, setClub] = useState<ClubWithMembers>(() => normalizePeopleClub(initialClubInput))
+  const [loadingClubData, setLoadingClubData] = useState(!hasFullPeopleData(initialClubInput))
   
   // Team management state
   const [selectedTeam, setSelectedTeam] = useState<ClubTeam | null>(null)
@@ -79,6 +110,45 @@ export function PeopleTab({ club: initialClub, currentMembership: _currentMember
   const [selectResetKeys, setSelectResetKeys] = useState<Record<string, number>>({})
 
   useEffect(() => {
+    if (hasFullPeopleData(initialClubInput)) {
+      setClub(normalizePeopleClub(initialClubInput))
+      setLoadingClubData(false)
+      return
+    }
+
+    let isMounted = true
+    const fetchFullClubData = async () => {
+      setLoadingClubData(true)
+      try {
+        const response = await fetch(`/api/clubs/${initialClubInput.id}`)
+        if (!response.ok) {
+          throw new Error('Failed to load full club data')
+        }
+
+        const data = (await response.json()) as { club?: ClubWithMembers }
+        if (!isMounted || !data.club) return
+        setClub(normalizePeopleClub(data.club))
+      } catch (error) {
+        console.error('Failed to fetch full people tab club data:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to load full roster data',
+          variant: 'destructive',
+        })
+      } finally {
+        if (isMounted) {
+          setLoadingClubData(false)
+        }
+      }
+    }
+
+    fetchFullClubData()
+    return () => {
+      isMounted = false
+    }
+  }, [initialClubInput, toast])
+
+  useEffect(() => {
     fetchEvents()
     fetchConflictGroups()
   }, [club.id])
@@ -87,6 +157,16 @@ export function PeopleTab({ club: initialClub, currentMembership: _currentMember
   useEffect(() => {
     fetchAssignments()
   }, [club.memberships])
+
+  if (loadingClubData) {
+    return (
+      <PageLoading
+        title="Loading people"
+        description="Fetching members and roster assignments..."
+        variant="orbit"
+      />
+    )
+  }
 
   const fetchEvents = async () => {
     try {

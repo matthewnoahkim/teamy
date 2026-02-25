@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-heading text-xl font-semibold mb-4">2. COPPA Compliance (Children Under 13)</h2>
             <h3 className="text-lg font-semibold mb-3 mt-6">2.1 Age Requirements</h3>
             <p>
-              Our Service is not directed to children under 13 years of age, and we do not knowingly collect personal information from children under 13 without verifiable parental consent as required by COPPA.
+              Our Service is intended for Science Olympiad teams and schools, which may include users under 13. We do not knowingly collect personal information from children under 13 without appropriate authorization (such as school authorization or verifiable parental consent) as required by COPPA.
             </p>
             
             <h3 className="text-lg font-semibold mb-3 mt-6">2.2 School Authorization</h3>
@@ -102,7 +102,7 @@ export default function PrivacyPolicyPage() {
 
             <h3 className="text-lg font-semibold mb-3 mt-6">3.4 Data Retention and Deletion</h3>
             <p>
-              We retain education records only as long as necessary to provide the Service or as required by law. Upon request by the educational institution or at the end of the service relationship, we will securely delete or return all education records as directed by the institution.
+              We retain education records only as long as necessary to provide the Service or as required by law. Upon request by the educational institution or at the end of the service relationship, we aim to delete data and provide exports where reasonably feasible. Some records may be retained for legal, security, or backup purposes for a limited period.
             </p>
           </section>
 
@@ -149,7 +149,7 @@ export default function PrivacyPolicyPage() {
               <li>Authenticate you and manage your account (e.g., via Google OAuth, session cookies)</li>
               <li>Send emails and in-app communications related to your clubs, tournaments, and use of the Service (e.g., via Resend)</li>
               <li>Process payments and manage subscriptions (via Stripe)</li>
-              <li>Provide optional AI-assisted features (test grading, roster suggestions, document import/parsing, and AI chat). When you use these, the relevant content (e.g., test responses, member/roster data, document text) is sent to OpenAI&apos;s API for processing. Per OpenAI&apos;s policy, API data is not used to train their models. See{' '}
+              <li>Provide optional AI-assisted features (test grading, roster suggestions, document import/parsing, and AI chat). When you use these, relevant content (e.g., test responses, member/roster data, document text) is sent to OpenAI&apos;s API for processing. OpenAI handles that data under its own terms and policies. See{' '}
                 <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
                   OpenAI&apos;s Privacy Policy
                 </a>.
@@ -182,7 +182,7 @@ export default function PrivacyPolicyPage() {
               We use practices intended to protect your information, including:
             </p>
             <ul>
-              <li>Encryption in transit (HTTPS) and, where applicable, at rest (e.g., database)</li>
+              <li>Encryption in transit (HTTPS). At-rest encryption depends on infrastructure provider capabilities and configuration</li>
               <li>Authentication via Google OAuth and session management (e.g., secure cookies)</li>
               <li>Access control so that data is visible only to authorized users (e.g., club members, tournament staff) as designed by the product</li>
               <li>Input validation and rate limiting on APIs where implemented</li>
