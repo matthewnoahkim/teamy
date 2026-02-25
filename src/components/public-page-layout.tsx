@@ -89,56 +89,69 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
 
   return (
     <div className="min-h-screen flex flex-col bg-background grid-pattern text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[10002] focus:rounded-lg focus:bg-card focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground focus:shadow-lg"
+      >
+        Skip to content
+      </a>
+
       {/* Discord Banner */}
       <DiscordBanner initialSettings={bannerSettings} />
       
       {/* Header */}
       <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl" suppressHydrationWarning>
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 overflow-x-auto">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">
             <HomeNav 
               variant="light" 
               mobileButton={
                 isLoggedIn ? (
-                  <Link href={loggedInRedirect}>
-                    <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
-                      My Clubs
-                    </button>
+                  <Link
+                    href={loggedInRedirect}
+                    className="block w-full rounded-full bg-white px-4 py-2.5 text-center text-sm font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md"
+                  >
+                    My Clubs
                   </Link>
                 ) : (
                   <div className="space-y-2">
-                    <Link href="/login" className="block w-full">
-                      <button className="w-full px-4 py-2.5 text-sm font-semibold border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors shadow-sm">
-                        Sign In
-                      </button>
+                    <Link
+                      href="/login"
+                      className="block w-full rounded-full border border-white/40 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-white/10"
+                    >
+                      Sign In
                     </Link>
-                    <Link href="/signup" className="block w-full">
-                      <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
-                        Sign Up
-                      </button>
+                    <Link
+                      href="/signup"
+                      className="block w-full rounded-full bg-white px-4 py-2.5 text-center text-sm font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md"
+                    >
+                      Sign Up
                     </Link>
                   </div>
                 )
               }
             />
             {isLoggedIn ? (
-              <Link href={loggedInRedirect} className="hidden md:block">
-                <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm">
-                  My Clubs
-                </button>
+              <Link
+                href={loggedInRedirect}
+                className="hidden whitespace-nowrap rounded-full bg-white px-5 py-2 text-xs font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md md:block md:px-6 md:py-2.5 md:text-sm"
+              >
+                My Clubs
               </Link>
             ) : (
               <div className="hidden md:flex items-center gap-3">
-                <Link href="/login">
-                  <button className="px-2 md:px-3 py-2 text-xs md:text-sm font-semibold text-white/90 hover:text-white transition-colors whitespace-nowrap">
-                    Sign In
-                  </button>
+                <Link
+                  href="/login"
+                  className="whitespace-nowrap px-2 py-2 text-xs font-semibold text-white/90 transition-colors hover:text-white md:px-3 md:text-sm"
+                >
+                  Sign In
                 </Link>
-                <Link href="/signup">
-                  <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm">
-                    Sign Up
-                  </button>
+                <Link
+                  href="/signup"
+                  className="block whitespace-nowrap rounded-full bg-white px-5 py-2 text-xs font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md md:px-6 md:py-2.5 md:text-sm"
+                >
+                  Sign Up
                 </Link>
               </div>
             )}
@@ -147,7 +160,7 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 bg-background grid-pattern">
+      <main id="main-content" className="flex-1 bg-background grid-pattern">
         {children}
       </main>
 

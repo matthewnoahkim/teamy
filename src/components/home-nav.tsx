@@ -63,6 +63,12 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
   // 'light' and 'hero' both use white text for blue backgrounds
   const isLight = variant === 'hero' || variant === 'light'
 
+  // Close menus when route changes.
+  useEffect(() => {
+    setMobileMenuOpen(false)
+    setOpenDropdown(null)
+  }, [pathname])
+
   // Clear timeout on unmount
   useEffect(() => {
     return () => {
@@ -70,6 +76,30 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
         clearTimeout(closeTimeoutRef.current)
       }
     }
+  }, [])
+
+  // Prevent background scrolling when mobile menu is open.
+  useEffect(() => {
+    if (!mobileMenuOpen || typeof document === 'undefined') return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [mobileMenuOpen])
+
+  // Close menu/dropdowns with Escape for keyboard users.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false)
+        setOpenDropdown(null)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
   // Calculate dropdown position when opened
@@ -151,6 +181,17 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                   ref={(el) => {
                     buttonRefs.current[item.label] = el
                   }}
+                  onClick={() => {
+                    setOpenDropdown((prev) => (prev === item.label ? null : item.label))
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setOpenDropdown((prev) => (prev === item.label ? null : item.label))
+                    }
+                  }}
+                  aria-expanded={openDropdown === item.label}
+                  aria-haspopup="menu"
                   className={cn(
                     "text-sm font-semibold transition-all duration-200 flex items-center gap-1 rounded-xl px-4 py-2",
                     isLight 
@@ -163,7 +204,12 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                   )}
                 >
                   {item.label}
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 transition-transform duration-200",
+                      openDropdown === item.label ? "rotate-180" : ""
+                    )}
+                  />
                 </button>
               </div>
             )
@@ -198,7 +244,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
             isLight
               ? "bg-popover border-border"
               : "bg-background border-border"
-          )}>
+          )} role="menu">
             <div className="p-1.5">
               {navItems
                 .find(item => item.label === openDropdown)
@@ -208,6 +254,8 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
                     <Link
                       key={subItem.href}
                       href={subItem.href}
+                      onClick={() => setOpenDropdown(null)}
+                      role="menuitem"
                       className={cn(
                         "block px-3 py-2 rounded-md transition-colors text-base leading-tight font-sans font-medium",
                         active
@@ -229,6 +277,8 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
       <div className="md:hidden">
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="home-mobile-menu"
           className={cn(
             "p-2 transition-colors relative z-[10001]",
             isLight 
@@ -260,7 +310,7 @@ export function HomeNav({ variant = 'default', mobileButton }: HomeNavProps) {
             isLight 
               ? "bg-teamy-primary dark:bg-popover border-l border-white/10" 
               : "bg-background border-l border-border"
-          )}>
+          )} id="home-mobile-menu">
             <div className="pt-16 pb-6 px-4">
               <nav className="flex flex-col gap-1">
                 {navItems.map((item) => {
