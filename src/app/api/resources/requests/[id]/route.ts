@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireDevAccess } from '@/lib/dev/guard'
 
 // Approve or reject a resource request
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const _resolvedParams = await params
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const guard = await requireDevAccess(req, '/api/resources/requests/[id]')
+  if (!guard.allowed) return guard.response
 
+  try {
     const { id } = await params
     const body = await req.json()
     const { action, rejectionReason, editedName, editedTag, editedUrl } = body
@@ -221,13 +217,10 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const _resolvedParams = await params
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const guard = await requireDevAccess(req, '/api/resources/requests/[id]')
+  if (!guard.allowed) return guard.response
 
+  try {
     const { id } = await params
     const request = await prisma.resourceRequest.findUnique({
       where: { id },

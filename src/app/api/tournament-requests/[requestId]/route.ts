@@ -2,22 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { devNotFoundResponse, requireDevAccess } from '@/lib/dev/guard'
 
 // PATCH - Update tournament hosting request status
-// This endpoint is used by dev panel users to approve/reject tournament hosting requests
-// Any authenticated user can update requests (dev panel access is controlled by the dev panel UI)
+// This endpoint is used by dev panel users to approve/reject tournament hosting requests.
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
-  console.error('insecure endpoint requested: /api/tournament-requests/[requestId] (PATCH)')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+  const guard = await requireDevAccess(request, '/api/tournament-requests/[requestId]')
+  if (!guard.allowed) return guard.response
 
   const resolvedParams = await params
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return devNotFoundResponse(request)
     }
 
     const { requestId } = resolvedParams
@@ -42,14 +42,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     }
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // TypeScript narrowing: we know currentRequest and session are not null after checks
-    // Use non-null assertions since we've already checked
-    const hostingRequest = currentRequest!
-    const userSession = session!
+    const hostingRequest = currentRequest
 
     // If approving and no tournament exists yet, create one
     if (status === 'APPROVED' && !hostingRequest.tournament) {
@@ -93,7 +86,7 @@ export async function PATCH(
             endTime: new Date(),
             location: hostingRequest.location,
             approved: true,
-            createdById: userSession.user.id,
+            createdById: session.user.id,
             hostingRequestId: requestId,
           },
         })
@@ -122,12 +115,12 @@ export async function PATCH(
           where: {
             tournamentId_userId: {
               tournamentId: tournament.id,
-              userId: userSession.user.id,
+              userId: session.user.id,
             },
           },
           create: {
             tournamentId: tournament.id,
-            userId: userSession.user.id,
+            userId: session.user.id,
           },
           update: {},
         })
@@ -183,8 +176,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
-  console.error('insecure endpoint requested: /api/tournament-requests/[requestId] (DELETE)')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+  const guard = await requireDevAccess(request, '/api/tournament-requests/[requestId]')
+  if (!guard.allowed) return guard.response
 
   const resolvedParams = await params
   try {

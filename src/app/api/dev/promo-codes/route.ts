@@ -3,53 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createAuditLog } from '@/lib/audit-log'
-
-// Helper function to check dev panel access
-async function checkDevAccess(email?: string | null) {
-  if (!email) return false
-
-  // Check database whitelist
-  const setting = await prisma.siteSetting.findUnique({
-    where: { key: 'dev_panel_email_whitelist' },
-  })
-
-  if (setting) {
-    try {
-      const emails = JSON.parse(setting.value)
-      if (Array.isArray(emails) && emails.map((e: string) => e.toLowerCase()).includes(email.toLowerCase())) {
-        return true
-      }
-    } catch (e) {
-      console.error('Failed to parse email whitelist:', e)
-    }
-  }
-
-  // Fallback to environment variable
-  const defaultEmails = process.env.DEV_PANEL_DEFAULT_EMAILS
-  if (defaultEmails) {
-    const emailList = defaultEmails
-      .split(',')
-      .map(e => e.trim().toLowerCase())
-    return emailList.includes(email.toLowerCase())
-  }
-
-  return false
-}
+import { devNotFoundResponse, requireDevAccess } from '@/lib/dev/guard'
 
 // GET - List all promo codes
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/promo-codes')
+  if (!guard.allowed) return guard.response
+
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const hasAccess = await checkDevAccess(session.user.email)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     const promoCodes = await prisma.promoCode.findMany({
       include: {
         redemptions: {
@@ -84,16 +45,14 @@ export async function GET(_request: NextRequest) {
 
 // POST - Create a new promo code
 export async function POST(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/promo-codes')
+  if (!guard.allowed) return guard.response
+
   try {
     const session = await getServerSession(authOptions)
 
     if (!session?.user?.email || !session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const hasAccess = await checkDevAccess(session.user.email)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return devNotFoundResponse(request)
     }
 
     const { code, effectType, effectDuration, effectQuantity, activatesAt, expiresAt, maxRedemptions } = await request.json()
@@ -184,17 +143,14 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Delete a promo code
 export async function DELETE(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/promo-codes')
+  if (!guard.allowed) return guard.response
+
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const hasAccess = await checkDevAccess(session.user.email)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auditUserId = session?.user?.id ?? 'internal-api-key'
+    const auditUserEmail = session?.user?.email ?? 'internal-api-key@local'
+    const auditUserName = session?.user?.name ?? 'Internal API Key'
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -212,9 +168,9 @@ export async function DELETE(request: NextRequest) {
 
     // Log the action
     await createAuditLog({
-      userId: session.user.id,
-      userEmail: session.user.email,
-      userName: session.user.name,
+      userId: auditUserId,
+      userEmail: auditUserEmail,
+      userName: auditUserName,
       action: 'DELETE_PROMO_CODE',
       target: id,
       request,
@@ -232,17 +188,14 @@ export async function DELETE(request: NextRequest) {
 
 // PATCH - Update a promo code
 export async function PATCH(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/promo-codes')
+  if (!guard.allowed) return guard.response
+
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const hasAccess = await checkDevAccess(session.user.email)
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auditUserId = session?.user?.id ?? 'internal-api-key'
+    const auditUserEmail = session?.user?.email ?? 'internal-api-key@local'
+    const auditUserName = session?.user?.name ?? 'Internal API Key'
 
     const { id, activatesAt, expiresAt, maxRedemptions } = await request.json()
 
@@ -264,9 +217,9 @@ export async function PATCH(request: NextRequest) {
 
     // Log the action
     await createAuditLog({
-      userId: session.user.id,
-      userEmail: session.user.email,
-      userName: session.user.name,
+      userId: auditUserId,
+      userEmail: auditUserEmail,
+      userName: auditUserName,
       action: 'UPDATE_PROMO_CODE',
       target: promoCode.code,
       details: {

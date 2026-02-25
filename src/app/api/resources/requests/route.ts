@@ -6,6 +6,7 @@ import {
   sanitizeSearchQuery,
   validateEnum,
 } from '@/lib/input-validation'
+import { requireDevAccess } from '@/lib/dev/guard'
 
 // Create a resource request (also creates club-visible resource immediately)
 export async function POST(req: NextRequest) {
@@ -107,12 +108,10 @@ export async function POST(req: NextRequest) {
 
 // Get all resource requests (for dev panel)
 export async function GET(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const guard = await requireDevAccess(req, '/api/resources/requests')
+  if (!guard.allowed) return guard.response
 
+  try {
     // Check if resourceRequest model exists
     if (!prisma.resourceRequest) {
       return NextResponse.json({ requests: [] })

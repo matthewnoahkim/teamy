@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { withRateLimit } from '@/lib/rate-limit-api'
 import { tournamentRequestSchema, validateRequestBody } from '@/lib/validation-schemas'
 import { getValidatedWebhook, EMAIL_CONFIG } from '@/lib/security-config'
+import { requireDevAccess } from '@/lib/dev/guard'
 
 function escapeHtml(str: string): string {
   return str
@@ -289,44 +288,26 @@ export const POST = withRateLimit(handlePOST, {
   identifier: 'tournament request',
 })
 
-// GET - Get all tournament hosting requests (for dev panel)
+// GET - Public approved listings, plus full dev-panel access for all statuses
 export async function GET(request: NextRequest) {
   try {
-    // Auth check: require authenticated user with dev panel access
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    // Verify dev panel access via whitelist
-    const setting = await prisma.siteSetting.findUnique({
-      where: { key: 'dev_panel_email_whitelist' },
-    })
-    let whitelist: string[] = []
-    if (setting) {
-      try {
-        whitelist = JSON.parse(setting.value)
-        if (!Array.isArray(whitelist)) whitelist = []
-      } catch { whitelist = [] }
-    }
-    if (whitelist.length === 0) {
-      const defaultEmailsEnv = process.env.DEV_PANEL_DEFAULT_EMAILS
-      if (defaultEmailsEnv) {
-        whitelist = defaultEmailsEnv.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0 && e.includes('@'))
-      }
-    }
-    const hasAccess = whitelist.some(e => e.toLowerCase().trim() === session.user!.email!.toLowerCase().trim())
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const search = searchParams.get('search')
+    const normalizedStatus = status?.toUpperCase()
+
+    // Allow public access only for approved listings without search.
+    // All other request views are dev-panel-only and should not leak route/data.
+    const isPublicApprovedListing = normalizedStatus === 'APPROVED' && !search
+    if (!isPublicApprovedListing) {
+      const guard = await requireDevAccess(request, '/api/tournament-requests')
+      if (!guard.allowed) return guard.response
+    }
 
     const where: Record<string, unknown> = {}
 
     if (status && status !== 'all') {
-      where.status = status.toUpperCase()
+      where.status = normalizedStatus
     }
 
     if (search) {
@@ -350,10 +331,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    // Return all requests - dev panel users should see all requests regardless of
-    // whether they have tournaments or whether those tournaments are published
-    // This allows developers to see and manage pending requests, approved requests,
-    // and rejected requests
+    // Dev panel users can fetch all statuses; public requests only reach APPROVED listing mode.
     return NextResponse.json({ requests })
   } catch (error) {
     console.error('Error fetching tournament hosting requests:', error)

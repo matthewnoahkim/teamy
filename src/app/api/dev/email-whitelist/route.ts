@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { requireDevAccess } from '@/lib/dev/guard'
 
 // GET - Fetch the email whitelist
-export async function GET(_request: Request) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export async function GET(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/email-whitelist')
+  if (!guard.allowed) return guard.response
 
-    // Verify user is in whitelist (dev access check)
+  try {
     const setting = await prisma.siteSetting.findUnique({
       where: { key: 'dev_panel_email_whitelist' },
     })
@@ -38,15 +33,6 @@ export async function GET(_request: Request) {
           .map(email => email.trim().toLowerCase())
           .filter(email => email.length > 0 && email.includes('@'))
       }
-    }
-
-    // Verify requesting user has dev panel access
-    const userEmail = session.user.email.toLowerCase().trim()
-    const isAllowed = emails.some(
-      (email) => email.toLowerCase().trim() === userEmail
-    )
-    if (!isAllowed) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Fetch user info for each email
@@ -85,50 +71,10 @@ export async function GET(_request: Request) {
 
 // PUT - Update the email whitelist
 export async function PUT(request: NextRequest) {
+  const guard = await requireDevAccess(request, '/api/dev/email-whitelist')
+  if (!guard.allowed) return guard.response
+
   try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Verify user is in whitelist before allowing updates
-    const currentSetting = await prisma.siteSetting.findUnique({
-      where: { key: 'dev_panel_email_whitelist' },
-    })
-
-    let currentWhitelist: string[] = []
-    if (currentSetting) {
-      try {
-        currentWhitelist = JSON.parse(currentSetting.value)
-        if (!Array.isArray(currentWhitelist)) {
-          currentWhitelist = []
-        }
-      } catch (_e) {
-        currentWhitelist = []
-      }
-    }
-
-    // If empty, use defaults from environment variable
-    if (currentWhitelist.length === 0) {
-      const defaultEmailsEnv = process.env.DEV_PANEL_DEFAULT_EMAILS
-      if (defaultEmailsEnv) {
-        currentWhitelist = defaultEmailsEnv
-          .split(',')
-          .map(email => email.trim().toLowerCase())
-          .filter(email => email.length > 0 && email.includes('@'))
-      }
-    }
-
-    const userEmail = session.user.email.toLowerCase().trim()
-    const isAllowed = currentWhitelist.some(
-      (email) => email.toLowerCase().trim() === userEmail
-    )
-
-    if (!isAllowed) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     const body = await request.json()
     const { emails } = body
 

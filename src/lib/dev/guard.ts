@@ -1,7 +1,7 @@
 /**
  * Guard for /api/dev/* routes that return sensitive data.
- * In production: require either (1) valid x-internal-api-key or (2) session + dev whitelist.
- * Denied requests get 404 to avoid leaking that the route exists.
+ * Require either (1) valid x-internal-api-key or (2) session + dev whitelist.
+ * Denied requests are redirected to /404 so users land on the custom not-found page.
  * Never log full user payloads; log only IP, user-agent, timestamp for denied attempts.
  */
 
@@ -14,13 +14,6 @@ import crypto from 'crypto'
 
 const INTERNAL_KEY_HEADER = 'x-internal-api-key'
 const ENV_KEY = 'INTERNAL_API_KEY'
-
-function isProduction(): boolean {
-  return (
-    process.env.NODE_ENV === 'production' ||
-    process.env.VERCEL_ENV === 'production'
-  )
-}
 
 /**
  * Constant-time comparison for API key to prevent timing attacks.
@@ -70,7 +63,7 @@ async function checkDevWhitelist(email: string): Promise<boolean> {
 }
 
 /**
- * Log a denied attempt. Only IP, user-agent, timestamp, and route — never user payloads.
+ * Log a denied attempt. Only IP, user-agent, timestamp, and route - never user payloads.
  */
 function logDenied(route: string, request: NextRequest, reason: string): void {
   const ip = getClientIp(request)
@@ -79,10 +72,38 @@ function logDenied(route: string, request: NextRequest, reason: string): void {
   console.warn(`[dev-guard] Denied access to ${route}: ${reason} | ip=${ip} | userAgent=${ua} | at=${ts}`)
 }
 
+export async function devNotFoundResponse(request: NextRequest): Promise<NextResponse> {
+  const accept = request.headers.get('accept')?.toLowerCase() ?? ''
+  const wantsHtml = accept.includes('text/html')
+
+  if (wantsHtml) {
+    try {
+      const notFoundUrl = new URL('/404', request.url)
+      const notFoundPage = await fetch(notFoundUrl.toString(), {
+        headers: { accept: 'text/html' },
+        cache: 'no-store',
+      })
+
+      const html = await notFoundPage.text()
+      return new NextResponse(html, {
+        status: 404,
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+        },
+      })
+    } catch (error) {
+      console.error('[dev-guard] Failed to load custom 404 page:', error)
+    }
+  }
+
+  return NextResponse.json({ error: 'Not Found' }, { status: 404 })
+}
+
 /**
  * Require dev access for sensitive /api/dev/* handlers.
  * Call at the very top of the handler; short-circuits before any heavy DB work for unauthorized requests.
- * In production, returns 404 when not allowed (to avoid leaking route existence).
+ * Returns a redirect to the custom /404 page when not allowed (to avoid leaking route existence).
  *
  * Usage:
  *   const guard = await requireDevAccess(request, '/api/dev/users')
@@ -92,7 +113,7 @@ export async function requireDevAccess(
   request: NextRequest,
   routeLabel: string
 ): Promise<{ allowed: true } | { allowed: false; response: NextResponse }> {
-  // 1) Internal API key (no DB, no session) — check first for fast path and server-to-server
+  // 1) Internal API key (no DB, no session) - check first for fast path and server-to-server
   if (hasValidInternalKey(request)) {
     return { allowed: true }
   }
@@ -105,18 +126,9 @@ export async function requireDevAccess(
   }
 
   // Not allowed
-  if (isProduction()) {
-    logDenied(routeLabel, request, 'unauthorized or not on dev whitelist')
-    return {
-      allowed: false,
-      response: new NextResponse(null, { status: 404, statusText: 'Not Found' }),
-    }
-  }
-
-  // Non-production: still deny but can use 403 so devs see it's an auth issue
   logDenied(routeLabel, request, 'unauthorized or not on dev whitelist')
   return {
     allowed: false,
-    response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
+    response: await devNotFoundResponse(request),
   }
 }
