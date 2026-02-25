@@ -1,205 +1,164 @@
+import type React from 'react'
+import Link from 'next/link'
 import { PublicPageLayout } from '@/components/public-page-layout'
-import { 
-  MessageSquare, 
-  Calendar, 
-  ClipboardCheck, 
-  FileText, 
-  BarChart3, 
-  FolderKanban, 
-  DollarSign, 
-  Wrench 
-} from 'lucide-react'
-import { StickyScroll } from '@/components/ui/sticky-scroll-reveal'
 import { DemoRequestDialog } from '@/components/demo-request-dialog'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  BarChart3,
+  Calendar,
+  ClipboardCheck,
+  DollarSign,
+  FileText,
+  FolderKanban,
+  MessageSquare,
+  Users,
+  Wrench,
+} from 'lucide-react'
 
-const stickyScrollContent = [
+type FeatureItem = {
+  title: string
+  description: string
+  icon: React.ComponentType<{ className?: string }>
+}
+
+const coreFeatures: FeatureItem[] = [
   {
     title: 'Communication Hub',
-    description: 'Keep your team connected with announcements, threaded replies, reactions, and email notifications. Share updates with specific roles or the entire team. Real-time notifications ensure everyone stays informed.',
-    content: (
-      <div className="h-full w-full flex items-center justify-center p-6">
-        <div className="bg-card rounded-xl p-6 shadow-lg w-full max-w-full border border-teamy-primary/10">
-          <div className="flex items-center gap-3 mb-4">
-            <MessageSquare className="h-8 w-8 text-teamy-primary flex-shrink-0" />
-            <h3 className="font-bold text-lg text-foreground leading-tight">Team Announcements</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">Stay connected and informed with real-time updates</p>
-        </div>
-      </div>
-    ),
+    description: 'Share announcements, updates, and reminders with the right members using clear role-based visibility.',
+    icon: MessageSquare,
   },
   {
     title: 'Smart Planning',
-    description: 'Schedule practices, meetings, and competitions with ease. RSVP tracking, recurring events, and calendar integration keep everyone organized. Automatic reminders and conflict detection prevent scheduling issues.',
-    content: (
-      <div className="h-full w-full flex items-center justify-center p-8">
-        <div className="bg-card rounded-xl p-6 shadow-lg w-full border border-teamy-primary/10">
-          <div className="flex items-center gap-3 mb-4">
-            <Calendar className="h-8 w-8 text-teamy-primary" />
-            <h3 className="font-bold text-lg text-foreground">Event Calendar</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">Keep everyone on the same schedule</p>
-        </div>
-      </div>
-    ),
+    description: 'Coordinate practices, meetings, and deadlines with one shared calendar and cleaner scheduling.',
+    icon: Calendar,
   },
   {
     title: 'Event Rosters',
-    description: 'Assign students to Science Olympiad events with AI assistance. Automatic conflict detection and capacity limits ensure optimal team composition. Track member preferences and availability to build the perfect roster.',
-    content: (
-      <div className="h-full w-full flex items-center justify-center p-8">
-        <div className="bg-card rounded-xl p-6 shadow-lg w-full border border-teamy-primary/10">
-          <div className="flex items-center gap-3 mb-4">
-            <ClipboardCheck className="h-8 w-8 text-teamy-primary" />
-            <h3 className="font-bold text-lg text-foreground">AI-Powered Rosters</h3>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-foreground">Anatomy & Physiology</span>
-              <span className="text-teamy-primary font-semibold">✓ 2/2</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-foreground">Disease Detectives</span>
-              <span className="text-teamy-primary font-semibold">✓ 2/2</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-foreground">Forensics</span>
-              <span className="text-teamy-accent font-semibold">⚠ 1/2</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
+    description: 'Build and maintain event assignments with better visibility into coverage and conflicts.',
+    icon: ClipboardCheck,
   },
   {
     title: 'Testing Platform',
-    description: 'Create and grade tests with multiple question types. AI-powered grading, proctoring tools, built-in calculator, and customizable score release. Support for multiple choice, short answer, and essay questions with automatic grading.',
-    content: (
-      <div className="h-full w-full flex items-center justify-center p-8">
-        <div className="bg-card rounded-xl p-6 shadow-lg w-full border border-teamy-primary/10">
-          <div className="flex items-center gap-3 mb-4">
-            <FileText className="h-8 w-8 text-teamy-primary" />
-            <h3 className="font-bold text-lg text-foreground">Test Creator</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">AI-powered grading and proctoring</p>
-        </div>
-      </div>
-    ),
+    description: 'Create, distribute, and review tests in one workflow with support for practice and competition prep.',
+    icon: FileText,
   },
   {
     title: 'Performance Analytics',
-    description: 'Track team performance with detailed statistics and insights. Monitor attendance, test scores, and event participation at a glance. Generate reports and identify areas for improvement with data-driven insights.',
-    content: (
-      <div className="h-full w-full flex items-center justify-center p-8">
-        <div className="bg-card rounded-xl p-6 shadow-lg w-full border border-teamy-primary/10">
-          <div className="flex items-center gap-3 mb-4">
-            <BarChart3 className="h-8 w-8 text-teamy-primary" />
-            <h3 className="font-bold text-lg text-foreground">Team Statistics</h3>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-foreground">Attendance Rate</span>
-                <span className="font-semibold text-foreground">94%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-teamy-primary h-2 rounded-full" style={{width: '94%'}}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-foreground">Test Completion</span>
-                <span className="font-semibold text-foreground">88%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-teamy-accent h-2 rounded-full" style={{width: '88%'}}></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
+    description: 'Track progress, attendance, and engagement so coaches can make data-informed decisions.',
+    icon: BarChart3,
   },
   {
     title: 'Team Organization',
-    description: 'Manage clubs, teams, and members with powerful admin tools. Photo albums, file sharing, and customizable dashboard widgets. Everything you need to keep your team organized and running smoothly.',
-    content: (
-      <div className="h-full w-full flex items-center justify-center p-8">
-        <div className="bg-card rounded-xl p-6 shadow-lg w-full border border-teamy-primary/10">
-          <div className="flex items-center gap-3 mb-4">
-            <FolderKanban className="h-8 w-8 text-teamy-primary" />
-            <h3 className="font-bold text-lg text-foreground">Organization Tools</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">Manage everything in one place</p>
-        </div>
-      </div>
-    ),
+    description: 'Manage members, roles, teams, files, and internal resources from a unified workspace.',
+    icon: FolderKanban,
   },
   {
     title: 'Financial Management',
-    description: 'Track event budgets and expenses effortlessly. Purchase request approval system with automatic budget enforcement and reporting. Never go over budget with real-time tracking and alerts.',
-    content: (
-      <div className="h-full w-full flex items-center justify-center p-8">
-        <div className="bg-card rounded-xl p-6 shadow-lg w-full border border-teamy-primary/10">
-          <div className="flex items-center gap-3 mb-4">
-            <DollarSign className="h-8 w-8 text-teamy-primary" />
-            <h3 className="font-bold text-lg text-foreground">Budget Overview</h3>
-          </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-foreground">Total Budget</span>
-              <span className="font-semibold text-foreground">$5,000</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-foreground">Spent</span>
-              <span className="text-teamy-accent">$3,200</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-foreground">Remaining</span>
-              <span className="text-teamy-primary">$1,800</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
+    description: 'Monitor budgets, expenses, and requests so spending stays transparent and under control.',
+    icon: DollarSign,
   },
   {
     title: 'Essential Tools',
-    description: 'Forms, to-do lists, attendance tracking, and more. Everything you need to run your Science Olympiad team efficiently in one place. Streamline your workflow with integrated tools designed for team management.',
-    content: (
-      <div className="h-full w-full flex items-center justify-center p-8">
-        <div className="bg-card rounded-xl p-6 shadow-lg w-full border border-teamy-primary/10">
-          <div className="flex items-center gap-3 mb-4">
-            <Wrench className="h-8 w-8 text-teamy-primary" />
-            <h3 className="font-bold text-lg text-foreground">Productivity Suite</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">Forms, to-dos, and more</p>
-        </div>
-      </div>
-    ),
+    description: 'Use forms, to-dos, attendance, and day-to-day operations tools without switching between apps.',
+    icon: Wrench,
+  },
+]
+
+const roleHighlights = [
+  {
+    title: 'For Coaches',
+    description: 'Keep your team organized with less admin overhead and more clarity across events and members.',
+  },
+  {
+    title: 'For Captains',
+    description: 'Coordinate peers, communicate faster, and stay ahead of deadlines with shared visibility.',
+  },
+  {
+    title: 'For Tournament Staff',
+    description: 'Run registrations, communication, and operational workflows from one consistent system.',
   },
 ]
 
 export default function FeaturesPage() {
   return (
     <PublicPageLayout>
-      <div className="container mx-auto px-4 sm:px-6 py-12 md:py-16 lg:py-20 max-w-7xl">
-        {/* Page Title */}
-        <div className="text-center mb-12 md:mb-16 lg:mb-20">
-          <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4 md:mb-6">
-            Features
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Everything you need to manage your Science Olympiad team
-          </p>
-        </div>
+      <div className="py-12 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto">
+          <section className="text-center mb-12">
+            <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
+              Features
+            </h1>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+              Everything your Science Olympiad team needs to communicate, plan, practice, and compete with less friction.
+            </p>
+          </section>
 
-        {/* Sticky Scroll Section - Full Width */}
-        <StickyScroll content={stickyScrollContent} />
+          <section className="mb-16">
+            <div className="mb-8">
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground">Core Capabilities</h2>
+              <p className="mt-2 text-muted-foreground text-base md:text-lg max-w-3xl">
+                Teamy brings team operations into a single system so communication, planning, and execution stay aligned.
+              </p>
+            </div>
 
-        {/* Schedule Demo CTA */}
-        <div className="text-center mt-16 md:mt-20 lg:mt-24 mb-8">
-          <DemoRequestDialog />
+            <div className="grid md:grid-cols-2 gap-6">
+              {coreFeatures.map((feature) => (
+                <Card key={feature.title} className="h-full">
+                  <CardHeader className="pb-3">
+                    <div className="h-10 w-10 rounded-xl bg-teamy-primary/10 border border-teamy-primary/20 flex items-center justify-center mb-3">
+                      <feature.icon className="h-5 w-5 text-teamy-primary" />
+                    </div>
+                    <CardTitle className="text-xl">{feature.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+
+          <section className="mb-16">
+            <div className="mb-8">
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground">Built for Every Role</h2>
+              <p className="mt-2 text-muted-foreground text-base md:text-lg max-w-3xl">
+                Different responsibilities, one shared workspace.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {roleHighlights.map((item) => (
+                <Card key={item.title}>
+                  <CardHeader className="pb-2">
+                    <div className="h-9 w-9 rounded-lg bg-teamy-primary/10 border border-teamy-primary/20 flex items-center justify-center mb-2">
+                      <Users className="h-4 w-4 text-teamy-primary" />
+                    </div>
+                    <CardTitle className="text-lg">{item.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground leading-relaxed text-sm">{item.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-teamy-primary/20 bg-teamy-primary/5 p-8 md:p-10 text-center">
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground">See Teamy in your workflow</h2>
+            <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
+              Get a walkthrough tailored to your team&apos;s current process and goals.
+            </p>
+
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <DemoRequestDialog buttonText="Schedule a Demo" />
+              <Link href="/signup">
+                <Button size="lg" variant="outline">
+                  Create Free Account
+                </Button>
+              </Link>
+            </div>
+          </section>
         </div>
       </div>
     </PublicPageLayout>

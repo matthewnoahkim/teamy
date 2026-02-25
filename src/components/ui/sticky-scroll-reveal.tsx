@@ -41,9 +41,9 @@ export const StickyScroll = ({
 
   // Subtle Teamy theme gradients - muted and elegant
   const subtleGradients = [
-    "linear-gradient(135deg, rgba(0, 86, 199, 0.08) 0%, rgba(26, 111, 234, 0.05) 50%, rgba(111, 214, 255, 0.08) 100%)", // Primary to accent - very subtle
-    "linear-gradient(135deg, rgba(26, 111, 234, 0.06) 0%, rgba(111, 214, 255, 0.05) 50%, rgba(14, 165, 233, 0.06) 100%)", // Soft to accent
-    "linear-gradient(135deg, rgba(0, 58, 140, 0.08) 0%, rgba(0, 86, 199, 0.05) 50%, rgba(26, 111, 234, 0.06) 100%)", // Dark to primary
+    "linear-gradient(160deg, rgba(0, 86, 199, 0.06) 0%, rgba(111, 214, 255, 0.02) 100%), hsl(var(--card))",
+    "linear-gradient(160deg, rgba(26, 111, 234, 0.05) 0%, rgba(111, 214, 255, 0.03) 100%), hsl(var(--card))",
+    "linear-gradient(160deg, rgba(0, 86, 199, 0.05) 0%, rgba(26, 111, 234, 0.02) 100%), hsl(var(--card))",
   ];
 
   const [backgroundGradient, setBackgroundGradient] = useState(
@@ -56,20 +56,22 @@ export const StickyScroll = ({
 
   return (
     <motion.div
-      className="flex flex-col lg:flex-row justify-center relative lg:space-x-12 rounded-md px-6 lg:px-10"
+      className="flex flex-col lg:flex-row justify-center relative lg:space-x-10 rounded-2xl px-4 sm:px-6 lg:px-8 py-6"
       ref={ref}
     >
-      <div className="relative flex items-start px-4 lg:flex-1">
+      <div className="relative flex items-start px-2 sm:px-3 lg:flex-1">
         {/* Scroll Indicator - Vertical line with dots */}
-        <div className="hidden lg:block absolute left-0 top-0 bottom-0 w-0.5 mr-10">
+        <div className="hidden lg:block absolute left-1 top-10 bottom-10 w-0.5">
           <div className="relative h-full w-full">
             {/* Background line */}
-            <div className="absolute inset-0 bg-border/50 rounded-full" />
+            <div className="absolute inset-0 bg-border/60 rounded-full" />
             {/* Active indicator line */}
             <motion.div
-              className="absolute top-0 left-0 w-full bg-teamy-primary rounded-full origin-top shadow-sm"
+              className="absolute top-0 left-0 w-full rounded-full origin-top shadow-sm"
               style={{
                 height: indicatorHeight,
+                background:
+                  "linear-gradient(180deg, rgb(0, 86, 199) 0%, rgb(111, 214, 255) 100%)",
               }}
             />
             {/* Dots for each item */}
@@ -94,15 +96,23 @@ export const StickyScroll = ({
           </div>
         </div>
 
-        <div className="max-w-2xl w-full lg:pl-16">
+        <div className="max-w-2xl w-full lg:pl-14">
           {content.map((item, index) => (
-            <div key={item.title + index} className="h-[280px] flex flex-col justify-center">
+            <div
+              key={item.title + index}
+              className={cn(
+                "h-[260px] sm:h-[250px] flex flex-col justify-center rounded-2xl border px-5 sm:px-6 my-2 transition-all duration-300",
+                activeCard === index
+                  ? "bg-background border-teamy-primary/20 shadow-card"
+                  : "bg-transparent border-transparent"
+              )}
+            >
               <motion.h2
                 initial={{
                   opacity: 0,
                 }}
                 animate={{
-                  opacity: activeCard === index ? 1 : 0.3,
+                  opacity: activeCard === index ? 1 : 0.7,
                 }}
                 transition={{ duration: 0.3 }}
                 className="text-2xl md:text-3xl font-bold text-foreground"
@@ -114,7 +124,7 @@ export const StickyScroll = ({
                   opacity: 0,
                 }}
                 animate={{
-                  opacity: activeCard === index ? 1 : 0.3,
+                  opacity: activeCard === index ? 1 : 0.7,
                 }}
                 transition={{ duration: 0.3 }}
                 className="text-base md:text-lg text-muted-foreground max-w-lg mt-6 leading-relaxed"
@@ -149,7 +159,7 @@ export const StickyScroll = ({
       <div
         style={{ background: backgroundGradient }}
         className={cn(
-          "hidden lg:block h-64 w-80 rounded-xl sticky top-1/2 -translate-y-1/2 overflow-hidden shadow-xl border border-teamy-primary/10 flex-shrink-0",
+          "hidden lg:block h-[340px] w-[400px] rounded-xl sticky top-28 overflow-hidden shadow-xl border border-teamy-primary/10 flex-shrink-0",
           contentClassName
         )}
       >
