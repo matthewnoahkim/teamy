@@ -71,18 +71,48 @@ export default async function BlogPostPage({ params }: Props) {
             <HomeNav 
               variant="light" 
               mobileButton={
-                <Link href={isLoggedIn ? loggedInRedirect : "/login"}>
-                  <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
+                isLoggedIn ? (
+                  <Link href={loggedInRedirect}>
+                    <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
+                      My Clubs
+                    </button>
+                  </Link>
+                ) : (
+                  <div className="space-y-2">
+                    <Link href="/login" className="block w-full">
+                      <button className="w-full px-4 py-2.5 text-sm font-semibold border border-white/40 text-white rounded-full hover:bg-white/10 transition-colors shadow-sm">
+                        Sign In
+                      </button>
+                    </Link>
+                    <Link href="/signup" className="block w-full">
+                      <button className="w-full px-4 py-2.5 text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm">
+                        Sign Up
+                      </button>
+                    </Link>
+                  </div>
+                )
+              }
+            />
+            {isLoggedIn ? (
+              <Link href={loggedInRedirect} className="hidden md:block">
+                <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm whitespace-nowrap">
+                  My Clubs
+                </button>
+              </Link>
+            ) : (
+              <div className="hidden md:flex items-center gap-3">
+                <Link href="/login">
+                  <button className="px-2 md:px-3 py-2 text-xs md:text-sm font-semibold text-white/90 hover:text-white transition-colors whitespace-nowrap">
                     Sign In
                   </button>
                 </Link>
-              }
-            />
-            <Link href={isLoggedIn ? loggedInRedirect : "/login"} className="hidden md:block">
-              <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm whitespace-nowrap">
-                Sign In
-              </button>
-            </Link>
+                <Link href="/signup">
+                  <button className="px-5 md:px-6 py-2 md:py-2.5 text-xs md:text-sm font-semibold bg-white text-teamy-primary rounded-full hover:bg-white/90 transition-colors shadow-sm whitespace-nowrap">
+                    Sign Up
+                  </button>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </header>

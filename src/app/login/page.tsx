@@ -2,15 +2,20 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { SignInButton } from '@/components/signin-button'
+import { SignUpButton } from '@/components/signup-button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
+import { cn } from '@/lib/utils'
+
+type AuthMode = 'signin' | 'signup'
 
 type SignInPageProps = {
   searchParams?: Promise<{
     callbackUrl?: string
+    mode?: string
   }>
 }
 
@@ -63,9 +68,33 @@ function resolveCallbackUrl(rawCallbackUrl?: string, defaultUrl?: string) {
   return defaultUrl || '/auth/callback'
 }
 
+function resolveAuthMode(rawMode?: string): AuthMode {
+  return rawMode === 'signup' ? 'signup' : 'signin'
+}
+
+function buildAuthPageHref(mode: AuthMode, callbackUrl?: string) {
+  const params = new URLSearchParams()
+
+  if (mode === 'signup') {
+    params.set('mode', 'signup')
+  }
+
+  if (callbackUrl) {
+    params.set('callbackUrl', callbackUrl)
+  }
+
+  const query = params.toString()
+  return query ? `/login?${query}` : '/login'
+}
+
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const session = await getServerSession(authOptions)
   const resolvedSearchParams = await searchParams
+  const authMode = resolveAuthMode(resolvedSearchParams?.mode)
+  const isSignUpMode = authMode === 'signup'
+  const rawCallbackUrl = resolvedSearchParams?.callbackUrl
+  const signInPageHref = buildAuthPageHref('signin', rawCallbackUrl)
+  const signUpPageHref = buildAuthPageHref('signup', rawCallbackUrl)
 
   // Calculate callback URL for both logged-in and logged-out states
   let callbackUrl = '/auth/callback' // default redirect handler
@@ -98,20 +127,69 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
               </div>
               <div className="space-y-2">
                 <h2 className="font-heading text-3xl font-bold text-foreground">
-                  Welcome
+                  {isSignUpMode ? 'Create your account' : 'Welcome back'}
                 </h2>
                 <p className="text-lg text-muted-foreground">
-                  Sign in to access your teams
+                  {isSignUpMode
+                    ? 'Get started with Teamy in under a minute.'
+                    : 'Sign in to access your teams and tournaments.'}
                 </p>
               </div>
             </div>
 
             <div className="space-y-6">
-              <SignInButton callbackUrl={callbackUrl} />
+              <div className="grid grid-cols-2 rounded-xl bg-muted p-1">
+                <Link
+                  href={signInPageHref}
+                  className={cn(
+                    'rounded-lg px-4 py-2 text-center text-sm font-semibold transition-colors',
+                    isSignUpMode
+                      ? 'text-muted-foreground hover:text-foreground'
+                      : 'bg-card text-foreground shadow-sm'
+                  )}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href={signUpPageHref}
+                  className={cn(
+                    'rounded-lg px-4 py-2 text-center text-sm font-semibold transition-colors',
+                    isSignUpMode
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Sign Up
+                </Link>
+              </div>
+
+              {isSignUpMode ? (
+                <SignUpButton callbackUrl={callbackUrl} label="Continue with Google" />
+              ) : (
+                <SignInButton callbackUrl={callbackUrl} label="Continue with Google" />
+              )}
+
+              <p className="text-center text-sm text-muted-foreground">
+                {isSignUpMode ? (
+                  <>
+                    Already have an account?{' '}
+                    <Link href={signInPageHref} className="font-semibold text-teamy-primary dark:text-teamy-accent hover:underline">
+                      Sign in
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    New to Teamy?{' '}
+                    <Link href={signUpPageHref} className="font-semibold text-teamy-primary dark:text-teamy-accent hover:underline">
+                      Create an account
+                    </Link>
+                  </>
+                )}
+              </p>
 
               <div className="text-center text-sm text-muted-foreground">
                 <p>
-                  By signing in, you agree to our{' '}
+                  By continuing, you agree to our{' '}
                   <Link href="/terms" className="text-teamy-primary dark:text-teamy-accent hover:underline font-medium">
                     Terms of Service
                   </Link>

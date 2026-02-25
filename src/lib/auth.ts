@@ -80,8 +80,8 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: 'jwt',
-    // Session expires after 7 days (default is 30 days — shorter is more secure)
-    maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+    // Session expires after 14 days (default is 30 days)
+    maxAge: 14 * 24 * 60 * 60, // 14 days in seconds
     // Refresh the session token every 24 hours
     updateAge: 24 * 60 * 60, // 24 hours in seconds
   },

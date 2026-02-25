@@ -3,22 +3,28 @@
 import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 
-type SignInButtonProps = {
+type SignUpButtonProps = {
   callbackUrl?: string
   label?: string
 }
 
-export function SignInButton({ callbackUrl = '/', label = 'Sign in with Google' }: SignInButtonProps) {
-  const handleSignIn = () =>
-    signIn('google', {
-      callbackUrl,
-    })
+export function SignUpButton({ callbackUrl = '/', label = 'Sign up with Google' }: SignUpButtonProps) {
+  const handleSignUp = () =>
+    signIn(
+      'google',
+      {
+        callbackUrl,
+      },
+      {
+        prompt: 'select_account',
+      }
+    )
 
   return (
-    <Button 
-      className="w-full h-14 text-base font-semibold bg-card border-2 border-border text-foreground hover:bg-muted hover:border-teamy-primary/30 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl" 
-      onClick={handleSignIn}
-      variant="outline"
+    <Button
+      className="w-full h-14 text-base font-semibold bg-teamy-primary text-white hover:bg-teamy-primary-dark shadow-sm hover:shadow-md transition-all duration-300 rounded-xl"
+      onClick={handleSignUp}
+      variant="default"
     >
       <svg className="mr-3 h-6 w-6" viewBox="0 0 24 24">
         <path
