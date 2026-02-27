@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { normalizePgConnectionString } from './postgres-connection-string'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -14,7 +15,7 @@ function getAdapter() {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const adapterModule = require('@prisma/adapter-pg')
     const PrismaPg = adapterModule?.PrismaPg
-    const connectionString = process.env.DATABASE_URL
+    const connectionString = normalizePgConnectionString(process.env.DATABASE_URL)
     if (connectionString && PrismaPg) {
       return new PrismaPg({ connectionString })
     }

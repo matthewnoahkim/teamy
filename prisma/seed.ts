@@ -1,4 +1,5 @@
 import { PrismaClient, Division } from '@prisma/client'
+import { normalizePgConnectionString } from '../src/lib/postgres-connection-string'
 
 // Conditionally import adapter if available
 let PrismaPg: (new (opts: { connectionString: string | undefined }) => unknown) | null = null
@@ -9,7 +10,7 @@ try {
   // Adapter not available, will use default
 }
 
-const connectionString = process.env.DATABASE_URL
+const connectionString = normalizePgConnectionString(process.env.DATABASE_URL)
 const adapter = connectionString && PrismaPg ? new PrismaPg({ connectionString }) : undefined
 
 const prisma = adapter 
