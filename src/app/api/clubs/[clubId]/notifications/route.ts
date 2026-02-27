@@ -6,6 +6,10 @@ import {
   hasTestAssignmentAccess,
   type MembershipAuthzContext,
 } from '@/lib/club-authz'
+import {
+  PEOPLE_ACTIVITY_ACTIONS,
+  shouldCountPeopleActivityAsUnread,
+} from '@/lib/people-notifications'
 import { serverSession } from '@/lib/server-session'
 import {
   AnnouncementScope,
@@ -380,16 +384,46 @@ export async function GET(
       tasks.push(
         (async () => {
           const peopleSince = parseSince(searchParams.get('peopleSince'))
-          const hasNewPeople = await prisma.membership.findFirst({
-            where: {
+          const [hasNewPeople, recentPeopleActivityLogs] = await Promise.all([
+            prisma.membership.findFirst({
+              where: {
+                clubId: resolvedParams.clubId,
+                createdAt: { gt: peopleSince },
+                userId: { not: session.user.id },
+              },
+              select: { id: true },
+              orderBy: { createdAt: 'desc' },
+            }),
+            prisma.activityLog.findMany({
+              where: {
+                action: { in: [...PEOPLE_ACTIVITY_ACTIONS] },
+                timestamp: { gt: peopleSince },
+                OR: [{ userId: null }, { userId: { not: session.user.id } }],
+              },
+              select: {
+                action: true,
+                userId: true,
+                metadata: true,
+              },
+              orderBy: { timestamp: 'desc' },
+              take: 200,
+            }),
+          ])
+
+          const hasNewPeopleActivity = recentPeopleActivityLogs.some((log) =>
+            shouldCountPeopleActivityAsUnread({
+              action: log.action,
               clubId: resolvedParams.clubId,
-              createdAt: { gt: peopleSince },
-              userId: { not: session.user.id },
-            },
-            select: { id: true },
-            orderBy: { createdAt: 'desc' },
-          })
-          notifications.people = !!hasNewPeople
+              viewerUserId: session.user.id,
+              actorUserId: log.userId,
+              metadata:
+                log.metadata && typeof log.metadata === 'object'
+                  ? (log.metadata as Record<string, unknown>)
+                  : null,
+            }),
+          )
+
+          notifications.people = !!hasNewPeople || hasNewPeopleActivity
         })(),
       )
     }

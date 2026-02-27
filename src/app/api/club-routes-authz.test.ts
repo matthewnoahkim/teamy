@@ -302,3 +302,91 @@ test('GET /api/clubs/[clubId]/notifications stream checks enforce target visibil
     restoreAll(mocks)
   }
 })
+
+test('GET /api/clubs/[clubId]/notifications people ignores self-join activity for viewer', async () => {
+  const { prisma, serverSession } = await getTestDeps()
+  const prismaAny = prisma as Record<string, { [key: string]: unknown }>
+  const mocks = [
+    mockMethod(serverSession, 'get', async () => ({ user: { id: 'user-1' } }) as never),
+    overrideMethod(
+      prismaAny.membership as Record<string, unknown>,
+      'findUnique',
+      async () =>
+        ({
+          id: 'membership-1',
+          userId: 'user-1',
+          teamId: null,
+          role: Role.MEMBER,
+          roles: [],
+        }) as never,
+    ),
+    overrideMethod(prismaAny.membership as Record<string, unknown>, 'findFirst', async () => null as never),
+    overrideMethod(
+      prismaAny.activityLog as Record<string, unknown>,
+      'findMany',
+      async () =>
+        [
+          {
+            action: 'USER_JOINED_CLUB',
+            userId: 'user-1',
+            metadata: { clubId: 'club-1' },
+          },
+        ] as never,
+    ),
+  ]
+  try {
+    const response = await notificationsGet(
+      makeRequest('http://localhost/api/clubs/club-1/notifications?tabs=people&peopleSince=1970-01-01T00:00:00.000Z') as never,
+      { params: Promise.resolve({ clubId: 'club-1' }) },
+    )
+    assert.equal(response.status, 200)
+    const data = (await response.json()) as { notifications: { people: boolean } }
+    assert.equal(data.notifications.people, false)
+  } finally {
+    restoreAll(mocks)
+  }
+})
+
+test('GET /api/clubs/[clubId]/notifications people shows other-user join activity to observers', async () => {
+  const { prisma, serverSession } = await getTestDeps()
+  const prismaAny = prisma as Record<string, { [key: string]: unknown }>
+  const mocks = [
+    mockMethod(serverSession, 'get', async () => ({ user: { id: 'viewer-1' } }) as never),
+    overrideMethod(
+      prismaAny.membership as Record<string, unknown>,
+      'findUnique',
+      async () =>
+        ({
+          id: 'membership-viewer-1',
+          userId: 'viewer-1',
+          teamId: null,
+          role: Role.MEMBER,
+          roles: [],
+        }) as never,
+    ),
+    overrideMethod(prismaAny.membership as Record<string, unknown>, 'findFirst', async () => null as never),
+    overrideMethod(
+      prismaAny.activityLog as Record<string, unknown>,
+      'findMany',
+      async () =>
+        [
+          {
+            action: 'USER_JOINED_CLUB',
+            userId: 'user-2',
+            metadata: { clubId: 'club-1' },
+          },
+        ] as never,
+    ),
+  ]
+  try {
+    const response = await notificationsGet(
+      makeRequest('http://localhost/api/clubs/club-1/notifications?tabs=people&peopleSince=1970-01-01T00:00:00.000Z') as never,
+      { params: Promise.resolve({ clubId: 'club-1' }) },
+    )
+    assert.equal(response.status, 200)
+    const data = (await response.json()) as { notifications: { people: boolean } }
+    assert.equal(data.notifications.people, true)
+  } finally {
+    restoreAll(mocks)
+  }
+})
