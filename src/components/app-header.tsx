@@ -86,8 +86,8 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
 
   return (
     <>
-      <header className="sticky top-4 z-50 mx-2 sm:mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl" suppressHydrationWarning>
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
+      <header className="floating-bar-shell floating-bar-shell-top" suppressHydrationWarning>
+        <div className="container mx-auto floating-bar-content px-3 sm:px-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 md:gap-4 min-w-0">
             <Logo size="md" className="flex-shrink-0" href="/" variant="light" />
             

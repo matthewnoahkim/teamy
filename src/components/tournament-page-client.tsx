@@ -380,8 +380,8 @@ export function TournamentPageClient({
   return (
     <div className="min-h-screen bg-background text-foreground grid-pattern flex flex-col">
       {/* Header */}
-      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+      <header className="floating-bar-shell floating-bar-shell-top">
+        <div className="container mx-auto floating-bar-content px-4 flex items-center justify-between">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-4">
             {user ? (

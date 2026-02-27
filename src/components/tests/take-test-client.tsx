@@ -938,11 +938,11 @@ export function TakeTestClient({
 
   return (
     <div className="min-h-screen flex flex-col bg-background grid-pattern">
-      {/* Sticky header with test info and timer */}
-      <div className="sticky top-0 z-40 bg-background border-b backdrop-blur-sm bg-background/95">
-        <div className="container mx-auto max-w-6xl px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+      {/* Standardized floating action bar (top) */}
+      <div className="floating-bar-shell floating-bar-shell-top border-border/80 bg-background/95 dark:bg-background/95">
+        <div className="container mx-auto max-w-6xl floating-bar-content px-4">
+          <div className="floating-bar-rail">
+            <div className="floating-bar-group gap-3">
               <h1 className="text-lg font-semibold truncate">{test.name}</h1>
               {tabSwitchCount > 0 && (
                 <span className="text-xs text-amber-600 dark:text-amber-400">
@@ -950,7 +950,7 @@ export function TakeTestClient({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-4 text-sm">
+            <div className="floating-bar-group floating-bar-group-end text-sm">
               {test.allowNoteSheet && <NoteSheetViewer testId={test.id} />}
               {test.allowCalculator && test.calculatorType && (
                 <CalculatorButton calculatorType={test.calculatorType} />
@@ -1369,11 +1369,11 @@ export function TakeTestClient({
         </Card>
       </div>
 
-      {/* Fixed bottom bar with submit actions */}
-      <div className="sticky bottom-0 z-40 border-t bg-background backdrop-blur-sm bg-background/95">
-        <div className="container mx-auto max-w-6xl px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+      {/* Standardized floating action bar (bottom) */}
+      <div className="floating-bar-shell floating-bar-shell-bottom border-border/80 bg-background/95 dark:bg-background/95">
+        <div className="container mx-auto max-w-6xl floating-bar-content px-4">
+          <div className="floating-bar-rail">
+            <div className="floating-bar-group">
               {(markedForReview.size > 0 || unansweredQuestions.length > 0) && (
                 <div className="text-sm text-amber-600 dark:text-amber-400">
                   {markedForReview.size > 0 && (
@@ -1386,9 +1386,10 @@ export function TakeTestClient({
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="floating-bar-group floating-bar-group-end">
               {(test.requireOneSitting === false) && (
                 <Button
+                  className="min-w-11"
                   variant="outline"
                   onClick={() => {
                     setShowSaveExitDialog(true)
@@ -1399,6 +1400,7 @@ export function TakeTestClient({
                 </Button>
               )}
               <Button
+                className="min-w-11"
                 onClick={() => {
                   setShowSubmitDialog(true)
                 }}
