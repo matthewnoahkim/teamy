@@ -210,16 +210,6 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
     setEventCoverageFilter('all')
   }, [selectedTeam?.id])
 
-  if (loadingClubData) {
-    return (
-      <PageLoading
-        title="Loading people"
-        description="Fetching members and roster assignments..."
-        variant="orbit"
-      />
-    )
-  }
-
   const fetchEvents = async () => {
     try {
       const response = await fetch(`/api/events?division=${club.division}`)
@@ -255,6 +245,16 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
       })
     })
     setAssignments(allAssignments)
+  }
+
+  if (loadingClubData) {
+    return (
+      <PageLoading
+        title="Loading people"
+        description="Fetching members and roster assignments..."
+        variant="orbit"
+      />
+    )
   }
 
   const handleCreateTeam = async (e: React.FormEvent) => {
