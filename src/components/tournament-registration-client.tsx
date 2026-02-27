@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +41,7 @@ import {
 import Link from 'next/link'
 import { format, isBefore, isAfter } from 'date-fns'
 import { formatDivision, divisionsMatch } from '@/lib/utils'
+import type { Division } from '@prisma/client'
 
 interface Tournament {
   id: string
@@ -64,6 +65,8 @@ interface Tournament {
   eligibilityRequirements: string | null
   directorName: string | null
   directorEmail: string | null
+  eventsRun: string | null
+  trialEvents: string | null
 }
 
 interface Registration {
@@ -91,7 +94,47 @@ interface UserClub {
   id: string
   name: string
   division: string
-  teams: { id: string; name: string }[]
+  teams: Array<{
+    id: string
+    name: string
+    members: Array<{
+      id: string
+      userId: string
+      role: string
+      roles: string[]
+      name: string
+      email: string | null
+    }>
+  }>
+}
+
+interface AvailableEvent {
+  id: string
+  name: string
+  slug: string
+  division: 'B' | 'C'
+}
+
+interface AvailableTrialEvent {
+  name: string
+  division: 'B' | 'C'
+}
+
+type TeamSelectionState = {
+  eventIds: string[]
+  trialEventKeys: string[]
+}
+
+interface ConflictBlock {
+  id: string
+  division: Division
+  blockNumber: number
+  name: string
+  events: Array<{
+    id: string
+    name: string
+    division: Division
+  }>
 }
 
 interface TournamentRegistrationClientProps {
@@ -103,6 +146,10 @@ interface TournamentRegistrationClientProps {
     email?: string | null
   }
   userClubs: UserClub[]
+  availableEvents: AvailableEvent[]
+  availableTrialEvents: AvailableTrialEvent[]
+  defaultMemberAssignments: Record<string, Record<string, { eventIds: string[]; eventNames: string[] }>>
+  conflictBlocks: ConflictBlock[]
 }
 
 export function TournamentRegistrationClient({
@@ -110,6 +157,10 @@ export function TournamentRegistrationClient({
   registrations,
   user,
   userClubs,
+  availableEvents,
+  availableTrialEvents,
+  defaultMemberAssignments,
+  conflictBlocks,
 }: TournamentRegistrationClientProps) {
   const { toast } = useToast()
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
@@ -119,6 +170,8 @@ export function TournamentRegistrationClient({
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false)
   const [selectedClub, setSelectedClub] = useState<string>('')
   const [selectedTeams, setSelectedTeams] = useState<string[]>([])
+  const [teamMemberSelections, setTeamMemberSelections] = useState<Record<string, Record<string, TeamSelectionState>>>({})
+  const [activeMemberByTeam, setActiveMemberByTeam] = useState<Record<string, string>>({})
   const [registering, setRegistering] = useState(false)
 
   // Registration helpers
@@ -145,6 +198,200 @@ export function TournamentRegistrationClient({
 
   const selectedClubData = eligibleClubs.find(c => c.id === selectedClub)
   const eligibleTeams = selectedClubData?.teams || []
+  const eligibleTeamById = useMemo(
+    () => new Map(eligibleTeams.map((team) => [team.id, team])),
+    [eligibleTeams]
+  )
+  const selectedClubDivision = selectedClubData?.division
+
+  const availableEventIds = useMemo(() => new Set(availableEvents.map(event => event.id)), [availableEvents])
+  const availableEventsById = useMemo(
+    () => new Map(availableEvents.map((event) => [event.id, event])),
+    [availableEvents]
+  )
+  const trialEventKey = (trialEvent: AvailableTrialEvent) => `${trialEvent.name.toLowerCase()}::${trialEvent.division}`
+  const trialEventsByKey = useMemo(
+    () => new Map(availableTrialEvents.map(event => [trialEventKey(event), event])),
+    [availableTrialEvents]
+  )
+  const eventNameNormalize = (name: string) => name.trim().toLowerCase()
+
+  const filteredTrialEvents = useMemo(() => {
+    if (!selectedClubDivision) return availableTrialEvents
+    if (selectedClubDivision === 'B&C' || tournament.division !== 'B&C') return availableTrialEvents
+    return availableTrialEvents.filter(event => event.division === selectedClubDivision)
+  }, [availableTrialEvents, selectedClubDivision, tournament.division])
+
+  const conflictBlocksWithEvents = useMemo(() => {
+    return conflictBlocks
+      .map((block) => ({
+        ...block,
+        events: block.events
+          .map((event) => availableEventsById.get(event.id))
+          .filter((event): event is AvailableEvent => !!event)
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .filter((block) => block.events.length > 0)
+      .sort((a, b) => {
+        if (a.blockNumber !== b.blockNumber) {
+          return a.blockNumber - b.blockNumber
+        }
+        return a.division.localeCompare(b.division)
+      })
+  }, [availableEventsById, conflictBlocks])
+
+  const conflictedEventIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const block of conflictBlocksWithEvents) {
+      for (const event of block.events) {
+        ids.add(event.id)
+      }
+    }
+    return ids
+  }, [conflictBlocksWithEvents])
+
+  const uncategorizedEvents = useMemo(() => {
+    return availableEvents
+      .filter((event) => !conflictedEventIds.has(event.id))
+      .sort((a, b) => {
+        if (a.division !== b.division) {
+          return a.division.localeCompare(b.division)
+        }
+        return a.name.localeCompare(b.name)
+      })
+  }, [availableEvents, conflictedEventIds])
+
+  const getTeamMembers = (teamId: string) => eligibleTeamById.get(teamId)?.members ?? []
+
+  const getInitialMemberSelection = (teamId: string, membershipId: string): TeamSelectionState => {
+    const defaults = defaultMemberAssignments[teamId]?.[membershipId]
+    if (!defaults) return { eventIds: [], trialEventKeys: [] }
+
+    const defaultEventIds = defaults.eventIds.filter(eventId => availableEventIds.has(eventId))
+    const defaultNames = new Set(defaults.eventNames.map(eventNameNormalize))
+
+    const defaultTrialKeys = filteredTrialEvents
+      .filter(trialEvent => defaultNames.has(eventNameNormalize(trialEvent.name)))
+      .map(trialEventKey)
+
+    return {
+      eventIds: Array.from(new Set(defaultEventIds)),
+      trialEventKeys: Array.from(new Set(defaultTrialKeys)),
+    }
+  }
+
+  const getMemberSelection = (teamId: string, membershipId: string): TeamSelectionState =>
+    teamMemberSelections[teamId]?.[membershipId] ?? getInitialMemberSelection(teamId, membershipId)
+
+  const updateMemberEventSelection = (
+    teamId: string,
+    membershipId: string,
+    eventId: string,
+    checked: boolean
+  ) => {
+    const current = getMemberSelection(teamId, membershipId)
+    const nextEventIds = checked
+      ? Array.from(new Set([...current.eventIds, eventId]))
+      : current.eventIds.filter(id => id !== eventId)
+
+    setTeamMemberSelections(prev => ({
+      ...prev,
+      [teamId]: {
+        ...(prev[teamId] ?? {}),
+        [membershipId]: {
+          ...current,
+          eventIds: nextEventIds,
+        },
+      },
+    }))
+  }
+
+  const updateMemberTrialSelection = (
+    teamId: string,
+    membershipId: string,
+    trialKey: string,
+    checked: boolean
+  ) => {
+    const current = getMemberSelection(teamId, membershipId)
+    const nextTrialEventKeys = checked
+      ? Array.from(new Set([...current.trialEventKeys, trialKey]))
+      : current.trialEventKeys.filter(key => key !== trialKey)
+
+    setTeamMemberSelections(prev => ({
+      ...prev,
+      [teamId]: {
+        ...(prev[teamId] ?? {}),
+        [membershipId]: {
+          ...current,
+          trialEventKeys: nextTrialEventKeys,
+        },
+      },
+    }))
+  }
+
+  const getMemberConflictWarnings = (teamId: string, membershipId: string) => {
+    const selection = getMemberSelection(teamId, membershipId)
+    const selectedEventIds = new Set(selection.eventIds)
+
+    return conflictBlocksWithEvents
+      .map((block) => {
+        const overlappingEvents = block.events
+          .filter((event) => selectedEventIds.has(event.id))
+          .map((event) => event.name)
+        return {
+          block,
+          overlappingEvents,
+        }
+      })
+      .filter((entry) => entry.overlappingEvents.length > 1)
+  }
+
+  const getTeamCoverage = (teamId: string) => {
+    const members = getTeamMembers(teamId)
+    const teamEventIds = new Set<string>()
+    const teamTrialKeys = new Set<string>()
+
+    const memberAssignments = members
+      .map((member) => {
+        const selection = getMemberSelection(teamId, member.id)
+        const eventIds = Array.from(new Set(selection.eventIds))
+        const trialEventSelections = Array.from(new Set(selection.trialEventKeys))
+          .map((key) => trialEventsByKey.get(key))
+          .filter((event): event is AvailableTrialEvent => !!event)
+          .map((event) => ({
+            name: event.name,
+            division: event.division,
+          }))
+
+        for (const eventId of eventIds) {
+          teamEventIds.add(eventId)
+        }
+        for (const trialKey of selection.trialEventKeys) {
+          teamTrialKeys.add(trialKey)
+        }
+
+        return {
+          membershipId: member.id,
+          eventIds,
+          trialEventSelections,
+        }
+      })
+      .filter((assignment) => assignment.eventIds.length > 0 || assignment.trialEventSelections.length > 0)
+
+    const trialEventSelections = Array.from(teamTrialKeys)
+      .map((key) => trialEventsByKey.get(key))
+      .filter((event): event is AvailableTrialEvent => !!event)
+      .map((event) => ({
+        name: event.name,
+        division: event.division,
+      }))
+
+    return {
+      eventIds: Array.from(teamEventIds),
+      trialEventSelections,
+      memberAssignments,
+    }
+  }
 
   // Calculate price
   const calculatePrice = () => {
@@ -174,6 +421,35 @@ export function TournamentRegistrationClient({
   const handleRegister = async () => {
     if (!selectedClub || selectedTeams.length === 0) return
 
+    for (const teamId of selectedTeams) {
+      const coverage = getTeamCoverage(teamId)
+      const teamName = eligibleTeamById.get(teamId)?.name || 'Selected team'
+
+      if (coverage.memberAssignments.length === 0) {
+        toast({
+          title: 'Member Assignments Required',
+          description: `${teamName} must have at least one member assigned to a regular or trial event.`,
+          variant: 'destructive',
+        })
+        return
+      }
+    }
+
+    const teamSelectionsPayload = Object.fromEntries(
+      selectedTeams.map((teamId) => {
+        const coverage = getTeamCoverage(teamId)
+
+        return [
+          teamId,
+          {
+            eventIds: coverage.eventIds,
+            trialEventSelections: coverage.trialEventSelections,
+            memberAssignments: coverage.memberAssignments,
+          },
+        ]
+      })
+    )
+
     setRegistering(true)
     try {
       const response = await fetch(`/api/tournaments/${tournament.id}/register`, {
@@ -182,6 +458,7 @@ export function TournamentRegistrationClient({
         body: JSON.stringify({
           clubId: selectedClub,
           teamIds: selectedTeams,
+          teamSelections: teamSelectionsPayload,
         }),
       })
 
@@ -197,6 +474,8 @@ export function TournamentRegistrationClient({
       setRegisterDialogOpen(false)
       setSelectedClub('')
       setSelectedTeams([])
+      setTeamMemberSelections({})
+      setActiveMemberByTeam({})
       
       // Refresh page to show new registration
       window.location.reload()
@@ -239,8 +518,8 @@ export function TournamentRegistrationClient({
   return (
     <div className="min-h-screen bg-background grid-pattern flex flex-col">
       {/* Header */}
-      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+      <header className="floating-bar-shell floating-bar-shell-top">
+        <div className="container mx-auto floating-bar-content px-4 flex items-center justify-between">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-4">
             {user && user.id ? (
@@ -551,11 +830,11 @@ export function TournamentRegistrationClient({
                         Register Now
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-lg">
+                    <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>Register for {tournament.name}</DialogTitle>
                         <DialogDescription>
-                          Select your club and teams to register for this tournament.
+                          Select your club and teams, then confirm who takes which regular and trial events.
                         </DialogDescription>
                       </DialogHeader>
 
@@ -566,6 +845,8 @@ export function TournamentRegistrationClient({
                           <Select value={selectedClub} onValueChange={(v) => {
                             setSelectedClub(v)
                             setSelectedTeams([])
+                            setTeamMemberSelections({})
+                            setActiveMemberByTeam({})
                           }}>
                             <SelectTrigger>
                               <SelectValue placeholder="Choose a club..." />
@@ -594,9 +875,30 @@ export function TournamentRegistrationClient({
                                     checked={selectedTeams.includes(team.id)}
                                     onCheckedChange={(checked) => {
                                       if (checked) {
-                                        setSelectedTeams([...selectedTeams, team.id])
+                                        setSelectedTeams((prev) =>
+                                          prev.includes(team.id) ? prev : [...prev, team.id]
+                                        )
+                                        setActiveMemberByTeam((prev) => {
+                                          if (prev[team.id]) return prev
+                                          const firstMemberId = team.members[0]?.id
+                                          if (!firstMemberId) return prev
+                                          return {
+                                            ...prev,
+                                            [team.id]: firstMemberId,
+                                          }
+                                        })
                                       } else {
-                                        setSelectedTeams(selectedTeams.filter(id => id !== team.id))
+                                        setSelectedTeams((prev) => prev.filter(id => id !== team.id))
+                                        setTeamMemberSelections((prev) => {
+                                          const next = { ...prev }
+                                          delete next[team.id]
+                                          return next
+                                        })
+                                        setActiveMemberByTeam((prev) => {
+                                          const next = { ...prev }
+                                          delete next[team.id]
+                                          return next
+                                        })
                                       }
                                     }}
                                   />
@@ -604,6 +906,9 @@ export function TournamentRegistrationClient({
                                 </label>
                               ))}
                             </div>
+                            <p className="text-xs text-muted-foreground">
+                              Assign members to events for this tournament. Existing roster assignments are pre-filled and editable.
+                            </p>
                           </div>
                         )}
 
@@ -611,6 +916,216 @@ export function TournamentRegistrationClient({
                           <p className="text-sm text-muted-foreground">
                             No teams found in this club. Create teams in your club settings first.
                           </p>
+                        )}
+
+                        {selectedTeams.length > 0 && (
+                          <div className="space-y-4">
+                            <div className="border rounded-md p-4 bg-muted/30">
+                              <p className="text-sm font-medium mb-1">Assign Members to Events</p>
+                              <p className="text-xs text-muted-foreground">
+                                Pick a team member, assign their events, and review conflict block warnings before submitting.
+                              </p>
+                            </div>
+
+                            {selectedTeams.map((teamId) => {
+                              const team = eligibleTeamById.get(teamId)
+                              const members = getTeamMembers(teamId)
+                              const selectedMemberId = activeMemberByTeam[teamId] || members[0]?.id || ''
+                              const selectedMember = members.find((member) => member.id === selectedMemberId) || members[0] || null
+                              const selectedMemberSelection = selectedMember
+                                ? getMemberSelection(teamId, selectedMember.id)
+                                : { eventIds: [], trialEventKeys: [] }
+                              const selectedMemberConflictWarnings = selectedMember
+                                ? getMemberConflictWarnings(teamId, selectedMember.id)
+                                : []
+
+                              return (
+                                <div key={teamId} className="border rounded-md p-4 space-y-4">
+                                  <h4 className="font-semibold">{team?.name || 'Team'}</h4>
+
+                                  {members.length === 0 && (
+                                    <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                                      This team has no members. Add members to this team before registering.
+                                    </div>
+                                  )}
+
+                                  {members.length > 0 && (
+                                    <>
+                                      <div className="space-y-3">
+                                        <p className="text-sm font-medium">Team Members</p>
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                          {members.map((member) => {
+                                            const memberSelection = getMemberSelection(teamId, member.id)
+                                            const memberConflicts = getMemberConflictWarnings(teamId, member.id)
+                                            const assignmentCount =
+                                              memberSelection.eventIds.length + memberSelection.trialEventKeys.length
+                                            const isActive = selectedMember?.id === member.id
+
+                                            return (
+                                              <button
+                                                key={member.id}
+                                                type="button"
+                                                onClick={() =>
+                                                  setActiveMemberByTeam((prev) => ({
+                                                    ...prev,
+                                                    [teamId]: member.id,
+                                                  }))
+                                                }
+                                                className={`rounded-md border p-3 text-left transition-colors ${
+                                                  isActive
+                                                    ? 'border-primary bg-primary/10'
+                                                    : 'border-border bg-background hover:bg-muted/40'
+                                                }`}
+                                              >
+                                                <p className="text-sm font-medium">{member.name}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                  {assignmentCount} assignment{assignmentCount === 1 ? '' : 's'}
+                                                </p>
+                                                {memberConflicts.length > 0 && (
+                                                  <p className="mt-1 text-xs text-destructive">
+                                                    {memberConflicts.length} conflict block
+                                                    {memberConflicts.length === 1 ? '' : 's'} overlap
+                                                  </p>
+                                                )}
+                                              </button>
+                                            )
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      {selectedMember && (
+                                        <div className="space-y-3">
+                                          <p className="text-sm font-medium">Assign events for {selectedMember.name}</p>
+
+                                          {selectedMemberConflictWarnings.length > 0 && (
+                                            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+                                              <div className="mb-1 flex items-center gap-2 font-medium">
+                                                <AlertCircle className="h-4 w-4" />
+                                                Schedule conflict warning
+                                              </div>
+                                              <div className="space-y-1 text-xs">
+                                                {selectedMemberConflictWarnings.map((entry) => (
+                                                  <p key={`${teamId}-${selectedMember.id}-${entry.block.id}`}>
+                                                    Block {entry.block.blockNumber}
+                                                    {tournament.division === 'B&C' ? ` (Div ${entry.block.division})` : ''}: {entry.overlappingEvents.join(', ')}
+                                                  </p>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          <div className="space-y-3">
+                                            <p className="text-sm font-medium">Official Events by Conflict Block</p>
+                                            {conflictBlocksWithEvents.length === 0 ? (
+                                              <p className="text-xs text-muted-foreground">
+                                                No conflict blocks are configured for this tournament division.
+                                              </p>
+                                            ) : (
+                                              <div className="space-y-3">
+                                                {conflictBlocksWithEvents.map((block) => (
+                                                  <div key={block.id} className="rounded-md border p-3">
+                                                    <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                                                      Block {block.blockNumber}: {block.name}
+                                                      {tournament.division === 'B&C' ? ` (Division ${block.division})` : ''}
+                                                    </p>
+                                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                      {block.events.map((event) => (
+                                                        <label key={event.id} className="flex cursor-pointer items-center gap-2 rounded p-2 hover:bg-muted/50">
+                                                          <Checkbox
+                                                            checked={selectedMemberSelection.eventIds.includes(event.id)}
+                                                            onCheckedChange={(checked) => {
+                                                              updateMemberEventSelection(
+                                                                teamId,
+                                                                selectedMember.id,
+                                                                event.id,
+                                                                checked === true
+                                                              )
+                                                            }}
+                                                          />
+                                                          <span className="text-sm">{event.name}</span>
+                                                        </label>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+
+                                            {uncategorizedEvents.length > 0 && (
+                                              <div className="rounded-md border p-3">
+                                                <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                                                  Events without conflict block
+                                                </p>
+                                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                  {uncategorizedEvents.map((event) => (
+                                                    <label key={event.id} className="flex cursor-pointer items-center gap-2 rounded p-2 hover:bg-muted/50">
+                                                      <Checkbox
+                                                        checked={selectedMemberSelection.eventIds.includes(event.id)}
+                                                        onCheckedChange={(checked) => {
+                                                          updateMemberEventSelection(
+                                                            teamId,
+                                                            selectedMember.id,
+                                                            event.id,
+                                                            checked === true
+                                                          )
+                                                        }}
+                                                      />
+                                                      <span className="text-sm">
+                                                        {event.name}
+                                                        {tournament.division === 'B&C' ? (
+                                                          <span className="text-muted-foreground"> (Div {event.division})</span>
+                                                        ) : null}
+                                                      </span>
+                                                    </label>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          <div className="space-y-3">
+                                            <p className="text-sm font-medium">Trial Events</p>
+                                            {filteredTrialEvents.length === 0 ? (
+                                              <p className="text-xs text-muted-foreground">No trial events configured for this tournament.</p>
+                                            ) : (
+                                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                {filteredTrialEvents.map((trialEvent) => {
+                                                  const key = trialEventKey(trialEvent)
+                                                  return (
+                                                    <label key={key} className="flex cursor-pointer items-center gap-2 rounded p-2 hover:bg-muted/50">
+                                                      <Checkbox
+                                                        checked={selectedMemberSelection.trialEventKeys.includes(key)}
+                                                        onCheckedChange={(checked) => {
+                                                          updateMemberTrialSelection(
+                                                            teamId,
+                                                            selectedMember.id,
+                                                            key,
+                                                            checked === true
+                                                          )
+                                                        }}
+                                                      />
+                                                      <span className="text-sm">
+                                                        {trialEvent.name}
+                                                        {tournament.division === 'B&C' ? (
+                                                          <span className="text-muted-foreground"> (Div {trialEvent.division})</span>
+                                                        ) : (
+                                                          <span className="text-muted-foreground"> (Trial)</span>
+                                                        )}
+                                                      </span>
+                                                    </label>
+                                                  )
+                                                })}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
                         )}
 
                         {/* Price Summary */}

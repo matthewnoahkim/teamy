@@ -124,6 +124,12 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
   }
   const isAdmin = currentMembership.role === 'ADMIN'
 
+  const persistTabSeenTime = useCallback((tab: string) => {
+    if (typeof window === 'undefined') return
+    const key = `lastCleared_${club.id}_${tab}_${user.id}`
+    localStorage.setItem(key, new Date().toISOString())
+  }, [club.id, user.id])
+
   // Save current club as last visited
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -143,27 +149,78 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
     if (typeof window === 'undefined') return new Date(0)
     const key = `lastCleared_${club.id}_${tab}_${user.id}`
     const stored = localStorage.getItem(key)
-    return stored ? new Date(stored) : new Date(0)
-  }, [club.id, user.id])
+    if (stored) {
+      return new Date(stored)
+    }
+
+    // New members should not inherit historical club activity as unread.
+    const membershipCreatedAt = new Date(currentMembership.createdAt)
+    return Number.isNaN(membershipCreatedAt.getTime()) ? new Date(0) : membershipCreatedAt
+  }, [club.id, user.id, currentMembership.createdAt])
 
   // Clear notification for a tab when it's opened
   const clearTabNotification = useCallback((tab: string) => {
-    if (typeof window === 'undefined') return
-    const key = `lastCleared_${club.id}_${tab}_${user.id}`
-    localStorage.setItem(key, new Date().toISOString())
+    persistTabSeenTime(tab)
     setTabNotifications(prev => {
       const updated = { ...prev, [tab]: false }
       const totalCount = Object.values(updated).filter(Boolean).length
       setTotalUnreadCount(totalCount)
       return updated
     })
-  }, [club.id, user.id])
+  }, [persistTabSeenTime])
+
+  const dismissTabNotification = useCallback((tab: string) => {
+    setTabNotifications(prev => {
+      if (!prev[tab]) return prev
+      const updated = { ...prev, [tab]: false }
+      const totalCount = Object.values(updated).filter(Boolean).length
+      setTotalUnreadCount(totalCount)
+      return updated
+    })
+  }, [])
 
   // Keep active tab in a ref so polling interval doesn't restart during navigation.
   const activeTabRef = useRef(activeTab)
+  const previousActiveTabRef = useRef<string | null>(null)
   useEffect(() => {
     activeTabRef.current = activeTab
   }, [activeTab])
+
+  // Mark previous tab as seen when navigating away; just dismiss indicator for current tab.
+  useEffect(() => {
+    const previousTab = previousActiveTabRef.current
+    if (previousTab && previousTab !== activeTab) {
+      clearTabNotification(previousTab)
+    }
+    dismissTabNotification(activeTab)
+    previousActiveTabRef.current = activeTab
+  }, [activeTab, clearTabNotification, dismissTabNotification])
+
+  // Persist "seen" timestamp for the currently open tab when page is backgrounded/unloaded.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const persistCurrentTab = () => {
+      const currentTab = activeTabRef.current
+      if (currentTab) {
+        persistTabSeenTime(currentTab)
+      }
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        persistCurrentTab()
+      }
+    }
+
+    window.addEventListener('beforeunload', persistCurrentTab)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      window.removeEventListener('beforeunload', persistCurrentTab)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [persistTabSeenTime])
 
   // Check for new content with a single lightweight API call.
   useEffect(() => {
@@ -211,13 +268,6 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
     }
   }, [club.id, getLastClearedTime])
 
-  // Clear notification when tab is opened
-  useEffect(() => {
-    if (activeTab) {
-      clearTabNotification(activeTab)
-    }
-  }, [activeTab, clearTabNotification])
-
   useEffect(() => {
     const tabParam = searchParams.get('tab')
     if (tabParam) {
@@ -226,7 +276,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
   }, [searchParams])
 
   const handleTabChange = useCallback((newTab: string) => {
-    clearTabNotification(newTab)
+    dismissTabNotification(newTab)
     setActiveTab(newTab)
     setMobileMenuOpen(false)
     if (typeof window !== 'undefined') {
@@ -234,7 +284,11 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       url.searchParams.set('tab', newTab)
       window.history.replaceState(window.history.state, '', url.pathname + url.search)
     }
-  }, [clearTabNotification])
+  }, [dismissTabNotification])
+
+  const hasUnread = useCallback((tab: string) => {
+    return Boolean(tabNotifications[tab] && activeTab !== tab)
+  }, [tabNotifications, activeTab])
 
   const handleUpdateClubName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -349,7 +403,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <MessageSquare className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Stream
-        {tabNotifications.stream && <NotificationDot />}
+        {hasUnread('stream') && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'people' ? 'default' : 'ghost'}
@@ -358,7 +412,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <Users className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         People
-        {tabNotifications.people && <NotificationDot />}
+        {hasUnread('people') && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'calendar' ? 'default' : 'ghost'}
@@ -367,7 +421,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <Calendar className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Calendar
-        {tabNotifications.calendar && <NotificationDot />}
+        {hasUnread('calendar') && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'attendance' ? 'default' : 'ghost'}
@@ -376,7 +430,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <ClipboardCheck className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Attendance
-        {tabNotifications.attendance && <NotificationDot />}
+        {hasUnread('attendance') && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'finance' ? 'default' : 'ghost'}
@@ -385,7 +439,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <DollarSign className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Finance
-        {tabNotifications.finance && <NotificationDot />}
+        {hasUnread('finance') && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'tests' ? 'default' : 'ghost'}
@@ -394,7 +448,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <FileText className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         Tests
-        {tabNotifications.tests && <NotificationDot />}
+        {hasUnread('tests') && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'gallery' ? 'default' : 'ghost'}
@@ -419,7 +473,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
       >
         <CheckSquare className="mr-2 sm:mr-3 h-3.5 w-3.5 sm:h-4 sm:w-4" />
         To-Do List
-        {tabNotifications.todos && <NotificationDot />}
+        {hasUnread('todos') && <NotificationDot />}
       </Button>
       <Button
         variant={activeTab === 'tools' ? 'default' : 'ghost'}
@@ -449,7 +503,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
         Settings
       </Button>
     </>
-  ), [activeTab, tabNotifications, handleTabChange, isAdmin])
+  ), [activeTab, hasUnread, handleTabChange, isAdmin])
 
   return (
     <div 

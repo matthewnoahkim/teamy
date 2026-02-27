@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/rbac'
+import { logActivity } from '@/lib/activity-log'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 
@@ -38,6 +39,10 @@ export async function PATCH(
 
     const body = await req.json()
     const { teamId, roles, role } = updateMembershipSchema.parse(body)
+    const normalizeRoles = (value: string[] | undefined) =>
+      [...(value ?? [])]
+        .map((entry) => entry.trim().toUpperCase())
+        .sort()
 
     // If teamId is provided, verify it belongs to the same club and check size limit
     if (teamId) {
@@ -93,6 +98,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'No updates provided' }, { status: 400 })
     }
 
+    const changedTeam = teamId !== undefined && teamId !== membership.teamId
+    const changedRole = role !== undefined && role !== membership.role
+    const changedRoles =
+      roles !== undefined &&
+      JSON.stringify(normalizeRoles(roles)) !== JSON.stringify(normalizeRoles(membership.roles))
+
     const updated = await prisma.membership.update({
       where: { id: resolvedParams.membershipId },
       data: updateData,
@@ -108,6 +119,59 @@ export async function PATCH(
         team: true,
       },
     })
+
+    const targetLabel = updated.user.name || updated.user.email
+    const targetUserId = updated.user.id
+    const targetMembershipId = updated.id
+    const clubId = updated.clubId
+
+    if (changedRole) {
+      await logActivity({
+        action: 'MEMBERSHIP_ROLE_CHANGED',
+        description: `${targetLabel} role changed from ${membership.role} to ${updated.role}`,
+        userId: session.user.id,
+        logType: 'ADMIN_ACTION',
+        metadata: {
+          clubId,
+          membershipId: targetMembershipId,
+          targetUserId,
+          fromRole: membership.role,
+          toRole: updated.role,
+        },
+      })
+    }
+
+    if (changedRoles) {
+      await logActivity({
+        action: 'MEMBERSHIP_ROLES_CHANGED',
+        description: `${targetLabel} role tags were updated`,
+        userId: session.user.id,
+        logType: 'ADMIN_ACTION',
+        metadata: {
+          clubId,
+          membershipId: targetMembershipId,
+          targetUserId,
+          fromRoles: membership.roles,
+          toRoles: updated.roles,
+        },
+      })
+    }
+
+    if (changedTeam) {
+      await logActivity({
+        action: 'MEMBERSHIP_TEAM_CHANGED',
+        description: `${targetLabel} moved teams`,
+        userId: session.user.id,
+        logType: 'ADMIN_ACTION',
+        metadata: {
+          clubId,
+          membershipId: targetMembershipId,
+          targetUserId,
+          fromTeamId: membership.teamId,
+          toTeamId: updated.teamId,
+        },
+      })
+    }
 
     return NextResponse.json({ membership: updated })
   } catch (error) {
@@ -136,6 +200,13 @@ export async function DELETE(
     const membership = await prisma.membership.findUnique({
       where: { id: resolvedParams.membershipId },
       include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         club: {
           include: {
             memberships: {
@@ -189,6 +260,27 @@ export async function DELETE(
     // Delete the membership (cascade will handle related records)
     await prisma.membership.delete({
       where: { id: resolvedParams.membershipId },
+    })
+
+    const action = isSelfRemoval ? 'MEMBERSHIP_LEFT_CLUB' : 'MEMBERSHIP_REMOVED'
+    const actorLabel =
+      requesterMembership.userId === membership.userId
+        ? (membership.user.name || membership.user.email)
+        : 'An admin'
+    const targetLabel = membership.user.name || membership.user.email
+    await logActivity({
+      action,
+      description: isSelfRemoval
+        ? `${targetLabel} left club "${membership.club.name}"`
+        : `${actorLabel} removed ${targetLabel} from club "${membership.club.name}"`,
+      userId: session.user.id,
+      logType: isRequesterAdmin ? 'ADMIN_ACTION' : 'USER_ACTION',
+      metadata: {
+        clubId: membership.clubId,
+        membershipId: membership.id,
+        targetUserId: membership.userId,
+        targetRole: membership.role,
+      },
     })
 
     // Revalidate dashboard to refresh the memberships list

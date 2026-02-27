@@ -89,8 +89,8 @@ export default async function HomePage() {
       <DiscordBanner initialSettings={bannerSettings} />
 
       {/* Header */}
-      <header className="sticky top-4 z-50 mx-4 rounded-2xl border border-white/10 bg-teamy-primary/90 dark:bg-popover/90 backdrop-blur-xl shadow-lg dark:shadow-xl">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 overflow-x-auto">
+      <header className="floating-bar-shell floating-bar-shell-top">
+        <div className="container mx-auto floating-bar-content px-4 sm:px-6 flex items-center justify-between gap-2 overflow-x-auto">
           <Logo size="md" href="/" variant="light" />
           <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">
             <HomeNav

@@ -279,6 +279,70 @@
     animation-delay: 3s;
   }
 
+  /* Floating action bar system */
+  .floating-bar-shell {
+    @apply sticky z-50 mx-3 rounded-2xl border backdrop-blur-xl shadow-lg;
+    border-color: rgb(255 255 255 / 10%);
+    background-color: rgb(0 86 199 / 90%);
+  }
+
+  @media (min-width: 640px) {
+    .floating-bar-shell {
+      margin-left: 1rem;
+      margin-right: 1rem;
+    }
+  }
+
+  .dark .floating-bar-shell {
+    background-color: hsl(var(--popover) / 90%);
+  }
+
+  .floating-bar-shell-top {
+    top: max(0.75rem, env(safe-area-inset-top));
+  }
+
+  .floating-bar-shell-bottom {
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .floating-bar-content {
+    @apply min-h-14 px-3 py-2 overflow-x-auto;
+  }
+
+  .floating-bar-content::-webkit-scrollbar {
+    display: none;
+  }
+
+  .floating-bar-content > * {
+    min-width: max-content;
+  }
+
+  .floating-bar-rail {
+    @apply flex min-h-10 items-center justify-between gap-3 overflow-x-auto;
+  }
+
+  .floating-bar-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .floating-bar-group {
+    @apply flex min-w-0 items-center gap-2;
+  }
+
+  .floating-bar-group-end {
+    @apply ml-auto shrink-0;
+  }
+
+  .floating-bar-shell :where(button, a, [role="button"]) {
+    min-height: 2.5rem;
+  }
+
+  .floating-bar-shell :where(button svg, a svg, [role="button"] svg) {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+  }
+
   /* Animated gradient for text */
   @keyframes gradient {
     0%, 100% {
