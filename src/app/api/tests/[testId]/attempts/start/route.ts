@@ -1,9 +1,110 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getUserMembership, isAdmin } from '@/lib/rbac'
 import { isTestAvailable, getClientIp, verifyTestPassword } from '@/lib/test-security'
+import { serverSession } from '@/lib/server-session'
+
+function normalizeEventName(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase()
+}
+
+function extractEventNameFromAuditDetails(details: unknown): string | null {
+  if (!details || typeof details !== 'object') return null
+  if (!('eventName' in details)) return null
+  const raw = (details as Record<string, unknown>).eventName
+  if (typeof raw !== 'string') return null
+  const normalized = raw.trim()
+  return normalized.length > 0 ? normalized : null
+}
+
+async function getCreatedTestEventName(testId: string, isESTest: boolean): Promise<string | null> {
+  if (isESTest) {
+    const audit = await prisma.eSTestAudit.findFirst({
+      where: {
+        testId,
+        action: 'CREATE',
+      },
+      select: {
+        details: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    })
+    return extractEventNameFromAuditDetails(audit?.details ?? null)
+  }
+
+  const audit = await prisma.testAudit.findFirst({
+    where: {
+      testId,
+      action: 'CREATE',
+    },
+    select: {
+      details: true,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  })
+  return extractEventNameFromAuditDetails(audit?.details ?? null)
+}
+
+async function enforceTournamentAssignmentAccess(options: {
+  registrationId: string
+  membershipId: string
+  eventId: string | null
+  testId: string
+  isESTest: boolean
+  normalizedRegistrationTrialEventNames: Set<string>
+}): Promise<NextResponse | null> {
+  if (options.eventId) {
+    const assignment = await prisma.tournamentMemberEventAssignment.findFirst({
+      where: {
+        registrationId: options.registrationId,
+        membershipId: options.membershipId,
+        eventId: options.eventId,
+      },
+      select: {
+        id: true,
+      },
+    })
+
+    if (!assignment) {
+      return NextResponse.json({ error: 'Not assigned to this event' }, { status: 403 })
+    }
+
+    return null
+  }
+
+  // eventId null can mean either trial-event test or true general test.
+  const eventName = await getCreatedTestEventName(options.testId, options.isESTest)
+  if (!eventName) return null
+
+  const normalizedEventName = normalizeEventName(eventName)
+  if (!options.normalizedRegistrationTrialEventNames.has(normalizedEventName)) {
+    return null
+  }
+
+  const trialAssignment = await prisma.tournamentMemberTrialEventAssignment.findFirst({
+    where: {
+      registrationId: options.registrationId,
+      membershipId: options.membershipId,
+      eventName: {
+        equals: eventName,
+        mode: 'insensitive',
+      },
+    },
+    select: {
+      id: true,
+    },
+  })
+
+  if (!trialAssignment) {
+    return NextResponse.json({ error: 'Not assigned to this trial event' }, { status: 403 })
+  }
+
+  return null
+}
 
 // POST /api/tests/[testId]/attempts/start
 export async function POST(
@@ -12,7 +113,7 @@ export async function POST(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -92,6 +193,16 @@ export async function POST(
             { clubId: { in: clubIds } },
           ],
         },
+        select: {
+          id: true,
+          clubId: true,
+          teamId: true,
+          trialEventSelections: {
+            select: {
+              eventName: true,
+            },
+          },
+        },
       })
 
       if (!registration) {
@@ -109,25 +220,22 @@ export async function POST(
         return NextResponse.json({ error: 'Membership not found' }, { status: 403 })
       }
 
-      // For tournament tests, check event assignment if test is event-specific
-      if (tournamentTest.eventId) {
-        const userEventAssignments = await prisma.rosterAssignment.findMany({
-          where: {
-            membershipId: membership.id,
-            eventId: tournamentTest.eventId,
-            ...(registration.teamId
-              ? { teamId: registration.teamId }
-              : {
-                  team: {
-                    clubId: registration.clubId,
-                  },
-                }),
-          },
-        })
+      const normalizedTrialEventNames = new Set(
+        registration.trialEventSelections.map((selection) =>
+          normalizeEventName(selection.eventName)
+        )
+      )
 
-        if (userEventAssignments.length === 0) {
-          return NextResponse.json({ error: 'Not assigned to this event' }, { status: 403 })
-        }
+      const assignmentAccessError = await enforceTournamentAssignmentAccess({
+        registrationId: registration.id,
+        membershipId: membership.id,
+        eventId: tournamentTest.eventId,
+        testId,
+        isESTest: false,
+        normalizedRegistrationTrialEventNames: normalizedTrialEventNames,
+      })
+      if (assignmentAccessError) {
+        return assignmentAccessError
       }
 
       // Tournament tests don't have admin bypass
@@ -221,6 +329,16 @@ export async function POST(
                 { clubId: { in: clubIds } },
               ],
             },
+            select: {
+              id: true,
+              clubId: true,
+              teamId: true,
+              trialEventSelections: {
+                select: {
+                  eventName: true,
+                },
+              },
+            },
           })
 
           if (!registration) {
@@ -238,25 +356,22 @@ export async function POST(
             return NextResponse.json({ error: 'Membership not found' }, { status: 403 })
           }
 
-          // For ESTest, check event assignment if test is event-specific
-          if (esTest.eventId) {
-            const userEventAssignments = await prisma.rosterAssignment.findMany({
-              where: {
-                membershipId: membership.id,
-                eventId: esTest.eventId,
-                ...(registration.teamId
-                  ? { teamId: registration.teamId }
-                  : {
-                      team: {
-                        clubId: registration.clubId,
-                      },
-                    }),
-              },
-            })
+          const normalizedTrialEventNames = new Set(
+            registration.trialEventSelections.map((selection) =>
+              normalizeEventName(selection.eventName)
+            )
+          )
 
-            if (userEventAssignments.length === 0) {
-              return NextResponse.json({ error: 'Not assigned to this event' }, { status: 403 })
-            }
+          const assignmentAccessError = await enforceTournamentAssignmentAccess({
+            registrationId: registration.id,
+            membershipId: membership.id,
+            eventId: esTest.eventId,
+            testId,
+            isESTest: true,
+            normalizedRegistrationTrialEventNames: normalizedTrialEventNames,
+          })
+          if (assignmentAccessError) {
+            return assignmentAccessError
           }
 
           // Check if ESTest is available

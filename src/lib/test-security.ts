@@ -299,7 +299,7 @@ export function checkRateLimit(
 
 // Cleanup old rate limit entries every hour
 if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
+  const cleanupInterval = setInterval(() => {
     const now = Date.now()
     for (const [key, record] of rateLimitStore.entries()) {
       if (now > record.resetAt) {
@@ -307,6 +307,11 @@ if (typeof setInterval !== 'undefined') {
       }
     }
   }, 60 * 60 * 1000)
+
+  // Prevent this housekeeping interval from keeping test/node processes alive.
+  if (typeof cleanupInterval.unref === 'function') {
+    cleanupInterval.unref()
+  }
 }
 
 /**

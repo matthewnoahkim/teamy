@@ -143,6 +143,8 @@ model Membership {
   reviewedNoteSheets  NoteSheet[]         @relation("NoteSheetReviewer")
   resourceRequests    ResourceRequest[]
   rosterAssignments   RosterAssignment[]
+  tournamentEventAssignments TournamentMemberEventAssignment[]
+  tournamentTrialEventAssignments TournamentMemberTrialEventAssignment[]
   todos               Todo[]
 
   @@unique([userId, clubId])
@@ -189,6 +191,7 @@ model Event {
   rosterAssignments         RosterAssignment[]
   testAssignments           TestAssignment[]
   tournamentEventSelections TournamentEventSelection[]
+  tournamentMemberEventAssignments TournamentMemberEventAssignment[]
   tournamentTestEvents      TournamentTest[]            @relation("TournamentTestEvents")
 
   @@unique([division, slug])
@@ -1185,6 +1188,9 @@ model TournamentRegistration {
   updatedAt       DateTime                     @updatedAt
   paid            Boolean                      @default(false)
   eventSelections TournamentEventSelection[]
+  trialEventSelections TournamentTrialEventSelection[]
+  memberEventAssignments TournamentMemberEventAssignment[]
+  memberTrialEventAssignments TournamentMemberTrialEventAssignment[]
   club            Club                         @relation("TournamentRegistrations", fields: [clubId], references: [id], onDelete: Cascade)
   registeredBy    User                         @relation("TournamentRegistrationsBy", fields: [registeredById], references: [id], onDelete: Cascade)
   team            Team?                        @relation("TournamentRegistrations", fields: [teamId], references: [id], onDelete: Cascade)
@@ -1209,6 +1215,49 @@ model TournamentEventSelection {
   @@unique([registrationId, eventId])
   @@index([registrationId])
   @@index([eventId])
+}
+
+model TournamentTrialEventSelection {
+  id             String                 @id @default(cuid())
+  registrationId String
+  eventName      String
+  eventDivision  Division
+  createdAt      DateTime               @default(now())
+  registration   TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([registrationId, eventName, eventDivision])
+  @@index([registrationId])
+}
+
+model TournamentMemberEventAssignment {
+  id             String                 @id @default(cuid())
+  registrationId String
+  membershipId   String
+  eventId        String
+  createdAt      DateTime               @default(now())
+  event          Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  membership     Membership             @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  registration   TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([registrationId, membershipId, eventId])
+  @@index([registrationId])
+  @@index([membershipId])
+  @@index([eventId])
+}
+
+model TournamentMemberTrialEventAssignment {
+  id             String                 @id @default(cuid())
+  registrationId String
+  membershipId   String
+  eventName      String
+  eventDivision  Division
+  createdAt      DateTime               @default(now())
+  membership     Membership             @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  registration   TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([registrationId, membershipId, eventName, eventDivision])
+  @@index([registrationId])
+  @@index([membershipId])
 }
 
 model TournamentTest {

@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint src --ext .ts,.tsx",
     "test:api-authz": "tsx --test src/lib/club-authz.test.ts",
-    "test:api-routes": "tsx --env-file=.env.test --test src/app/api/club-routes-authz.test.ts",
+    "test:api-routes": "tsx --env-file=.env.test --test src/app/api/club-routes-authz.test.ts src/app/api/tournament-signup-testing-authz.test.ts",
     "test:api": "npm run test:api-authz && npm run test:api-routes",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",

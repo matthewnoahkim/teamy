@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { serverSession } from '@/lib/server-session'
 
 // Force dynamic rendering to ensure fresh data
 export const dynamic = 'force-dynamic'
@@ -11,7 +10,7 @@ export const revalidate = 0
 // Get all tournaments the user's teams are registered for, with their assigned events and released tests
 export async function GET(_req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -108,52 +107,49 @@ export async function GET(_req: NextRequest) {
           return null
         }
 
-        // Get events the user is assigned to on this team/club
-        // If registration has a specific team, get assignments for that team
-        // Otherwise, get all assignments for the user in this club
-        const rosterAssignments = await prisma.rosterAssignment.findMany({
-          where: {
-            membershipId: membership.id,
-            ...(registration.teamId
-              ? { teamId: registration.teamId }
-              : {
-                  team: {
-                    clubId: registration.clubId,
-                  },
-                }),
-          },
-          include: {
-            event: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                division: true,
+        // Tournament-specific member assignments drive portal visibility.
+        const [memberEventAssignments, memberTrialEventAssignments] = await Promise.all([
+          prisma.tournamentMemberEventAssignment.findMany({
+            where: {
+              registrationId: registration.id,
+              membershipId: membership.id,
+            },
+            include: {
+              event: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  division: true,
+                },
               },
             },
-          },
-        })
+          }),
+          prisma.tournamentMemberTrialEventAssignment.findMany({
+            where: {
+              registrationId: registration.id,
+              membershipId: membership.id,
+            },
+            select: {
+              eventName: true,
+              eventDivision: true,
+            },
+          }),
+        ])
 
-        const eventIds = rosterAssignments.map((ra) => ra.event.id)
+        const assignedEventIds = memberEventAssignments.map((assignment) => assignment.event.id)
 
-        // Get released tests for these events in this tournament
-        // Include both regular Test records (via TournamentTest) and ESTest records
-        // IMPORTANT: If user has no event assignments, show all tests (eventId: null OR any eventId)
-        // This allows tests to be visible even if roster hasn't been set up yet
+        // Get released tests for assigned events in this tournament.
+        // Event-less tests are fetched and then split into trial/general buckets below.
         const [tournamentTests, esTests] = await Promise.all([
           // Regular Test records linked via TournamentTest
           prisma.tournamentTest.findMany({
             where: {
               tournamentId: registration.tournamentId,
-              OR: eventIds.length === 0
-                ? [
-                    // If no event assignments, show all tests (both event-specific and general)
-                    {},
-                  ]
-                : [
-                    { eventId: { in: eventIds } },
-                    { eventId: null }, // Tests not assigned to a specific event
-                  ],
+              OR: [
+                { eventId: { in: assignedEventIds } },
+                { eventId: null }, // Tests not assigned to a specific event
+              ],
             },
             include: {
               test: {
@@ -203,15 +199,10 @@ export async function GET(_req: NextRequest) {
             where: {
               tournamentId: registration.tournamentId,
               status: 'PUBLISHED',
-              OR: eventIds.length === 0
-                ? [
-                    // If no event assignments, show all tests (both event-specific and general)
-                    {},
-                  ]
-                : [
-                    { eventId: { in: eventIds } },
-                    { eventId: null }, // Tests not assigned to a specific event
-                  ],
+              OR: [
+                { eventId: { in: assignedEventIds } },
+                { eventId: null }, // Tests not assigned to a specific event
+              ],
             },
             select: {
               id: true,
@@ -505,7 +496,12 @@ export async function GET(_req: NextRequest) {
             console.error('Error parsing trial events:', e)
           }
         }
-        const trialEventNames = trialEvents.map(e => e.name)
+        const trialEventsByName = new Map(
+          trialEvents.map((event) => [event.name.toLowerCase(), event])
+        )
+        const assignedTrialEventNames = new Set(
+          memberTrialEventAssignments.map((assignment) => assignment.eventName.toLowerCase())
+        )
 
         // Fetch eventNames from audit logs for tests with null eventId (trial events)
         const testsWithNullEventId = releasedTests.filter(tt => !tt.eventId)
@@ -598,66 +594,39 @@ export async function GET(_req: NextRequest) {
           return acc
         }, new Map<string, Array<(typeof releasedTests)[number]>>())
 
-        // Group tests by event
-        // If user has no roster assignments, show all event-specific tests grouped by their events
+        // Group tests by event using tournament-specific member assignments.
         let eventsWithTests: Array<{ event: Record<string, unknown>; tests: Array<Record<string, unknown>> }> = []
 
-        if (eventIds.length === 0) {
-          // No roster assignments - show all event-specific tests grouped by event
-          const allEventIds = Array.from(testsByEventId.keys())
+        const uniqueAssignedEvents = Array.from(
+          new Map(memberEventAssignments.map((assignment) => [assignment.event.id, assignment.event])).values()
+        )
 
-          if (allEventIds.length > 0) {
-            // Get event details for all events that have tests
-            const eventsWithTestData = await prisma.event.findMany({
-              where: {
-                id: { in: allEventIds },
-                division: registration.tournament.division,
-              },
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                division: true,
-              },
-            })
-
-            eventsWithTests = eventsWithTestData.map((event) => {
-              const eventTests = testsByEventId.get(event.id) || []
-              return {
-                event: {
-                  id: event.id,
-                  name: event.name,
-                  slug: event.slug,
-                  division: event.division,
-                },
-                tests: eventTests.map(serializeReleasedTest),
-              }
-            })
-          }
-        } else {
-          // User has roster assignments - only show tests for assigned events
-          eventsWithTests = rosterAssignments.map((ra) => ({
-            event: ra.event,
-            tests: (testsByEventId.get(ra.event.id) || []).map(serializeReleasedTest),
-          }))
-        }
+        eventsWithTests = uniqueAssignedEvents.map((event) => ({
+          event,
+          tests: (testsByEventId.get(event.id) || []).map(serializeReleasedTest),
+        }))
 
         // Separate tests with null eventId into trial events and true general tests
         const testsWithNullEventId_ = releasedTests.filter((tt) => !tt.eventId)
         
-        // Group trial event tests by event name
-        const trialEventNameSet = new Set(trialEventNames)
+        // Group trial event tests by event name and filter to assigned trial events only.
+        const trialEventNameSet = new Set(Array.from(trialEventsByName.keys()))
         const trialEventTestsByEvent = new Map<string, Array<Record<string, unknown>>>()
         const generalTests: Array<Record<string, unknown>> = []
 
         for (const tt of testsWithNullEventId_) {
-          const eventName = testEventNameMap.get(tt.test.id)
-          if (eventName && trialEventNameSet.has(eventName)) {
-            // This is a trial event test
-            if (!trialEventTestsByEvent.has(eventName)) {
-              trialEventTestsByEvent.set(eventName, [])
+          const rawEventName = testEventNameMap.get(tt.test.id)
+          const normalizedEventName = rawEventName?.toLowerCase() ?? null
+          if (normalizedEventName && trialEventNameSet.has(normalizedEventName)) {
+            // Trial event tests are visible only if this member is assigned to that trial event.
+            if (!assignedTrialEventNames.has(normalizedEventName)) {
+              continue
             }
-            trialEventTestsByEvent.get(eventName)!.push(serializeReleasedTest(tt))
+
+            if (!trialEventTestsByEvent.has(normalizedEventName)) {
+              trialEventTestsByEvent.set(normalizedEventName, [])
+            }
+            trialEventTestsByEvent.get(normalizedEventName)!.push(serializeReleasedTest(tt))
           } else {
             // True general test (not a trial event)
             generalTests.push(serializeReleasedTest(tt))
@@ -665,8 +634,9 @@ export async function GET(_req: NextRequest) {
         }
 
         // Convert trial event tests map to array format
-        const trialEventsWithTests = Array.from(trialEventTestsByEvent.entries()).map(([eventName, tests]) => {
-          const trialEvent = trialEvents.find(te => te.name === eventName)
+        const trialEventsWithTests = Array.from(trialEventTestsByEvent.entries()).map(([normalizedName, tests]) => {
+          const trialEvent = trialEventsByName.get(normalizedName)
+          const eventName = trialEvent?.name ?? normalizedName
           return {
             event: {
               id: null, // Trial events don't have an Event ID
