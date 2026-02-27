@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { POST as registerPost } from '@/app/api/tournaments/[tournamentId]/register/route'
 import { GET as testingTournamentsGet } from '@/app/api/testing/tournaments/route'
 import { POST as startAttemptPost } from '@/app/api/tests/[testId]/attempts/start/route'
+import { POST as clubProctorEventPost } from '@/app/api/tests/[testId]/attempts/[attemptId]/proctor-events/route'
+import { POST as esProctorEventPost } from '@/app/api/es/tests/[testId]/attempts/[attemptId]/proctor-events/route'
 
 function overrideMethod(
   object: Record<string, unknown>,
@@ -515,6 +517,148 @@ test('POST /api/tests/[testId]/attempts/start blocks unassigned trial event acce
     assert.equal(response.status, 403)
     const payload = (await response.json()) as { error: string }
     assert.equal(payload.error, 'Not assigned to this trial event')
+  } finally {
+    restoreAll(mocks)
+  }
+})
+
+test('POST /api/tests/[testId]/attempts/[attemptId]/proctor-events records for owned in-progress regular attempts', async () => {
+  const { prisma, serverSession } = await getDeps()
+  let createdData: Record<string, unknown> | null = null
+
+  const mocks = [
+    overrideMethod(serverSession, 'get', async () => ({ user: { id: 'user-1' } }) as never),
+    overrideMethod(
+      prisma.testAttempt as Record<string, unknown>,
+      'findUnique',
+      async () =>
+        ({
+          membershipId: 'membership-1',
+          testId: 'test-regular-1',
+          status: 'IN_PROGRESS',
+        }) as never,
+    ),
+    overrideMethod(
+      prisma.membership as Record<string, unknown>,
+      'findFirst',
+      async () => ({ id: 'membership-1' }) as never,
+    ),
+    overrideMethod(
+      prisma.proctorEvent as Record<string, unknown>,
+      'create',
+      async (args: unknown) => {
+        createdData = (args as { data: Record<string, unknown> }).data
+        return {
+          id: 'proctor-1',
+          ...createdData,
+        } as never
+      },
+    ),
+  ]
+
+  try {
+    const response = await clubProctorEventPost(
+      makeJsonRequest(
+        'http://localhost/api/tests/test-regular-1/attempts/attempt-1/proctor-events',
+        { kind: 'TAB_SWITCH', meta: { source: 'client' } },
+      ) as never,
+      { params: Promise.resolve({ testId: 'test-regular-1', attemptId: 'attempt-1' }) },
+    )
+
+    assert.equal(response.status, 201)
+    assert.ok(createdData)
+    const created = createdData as Record<string, unknown>
+    assert.equal(created['attemptId'], 'attempt-1')
+    assert.equal(created['esAttemptId'], undefined)
+    assert.equal(created['kind'], 'TAB_SWITCH')
+  } finally {
+    restoreAll(mocks)
+  }
+})
+
+test('POST /api/tests/[testId]/attempts/[attemptId]/proctor-events rejects test mismatch', async () => {
+  const { prisma, serverSession } = await getDeps()
+
+  const mocks = [
+    overrideMethod(serverSession, 'get', async () => ({ user: { id: 'user-1' } }) as never),
+    overrideMethod(
+      prisma.testAttempt as Record<string, unknown>,
+      'findUnique',
+      async () =>
+        ({
+          membershipId: 'membership-1',
+          testId: 'different-test',
+          status: 'IN_PROGRESS',
+        }) as never,
+    ),
+  ]
+
+  try {
+    const response = await clubProctorEventPost(
+      makeJsonRequest(
+        'http://localhost/api/tests/test-regular-1/attempts/attempt-1/proctor-events',
+        { kind: 'TAB_SWITCH' },
+      ) as never,
+      { params: Promise.resolve({ testId: 'test-regular-1', attemptId: 'attempt-1' }) },
+    )
+
+    assert.equal(response.status, 400)
+    const payload = (await response.json()) as { error: string }
+    assert.equal(payload.error, 'Attempt does not belong to this test')
+  } finally {
+    restoreAll(mocks)
+  }
+})
+
+test('POST /api/es/tests/[testId]/attempts/[attemptId]/proctor-events records for owned in-progress ES attempts', async () => {
+  const { prisma, serverSession } = await getDeps()
+  let createdData: Record<string, unknown> | null = null
+
+  const mocks = [
+    overrideMethod(serverSession, 'get', async () => ({ user: { id: 'user-1' } }) as never),
+    overrideMethod(
+      prisma.eSTestAttempt as Record<string, unknown>,
+      'findUnique',
+      async () =>
+        ({
+          membershipId: 'membership-1',
+          testId: 'es-test-1',
+          status: 'IN_PROGRESS',
+        }) as never,
+    ),
+    overrideMethod(
+      prisma.membership as Record<string, unknown>,
+      'findFirst',
+      async () => ({ id: 'membership-1' }) as never,
+    ),
+    overrideMethod(
+      prisma.proctorEvent as Record<string, unknown>,
+      'create',
+      async (args: unknown) => {
+        createdData = (args as { data: Record<string, unknown> }).data
+        return {
+          id: 'proctor-es-1',
+          ...createdData,
+        } as never
+      },
+    ),
+  ]
+
+  try {
+    const response = await esProctorEventPost(
+      makeJsonRequest(
+        'http://localhost/api/es/tests/es-test-1/attempts/es-attempt-1/proctor-events',
+        { kind: 'EXIT_FULLSCREEN', meta: { source: 'client' } },
+      ) as never,
+      { params: Promise.resolve({ testId: 'es-test-1', attemptId: 'es-attempt-1' }) },
+    )
+
+    assert.equal(response.status, 201)
+    assert.ok(createdData)
+    const created = createdData as Record<string, unknown>
+    assert.equal(created['esAttemptId'], 'es-attempt-1')
+    assert.equal(created['attemptId'], undefined)
+    assert.equal(created['kind'], 'EXIT_FULLSCREEN')
   } finally {
     restoreAll(mocks)
   }
