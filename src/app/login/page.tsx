@@ -15,6 +15,7 @@ type AuthMode = 'signin' | 'signup'
 type SignInPageProps = {
   searchParams?: Promise<{
     callbackUrl?: string
+    redirect?: string
     mode?: string
   }>
 }
@@ -92,7 +93,8 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   const resolvedSearchParams = await searchParams
   const authMode = resolveAuthMode(resolvedSearchParams?.mode)
   const isSignUpMode = authMode === 'signup'
-  const rawCallbackUrl = resolvedSearchParams?.callbackUrl
+  // Accept both callbackUrl and legacy redirect query params.
+  const rawCallbackUrl = resolvedSearchParams?.callbackUrl ?? resolvedSearchParams?.redirect
   const signInPageHref = buildAuthPageHref('signin', rawCallbackUrl)
   const signUpPageHref = buildAuthPageHref('signup', rawCallbackUrl)
 
@@ -101,11 +103,11 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   
   if (session?.user) {
     const defaultRedirect = await getDefaultRedirect(session.user.id)
-    callbackUrl = resolveCallbackUrl(resolvedSearchParams?.callbackUrl, defaultRedirect)
+    callbackUrl = resolveCallbackUrl(rawCallbackUrl, defaultRedirect)
     redirect(callbackUrl)
   } else {
     // For non-logged-in users, use the callback from query params or default to auth callback
-    callbackUrl = resolveCallbackUrl(resolvedSearchParams?.callbackUrl, '/auth/callback')
+    callbackUrl = resolveCallbackUrl(rawCallbackUrl, '/auth/callback')
   }
 
   return (

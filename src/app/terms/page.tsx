@@ -1,15 +1,31 @@
 import Link from 'next/link'
 import { PublicPageLayout } from '@/components/public-page-layout'
+import { LegalDocumentShell } from '@/components/legal-document-shell'
+
+const sections = [
+  { id: 'acceptance', title: '1. Acceptance of Terms' },
+  { id: 'description-of-service', title: '2. Description of Service' },
+  { id: 'accounts-and-eligibility', title: '3. Accounts and Eligibility' },
+  { id: 'user-content-and-conduct', title: '4. User Content and Conduct' },
+  { id: 'privacy-and-legal', title: '5. Privacy and Legal Responsibilities' },
+  { id: 'subscriptions-and-payments', title: '6. Subscriptions and Payments' },
+  { id: 'third-party-services', title: '7. Third-Party Services' },
+  { id: 'intellectual-property', title: '8. Intellectual Property' },
+  { id: 'service-availability', title: '9. Service Availability' },
+  { id: 'warranties', title: '10. Disclaimer of Warranties' },
+  { id: 'limitation-of-liability', title: '11. Limitation of Liability' },
+  { id: 'indemnification', title: '12. Indemnification' },
+  { id: 'termination', title: '13. Termination' },
+  { id: 'governing-law', title: '14. Governing Law' },
+  { id: 'changes-to-terms', title: '15. Changes to These Terms' },
+  { id: 'contact', title: '16. Contact' },
+]
 
 export default function TermsOfServicePage() {
   return (
     <PublicPageLayout>
-      <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-12">
-        <div className="prose prose-slate dark:prose-invert max-w-none bg-card border border-border rounded-2xl p-8 md:p-12 shadow-card">
-          <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Terms of Service</h1>
-          <p className="text-muted-foreground mb-8">Last updated: February 25, 2026</p>
-
-          <section className="mb-8">
+      <LegalDocumentShell title="Terms of Service" lastUpdated="February 25, 2026" sections={sections}>
+          <section id="acceptance" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p>
               By accessing or using Teamy (&quot;Service&quot;), you agree to these Terms of Service. If you do not agree, do not use the Service.
@@ -19,7 +35,7 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="description-of-service" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">2. Description of Service</h2>
             <p>
               Teamy is a web platform for Science Olympiad organizations and related activities. Features may include:
@@ -36,7 +52,7 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="accounts-and-eligibility" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">3. Accounts and Eligibility</h2>
             <h3 className="text-lg font-semibold mb-3 mt-6">3.1 Account Access</h3>
             <p>
@@ -54,7 +70,7 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="user-content-and-conduct" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">4. User Content and Conduct</h2>
             <p>
               You are responsible for all content you create, upload, share, or otherwise make available through the Service (&quot;User Content&quot;).
@@ -74,7 +90,7 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="privacy-and-legal" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">5. Privacy and Legal Responsibilities</h2>
             <p>
               Your use of the Service is also governed by our{' '}
@@ -91,7 +107,7 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="subscriptions-and-payments" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">6. Subscriptions and Payments</h2>
             <p>
               Some features may require payment. By purchasing a paid feature, you agree to pay the fees shown at checkout.
@@ -104,7 +120,7 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="third-party-services" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">7. Third-Party Services</h2>
             <p>
               The Service relies on third-party providers, including providers for authentication, hosting, email delivery, payment processing, analytics, and optional AI features.
@@ -114,7 +130,7 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="intellectual-property" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">8. Intellectual Property</h2>
             <p>
               We retain all rights in the Service and its underlying software, content, and branding. You retain ownership of your User Content.
@@ -124,21 +140,21 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="service-availability" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">9. Service Availability</h2>
             <p>
               We may modify, suspend, or discontinue all or part of the Service at any time. We do not guarantee uninterrupted or error-free operation.
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="warranties" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">10. Disclaimer of Warranties</h2>
             <p>
               THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE,&quot; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="limitation-of-liability" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">11. Limitation of Liability</h2>
             <p>
               TO THE MAXIMUM EXTENT PERMITTED BY LAW, TEAMY WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR LOST PROFITS, REVENUES, DATA, OR GOODWILL.
@@ -148,14 +164,14 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="indemnification" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">12. Indemnification</h2>
             <p>
               You agree to indemnify and hold harmless Teamy and its affiliates, officers, directors, employees, and agents from claims, liabilities, damages, losses, and expenses (including reasonable attorneys&apos; fees) arising from your use of the Service, User Content, or violation of these Terms.
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="termination" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">13. Termination</h2>
             <p>
               We may suspend or terminate access to the Service at any time for any reason, including suspected violations of these Terms or unlawful activity.
@@ -165,21 +181,21 @@ export default function TermsOfServicePage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="governing-law" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">14. Governing Law</h2>
             <p>
               These Terms are governed by the laws of the United States, without regard to conflict-of-law principles.
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="changes-to-terms" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">15. Changes to These Terms</h2>
             <p>
               We may update these Terms from time to time. The current version will be posted on this page with an updated &quot;Last updated&quot; date. Continued use of the Service after changes means you accept the revised Terms.
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="contact" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">16. Contact</h2>
             <p>
               Questions about these Terms can be sent to:
@@ -191,8 +207,7 @@ export default function TermsOfServicePage() {
               </a>
             </p>
           </section>
-        </div>
-      </div>
+      </LegalDocumentShell>
     </PublicPageLayout>
   )
 }

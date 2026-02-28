@@ -8,7 +8,7 @@ export default async function BillingPage() {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    redirect('/login?redirect=/billing')
+    redirect('/login?callbackUrl=/billing')
   }
 
   // Get user subscription status

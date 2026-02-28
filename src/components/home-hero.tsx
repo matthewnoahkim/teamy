@@ -71,4 +71,3 @@ export function HomeHero({ isLoggedIn, loggedInRedirect }: HomeHeroProps) {
     </section>
   )
 }
-

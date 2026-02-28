@@ -1,15 +1,27 @@
 import Link from 'next/link'
 import { PublicPageLayout } from '@/components/public-page-layout'
+import { LegalDocumentShell } from '@/components/legal-document-shell'
+
+const sections = [
+  { id: 'overview', title: '1. Overview' },
+  { id: 'information-we-collect', title: '2. Information We Collect' },
+  { id: 'how-we-use-information', title: '3. How We Use Information' },
+  { id: 'information-sharing', title: '4. Information Sharing' },
+  { id: 'cookies', title: '5. Cookies and Similar Technologies' },
+  { id: 'data-retention', title: '6. Data Retention' },
+  { id: 'security', title: '7. Security' },
+  { id: 'children-and-student-data', title: '8. Children and Student Data' },
+  { id: 'choices-and-requests', title: '9. Your Choices and Requests' },
+  { id: 'international-access', title: '10. International Access' },
+  { id: 'changes', title: '11. Changes to This Policy' },
+  { id: 'contact', title: '12. Contact' },
+]
 
 export default function PrivacyPolicyPage() {
   return (
     <PublicPageLayout>
-      <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-12">
-        <div className="prose prose-slate dark:prose-invert max-w-none bg-card border border-border rounded-2xl p-8 md:p-12 shadow-card">
-          <h1 className="font-heading text-3xl md:text-4xl font-bold mb-2">Privacy Policy</h1>
-          <p className="text-muted-foreground mb-8">Last updated: February 25, 2026</p>
-
-          <section className="mb-8">
+      <LegalDocumentShell title="Privacy Policy" lastUpdated="February 25, 2026" sections={sections}>
+          <section id="overview" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Overview</h2>
             <p>
               This Privacy Policy explains how Teamy (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) collects, uses, shares, and stores information when you use the Service.
@@ -23,7 +35,7 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="information-we-collect" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">2. Information We Collect</h2>
             <h3 className="text-lg font-semibold mb-3 mt-6">2.1 Information You Provide</h3>
             <ul>
@@ -49,7 +61,7 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="how-we-use-information" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">3. How We Use Information</h2>
             <p>We use information to:</p>
             <ul>
@@ -64,7 +76,7 @@ export default function PrivacyPolicyPage() {
             </ul>
           </section>
 
-          <section className="mb-8">
+          <section id="information-sharing" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">4. Information Sharing</h2>
             <p>We do not sell personal information for money. We may share information in these cases:</p>
             <ul>
@@ -80,14 +92,14 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="cookies" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">5. Cookies and Similar Technologies</h2>
             <p>
               We use cookies and similar technologies for authentication, settings, analytics, and product performance. Most browsers allow you to control cookies, but disabling cookies may impact functionality.
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="data-retention" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">6. Data Retention</h2>
             <p>
               We keep information for as long as reasonably necessary to provide the Service and for legitimate business or legal purposes. Retention periods vary by data type and use case.
@@ -99,7 +111,7 @@ export default function PrivacyPolicyPage() {
             </ul>
           </section>
 
-          <section className="mb-8">
+          <section id="security" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">7. Security</h2>
             <p>
               We use administrative, technical, and organizational measures designed to protect information, including transport encryption and authentication controls.
@@ -109,7 +121,7 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="children-and-student-data" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">8. Children and Student Data</h2>
             <p>
               Teamy may be used by schools, teams, and youth organizations. Organizations that use Teamy are responsible for providing required notices, permissions, and consents for their users, including minors, as required by applicable law.
@@ -119,7 +131,7 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="choices-and-requests" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">9. Your Choices and Requests</h2>
             <p>
               Depending on your location and relationship to the data, you may request access, correction, export, or deletion of certain information.
@@ -133,21 +145,21 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="international-access" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">10. International Access</h2>
             <p>
               The Service is operated from the United States. If you access it from outside the U.S., your information may be processed and stored in the U.S. and other countries where our providers operate.
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="changes" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">11. Changes to This Policy</h2>
             <p>
               We may update this Privacy Policy from time to time. We will post the current version on this page and update the &quot;Last updated&quot; date.
             </p>
           </section>
 
-          <section className="mb-8">
+          <section id="contact" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">12. Contact</h2>
             <p>
               Questions about this Privacy Policy or privacy requests can be sent to:
@@ -159,8 +171,7 @@ export default function PrivacyPolicyPage() {
               </a>
             </p>
           </section>
-        </div>
-      </div>
+      </LegalDocumentShell>
     </PublicPageLayout>
   )
 }

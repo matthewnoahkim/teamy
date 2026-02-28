@@ -5,6 +5,7 @@ import { Logo } from '@/components/logo'
 import { HomeNav } from '@/components/home-nav'
 import { DiscordBanner } from '@/components/discord-banner'
 import { HomeHero } from '@/components/home-hero'
+import { PublicPageTools } from '@/components/public-page-tools'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 
@@ -19,17 +20,17 @@ async function getBannerSettings() {
 
     return {
       enabled: enabledSetting?.value === 'true',
-      text: textSetting?.value || 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
+      text: textSetting?.value || 'Welcome to Teamy. Questions or feedback? teamysite@gmail.com',
       link: linkSetting?.value || '',
-      backgroundColor: bgSetting?.value || '#8B5CF6',
+      backgroundColor: bgSetting?.value || '#0056C7',
     }
   } catch (error) {
     console.error('Failed to fetch banner settings:', error)
     return {
-      enabled: true,
-      text: 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
+      enabled: false,
+      text: 'Welcome to Teamy. Questions or feedback? teamysite@gmail.com',
       link: '',
-      backgroundColor: '#8B5CF6',
+      backgroundColor: '#0056C7',
     }
   }
 }
@@ -85,6 +86,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background grid-pattern text-foreground">
+      <PublicPageTools />
       {/* Discord Banner */}
       <DiscordBanner initialSettings={bannerSettings} />
 

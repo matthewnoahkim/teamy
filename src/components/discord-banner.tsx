@@ -56,10 +56,10 @@ function dismissBannerId(bannerId: string): void {
 export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
   const [settings, setSettings] = useState<BannerSettings>(
     initialSettings || {
-      enabled: true,
-      text: 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
+      enabled: false,
+      text: 'Welcome to Teamy. Questions or feedback? teamysite@gmail.com',
       link: '',
-      backgroundColor: '#8B5CF6',
+      backgroundColor: '#0056C7',
     }
   )
   
@@ -105,9 +105,9 @@ export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
 
         const bannerSettings: BannerSettings = {
           enabled: enabledData.setting?.value === 'true',
-          text: textData.setting?.value || 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
+          text: textData.setting?.value || 'Welcome to Teamy. Questions or feedback? teamysite@gmail.com',
           link: linkData.setting?.value || '',
-          backgroundColor: bgData.setting?.value || '#8B5CF6',
+          backgroundColor: bgData.setting?.value || '#0056C7',
         }
 
         setSettings(bannerSettings)
@@ -159,4 +159,3 @@ export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
     </div>
   )
 }
-

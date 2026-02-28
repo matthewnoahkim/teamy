@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { Logo } from '@/components/logo'
 import { HomeNav } from '@/components/home-nav'
 import { DiscordBanner } from '@/components/discord-banner'
+import { PublicPageTransition } from '@/components/public-page-transition'
+import { PublicPageTools } from '@/components/public-page-tools'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -23,17 +25,17 @@ async function getBannerSettings() {
 
     return {
       enabled: enabledSetting?.value === 'true',
-      text: textSetting?.value || 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
+      text: textSetting?.value || 'Welcome to Teamy. Questions or feedback? teamysite@gmail.com',
       link: linkSetting?.value || '',
-      backgroundColor: bgSetting?.value || '#8B5CF6',
+      backgroundColor: bgSetting?.value || '#0056C7',
     }
   } catch (error) {
     console.error('Failed to fetch banner settings:', error)
     return {
-      enabled: true,
-      text: 'This website is still a work in progress! Please report any issues to teamysite@gmail.com',
+      enabled: false,
+      text: 'Welcome to Teamy. Questions or feedback? teamysite@gmail.com',
       link: '',
-      backgroundColor: '#8B5CF6',
+      backgroundColor: '#0056C7',
     }
   }
 }
@@ -89,6 +91,7 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
 
   return (
     <div className="min-h-screen flex flex-col bg-background grid-pattern text-foreground">
+      <PublicPageTools />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[10002] focus:rounded-lg focus:bg-card focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground focus:shadow-lg"
@@ -161,7 +164,7 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
 
       {/* Main Content */}
       <main id="main-content" className="flex-1 bg-background grid-pattern">
-        {children}
+        <PublicPageTransition>{children}</PublicPageTransition>
       </main>
 
       {/* Footer */}
@@ -185,4 +188,3 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
     </div>
   )
 }
-
