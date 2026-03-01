@@ -61,6 +61,9 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   const currentClub = clubs?.find(c => c.id === clubId)
   const effectiveClubs = clubs || allClubs || []
   const effectivePath = currentPath || pathname
+  const fromPath = pathname || '/'
+  const customizationHref = `/customization?from=${encodeURIComponent(fromPath)}`
+  const billingHref = `/billing?from=${encodeURIComponent(fromPath)}`
   const inviteCodeFromUrl = pathname?.startsWith('/club/')
     ? (searchParams.get('join') || searchParams.get('code') || '')
     : ''
@@ -76,6 +79,13 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
       }
     }
   }, [effectiveClubs, clubId, router])
+
+  useEffect(() => {
+    if (!showCustomizationBilling) return
+    // Prefetch settings routes so top-nav button clicks feel instant.
+    router.prefetch(customizationHref)
+    router.prefetch(billingHref)
+  }, [router, showCustomizationBilling, customizationHref, billingHref])
 
   useEffect(() => {
     if (!inviteCodeFromUrl || !pathname) return
@@ -162,8 +172,10 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
               <>
                 <div className="hidden lg:block h-6 w-px bg-white/20 mx-1" />
                 <button
+                  onMouseEnter={() => router.prefetch(customizationHref)}
+                  onFocus={() => router.prefetch(customizationHref)}
                   onClick={() => {
-                    router.push(`/customization?from=${encodeURIComponent(pathname)}`)
+                    router.push(customizationHref)
                   }}
                   className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
                     effectivePath === '/customization'
@@ -175,8 +187,10 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
                   <span>Customization</span>
                 </button>
                 <button
+                  onMouseEnter={() => router.prefetch(billingHref)}
+                  onFocus={() => router.prefetch(billingHref)}
                   onClick={() => {
-                    router.push(`/billing?from=${encodeURIComponent(pathname)}`)
+                    router.push(billingHref)
                   }}
                   className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
                     effectivePath === '/billing'
@@ -220,14 +234,18 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
                 {showCustomizationBilling && (
                   <>
                     <DropdownMenuItem 
-                      onClick={() => router.push(`/customization?from=${encodeURIComponent(pathname)}`)} 
+                      onMouseEnter={() => router.prefetch(customizationHref)}
+                      onFocus={() => router.prefetch(customizationHref)}
+                      onClick={() => router.push(customizationHref)} 
                       className="lg:hidden"
                     >
                       <Settings className="mr-2 h-4 w-4" />
                       Customization
                     </DropdownMenuItem>
                     <DropdownMenuItem 
-                      onClick={() => router.push(`/billing?from=${encodeURIComponent(pathname)}`)} 
+                      onMouseEnter={() => router.prefetch(billingHref)}
+                      onFocus={() => router.prefetch(billingHref)}
+                      onClick={() => router.push(billingHref)} 
                       className="lg:hidden"
                     >
                       <CreditCard className="mr-2 h-4 w-4" />

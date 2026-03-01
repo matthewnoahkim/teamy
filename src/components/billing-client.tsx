@@ -138,7 +138,7 @@ export function BillingClient({ user, clubs, subscriptionStatus, subscriptionTyp
         description: 'Your Pro subscription is now active.',
       })
       router.refresh()
-      router.replace('/dashboard/billing')
+      router.replace('/billing')
     } else if (canceled === 'true') {
       toast({
         title: 'Payment canceled',
@@ -146,7 +146,7 @@ export function BillingClient({ user, clubs, subscriptionStatus, subscriptionTyp
         variant: 'destructive',
       })
       // Clean up URL
-      router.replace('/dashboard/billing')
+      router.replace('/billing')
     }
   }, [searchParams, router, toast])
   
@@ -324,7 +324,7 @@ export function BillingClient({ user, clubs, subscriptionStatus, subscriptionTyp
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !isRedeemingPromo) {
                     handleRedeemPromoCode()
                   }
                 }}

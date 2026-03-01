@@ -12,7 +12,7 @@ export default async function BillingPage() {
   }
 
   // Get user subscription status
-  const user = await prisma.user.findUnique({
+  let user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
       id: true,
@@ -32,6 +32,7 @@ export default async function BillingPage() {
     where: { 
       userId: session.user.id,
     },
+    orderBy: { createdAt: 'desc' },
     include: {
       club: {
         select: {
@@ -68,14 +69,13 @@ export default async function BillingPage() {
     return sum + (redemption.promoCode.effectQuantity || 0)
   }, 0)
 
-  // Get Pro subscription boosts (5 included with Pro)
-  const isPro = user?.subscriptionStatus === 'active' && user?.subscriptionType === 'pro'
-  const proSubscriptionBoosts = isPro ? 5 : 0
-
   // Get all assigned boosts
   const assignedBoosts = await prisma.clubBoost.findMany({
     where: {
       userId: session.user.id,
+      expiresAt: {
+        gt: now,
+      },
     },
     include: {
       club: {
@@ -86,11 +86,6 @@ export default async function BillingPage() {
       },
     },
   })
-
-  // Calculate available boost balance
-  const totalBoosts = totalPromoBoosts + proSubscriptionBoosts
-  const assignedBoostCount = assignedBoosts.length
-  const availableBoostBalance = totalBoosts - assignedBoostCount
 
   // Group assigned boosts by club for display
   const clubBoostMap = assignedBoosts.reduce((acc, boost) => {
@@ -142,7 +137,7 @@ export default async function BillingPage() {
         })
 
         // Re-fetch user with updated subscription status
-        const updatedUser = await prisma.user.findUnique({
+        user = await prisma.user.findUnique({
           where: { id: session.user.id },
           select: {
             id: true,
@@ -156,16 +151,21 @@ export default async function BillingPage() {
             subscriptionEndsAt: true,
           },
         })
-        
-        if (updatedUser) {
-          Object.assign(user, updatedUser)
-        }
       }
     } catch (error) {
       console.error('Error syncing subscription from Stripe:', error)
       // Continue with existing user data if sync fails
     }
   }
+
+  // Get Pro subscription boosts (5 included with Pro)
+  const isPro = user?.subscriptionStatus === 'active' && user?.subscriptionType === 'pro'
+  const proSubscriptionBoosts = isPro ? 5 : 0
+
+  // Calculate available boost balance from active boosts only
+  const totalBoosts = totalPromoBoosts + proSubscriptionBoosts
+  const assignedBoostCount = assignedBoosts.length
+  const availableBoostBalance = Math.max(totalBoosts - assignedBoostCount, 0)
 
   return (
     <BillingClient 

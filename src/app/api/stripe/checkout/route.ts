@@ -119,8 +119,8 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
         type: subscriptionType,
       },
-      success_url: `${baseUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,
+      success_url: `${baseUrl}/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/billing?canceled=true`,
     })
 
     return NextResponse.json({ 
@@ -148,4 +148,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-

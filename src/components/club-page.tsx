@@ -99,6 +99,7 @@ interface ClubPageProps {
   user: SessionUser
   clubs?: Array<{ id: string; name: string }>
   initialData?: Partial<ClubPageInitialData>
+  initialInviteCodes?: { adminCode: string; memberCode: string } | null
 }
 
 const TAB_DETAILS = {
@@ -168,7 +169,7 @@ function resolveTab(tab: string | null, isAdmin: boolean): ClubTab {
   return tab
 }
 
-export function ClubPage({ club, currentMembership, user, clubs, initialData }: ClubPageProps) {
+export function ClubPage({ club, currentMembership, user, clubs, initialData, initialInviteCodes }: ClubPageProps) {
   const searchParams = useSearchParams()
   const { toast } = useToast()
   const isAdmin = currentMembership.role === 'ADMIN'
@@ -777,6 +778,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
                 club={club}
                 currentMembership={currentMembership}
                 isAdmin={isAdmin}
+                initialInviteCodes={initialInviteCodes}
                 personalBackground={personalBackground as BackgroundPreferences | null | undefined}
                 onBackgroundUpdate={handleBackgroundUpdate as ((preferences: BackgroundPreferences | null) => void) | undefined}
               />

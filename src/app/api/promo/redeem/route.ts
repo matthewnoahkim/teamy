@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -110,15 +111,35 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Update promo code redemption count
-      await tx.promoCode.update({
-        where: { id: promoCode.id },
-        data: {
-          currentRedemptions: {
-            increment: 1,
+      // Update promo code redemption count with a race-safe max-redemption check.
+      if (promoCode.maxRedemptions) {
+        const updated = await tx.promoCode.updateMany({
+          where: {
+            id: promoCode.id,
+            currentRedemptions: {
+              lt: promoCode.maxRedemptions,
+            },
           },
-        },
-      })
+          data: {
+            currentRedemptions: {
+              increment: 1,
+            },
+          },
+        })
+
+        if (updated.count === 0) {
+          throw new Error('PROMO_MAX_REDEMPTIONS_REACHED')
+        }
+      } else {
+        await tx.promoCode.update({
+          where: { id: promoCode.id },
+          data: {
+            currentRedemptions: {
+              increment: 1,
+            },
+          },
+        })
+      }
 
       // If PRO_SUBSCRIPTION, update user's subscription
       if (promoCode.effectType === 'PRO_SUBSCRIPTION') {
@@ -165,6 +186,20 @@ export async function POST(request: NextRequest) {
       redemption: result,
     })
   } catch (error) {
+    if (error instanceof Error && error.message === 'PROMO_MAX_REDEMPTIONS_REACHED') {
+      return NextResponse.json(
+        { error: 'This promo code has reached its maximum number of redemptions' },
+        { status: 400 }
+      )
+    }
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'You have already redeemed this promo code' },
+        { status: 400 }
+      )
+    }
+
     console.error('Error redeeming promo code:', error)
     return NextResponse.json(
       { error: 'Failed to redeem promo code' },
@@ -172,4 +207,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

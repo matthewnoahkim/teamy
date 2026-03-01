@@ -8,6 +8,7 @@ import { PageLoading } from '@/components/ui/loading-spinner'
 import { CalendarScope, AnnouncementScope, Role } from '@prisma/client'
 import { userSelectFields } from '@/types/models'
 import { hasAnnouncementTargetAccess, hasTestAssignmentAccess } from '@/lib/club-authz'
+import { decryptInviteCode } from '@/lib/invite-codes'
 
 // This page requires authentication (getServerSession), so ISR/static caching
 // cannot be used. Force dynamic rendering for correct per-user data.
@@ -175,6 +176,7 @@ export default async function ClubDetailPage({
     purchaseRequests,
     eventBudgets,
     userRosterAssignments,
+    inviteCodeRecord,
   ] = await Promise.all([
     needsAttendanceData
       ? prisma.attendance.findMany({
@@ -303,6 +305,15 @@ export default async function ClubDetailPage({
           },
         })
       : Promise.resolve([]),
+    isAdminUser
+      ? prisma.club.findUnique({
+          where: { id: resolvedParams.clubId },
+          select: {
+            adminInviteCodeEncrypted: true,
+            memberInviteCodeEncrypted: true,
+          },
+        })
+      : Promise.resolve(null),
   ])
 
   const rosterList = Array.isArray(userRosterAssignments) ? userRosterAssignments : []
@@ -613,6 +624,23 @@ export default async function ClubDetailPage({
         return hasAnnouncementTargetAccess(targets, membership, userEventIds)
       })
 
+  let initialInviteCodes: { adminCode: string; memberCode: string } | null = null
+  if (
+    isAdminUser &&
+    inviteCodeRecord &&
+    inviteCodeRecord.adminInviteCodeEncrypted !== 'NEEDS_REGENERATION' &&
+    inviteCodeRecord.memberInviteCodeEncrypted !== 'NEEDS_REGENERATION'
+  ) {
+    try {
+      initialInviteCodes = {
+        adminCode: decryptInviteCode(inviteCodeRecord.adminInviteCodeEncrypted),
+        memberCode: decryptInviteCode(inviteCodeRecord.memberInviteCodeEncrypted),
+      }
+    } catch (error) {
+      console.error('Failed to decrypt initial invite codes:', error)
+    }
+  }
+
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-background grid-pattern flex items-center justify-center px-4 py-12">
@@ -628,6 +656,7 @@ export default async function ClubDetailPage({
         currentMembership={membership}
         user={session.user}
         clubs={clubs}
+        initialInviteCodes={initialInviteCodes}
         initialData={{
           attendances: attendances ?? [],
           expenses: expenses ?? [],
@@ -643,4 +672,3 @@ export default async function ClubDetailPage({
     </Suspense>
   )
 }
-

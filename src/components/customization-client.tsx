@@ -260,8 +260,11 @@ export function CustomizationClient({ user, preferences, allClubs }: Customizati
   )
   const [gradientColors, setGradientColors] = useState<string[]>(() => {
     const prefColors = preferences?.gradientColors as string[] | undefined
-    if (prefColors && prefColors.length > 0) {
+    if (prefColors && prefColors.length >= 2) {
       return prefColors
+    }
+    if (prefColors && prefColors.length === 1) {
+      return [prefColors[0], defaultColors.gradientEndColor]
     }
     return [defaultColors.gradientStartColor, defaultColors.gradientEndColor]
   })
@@ -655,8 +658,13 @@ export function CustomizationClient({ user, preferences, allClubs }: Customizati
       return backgroundColor
     }
     if (backgroundType === 'gradient') {
-      return `linear-gradient(${gradientDirection}deg, ${gradientColors.map((color, index) => 
-        `${color} ${(index / (gradientColors.length - 1)) * 100}%`
+      const safeGradientColors =
+        gradientColors.length >= 2
+          ? gradientColors
+          : [gradientColors[0] || defaultColors.gradientStartColor, defaultColors.gradientEndColor]
+
+      return `linear-gradient(${gradientDirection}deg, ${safeGradientColors.map((color, index) => 
+        `${color} ${(index / (safeGradientColors.length - 1)) * 100}%`
       ).join(', ')})`
     }
     if (backgroundType === 'image' && backgroundImageUrl) {

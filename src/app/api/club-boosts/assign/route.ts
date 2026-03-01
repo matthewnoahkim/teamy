@@ -79,6 +79,9 @@ export async function POST(request: NextRequest) {
     const assignedBoosts = await prisma.clubBoost.count({
       where: {
         userId: session.user.id,
+        expiresAt: {
+          gt: now,
+        },
       },
     })
 
@@ -94,7 +97,39 @@ export async function POST(request: NextRequest) {
 
     // Determine source type and ID
     let sourceType = 'PRO_SUBSCRIPTION'
-    let sourceId = null
+    let sourceId: string | null = null
+
+    const promoRedemptionIds = promoBoostRedemptions.map((redemption) => redemption.id)
+    const promoUsageByRedemption = promoRedemptionIds.length > 0
+      ? await prisma.clubBoost.groupBy({
+          by: ['sourceId'],
+          where: {
+            userId: session.user.id,
+            sourceType: 'PROMO',
+            expiresAt: {
+              gt: now,
+            },
+            sourceId: {
+              in: promoRedemptionIds,
+            },
+          },
+          _count: {
+            _all: true,
+          },
+        })
+      : []
+
+    const promoUsageMap = new Map(
+      promoUsageByRedemption
+        .map((entry) => [entry.sourceId, entry._count._all] as const)
+        .filter((entry): entry is [string, number] => entry[0] !== null),
+    )
+
+    const promoRedemptionWithCapacity = promoBoostRedemptions.find((redemption) => {
+      const totalFromRedemption = redemption.promoCode.effectQuantity || 0
+      const usedFromRedemption = promoUsageMap.get(redemption.id) || 0
+      return usedFromRedemption < totalFromRedemption
+    })
 
     // If user has Pro subscription, use those boosts first
     if (isPro) {
@@ -102,18 +137,26 @@ export async function POST(request: NextRequest) {
         where: {
           userId: session.user.id,
           sourceType: 'PRO_SUBSCRIPTION',
+          expiresAt: {
+            gt: now,
+          },
         },
       })
 
       if (proBoostsUsed < 5) {
         sourceType = 'PRO_SUBSCRIPTION'
-      } else if (promoBoostRedemptions.length > 0) {
+      } else if (promoRedemptionWithCapacity) {
         sourceType = 'PROMO'
-        sourceId = promoBoostRedemptions[0].id
+        sourceId = promoRedemptionWithCapacity.id
       }
-    } else if (promoBoostRedemptions.length > 0) {
+    } else if (promoRedemptionWithCapacity) {
       sourceType = 'PROMO'
-      sourceId = promoBoostRedemptions[0].id
+      sourceId = promoRedemptionWithCapacity.id
+    } else {
+      return NextResponse.json(
+        { error: 'No available boosts to assign' },
+        { status: 400 }
+      )
     }
 
     // Create the club boost assignment
@@ -139,4 +182,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

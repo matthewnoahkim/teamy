@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Copy, RefreshCw, Eye, EyeOff, Trash2, UserX, X, Link as LinkIcon, Upload, Image as ImageIcon, Plus, GripVertical } from 'lucide-react'
+import { Copy, RefreshCw, Eye, EyeOff, Trash2, UserX, X, Link as LinkIcon, Upload, Image as ImageIcon, Plus, GripVertical, Loader2 } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -274,25 +274,62 @@ interface SettingsTabProps {
   club: ClubWithMembers | ClubWithMembersLite
   currentMembership: MembershipWithPreferences
   isAdmin: boolean
+  initialInviteCodes?: { adminCode: string; memberCode: string } | null
   personalBackground?: BackgroundPreferences | null
   onBackgroundUpdate?: (preferences: BackgroundPreferences | null) => void
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+
+  // Try synchronous copy first for immediate user-gesture responsiveness.
+  try {
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.setAttribute('readonly', '')
+    textArea.style.position = 'fixed'
+    textArea.style.top = '-1000px'
+    textArea.style.opacity = '0'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    const copied = document.execCommand('copy')
+    document.body.removeChild(textArea)
+    if (copied) return true
+  } catch {
+    // Fallback below.
+  }
+
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  return false
 }
 
 export function SettingsTab({
   club,
   currentMembership,
   isAdmin,
+  initialInviteCodes,
   personalBackground,
   onBackgroundUpdate,
 }: SettingsTabProps) {
   const { toast } = useToast()
   const router = useRouter()
-  const [adminCode, setAdminCode] = useState<string>('••••••••••••')
-  const [memberCode, setMemberCode] = useState<string>('••••••••••••')
+  const [adminCode, setAdminCode] = useState<string>(initialInviteCodes?.adminCode || '••••••••••••')
+  const [memberCode, setMemberCode] = useState<string>(initialInviteCodes?.memberCode || '••••••••••••')
   const [showAdminCode, setShowAdminCode] = useState(false)
   const [showMemberCode, setShowMemberCode] = useState(false)
+  const [codesLoading, setCodesLoading] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [codesFetched, setCodesFetched] = useState(false)
+  const [codesFetched, setCodesFetched] = useState(Boolean(initialInviteCodes?.adminCode && initialInviteCodes?.memberCode))
+  const codesFetchPromiseRef = useRef<Promise<{ adminCode: string; memberCode: string } | null> | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -325,6 +362,17 @@ export function SettingsTab({
       setDismissedTransferPrompt(false)
     }
   }, [leaveDialogOpen])
+
+  useEffect(() => {
+    // Reset invite-code state when switching clubs.
+    setAdminCode(initialInviteCodes?.adminCode || '••••••••••••')
+    setMemberCode(initialInviteCodes?.memberCode || '••••••••••••')
+    setShowAdminCode(false)
+    setShowMemberCode(false)
+    setCodesFetched(Boolean(initialInviteCodes?.adminCode && initialInviteCodes?.memberCode))
+    setCodesLoading(false)
+    codesFetchPromiseRef.current = null
+  }, [club.id, initialInviteCodes?.adminCode, initialInviteCodes?.memberCode])
   
   const memberPreferences = personalBackground ?? currentMembership.preferences ?? null
   const defaultColors = {
@@ -460,49 +508,84 @@ export function SettingsTab({
     }
   }
 
-  const fetchCodes = async () => {
-    if (codesFetched) return
+  const fetchCodes = useCallback(async ({ force = false, silent = false }: { force?: boolean; silent?: boolean } = {}) => {
+    if (!isAdmin) return null
 
-    try {
-      const response = await fetch(`/api/clubs/${club.id}/invite/codes`)
-      
-      if (!response.ok) throw new Error('Failed to fetch codes')
-
-      const data = await response.json()
-      
-      if (data.needsRegeneration) {
-        toast({
-          title: 'Codes need regeneration',
-          description: 'Please regenerate the invite codes',
-          variant: 'destructive',
-        })
-        return
-      }
-
-      setAdminCode(data.adminCode)
-      setMemberCode(data.memberCode)
-      setCodesFetched(true)
-    } catch (_error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch invite codes',
-        variant: 'destructive',
-      })
+    if (!force && codesFetched) {
+      return { adminCode, memberCode }
     }
-  }
+
+    if (!force && codesFetchPromiseRef.current) {
+      return codesFetchPromiseRef.current
+    }
+
+    const request = (async () => {
+      setCodesLoading(true)
+      try {
+        const response = await fetch(`/api/clubs/${club.id}/invite/codes`)
+        if (!response.ok) throw new Error('Failed to fetch codes')
+
+        const data = await response.json()
+
+        if (data.needsRegeneration) {
+          if (!silent) {
+            toast({
+              title: 'Codes need regeneration',
+              description: 'Please regenerate the invite codes',
+              variant: 'destructive',
+            })
+          }
+          return null
+        }
+
+        const normalized = {
+          adminCode: data.adminCode,
+          memberCode: data.memberCode,
+        }
+
+        setAdminCode(normalized.adminCode)
+        setMemberCode(normalized.memberCode)
+        setCodesFetched(true)
+
+        return normalized
+      } catch (_error) {
+        if (!silent) {
+          toast({
+            title: 'Error',
+            description: 'Failed to fetch invite codes',
+            variant: 'destructive',
+          })
+        }
+        return null
+      } finally {
+        setCodesLoading(false)
+        codesFetchPromiseRef.current = null
+      }
+    })()
+
+    codesFetchPromiseRef.current = request
+    return request
+  }, [adminCode, memberCode, club.id, codesFetched, isAdmin, toast])
+
+  useEffect(() => {
+    if (!isAdmin || codesFetched) return
+    void fetchCodes({ silent: true })
+  }, [isAdmin, codesFetched, fetchCodes])
 
   const handleShowAdminCode = async () => {
-    if (!showAdminCode && !codesFetched) {
-      await fetchCodes()
+    if (!showAdminCode) {
+      const codes = await fetchCodes()
+      if (!codes) return
     }
-    setShowAdminCode(!showAdminCode)
+    setShowAdminCode((prev) => !prev)
   }
 
   const handleShowMemberCode = async () => {
-    if (!showMemberCode && !codesFetched) {
-      await fetchCodes()
+    if (!showMemberCode) {
+      const codes = await fetchCodes()
+      if (!codes) return
     }
-    setShowMemberCode(!showMemberCode)
+    setShowMemberCode((prev) => !prev)
   }
 
   const handleRegenerateClick = (type: 'admin' | 'member') => {
@@ -561,44 +644,27 @@ export function SettingsTab({
     return `${window.location.origin}/join?${query}`
   }
 
-  const handleCopy = async (code: string, type: 'Admin' | 'Member', variant: 'code' | 'link' = 'code') => {
-    let realCode = code
-    // If code is hidden or codes not fetched, fetch codes first
-    if (code === '••••••••••••' || !codesFetched) {
-      try {
-        const response = await fetch(`/api/clubs/${club.id}/invite/codes`)
-        if (!response.ok) throw new Error('Failed to fetch codes')
-        const data = await response.json()
-        if (type === 'Admin') {
-          realCode = data.adminCode
-          setAdminCode(data.adminCode)
-        } else {
-          realCode = data.memberCode
-          setMemberCode(data.memberCode)
-        }
-        setCodesFetched(true)
-      } catch (_error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch invite code',
-          variant: 'destructive',
-        })
-        return
-      }
-    }
+  const handleCopy = async (type: 'Admin' | 'Member', variant: 'code' | 'link' = 'code') => {
+    const codes = codesFetched ? { adminCode, memberCode } : await fetchCodes()
+    if (!codes) return
+
+    const realCode = type === 'Admin' ? codes.adminCode : codes.memberCode
     const valueToCopy = variant === 'link' ? getInviteLink(realCode) : realCode
 
-    try {
-      await navigator.clipboard.writeText(valueToCopy)
-      toast({
-        title: 'Copied!',
-        description:
-          variant === 'link'
-            ? `${type} invite link copied to clipboard`
-            : `${type} invite code copied to clipboard`,
-      })
-    } catch (_error) {
-      toast({
+    const successDescription =
+      variant === 'link'
+        ? `${type} invite link copied to clipboard`
+        : `${type} invite code copied to clipboard`
+
+    const toastController = toast({
+      title: 'Copied!',
+      description: successDescription,
+    })
+
+    const copied = await copyToClipboard(valueToCopy)
+    if (!copied) {
+      toastController.update({
+        id: toastController.id,
         title: 'Error',
         description: 'Failed to copy to clipboard',
         variant: 'destructive',
@@ -1324,12 +1390,18 @@ export function SettingsTab({
                     onClick={handleShowMemberCode}
                     className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
                   >
-                    {showMemberCode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {codesLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : showMemberCode ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </Button>
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => handleCopy(memberCode, 'Member')}
+                    onClick={() => handleCopy('Member')}
                     className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
                   >
                     <Copy className="h-4 w-4" />
@@ -1338,7 +1410,7 @@ export function SettingsTab({
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => handleCopy(memberCode, 'Member', 'link')}
+                    onClick={() => handleCopy('Member', 'link')}
                     className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
                   >
                     <LinkIcon className="h-4 w-4" />
@@ -1348,7 +1420,7 @@ export function SettingsTab({
                     variant="outline"
                     size="icon"
                     onClick={() => handleRegenerateClick('member')}
-                    disabled={loading}
+                    disabled={loading || codesLoading}
                     className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
                   >
                     <RefreshCw className="h-4 w-4" />
@@ -1377,12 +1449,18 @@ export function SettingsTab({
                     onClick={handleShowAdminCode}
                     className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
                   >
-                    {showAdminCode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {codesLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : showAdminCode ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </Button>
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => handleCopy(adminCode, 'Admin')}
+                    onClick={() => handleCopy('Admin')}
                     className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
                   >
                     <Copy className="h-4 w-4" />
@@ -1391,7 +1469,7 @@ export function SettingsTab({
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => handleCopy(adminCode, 'Admin', 'link')}
+                    onClick={() => handleCopy('Admin', 'link')}
                     className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
                   >
                     <LinkIcon className="h-4 w-4" />
@@ -1401,7 +1479,7 @@ export function SettingsTab({
                     variant="outline"
                     size="icon"
                     onClick={() => handleRegenerateClick('admin')}
-                    disabled={loading}
+                    disabled={loading || codesLoading}
                     className="h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
                   >
                     <RefreshCw className="h-4 w-4" />

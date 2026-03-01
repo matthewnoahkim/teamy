@@ -4,6 +4,7 @@ import crypto from 'crypto'
 
 const ENCRYPTION_KEY = process.env.INVITE_CODE_ENCRYPTION_KEY || 'default-key-please-change-in-production-32-chars!!'
 const ALGORITHM = 'aes-256-cbc'
+const DERIVED_ENCRYPTION_KEY = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
 
 /**
  * Generates a human-readable invite code
@@ -32,8 +33,7 @@ export async function verifyInviteCode(code: string, hash: string): Promise<bool
  */
 export function encryptInviteCode(code: string): string {
   const iv = crypto.randomBytes(16)
-  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv)
+  const cipher = crypto.createCipheriv(ALGORITHM, DERIVED_ENCRYPTION_KEY, iv)
   
   let encrypted = cipher.update(code, 'utf8', 'hex')
   encrypted += cipher.final('hex')
@@ -48,8 +48,7 @@ export function encryptInviteCode(code: string): string {
 export function decryptInviteCode(encrypted: string): string {
   const [ivHex, encryptedData] = encrypted.split(':')
   const iv = Buffer.from(ivHex, 'hex')
-  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
+  const decipher = crypto.createDecipheriv(ALGORITHM, DERIVED_ENCRYPTION_KEY, iv)
   
   let decrypted = decipher.update(encryptedData, 'hex', 'utf8')
   decrypted += decipher.final('utf8')
@@ -88,4 +87,3 @@ export async function createInviteCodes(): Promise<{
     memberEncrypted,
   }
 }
-
