@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
+import { getConfiguredAppOrigins, isTrustedOrigin } from '@/lib/url-safety'
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
@@ -13,6 +14,46 @@ if (stripeSecretKey) {
   } catch (error) {
     console.error('Failed to initialize Stripe:', error)
   }
+}
+
+type CheckoutSessionOwnershipInput = Pick<
+  Stripe.Checkout.Session,
+  'client_reference_id' | 'metadata' | 'customer'
+>
+
+type CheckoutSessionOwnershipContext = {
+  userId: string
+  userStripeCustomerId?: string | null
+}
+
+function getCheckoutCustomerId(checkoutSession: CheckoutSessionOwnershipInput): string | null {
+  return typeof checkoutSession.customer === 'string'
+    ? checkoutSession.customer
+    : checkoutSession.customer?.id ?? null
+}
+
+export function isCheckoutSessionOwnedByUser(
+  checkoutSession: CheckoutSessionOwnershipInput,
+  context: CheckoutSessionOwnershipContext
+): boolean {
+  if (checkoutSession.client_reference_id === context.userId) {
+    return true
+  }
+
+  if (checkoutSession.metadata?.userId === context.userId) {
+    return true
+  }
+
+  const checkoutCustomerId = getCheckoutCustomerId(checkoutSession)
+  if (
+    checkoutCustomerId &&
+    context.userStripeCustomerId &&
+    checkoutCustomerId === context.userStripeCustomerId
+  ) {
+    return true
+  }
+
+  return false
 }
 
 // POST /api/stripe/verify-subscription
@@ -30,6 +71,10 @@ export async function POST(req: NextRequest) {
 
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!isTrustedOrigin(req.headers.get('origin'), getConfiguredAppOrigins())) {
+      return NextResponse.json({ error: 'Forbidden origin' }, { status: 403 })
     }
 
     const body = await req.json()
@@ -126,15 +171,21 @@ export async function POST(req: NextRequest) {
       console.log(`Selected subscription: ${subscription.id}, status: ${subscription.status}, type: ${subscriptionType}`)
     } else {
       // Normal mode: verify from checkout session
-      if (!sessionId) {
+      if (typeof sessionId !== 'string' || sessionId.trim().length === 0) {
         return NextResponse.json(
           { error: 'Session ID is required' },
           { status: 400 }
         )
       }
 
+      const normalizedSessionId = sessionId.trim()
+      const currentUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { stripeCustomerId: true },
+      })
+
       // Retrieve the checkout session from Stripe
-      const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
+      const checkoutSession = await stripe.checkout.sessions.retrieve(normalizedSessionId, {
         expand: ['subscription', 'customer'],
       })
 
@@ -152,25 +203,35 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      if (checkoutSession.status !== 'complete') {
+        return NextResponse.json(
+          { error: 'Checkout session is not complete yet' },
+          { status: 400 }
+        )
+      }
+
+      const ownsSession = isCheckoutSessionOwnedByUser(checkoutSession, {
+        userId: session.user.id,
+        userStripeCustomerId: currentUser?.stripeCustomerId,
+      })
+
+      if (!ownsSession) {
+        return NextResponse.json(
+          { error: 'Checkout session does not belong to this account' },
+          { status: 403 }
+        )
+      }
+
       // Get customer ID from checkout session
-      const checkoutCustomerId = typeof checkoutSession.customer === 'string'
-        ? checkoutSession.customer
-        : checkoutSession.customer?.id
+      const checkoutCustomerId = getCheckoutCustomerId(checkoutSession)
 
       // Save customer ID if we don't have it
-      if (checkoutCustomerId) {
-        const currentUser = await prisma.user.findUnique({
+      if (checkoutCustomerId && !currentUser?.stripeCustomerId) {
+        await prisma.user.update({
           where: { id: session.user.id },
-          select: { stripeCustomerId: true },
+          data: { stripeCustomerId: checkoutCustomerId },
         })
-        
-        if (!currentUser?.stripeCustomerId) {
-          await prisma.user.update({
-            where: { id: session.user.id },
-            data: { stripeCustomerId: checkoutCustomerId },
-          })
-          console.log(`Saved customer ID ${checkoutCustomerId} for user ${session.user.id}`)
-        }
+        console.log(`Saved customer ID ${checkoutCustomerId} for user ${session.user.id}`)
       }
 
       // Get subscription details
@@ -243,4 +304,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-

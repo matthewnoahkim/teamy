@@ -9,6 +9,7 @@ import { Logo } from '@/components/logo'
 import { getPreferredClubPathForUser } from '@/lib/club-routing'
 import { cookies } from 'next/headers'
 import { cn } from '@/lib/utils'
+import { resolveSafeCallbackPath } from '@/lib/url-safety'
 
 type AuthMode = 'signin' | 'signup'
 
@@ -25,27 +26,6 @@ async function getDefaultRedirect(userId: string) {
   const lastVisitedClub = cookieStore.get('lastVisitedClub')?.value
 
   return getPreferredClubPathForUser(userId, { lastVisitedClubId: lastVisitedClub })
-}
-
-function resolveCallbackUrl(rawCallbackUrl?: string, defaultUrl?: string) {
-  if (!rawCallbackUrl) {
-    return defaultUrl || '/auth/callback'
-  }
-
-  if (rawCallbackUrl.startsWith('/')) {
-    return rawCallbackUrl
-  }
-
-  try {
-    const url = new URL(rawCallbackUrl)
-    if (url.protocol === 'http:' || url.protocol === 'https:') {
-      return url.toString()
-    }
-  } catch {
-    // Ignore parsing errors and fallback to default
-  }
-
-  return defaultUrl || '/auth/callback'
 }
 
 function resolveAuthMode(rawMode?: string): AuthMode {
@@ -74,19 +54,20 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   const isSignUpMode = authMode === 'signup'
   // Accept both callbackUrl and legacy redirect query params.
   const rawCallbackUrl = resolvedSearchParams?.callbackUrl ?? resolvedSearchParams?.redirect
-  const signInPageHref = buildAuthPageHref('signin', rawCallbackUrl)
-  const signUpPageHref = buildAuthPageHref('signup', rawCallbackUrl)
+  const sanitizedCallbackUrl = resolveSafeCallbackPath(rawCallbackUrl, '/auth/callback')
+  const signInPageHref = buildAuthPageHref('signin', sanitizedCallbackUrl)
+  const signUpPageHref = buildAuthPageHref('signup', sanitizedCallbackUrl)
 
   // Calculate callback URL for both logged-in and logged-out states
   let callbackUrl = '/auth/callback' // default redirect handler
   
   if (session?.user) {
     const defaultRedirect = await getDefaultRedirect(session.user.id)
-    callbackUrl = resolveCallbackUrl(rawCallbackUrl, defaultRedirect)
+    callbackUrl = resolveSafeCallbackPath(rawCallbackUrl, defaultRedirect)
     redirect(callbackUrl)
   } else {
     // For non-logged-in users, use the callback from query params or default to auth callback
-    callbackUrl = resolveCallbackUrl(rawCallbackUrl, '/auth/callback')
+    callbackUrl = resolveSafeCallbackPath(rawCallbackUrl, '/auth/callback')
   }
 
   return (

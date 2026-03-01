@@ -2,9 +2,29 @@ import { nanoid } from 'nanoid'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
-const ENCRYPTION_KEY = process.env.INVITE_CODE_ENCRYPTION_KEY || 'default-key-please-change-in-production-32-chars!!'
-const ALGORITHM = 'aes-256-cbc'
-const DERIVED_ENCRYPTION_KEY = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+const LEGACY_FALLBACK_KEY = 'default-key-please-change-in-production-32-chars!!'
+const ENCRYPTION_KEY =
+  process.env.INVITE_CODE_ENCRYPTION_KEY || LEGACY_FALLBACK_KEY
+const LEGACY_ALGORITHM = 'aes-256-cbc'
+const V2_ALGORITHM = 'aes-256-gcm'
+const LEGACY_DERIVED_ENCRYPTION_KEY = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.INVITE_CODE_ENCRYPTION_KEY) {
+    throw new Error(
+      'CRITICAL: INVITE_CODE_ENCRYPTION_KEY must be set in production. Refusing to use insecure default key.'
+    )
+  }
+  if (process.env.INVITE_CODE_ENCRYPTION_KEY.length < 32) {
+    throw new Error(
+      'CRITICAL: INVITE_CODE_ENCRYPTION_KEY must be at least 32 characters in production.'
+    )
+  }
+}
+
+function deriveEncryptionKey(salt: Buffer): Buffer {
+  return crypto.scryptSync(ENCRYPTION_KEY, salt, 32)
+}
 
 /**
  * Generates a human-readable invite code
@@ -32,27 +52,52 @@ export async function verifyInviteCode(code: string, hash: string): Promise<bool
  * Encrypts an invite code for retrievable storage
  */
 export function encryptInviteCode(code: string): string {
-  const iv = crypto.randomBytes(16)
-  const cipher = crypto.createCipheriv(ALGORITHM, DERIVED_ENCRYPTION_KEY, iv)
-  
+  const salt = crypto.randomBytes(16)
+  const iv = crypto.randomBytes(12)
+  const key = deriveEncryptionKey(salt)
+  const cipher = crypto.createCipheriv(V2_ALGORITHM, key, iv)
+
   let encrypted = cipher.update(code, 'utf8', 'hex')
   encrypted += cipher.final('hex')
-  
-  // Return IV and encrypted data together
-  return iv.toString('hex') + ':' + encrypted
+  const authTag = cipher.getAuthTag().toString('hex')
+
+  return `v2:${salt.toString('hex')}:${iv.toString('hex')}:${encrypted}:${authTag}`
 }
 
 /**
  * Decrypts an invite code
  */
 export function decryptInviteCode(encrypted: string): string {
+  if (encrypted.startsWith('v2:')) {
+    const parts = encrypted.split(':')
+    if (parts.length !== 5) {
+      throw new Error('Invalid invite code ciphertext format')
+    }
+
+    const [, saltHex, ivHex, encryptedData, authTagHex] = parts
+    const salt = Buffer.from(saltHex, 'hex')
+    const iv = Buffer.from(ivHex, 'hex')
+    const authTag = Buffer.from(authTagHex, 'hex')
+    const key = deriveEncryptionKey(salt)
+    const decipher = crypto.createDecipheriv(V2_ALGORITHM, key, iv)
+    decipher.setAuthTag(authTag)
+
+    let decrypted = decipher.update(encryptedData, 'hex', 'utf8')
+    decrypted += decipher.final('utf8')
+    return decrypted
+  }
+
   const [ivHex, encryptedData] = encrypted.split(':')
+  if (!ivHex || !encryptedData) {
+    throw new Error('Invalid invite code ciphertext format')
+  }
+
   const iv = Buffer.from(ivHex, 'hex')
-  const decipher = crypto.createDecipheriv(ALGORITHM, DERIVED_ENCRYPTION_KEY, iv)
-  
+  const decipher = crypto.createDecipheriv(LEGACY_ALGORITHM, LEGACY_DERIVED_ENCRYPTION_KEY, iv)
+
   let decrypted = decipher.update(encryptedData, 'hex', 'utf8')
   decrypted += decipher.final('utf8')
-  
+
   return decrypted
 }
 

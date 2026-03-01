@@ -77,24 +77,21 @@ export async function devNotFoundResponse(request: NextRequest): Promise<NextRes
   const wantsHtml = accept.includes('text/html')
 
   if (wantsHtml) {
-    try {
-      const notFoundUrl = new URL('/404', request.url)
-      const notFoundPage = await fetch(notFoundUrl.toString(), {
-        headers: { accept: 'text/html' },
-        cache: 'no-store',
-      })
+    const safeHtml = [
+      '<!doctype html>',
+      '<html lang="en">',
+      '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>404 Not Found</title></head>',
+      '<body><h1>404 - Not Found</h1></body>',
+      '</html>',
+    ].join('')
 
-      const html = await notFoundPage.text()
-      return new NextResponse(html, {
-        status: 404,
-        headers: {
-          'content-type': 'text/html; charset=utf-8',
-          'cache-control': 'no-store',
-        },
-      })
-    } catch (error) {
-      console.error('[dev-guard] Failed to load custom 404 page:', error)
-    }
+    return new NextResponse(safeHtml, {
+      status: 404,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-store',
+      },
+    })
   }
 
   return NextResponse.json({ error: 'Not Found' }, { status: 404 })
