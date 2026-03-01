@@ -97,7 +97,7 @@ export function TDPortalClient({ user, requests }: TDPortalClientProps) {
   const rejectedRequests = requests.filter(r => r.status === 'REJECTED')
   
   // Notifications include all non-approved requests plus recently approved ones
-  const notifications = requests.sort(
+  const notifications = [...requests].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )
   // Count only pending/rejected as "unread"

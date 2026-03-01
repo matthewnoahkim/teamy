@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useToast } from '@/components/ui/use-toast'
 import {
   Dialog,
   DialogContent,
@@ -89,8 +90,8 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
   const regex = new RegExp(`(${escapedQuery})`, 'gi')
   const parts = text.split(regex)
   
-  return parts.map((part, index) => 
-    regex.test(part) ? (
+  return parts.map((part, index) =>
+    index % 2 === 1 ? (
       <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-foreground px-0.5 rounded">
         {part}
       </mark>
@@ -99,6 +100,8 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
 }
 
 export function HealthTools() {
+  const { toast } = useToast()
+
   // State for all logs (combined)
   const [allLogs, setAllLogs] = useState<LogEntry[]>([])
   const [apiLogs, setApiLogs] = useState<LogEntry[]>([])
@@ -154,11 +157,13 @@ export function HealthTools() {
   const [newEmail, setNewEmail] = useState('')
   const [whitelistLoading, setWhitelistLoading] = useState(false)
   const [whitelistSaving, setWhitelistSaving] = useState(false)
+  const [isPageVisible, setIsPageVisible] = useState(true)
 
+  const isLogTab = activeTab === 'all' || activeTab === 'api' || activeTab === 'errors'
 
   // Scroll detection for pausing auto-refresh
   const [isScrolling, setIsScrolling] = useState(false)
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scrollAreaRefs = useRef<Map<string, HTMLElement>>(new Map())
   const scrollListenersRef = useRef<Map<string, HTMLElement>>(new Map())
   
@@ -351,28 +356,43 @@ export function HealthTools() {
         await refetchWhitelist()
         return true
       } else {
-        alert(data.error || 'Failed to save whitelist')
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to save whitelist',
+          variant: 'destructive',
+        })
         return false
       }
     } catch (error) {
       console.error('Failed to save email whitelist:', error)
-      alert('Failed to save whitelist')
+      toast({
+        title: 'Error',
+        description: 'Failed to save whitelist',
+        variant: 'destructive',
+      })
       return false
     } finally {
       setWhitelistSaving(false)
     }
-  }, [refetchWhitelist])
+  }, [refetchWhitelist, toast])
 
   // Add email to whitelist
   const handleAddEmail = async () => {
     const email = newEmail.trim().toLowerCase()
     if (!email || !email.includes('@')) {
-      alert('Please enter a valid email address')
+      toast({
+        title: 'Invalid email',
+        description: 'Please enter a valid email address',
+        variant: 'destructive',
+      })
       return
     }
 
     if (whitelistEmails.some(e => e.email.toLowerCase() === email)) {
-      alert('Email already in whitelist')
+      toast({
+        title: 'Duplicate email',
+        description: 'Email already in whitelist',
+      })
       setNewEmail('')
       return
     }
@@ -388,7 +408,11 @@ export function HealthTools() {
   // Remove email from whitelist
   const handleRemoveEmail = async (emailToRemove: string) => {
     if (whitelistEmails.length <= 1) {
-      alert('Cannot remove all emails from whitelist')
+      toast({
+        title: 'Action blocked',
+        description: 'Cannot remove all emails from whitelist',
+        variant: 'destructive',
+      })
       return
     }
 
@@ -397,6 +421,16 @@ export function HealthTools() {
       .map(e => e.email)
     await saveWhitelist(emailList)
   }
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState === 'visible')
+    }
+
+    handleVisibilityChange()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
 
 
   // Save active tab to localStorage whenever it changes
@@ -408,14 +442,10 @@ export function HealthTools() {
 
   // Initial load
   useEffect(() => {
-    if (activeTab === 'users') {
-      fetchUsers()
-    } else if (activeTab === 'access') {
+    if (activeTab === 'access') {
       fetchWhitelist()
-    } else {
-      fetchLogs()
     }
-  }, [activeTab, fetchUsers, fetchWhitelist, fetchLogs])
+  }, [activeTab, fetchWhitelist])
 
   // Fetch when filters change (debounced search)
   useEffect(() => {
@@ -427,38 +457,19 @@ export function HealthTools() {
     }
   }, [userSearch, activeTab, fetchUsers])
 
-  // Fetch logs when filters change
+  // Fetch logs when filters change (debounced)
   useEffect(() => {
-    if (activeTab !== 'users') {
+    if (isLogTab) {
       const timer = setTimeout(() => {
         fetchLogs()
       }, 300)
       return () => clearTimeout(timer)
     }
-  }, [
-    selectedLogTypes,
-    selectedSeverities,
-    selectedRoutes,
-    selectedUserIds,
-    startDate,
-    endDate,
-    errorsOnly,
-    slowOnly,
-    apiUsageOnly,
-    resolvedFilter,
-    activeTab,
-  ])
-  
-  // Search query changes trigger immediate fetch
-  useEffect(() => {
-    if (activeTab !== 'users' && searchQuery !== undefined) {
-      fetchLogs()
-    }
-  }, [searchQuery])
+  }, [isLogTab, fetchLogs])
 
   // Handle scroll detection to pause auto-refresh
   useEffect(() => {
-    if (activeTab === 'users') return
+    if (!isLogTab) return
 
     const handleScroll = () => {
       setIsScrolling(true)
@@ -502,21 +513,19 @@ export function HealthTools() {
         clearTimeout(scrollTimeoutRef.current)
       }
     }
-  }, [activeTab])
+  }, [activeTab, isLogTab])
 
-  // Auto-refresh logs every 1 second when on logs tabs (silent, no loading indicator)
-  // Pauses when user is scrolling
+  // Auto-refresh logs every 5 seconds on log tabs (silent, no loading indicator).
+  // Pause while scrolling or when tab is not visible.
   useEffect(() => {
-    if (activeTab === 'users' || isScrolling) return
+    if (!isLogTab || isScrolling || !isPageVisible) return
 
-    // Set up interval to refresh every 1 second (silent refresh)
     const interval = setInterval(() => {
       fetchLogs(false) // false = don't show loading indicator
-    }, 1000) // 1 second
+    }, 5000)
 
-    // Cleanup interval on unmount or tab change
     return () => clearInterval(interval)
-  }, [activeTab, fetchLogs, isScrolling])
+  }, [isLogTab, fetchLogs, isScrolling, isPageVisible])
 
   // Clear filters
   const clearFilters = () => {
@@ -593,11 +602,19 @@ export function HealthTools() {
         fetchLogs()
       } else {
         const errorData = await response.json().catch(() => ({}))
-        alert(errorData.error || 'Failed to delete user')
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to delete user',
+          variant: 'destructive',
+        })
       }
     } catch (error) {
       console.error('Error deleting user:', error)
-      alert('Error deleting user')
+      toast({
+        title: 'Error',
+        description: 'Error deleting user',
+        variant: 'destructive',
+      })
     } finally {
       setDeleteDialogOpen(false)
       setUserToDelete(null)
@@ -1404,4 +1421,3 @@ export function HealthTools() {
     </div>
   )
 }
-

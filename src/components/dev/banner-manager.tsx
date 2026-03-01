@@ -31,30 +31,40 @@ export function BannerManager() {
   const fetchSettings = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/dev/site-settings?key=banner_enabled')
-      const enabledData = await response.json()
-      
-      const textResponse = await fetch('/api/dev/site-settings?key=banner_text')
-      const textData = await textResponse.json()
-      
-      const linkResponse = await fetch('/api/dev/site-settings?key=banner_link')
-      const linkData = await linkResponse.json()
-      
-      const bgResponse = await fetch('/api/dev/site-settings?key=banner_background_color')
-      const bgData = await bgResponse.json()
+      const getSettingValue = async (key: string) => {
+        const response = await fetch(`/api/dev/site-settings?key=${encodeURIComponent(key)}`)
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || `Failed to load setting "${key}"`)
+        }
+        const data = await response.json()
+        return data.setting?.value ?? null
+      }
+
+      const [enabledValue, textValue, linkValue, bgValue] = await Promise.all([
+        getSettingValue('banner_enabled'),
+        getSettingValue('banner_text'),
+        getSettingValue('banner_link'),
+        getSettingValue('banner_background_color'),
+      ])
 
       setSettings({
-        enabled: enabledData.setting?.value === 'true',
-        text: textData.setting?.value || 'Welcome to Teamy. Questions or feedback? teamysite@gmail.com',
-        link: linkData.setting?.value || '',
-        backgroundColor: bgData.setting?.value || '#0056C7',
+        enabled: enabledValue === 'true',
+        text: textValue || 'Welcome to Teamy. Questions or feedback? teamysite@gmail.com',
+        link: linkValue || '',
+        backgroundColor: bgValue || '#0056C7',
       })
     } catch (error) {
       console.error('Failed to fetch banner settings:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to load banner settings',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     fetchSettings()
@@ -64,7 +74,7 @@ export function BannerManager() {
     setSaving(true)
     try {
       // Save all settings
-      await Promise.all([
+      const responses = await Promise.all([
         fetch('/api/dev/site-settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -86,6 +96,18 @@ export function BannerManager() {
           body: JSON.stringify({ key: 'banner_background_color', value: settings.backgroundColor }),
         }),
       ])
+
+      const failures = await Promise.all(
+        responses.map(async (response) => {
+          if (response.ok) return null
+          const errorData = await response.json().catch(() => ({}))
+          return errorData.error || `Request failed (${response.status})`
+        })
+      )
+      const firstFailure = failures.find(Boolean)
+      if (firstFailure) {
+        throw new Error(firstFailure)
+      }
 
       toast({
         title: 'Success',

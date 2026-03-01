@@ -205,7 +205,11 @@ export default async function TournamentRegistrationPage({ params }: PageProps) 
   }
 
   const displayDivision = tournament.hostingRequest?.division || tournament.division || 'C'
-  const tournamentDivisions: Division[] = displayDivision === 'B&C' ? [Division.B, Division.C] : [tournament.division]
+  const tournamentDivisions: Division[] = displayDivision === 'B&C'
+    ? [Division.B, Division.C]
+    : displayDivision === 'B'
+    ? [Division.B]
+    : [Division.C]
 
   // Load events offered by this tournament.
   const allDivisionEvents = await prisma.event.findMany({

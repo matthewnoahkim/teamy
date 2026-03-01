@@ -10,14 +10,36 @@ interface ESPortalPageProps {
   searchParams: Promise<{ token?: string; tournament?: string }>
 }
 
+interface InviteInfo {
+  id: string
+  email: string
+  name: string | null
+  role: 'EVENT_SUPERVISOR' | 'TOURNAMENT_DIRECTOR'
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED'
+  tournament: {
+    id: string
+    name: string
+    division: string
+    startDate: Date
+    endDate: Date
+    hostingRequestId: string | null
+  }
+  events: Array<{
+    event: {
+      id: string
+      name: string
+    }
+  }>
+}
+
 export default async function ESPortalPage({ searchParams }: ESPortalPageProps) {
   const { token, tournament } = await searchParams
   const session = await getServerSession(authOptions)
 
   // If there's a token, fetch invite info for display
-  let inviteInfo = null
+  let inviteInfo: InviteInfo | null = null
   if (token) {
-    inviteInfo = await prisma.tournamentStaff.findUnique({
+    const foundInvite = await prisma.tournamentStaff.findUnique({
       where: { inviteToken: token },
       select: {
         id: true,
@@ -47,13 +69,16 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
         },
       },
     })
+    if (foundInvite) {
+      inviteInfo = foundInvite as InviteInfo
+    }
   }
 
-  // If not signed in, show login page with invite info if available
-  if (!session?.user?.email) {
-    // Get hosting request division for display if available (as string, since hosting request supports "B&C")
-    let displayDivision: string | undefined = inviteInfo?.tournament?.division
-    if (inviteInfo?.tournament?.hostingRequestId) {
+  const serializeInviteInfo = async () => {
+    if (!inviteInfo) return null
+
+    let displayDivision: string | undefined = inviteInfo.tournament.division
+    if (inviteInfo.tournament.hostingRequestId) {
       const hostingRequest = await prisma.tournamentHostingRequest.findUnique({
         where: { id: inviteInfo.tournament.hostingRequestId },
         select: { division: true },
@@ -62,9 +87,8 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
         displayDivision = hostingRequest.division
       }
     }
-    
-    // Serialize dates to strings for client component
-    const serializedInviteInfo = inviteInfo ? {
+
+    return {
       ...inviteInfo,
       tournament: {
         ...inviteInfo.tournament,
@@ -72,7 +96,12 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
         startDate: inviteInfo.tournament.startDate.toISOString(),
         endDate: inviteInfo.tournament.endDate.toISOString(),
       },
-    } : null
+    }
+  }
+
+  // If not signed in, show login page with invite info if available
+  if (!session?.user?.email) {
+    const serializedInviteInfo = await serializeInviteInfo()
     return <ESLoginClient inviteInfo={serializedInviteInfo} token={token} />
   }
 
@@ -93,194 +122,15 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
     }
   }
 
-  // Check if the user has any staff memberships
-  const staffMemberships = await prisma.tournamentStaff.findMany({
-    where: {
-      OR: [
-        { userId: session.user.id },
-        { email: { equals: session.user.email, mode: 'insensitive' } },
-      ],
-      status: 'ACCEPTED',
-    },
-    include: {
-        tournament: {
-          select: {
-            id: true,
-            name: true,
-            division: true,
-            startDate: true,
-            hostingRequestId: true,
-            slug: true,
-            trialEvents: true,
-            createdById: true,
-          },
-        },
-        events: {
-          include: {
-            event: {
-              select: {
-                id: true,
-                name: true,
-                division: true,
-              },
-            },
-          },
-          orderBy: {
-            event: {
-              name: 'asc',
-            },
-          },
-        },
-      // Tests will be fetched separately via API organized by event
-    },
-    orderBy: {
-      tournament: {
-        startDate: 'asc',
-      },
-    },
-  })
-
-  // Also check for tournament directors via TournamentAdmin or createdById
-  // These should also have access to the ES portal
-  const tournamentAdmins = await prisma.tournamentAdmin.findMany({
-    where: {
-      userId: session.user.id,
-    },
-    include: {
-      tournament: {
-        select: {
-          id: true,
-          name: true,
-          division: true,
-          startDate: true,
-          hostingRequestId: true,
-          slug: true,
-          trialEvents: true,
-          createdById: true,
-        },
-      },
-    },
-  })
-
-  const createdTournaments = await prisma.tournament.findMany({
-    where: {
-      createdById: session.user.id,
-    },
-    select: {
-      id: true,
-      name: true,
-      division: true,
-      startDate: true,
-      hostingRequestId: true,
-      slug: true,
-      trialEvents: true,
-      createdById: true,
-    },
-  })
-
-  // Also check hosting requests where user is director
-  const directorHostingRequests = await prisma.tournamentHostingRequest.findMany({
-    where: {
-      directorEmail: {
-        equals: session.user.email,
-        mode: 'insensitive',
-      },
-      status: 'APPROVED',
-    },
-    include: {
-      tournament: {
-        select: {
-          id: true,
-          name: true,
-          division: true,
-          startDate: true,
-          hostingRequestId: true,
-          slug: true,
-          trialEvents: true,
-          createdById: true,
-        },
-      },
-    },
-  })
-
-  // Combine all tournament access and create TournamentStaff-like records for TDs
-  const tournamentIdsSet = new Set(staffMemberships.map(m => m.tournament.id))
-  
-  // Add tournaments where user is admin
-  for (const admin of tournamentAdmins) {
-    if (admin.tournament && !tournamentIdsSet.has(admin.tournament.id)) {
-      tournamentIdsSet.add(admin.tournament.id)
-      // Create a TournamentStaff-like record for TD access
-      staffMemberships.push({
-        id: `admin-${admin.id}`,
-        userId: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        role: 'TOURNAMENT_DIRECTOR' as const,
-        status: 'ACCEPTED' as const,
-        tournamentId: admin.tournament.id,
-        inviteToken: `admin-${admin.id}-${admin.tournament.id}`, // Required field
-        invitedAt: new Date(),
-        acceptedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        trialEvents: null,
-        tournament: admin.tournament,
-        events: [],
-      } as unknown as typeof staffMemberships[number])
-    }
-  }
-
-  // Add tournaments created by user
-  for (const tournament of createdTournaments) {
-    if (!tournamentIdsSet.has(tournament.id)) {
-      tournamentIdsSet.add(tournament.id)
-      staffMemberships.push({
-        id: `creator-${tournament.id}`,
-        userId: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        role: 'TOURNAMENT_DIRECTOR' as const,
-        status: 'ACCEPTED' as const,
-        tournamentId: tournament.id,
-        inviteToken: `creator-${tournament.id}`, // Required field
-        invitedAt: new Date(),
-        acceptedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        trialEvents: null,
-        tournament: tournament,
-        events: [],
-      } as unknown as typeof staffMemberships[number])
-    }
-  }
-
-  // Add tournaments from hosting requests
-  for (const request of directorHostingRequests) {
-    if (request.tournament && !tournamentIdsSet.has(request.tournament.id)) {
-      tournamentIdsSet.add(request.tournament.id)
-      staffMemberships.push({
-        id: `hosting-${request.id}`,
-        userId: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        role: 'TOURNAMENT_DIRECTOR' as const,
-        status: 'ACCEPTED' as const,
-        tournamentId: request.tournament.id,
-        inviteToken: `hosting-${request.id}`, // Required field
-        invitedAt: new Date(),
-        acceptedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        trialEvents: null,
-        tournament: request.tournament,
-        events: [],
-      } as unknown as typeof staffMemberships[number])
-    }
-  }
+  // Build all ES/TD test access using the shared loader (single source of truth).
+  const serializedStaffMemberships = await getESTestsForUser(
+    session.user.id,
+    session.user.email,
+    { includeQuestions: true }
+  )
 
   // If no memberships found, show unauthorized message
-  if (staffMemberships.length === 0) {
+  if (serializedStaffMemberships.length === 0) {
     // Check if there's a pending invitation for this email
     const pendingInvite = await prisma.tournamentStaff.findFirst({
       where: {
@@ -291,64 +141,61 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
 
     // If there's a pending invite that matches but wasn't auto-accepted (edge case), show appropriate message
     if (pendingInvite && pendingInvite.inviteToken === token) {
-      // Get hosting request division for display if available (as string, since hosting request supports "B&C")
-      let displayDivision: string | undefined = inviteInfo?.tournament?.division
-      if (inviteInfo?.tournament?.hostingRequestId) {
-        const hostingRequest = await prisma.tournamentHostingRequest.findUnique({
-          where: { id: inviteInfo.tournament.hostingRequestId },
-          select: { division: true },
-        })
-        if (hostingRequest?.division) {
-          displayDivision = hostingRequest.division
-        }
-      }
-      
-      // The email didn't match but there's an invite - redirect to correct flow
-      // Serialize dates to strings for client component
-      const serializedInviteInfo = inviteInfo ? {
-        ...inviteInfo,
-        tournament: {
-          ...inviteInfo.tournament,
-          division: displayDivision || inviteInfo.tournament.division,
-          startDate: inviteInfo.tournament.startDate.toISOString(),
-          endDate: inviteInfo.tournament.endDate.toISOString(),
-        },
-      } : null
+      const serializedInviteInfo = await serializeInviteInfo()
       return <ESLoginClient unauthorized email={session.user.email} inviteInfo={serializedInviteInfo} token={token} />
     }
 
     return <ESLoginClient unauthorized email={session.user.email} />
   }
 
-  // Prefetch timelines server-side so the first paint isn't empty
-  const timelineEntries = await Promise.all(
-    staffMemberships.map(async membership => {
-      const items = await prisma.tournamentTimeline.findMany({
-        where: { tournamentId: membership.tournament.id },
-        orderBy: { dueDate: 'asc' },
-      })
-      return [membership.tournament.id, items] as const
-    })
+  // Prefetch timelines server-side so the first paint isn't empty.
+  const tournamentIds = Array.from(
+    new Set(serializedStaffMemberships.map((membership) => membership.tournament.id))
   )
+  const timelineItems = tournamentIds.length
+    ? await prisma.tournamentTimeline.findMany({
+        where: {
+          tournamentId: {
+            in: tournamentIds,
+          },
+        },
+        select: {
+          id: true,
+          tournamentId: true,
+          name: true,
+          description: true,
+          dueDate: true,
+          type: true,
+        },
+        orderBy: [
+          { tournamentId: 'asc' },
+          { dueDate: 'asc' },
+        ],
+      })
+    : []
+
+  const timelineByTournament = timelineItems.reduce<Record<string, Array<{
+    id: string
+    name: string
+    description: string | null
+    dueDate: string
+    type: string
+  }>>>((acc, item) => {
+    if (!acc[item.tournamentId]) {
+      acc[item.tournamentId] = []
+    }
+    acc[item.tournamentId].push({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      dueDate: item.dueDate.toISOString(),
+      type: item.type,
+    })
+    return acc
+  }, {})
 
   const initialTimelines = Object.fromEntries(
-    timelineEntries.map(([tournamentId, items]) => [
-      tournamentId,
-      items.map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        dueDate: item.dueDate.toISOString(),
-        type: item.type,
-      })),
-    ])
-  )
-
-  // Prefetch tests server-side using shared function
-  const serializedStaffMemberships = await getESTestsForUser(
-    session.user.id,
-    session.user.email,
-    { includeQuestions: true } // Include questions for server-side rendering
+    tournamentIds.map((tournamentId) => [tournamentId, timelineByTournament[tournamentId] ?? []])
   )
 
   return (
@@ -362,4 +209,3 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
     </Suspense>
   )
 }
-

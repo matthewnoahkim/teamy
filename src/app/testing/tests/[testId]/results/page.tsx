@@ -1,14 +1,22 @@
+import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { ViewResultsClient, type ResultAttempt } from '@/components/tests/view-results-client'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft, AlertCircle } from 'lucide-react'
+
+interface TournamentTestResultsPageProps {
+  params: Promise<{ testId: string }>
+}
+
+type ScoreReleaseMode = 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST'
 
 export default async function TournamentTestResultsPage({
   params,
-}: {
-  params: Promise<{ testId: string }>
-}) {
+}: TournamentTestResultsPageProps) {
   const resolvedParams = await params
   const session = await getServerSession(authOptions)
 
@@ -18,129 +26,234 @@ export default async function TournamentTestResultsPage({
 
   const testId = resolvedParams.testId
 
-  // Find the ESTest (query without new fields that might not exist yet)
-  const esTest = await prisma.eSTest.findUnique({
-    where: { id: testId },
-    select: {
-      id: true,
-      name: true,
-      tournamentId: true,
-      status: true,
-    },
-  })
-
-  if (!esTest) {
-    notFound()
-  }
-
-  // Safely access new fields that might not exist yet
-  const releaseScoresAt = (esTest as unknown as Record<string, unknown>).releaseScoresAt
-  const scoreReleaseMode = (esTest as unknown as Record<string, unknown>).scoreReleaseMode || 'FULL_TEST'
-  const scoresReleasedField = (esTest as unknown as Record<string, unknown>).scoresReleased
-
-  // Find user's membership through tournament registration
-  const registration = await prisma.tournamentRegistration.findFirst({
-    where: {
-      tournamentId: esTest.tournamentId,
-      registeredById: session.user.id,
-      status: 'CONFIRMED',
-    },
-    include: {
-      club: {
-        include: {
-          memberships: {
-            where: {
-              userId: session.user.id,
-            },
+  const [esTest, tournamentTest] = await Promise.all([
+    prisma.eSTest.findUnique({
+      where: { id: testId },
+      select: {
+        id: true,
+        name: true,
+        tournamentId: true,
+        status: true,
+        releaseScoresAt: true,
+        scoreReleaseMode: true,
+        scoresReleased: true,
+      },
+    }),
+    prisma.tournamentTest.findFirst({
+      where: { testId },
+      include: {
+        tournament: {
+          select: {
+            id: true,
+          },
+        },
+        test: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            releaseScoresAt: true,
+            scoreReleaseMode: true,
           },
         },
       },
+    }),
+  ])
+
+  const isESTest = Boolean(esTest)
+  const tournamentId = isESTest ? esTest?.tournamentId : tournamentTest?.tournament.id
+
+  if (!tournamentId) {
+    notFound()
+  }
+
+  const testName = isESTest ? esTest!.name : tournamentTest!.test.name
+  const releaseScoresAt = isESTest
+    ? esTest!.releaseScoresAt
+    : tournamentTest!.test.releaseScoresAt
+  const scoreReleaseMode = (isESTest
+    ? esTest!.scoreReleaseMode
+    : tournamentTest!.test.scoreReleaseMode) || 'FULL_TEST'
+  const scoresReleasedField = isESTest ? esTest!.scoresReleased : false
+
+  // Match access checks used by /testing/tests/[testId]/take.
+  const userMemberships = await prisma.membership.findMany({
+    where: {
+      userId: session.user.id,
+    },
+    select: {
+      id: true,
+      clubId: true,
+      teamId: true,
     },
   })
 
-  if (!registration || !registration.club.memberships.length) {
+  const teamIds = userMemberships
+    .map((membership) => membership.teamId)
+    .filter((id): id is string => id !== null)
+  const clubIds = userMemberships.map((membership) => membership.clubId)
+
+  const registration = await prisma.tournamentRegistration.findFirst({
+    where: {
+      tournamentId,
+      status: 'CONFIRMED',
+      OR: [
+        { teamId: { in: teamIds } },
+        { clubId: { in: clubIds } },
+      ],
+    },
+    select: {
+      clubId: true,
+      teamId: true,
+    },
+  })
+
+  if (!registration) {
     redirect('/testing')
   }
 
-  const membership = registration.club.memberships[0]
+  const membership = registration.teamId
+    ? userMemberships.find(
+        (entry) => entry.clubId === registration.clubId && entry.teamId === registration.teamId
+      )
+    : userMemberships.find((entry) => entry.clubId === registration.clubId)
 
-  // Get the latest submitted/graded attempt for this user
-  const attempt = await prisma.eSTestAttempt.findFirst({
-    where: {
-      membershipId: membership.id,
-      testId: testId,
-      status: {
-        in: ['SUBMITTED', 'GRADED'],
-      },
-    },
-    include: {
-      answers: {
+  if (!membership) {
+    redirect('/testing')
+  }
+
+  const attempt = isESTest
+    ? await prisma.eSTestAttempt.findFirst({
+        where: {
+          membershipId: membership.id,
+          testId,
+          status: {
+            in: ['SUBMITTED', 'GRADED'],
+          },
+        },
         include: {
-          question: {
+          answers: {
             include: {
-              options: {
-                orderBy: { order: 'asc' },
+              question: {
+                include: {
+                  options: {
+                    orderBy: { order: 'asc' },
+                  },
+                },
               },
             },
           },
         },
-      },
-    },
-    orderBy: {
-      submittedAt: 'desc',
-    },
-  })
+        orderBy: {
+          submittedAt: 'desc',
+        },
+      })
+    : await prisma.testAttempt.findFirst({
+        where: {
+          membershipId: membership.id,
+          testId,
+          status: {
+            in: ['SUBMITTED', 'GRADED'],
+          },
+        },
+        include: {
+          answers: {
+            include: {
+              question: {
+                include: {
+                  options: {
+                    orderBy: { order: 'asc' },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          submittedAt: 'desc',
+        },
+      })
 
   if (!attempt) {
     return (
-      <div className="container mx-auto max-w-4xl py-8 px-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">No Results Found</h1>
-          <p className="text-muted-foreground">
-            You have not submitted any attempts for this test yet.
-          </p>
+      <div className="min-h-screen bg-background grid-pattern flex items-center justify-center px-4 py-12">
+        <div className="container mx-auto max-w-2xl">
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle>No Results Found</CardTitle>
+              <CardDescription>You have not submitted any attempts for this test yet.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <Button asChild>
+                <Link href="/testing">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Testing Portal
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
   }
 
-  // Check if scores should be released
   const now = new Date()
   let scoresReleased = false
   if (scoresReleasedField === true) {
     scoresReleased = true
   } else if (releaseScoresAt) {
-    const releaseDate = releaseScoresAt instanceof Date ? releaseScoresAt : new Date(releaseScoresAt as string)
-    scoresReleased = now >= releaseDate
+    const releaseDate = releaseScoresAt instanceof Date ? releaseScoresAt : new Date(releaseScoresAt)
+    if (!Number.isNaN(releaseDate.getTime())) {
+      scoresReleased = now.getTime() >= (releaseDate.getTime() - 1000)
+    }
   }
 
   if (!scoresReleased) {
     return (
-      <div className="container mx-auto max-w-4xl py-8 px-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Results Not Yet Available</h1>
-          <p className="text-muted-foreground">
-            {releaseScoresAt
-              ? `Results will be released on ${new Date(releaseScoresAt as string | Date).toLocaleString()}.`
-              : 'Results will be released once the tournament director makes them available.'}
-          </p>
+      <div className="min-h-screen bg-background grid-pattern flex items-center justify-center px-4 py-12">
+        <div className="container mx-auto max-w-2xl">
+          <Card className="border-orange-300/60">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-orange-500/10">
+                <AlertCircle className="h-6 w-6 text-orange-600" />
+              </div>
+              <CardTitle>Results Not Yet Available</CardTitle>
+              <CardDescription>
+                {releaseScoresAt
+                  ? `Results will be released on ${new Date(releaseScoresAt).toLocaleString()}.`
+                  : 'Results will be released once tournament staff makes them available.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <Button asChild variant="outline">
+                <Link href="/testing">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Testing Portal
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
   }
 
-  // Sort answers by question order
-  const sortedAnswers = attempt.answers.sort((a, b) => a.question.order - b.question.order)
+  const sortedAnswers = [...attempt.answers].sort((a, b) => a.question.order - b.question.order)
 
-  // Transform attempt data
-  const attemptData = {
+  const attemptRecord = {
     id: attempt.id,
     status: attempt.status,
     startedAt: attempt.startedAt?.toISOString() || null,
     submittedAt: attempt.submittedAt?.toISOString() || null,
     gradeEarned: attempt.gradeEarned ? Number(attempt.gradeEarned) : null,
-    proctoringScore: attempt.proctoringScore ? Number(attempt.proctoringScore) : null,
-    tabSwitchCount: attempt.tabSwitchCount || 0,
+    proctoringScore:
+      'proctoringScore' in attempt && attempt.proctoringScore
+        ? Number(attempt.proctoringScore)
+        : null,
+    tabSwitchCount:
+      'tabSwitchCount' in attempt && typeof attempt.tabSwitchCount === 'number'
+        ? attempt.tabSwitchCount
+        : 0,
     answers: sortedAnswers.map((answer) => ({
       id: answer.id,
       questionId: answer.questionId,
@@ -156,49 +269,49 @@ export default async function TournamentTestResultsPage({
         type: answer.question.type,
         points: Number(answer.question.points),
         explanation: scoresReleased ? answer.question.explanation : null,
-        options: answer.question.options.map((opt) => ({
-          id: opt.id,
-          label: opt.label,
-          isCorrect: scoresReleased ? opt.isCorrect : undefined,
+        order: answer.question.order,
+        options: answer.question.options.map((option) => ({
+          id: option.id,
+          label: option.label,
+          isCorrect: scoresReleased ? option.isCorrect : undefined,
+          order: option.order,
         })),
       },
     })),
   }
 
-  // Apply score release mode filtering
-  let filteredAttempt: unknown = attemptData
+  let filteredAttempt: unknown = attemptRecord
   if (scoreReleaseMode === 'NONE') {
     filteredAttempt = {
-      ...attemptData,
+      ...attemptRecord,
       gradeEarned: null,
       proctoringScore: null,
       answers: null,
     }
   } else if (scoreReleaseMode === 'SCORE_ONLY') {
     filteredAttempt = {
-      ...attemptData,
+      ...attemptRecord,
       answers: null,
     }
   } else if (scoreReleaseMode === 'SCORE_WITH_WRONG') {
     filteredAttempt = {
-      ...attemptData,
-      answers: attemptData.answers.filter((answer) => {
+      ...attemptRecord,
+      answers: attemptRecord.answers.filter((answer) => {
         const questionPoints = answer.question.points
         const earnedPoints = answer.pointsAwarded || 0
         return earnedPoints < questionPoints
       }),
     }
   }
-  // FULL_TEST mode shows everything (no filtering needed)
 
   return (
     <ViewResultsClient
-      testId={esTest.id}
-      testName={esTest.name}
+      testId={testId}
+      testName={testName}
       attempt={filteredAttempt as ResultAttempt}
       testSettings={{
-        releaseScoresAt: (releaseScoresAt ?? null) as Date | null,
-        scoreReleaseMode: (scoreReleaseMode || 'FULL_TEST') as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',
+        releaseScoresAt: releaseScoresAt ?? null,
+        scoreReleaseMode: scoreReleaseMode as ScoreReleaseMode,
       }}
     />
   )

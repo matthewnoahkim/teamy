@@ -62,8 +62,8 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
   const regex = new RegExp(`(${escapedQuery})`, 'gi')
   const parts = text.split(regex)
   
-  return parts.map((part, index) => 
-    regex.test(part) ? (
+  return parts.map((part, index) =>
+    index % 2 === 1 ? (
       <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-foreground px-0.5 rounded">
         {part}
       </mark>
@@ -334,7 +334,7 @@ export function ResourceRequests() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Filters */}
-          <div className="flex gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="relative flex-1">
               <Search 
                 className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none z-10" 
@@ -348,7 +348,7 @@ export function ResourceRequests() {
               />
             </div>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -627,4 +627,3 @@ export function ResourceRequests() {
     </div>
   )
 }
-

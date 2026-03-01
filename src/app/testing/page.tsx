@@ -17,14 +17,15 @@ export default async function TestingPage() {
     where: {
       userId: session.user.id,
     },
-    include: {
-      team: {
-        select: {
-          id: true,
-        },
-      },
+    select: {
+      clubId: true,
+      teamId: true,
     },
   })
+
+  if (memberships.length === 0) {
+    return <TestingLoginClient unauthorized email={session.user.email} />
+  }
 
   const teamIds = memberships
     .map((m) => m.teamId)
@@ -49,4 +50,3 @@ export default async function TestingPage() {
 
   return <TestingPortalClient user={session.user} />
 }
-

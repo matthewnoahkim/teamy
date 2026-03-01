@@ -33,6 +33,7 @@ import {
 import { format } from 'date-fns'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { formatDivision } from '@/lib/utils'
+import { useToast } from '@/components/ui/use-toast'
 import {
   Dialog,
   DialogContent,
@@ -54,8 +55,8 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
   const regex = new RegExp(`(${escapedQuery})`, 'gi')
   const parts = text.split(regex)
   
-  return parts.map((part, index) => 
-    regex.test(part) ? (
+  return parts.map((part, index) =>
+    index % 2 === 1 ? (
       <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-foreground px-0.5 rounded">
         {part}
       </mark>
@@ -81,6 +82,8 @@ interface TournamentRequest {
 }
 
 export function TournamentRequests() {
+  const { toast } = useToast()
+
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING')
@@ -109,13 +112,25 @@ export function TournamentRequests() {
       if (response.ok) {
         const data = await response.json()
         setAllRequests(data.requests || [])
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to fetch requests',
+          variant: 'destructive',
+        })
       }
     } catch (error) {
       console.error('Failed to fetch requests:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch requests',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
-  }, [statusFilter])
+  }, [statusFilter, toast])
 
   useEffect(() => {
     fetchRequests()
@@ -154,13 +169,29 @@ export function TournamentRequests() {
         setReviewDialogOpen(false)
         setRequestToReview(null)
         setReviewNotes('')
+        toast({
+          title: 'Success',
+          description: reviewAction === 'APPROVED'
+            ? 'Request approved'
+            : reviewAction === 'REJECTED'
+              ? 'Request rejected'
+              : 'Request reset to pending',
+        })
       } else {
-        const errorData = await response.json()
-        alert(errorData.error || 'Failed to update request')
+        const errorData = await response.json().catch(() => ({}))
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to update request',
+          variant: 'destructive',
+        })
       }
     } catch (error) {
       console.error('Error updating request:', error)
-      alert('Error updating request')
+      toast({
+        title: 'Error',
+        description: 'Error updating request',
+        variant: 'destructive',
+      })
     } finally {
       setActionLoading(null)
     }
@@ -179,13 +210,25 @@ export function TournamentRequests() {
         await fetchRequests()
         setDeleteDialogOpen(false)
         setRequestToDelete(null)
+        toast({
+          title: 'Success',
+          description: 'Request deleted',
+        })
       } else {
-        const errorData = await response.json()
-        alert(errorData.error || 'Failed to delete request')
+        const errorData = await response.json().catch(() => ({}))
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to delete request',
+          variant: 'destructive',
+        })
       }
     } catch (error) {
       console.error('Error deleting request:', error)
-      alert('Error deleting request')
+      toast({
+        title: 'Error',
+        description: 'Error deleting request',
+        variant: 'destructive',
+      })
     } finally {
       setActionLoading(null)
     }
@@ -238,7 +281,7 @@ export function TournamentRequests() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Filters */}
-          <div className="flex gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="relative flex-1">
               <Search 
                 className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none z-10" 
@@ -252,7 +295,7 @@ export function TournamentRequests() {
               />
             </div>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'all' | 'PENDING' | 'APPROVED' | 'REJECTED')}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -519,4 +562,3 @@ export function TournamentRequests() {
     </div>
   )
 }
-

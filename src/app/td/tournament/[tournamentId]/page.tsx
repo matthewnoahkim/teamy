@@ -141,7 +141,7 @@ export default async function TournamentManagePage({ params }: Props) {
     // For single division tournaments
     events = await prisma.event.findMany({
       where: {
-        division: tournament.division,
+        division: displayDivision === 'B' ? 'B' : 'C',
         ...(eventsRunIds.length > 0 && { id: { in: eventsRunIds } }),
       },
       select: {
@@ -207,4 +207,3 @@ export default async function TournamentManagePage({ params }: Props) {
     />
   )
 }
-

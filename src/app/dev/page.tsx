@@ -13,6 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import {
   Dialog,
@@ -165,6 +172,11 @@ export default function DevPage() {
               </div>
 
               <div className="space-y-4">
+                {status === 'authenticated' && session?.user?.email && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Signed in as {session.user.email}
+                  </p>
+                )}
                 {status === 'loading' || isVerifying ? (
                   <Button 
                     type="button" 
@@ -172,6 +184,15 @@ export default function DevPage() {
                     disabled
                   >
                     Verifying access...
+                  </Button>
+                ) : status === 'authenticated' ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12"
+                    onClick={() => signOut({ callbackUrl: '/dev' })}
+                  >
+                    Use a Different Account
                   </Button>
                 ) : (
                   <SignInButton callbackUrl="/dev" />
@@ -209,6 +230,8 @@ export default function DevPage() {
   }
 
   // Main dev panel with sidebar (club page style)
+  const activeNavItem = navItems.find((item) => item.id === activeSection)
+
   return (
     <div className="min-h-screen bg-background text-foreground grid-pattern">
       {/* Header */}
@@ -293,9 +316,26 @@ export default function DevPage() {
 
           {/* Main Content */}
           <div className="flex-1 min-w-0 md:pl-0 flex flex-col min-h-0">
-          <div className="mb-6">
+          <div className="mb-6 space-y-3">
+            <div className="md:hidden">
+              <Select
+                value={activeSection}
+                onValueChange={(value) => setActiveSection(value as Section)}
+              >
+                <SelectTrigger className="w-full max-w-xs">
+                  <SelectValue placeholder="Select a section" />
+                </SelectTrigger>
+                <SelectContent>
+                  {navItems.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <h1 className="text-2xl font-bold">
-              {navItems.find(item => item.id === activeSection)?.label}
+              {activeNavItem?.label ?? 'Dev Panel'}
             </h1>
           </div>
 
