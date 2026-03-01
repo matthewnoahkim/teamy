@@ -3,24 +3,39 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
 const LEGACY_FALLBACK_KEY = 'default-key-please-change-in-production-32-chars!!'
-const ENCRYPTION_KEY =
-  process.env.INVITE_CODE_ENCRYPTION_KEY || LEGACY_FALLBACK_KEY
 const LEGACY_ALGORITHM = 'aes-256-cbc'
 const V2_ALGORITHM = 'aes-256-gcm'
-const LEGACY_DERIVED_ENCRYPTION_KEY = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+let warnedAboutFallbackKey = false
 
-if (process.env.NODE_ENV === 'production') {
-  if (!process.env.INVITE_CODE_ENCRYPTION_KEY) {
-    throw new Error(
-      'CRITICAL: INVITE_CODE_ENCRYPTION_KEY must be set in production. Refusing to use insecure default key.'
+function resolveEncryptionKey(): string {
+  const configured = process.env.INVITE_CODE_ENCRYPTION_KEY?.trim()
+  if (configured && configured.length >= 32) {
+    return configured
+  }
+
+  const nextAuthSecret = process.env.NEXTAUTH_SECRET?.trim()
+  if (nextAuthSecret && nextAuthSecret.length >= 32) {
+    if (process.env.NODE_ENV === 'production' && !warnedAboutFallbackKey) {
+      warnedAboutFallbackKey = true
+      console.warn(
+        'INVITE_CODE_ENCRYPTION_KEY is missing/weak; falling back to NEXTAUTH_SECRET for invite-code encryption.'
+      )
+    }
+    return nextAuthSecret
+  }
+
+  if (process.env.NODE_ENV === 'production' && !warnedAboutFallbackKey) {
+    warnedAboutFallbackKey = true
+    console.warn(
+      'INVITE_CODE_ENCRYPTION_KEY and NEXTAUTH_SECRET are missing/weak; using legacy fallback key. Set INVITE_CODE_ENCRYPTION_KEY immediately.'
     )
   }
-  if (process.env.INVITE_CODE_ENCRYPTION_KEY.length < 32) {
-    throw new Error(
-      'CRITICAL: INVITE_CODE_ENCRYPTION_KEY must be at least 32 characters in production.'
-    )
-  }
+
+  return LEGACY_FALLBACK_KEY
 }
+
+const ENCRYPTION_KEY = resolveEncryptionKey()
+const LEGACY_DERIVED_ENCRYPTION_KEY = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
 
 function deriveEncryptionKey(salt: Buffer): Buffer {
   return crypto.scryptSync(ENCRYPTION_KEY, salt, 32)
