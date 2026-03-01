@@ -5,15 +5,7 @@ import { withRateLimit } from '@/lib/rate-limit-api'
 import { tournamentRequestSchema, validateRequestBody } from '@/lib/validation-schemas'
 import { getValidatedWebhook, EMAIL_CONFIG } from '@/lib/security-config'
 import { requireDevAccess } from '@/lib/dev/guard'
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
+import { escapeHtml, renderTeamyEmailLayout } from '@/lib/email'
 
 /**
  * Tournament Hosting Request API Endpoint
@@ -168,97 +160,87 @@ async function handlePOST(request: NextRequest) {
     try {
       if (resend && EMAIL_CONFIG.RESEND_API_KEY) {
         const baseUrl = process.env.NEXTAUTH_URL || 'https://teamy.site'
-        
+        const formatLabel =
+          data.tournamentFormat === 'in-person'
+            ? 'In-Person'
+            : data.tournamentFormat === 'satellite'
+            ? 'Satellite'
+            : 'Mini SO'
+        const levelLabel = data.tournamentLevel.charAt(0).toUpperCase() + data.tournamentLevel.slice(1)
+
+        const bodyHtml = `
+          <p style="margin:0 0 14px 0; color:#c6d5ee; font-size:15px; line-height:1.65;">
+            Hi ${escapeHtml(data.directorName)},
+          </p>
+          <p style="margin:0 0 14px 0; color:#c6d5ee; font-size:15px; line-height:1.65;">
+            We received your request to host <strong style="color:#f3f7ff;">${escapeHtml(data.tournamentName)}</strong>. Your request is now in review.
+          </p>
+          <div style="background:#0f244a; border:1px solid #2e5ba4; border-radius:12px; padding:12px 14px; margin:0 0 18px 0;">
+            <p style="margin:0; color:#d9e6ff; font-size:13px; line-height:1.5;">
+              Typical review time is 2-3 business days. We will email you when your request is approved or if we need more details.
+            </p>
+          </div>
+          <div style="background:#091329; border:1px solid #244a88; border-radius:12px; padding:14px 16px;">
+            <p style="margin:0 0 8px 0; color:#f3f7ff; font-size:14px; font-weight:700;">Request details</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
+              <tr>
+                <td style="padding:5px 0; color:#9bb0d1; font-size:13px; width:148px;">Tournament</td>
+                <td style="padding:5px 0; color:#c6d5ee; font-size:13px;">${escapeHtml(data.tournamentName)}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0; color:#9bb0d1; font-size:13px;">Level</td>
+                <td style="padding:5px 0; color:#c6d5ee; font-size:13px;">${escapeHtml(levelLabel)}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0; color:#9bb0d1; font-size:13px;">Division</td>
+                <td style="padding:5px 0; color:#c6d5ee; font-size:13px;">Division ${escapeHtml(data.division)}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0; color:#9bb0d1; font-size:13px;">Format</td>
+                <td style="padding:5px 0; color:#c6d5ee; font-size:13px;">${escapeHtml(formatLabel)}</td>
+              </tr>
+              ${data.location ? `
+              <tr>
+                <td style="padding:5px 0; color:#9bb0d1; font-size:13px;">Location</td>
+                <td style="padding:5px 0; color:#c6d5ee; font-size:13px;">${escapeHtml(data.location)}</td>
+              </tr>
+              ` : ''}
+              ${data.preferredSlug ? `
+              <tr>
+                <td style="padding:5px 0; color:#9bb0d1; font-size:13px;">Preferred URL</td>
+                <td style="padding:5px 0; color:#c6d5ee; font-size:13px;">teamy.site/tournaments/${escapeHtml(data.preferredSlug)}</td>
+              </tr>
+              ` : ''}
+            </table>
+          </div>
+          <p style="margin:16px 0 0 0; color:#9bb0d1; font-size:13px; line-height:1.6;">
+            Questions? Reply to this email or contact
+            <a href="mailto:teamysite@gmail.com" style="color:#8ec5ff;">teamysite@gmail.com</a>.
+          </p>
+        `
+
+        const actionUrl = `${baseUrl}/td`
+        const html = renderTeamyEmailLayout({
+          preheader: `Tournament hosting request received for ${data.tournamentName}`,
+          label: 'Tournament Request',
+          title: 'Request Received',
+          subtitle: `We received your ${data.tournamentName} submission`,
+          bodyHtml,
+          actionLabel: 'Open TD Portal',
+          actionUrl,
+          actionHintHtml: `
+            <p style="margin:14px 0 0 0; color:#9bb0d1; font-size:12px; line-height:1.6; text-align:center;">
+              Sign in with <strong style="color:#c6d5ee;">${escapeHtml(data.directorEmail)}</strong> to track your request.
+            </p>
+          `,
+          footerText: 'Teamy • Science Olympiad Tournament Management Platform',
+        })
+
         await resend.emails.send({
           from: EMAIL_CONFIG.FROM_EMAIL,
           to: [data.directorEmail],
           subject: `Tournament Hosting Request Received - ${data.tournamentName}`,
-          html: `
-            <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <div style="text-align: center; margin-bottom: 32px;">
-                <h1 style="color: #0056C7; margin: 0;">Teamy</h1>
-                <p style="color: #6b7280; margin-top: 4px;">Tournament Management Platform</p>
-              </div>
-              
-              <h2 style="color: #1f2937; margin-top: 0;">Tournament Hosting Request Received</h2>
-              
-              <p style="color: #374151; line-height: 1.6;">
-                Hi ${escapeHtml(data.directorName)},
-              </p>
-              
-              <p style="color: #374151; line-height: 1.6;">
-                Thank you for your interest in hosting <strong>${escapeHtml(data.tournamentName)}</strong> on Teamy! 
-                We have received your tournament hosting request and it is currently <strong>pending approval</strong>.
-              </p>
-              
-              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 24px 0; border-radius: 4px;">
-                <p style="color: #92400e; margin: 0; font-weight: 500;">
-                  ⏳ Your request is pending review
-                </p>
-                <p style="color: #92400e; margin: 8px 0 0 0; font-size: 14px;">
-                  Our team will review your submission and get back to you within 2-3 business days.
-                </p>
-              </div>
-
-              <div style="text-align: center; padding: 24px; background-color: #eff6ff; border-radius: 8px; margin: 24px 0;">
-                <p style="color: #0056C7; font-weight: 500; margin: 0 0 12px 0;">
-                  Track your request status anytime
-                </p>
-                <a href="${baseUrl}/td" style="display: inline-block; background-color: #0056C7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">
-                  Visit TD Portal
-                </a>
-                <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0;">
-                  Sign in with this email (${data.directorEmail}) to view your request status.
-                </p>
-              </div>
-              
-              <h3 style="color: #1f2937; margin-top: 32px;">Request Details</h3>
-              <div style="background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse;">
-                  <tr>
-                    <td style="padding: 8px 0; color: #6b7280; width: 140px;">Tournament Name:</td>
-                    <td style="padding: 8px 0; color: #1f2937; font-weight: 500;">${escapeHtml(data.tournamentName)}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 8px 0; color: #6b7280;">Level:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">${escapeHtml(data.tournamentLevel.charAt(0).toUpperCase() + data.tournamentLevel.slice(1))}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 8px 0; color: #6b7280;">Division:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">Division ${data.division}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 8px 0; color: #6b7280;">Format:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">${data.tournamentFormat === 'in-person' ? 'In-Person' : data.tournamentFormat === 'satellite' ? 'Satellite' : 'Mini SO'}</td>
-                  </tr>
-                  ${data.location ? `
-                  <tr>
-                    <td style="padding: 8px 0; color: #6b7280;">Location:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">${escapeHtml(data.location)}</td>
-                  </tr>
-                  ` : ''}
-                  ${data.preferredSlug ? `
-                  <tr>
-                    <td style="padding: 8px 0; color: #6b7280;">Preferred URL:</td>
-                    <td style="padding: 8px 0; color: #1f2937;">teamy.site/tournaments/${escapeHtml(data.preferredSlug)}</td>
-                  </tr>
-                  ` : ''}
-                </table>
-              </div>
-              
-              <p style="color: #374151; line-height: 1.6;">
-                If you have any questions in the meantime, feel free to reply to this email or contact us at 
-                <a href="mailto:teamysite@gmail.com" style="color: #0056C7;">teamysite@gmail.com</a>.
-              </p>
-              
-              <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;" />
-              
-              <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-                Teamy • Science Olympiad Tournament Management Platform<br/>
-                <a href="${baseUrl}" style="color: #6b7280;">teamy.site</a>
-              </p>
-            </div>
-          `,
+          html,
         })
         console.log('Confirmation email sent to:', data.directorEmail)
       }
@@ -341,4 +323,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

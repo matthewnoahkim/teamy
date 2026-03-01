@@ -3,10 +3,37 @@ import { Resend } from 'resend'
 const resendApiKey = process.env.RESEND_API_KEY
 const resend = resendApiKey ? new Resend(resendApiKey) : null
 
+const EMAIL_THEME = {
+  background: '#08122b',
+  card: '#0f1d3d',
+  cardBorder: '#223f74',
+  title: '#f5f8ff',
+  body: '#d3def2',
+  muted: '#a7b8d8',
+  primary: '#0056C7',
+  primaryDark: '#00469f',
+  accentSoft: '#13284f',
+  accentBorder: '#335a98',
+  positiveSoft: '#12324a',
+  positiveBorder: '#2f6d91',
+} as const
+
+export interface TeamyEmailLayoutParams {
+  preheader: string
+  label: string
+  title: string
+  subtitle?: string
+  bodyHtml: string
+  actionLabel?: string
+  actionUrl?: string
+  actionHintHtml?: string
+  footerText?: string
+}
+
 /**
- * Escape HTML special characters to prevent XSS/injection in email templates
+ * Escape HTML special characters to prevent XSS/injection in email templates.
  */
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -15,29 +42,131 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;')
 }
 
+function escapeHtmlWithLineBreaks(str: string): string {
+  return escapeHtml(str).replace(/\r?\n/g, '<br />')
+}
+
 /**
  * Get the base URL for the app.
  * Uses NEXTAUTH_URL if set, otherwise VERCEL_URL for production, or localhost for development.
  */
 function getBaseUrl(): string {
-  // First priority: explicitly set NEXTAUTH_URL
-  if (process.env.NEXTAUTH_URL) {
-    return process.env.NEXTAUTH_URL
-  }
-  // Second priority: Vercel deployment URL (automatically set by Vercel)
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-  // Third priority: custom APP_URL env var
-  if (process.env.APP_URL) {
-    return process.env.APP_URL
-  }
-  // Production fallback
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://teamy.site'
-  }
-  // Development fallback
+  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  if (process.env.APP_URL) return process.env.APP_URL
+  if (process.env.NODE_ENV === 'production') return 'https://teamy.site'
   return 'http://localhost:3000'
+}
+
+/**
+ * Shared Teamy email wrapper so all notification emails stay visually consistent.
+ */
+export function renderTeamyEmailLayout({
+  preheader,
+  label,
+  title,
+  subtitle,
+  bodyHtml,
+  actionLabel,
+  actionUrl,
+  actionHintHtml,
+  footerText,
+}: TeamyEmailLayoutParams): string {
+  const safePreheader = escapeHtml(preheader)
+  const safeLabel = escapeHtml(label)
+  const safeTitle = escapeHtml(title)
+  const safeSubtitle = subtitle ? escapeHtml(subtitle) : null
+  const safeActionLabel = actionLabel ? escapeHtml(actionLabel) : null
+  const safeActionUrl = actionUrl ? escapeHtml(actionUrl) : null
+  const footer = escapeHtml(footerText ?? 'Teamy • Science Olympiad Management Platform')
+
+  const actionBlock =
+    safeActionLabel && safeActionUrl
+      ? `
+        <div style="text-align:center; margin: 24px 0 8px 0;">
+          <a href="${safeActionUrl}" style="display:inline-block; background:${EMAIL_THEME.primary}; color:#ffffff; text-decoration:none; font-weight:700; font-size:14px; padding:11px 22px; border-radius:8px; border:1px solid ${EMAIL_THEME.primaryDark};">
+            ${safeActionLabel}
+          </a>
+        </div>
+      `
+      : ''
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${safeTitle}</title>
+</head>
+<body style="margin:0; padding:0; background-color:${EMAIL_THEME.background};">
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">${safePreheader}</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px; border-collapse:separate; border-spacing:0; border:1px solid ${EMAIL_THEME.cardBorder}; border-radius:14px; overflow:hidden; background:${EMAIL_THEME.card};">
+          <tr>
+            <td style="padding:0;">
+              <div style="height:4px; width:100%; background:${EMAIL_THEME.primary};"></div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 22px 0 22px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td valign="middle" style="width:44px;">
+                    <div style="height:32px; width:32px; border-radius:8px; background:${EMAIL_THEME.primary}; color:#ffffff; font-weight:700; font-size:14px; line-height:32px; text-align:center;">T</div>
+                  </td>
+                  <td valign="middle">
+                    <p style="margin:0; color:${EMAIL_THEME.title}; font-size:18px; font-weight:700; letter-spacing:0.1px;">Teamy</p>
+                    <p style="margin:2px 0 0 0; color:${EMAIL_THEME.muted}; font-size:11px;">Science Olympiad workspace</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 22px 0 22px;">
+              <div style="display:inline-block; border:1px solid ${EMAIL_THEME.accentBorder}; background:${EMAIL_THEME.accentSoft}; color:${EMAIL_THEME.muted}; font-size:10px; text-transform:uppercase; letter-spacing:0.6px; font-weight:700; border-radius:999px; padding:5px 9px;">
+                ${safeLabel}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:12px 22px 0 22px;">
+              <h1 style="margin:0; color:${EMAIL_THEME.title}; font-size:24px; line-height:1.28; font-weight:700;">${safeTitle}</h1>
+              ${
+                safeSubtitle
+                  ? `<p style="margin:8px 0 0 0; color:${EMAIL_THEME.muted}; font-size:13px; line-height:1.5;">${safeSubtitle}</p>`
+                  : ''
+              }
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 22px 0 22px;">
+              ${bodyHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 22px 0 22px;">
+              ${actionBlock}
+              ${actionHintHtml ?? ''}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 22px 22px 22px;">
+              <div style="border-top:1px solid ${EMAIL_THEME.cardBorder}; padding-top:12px; text-align:center; color:${EMAIL_THEME.muted}; font-size:12px; line-height:1.5;">
+                ${footer}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
 }
 
 export interface StaffInviteEmailParams {
@@ -47,11 +176,11 @@ export interface StaffInviteEmailParams {
   role: 'EVENT_SUPERVISOR' | 'TOURNAMENT_DIRECTOR'
   inviteToken: string
   inviterName: string
-  events?: string[] // Event names for ES
+  events?: string[]
 }
 
 /**
- * Send staff invitation email (ES or TD)
+ * Send staff invitation email (ES or TD).
  */
 export async function sendStaffInviteEmail({
   to,
@@ -69,72 +198,69 @@ export async function sendStaffInviteEmail({
     }
 
     const baseUrl = getBaseUrl()
-    const portalUrl = role === 'EVENT_SUPERVISOR' 
-      ? `${baseUrl}/es?token=${inviteToken}`
-      : `${baseUrl}/td?token=${inviteToken}`
+    const portalUrl =
+      role === 'EVENT_SUPERVISOR'
+        ? `${baseUrl}/es?token=${inviteToken}`
+        : `${baseUrl}/td?token=${inviteToken}`
 
     const roleLabel = role === 'EVENT_SUPERVISOR' ? 'Event Supervisor' : 'Tournament Director'
     const greeting = staffName ? `Hi ${escapeHtml(staffName)},` : 'Hello,'
 
-    const eventsSection = events.length > 0 ? `
-      <div style="background-color: #f3f4f6; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0; border-radius: 4px;">
-        <h3 style="color: #1f2937; font-size: 14px; margin-top: 0; margin-bottom: 8px;">Assigned Events:</h3>
-        <ul style="color: #374151; font-size: 14px; margin: 0; padding-left: 20px;">
-          ${events.map(e => `<li style="margin: 4px 0;">${escapeHtml(e)}</li>`).join('')}
-        </ul>
-      </div>
-    ` : ''
+    const eventsSection =
+      events.length > 0
+        ? `
+          <div style="background:${EMAIL_THEME.positiveSoft}; border:1px solid ${EMAIL_THEME.positiveBorder}; border-radius:12px; padding:14px 16px; margin:0 0 18px 0;">
+            <p style="margin:0 0 8px 0; color:${EMAIL_THEME.title}; font-size:14px; font-weight:700;">Assigned events</p>
+            <ul style="margin:0; padding-left:18px; color:${EMAIL_THEME.body}; font-size:14px; line-height:1.7;">
+              ${events.map(eventName => `<li>${escapeHtml(eventName)}</li>`).join('')}
+            </ul>
+          </div>
+        `
+        : ''
 
-    console.log('Sending staff invite email via Resend:', {
-      to,
-      role,
-      tournamentName,
+    const bodyHtml = `
+      <p style="margin:0 0 14px 0; color:${EMAIL_THEME.body}; font-size:15px; line-height:1.7;">${greeting}</p>
+      <p style="margin:0 0 14px 0; color:${EMAIL_THEME.body}; font-size:15px; line-height:1.7;">
+        <strong style="color:${EMAIL_THEME.title};">${escapeHtml(inviterName)}</strong> invited you to join
+        <strong style="color:${EMAIL_THEME.title};">${escapeHtml(tournamentName)}</strong> as a
+        <strong style="color:${EMAIL_THEME.title};">${escapeHtml(roleLabel)}</strong>.
+      </p>
+      ${eventsSection}
+      <p style="margin:0; color:${EMAIL_THEME.body}; font-size:15px; line-height:1.7;">
+        ${
+          role === 'EVENT_SUPERVISOR'
+            ? "You will be able to create and manage tests for your assigned events in Teamy's event supervisor portal."
+            : "You will have full tournament administration access, including staff invites, event oversight, and tournament operations."
+        }
+      </p>
+    `
+
+    const actionHintHtml = `
+      <p style="margin:14px 0 0 0; color:${EMAIL_THEME.muted}; font-size:12px; line-height:1.6; text-align:center;">
+        If the button does not work, copy this link:<br />
+        <a href="${escapeHtml(portalUrl)}" style="color:#8ec5ff; word-break:break-all;">${escapeHtml(portalUrl)}</a>
+      </p>
+    `
+
+    const html = renderTeamyEmailLayout({
+      preheader: `${roleLabel} invite for ${tournamentName}`,
+      label: 'Tournament Invitation',
+      title: `${roleLabel} Invitation`,
+      subtitle: `Join ${tournamentName} on Teamy`,
+      bodyHtml,
+      actionLabel: 'Accept Invitation',
+      actionUrl: portalUrl,
+      actionHintHtml,
+      footerText: 'Teamy • Science Olympiad Tournament Management',
     })
+
+    console.log('Sending staff invite email via Resend:', { to, role, tournamentName })
 
     const { data, error } = await resend.emails.send({
       from: 'Teamy <no-reply@teamy.site>',
       to,
-      subject: `You've been invited as ${roleLabel} for ${tournamentName}`,
-      html: `
-        <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-top: 0;">
-            ${escapeHtml(roleLabel)} Invitation
-          </h1>
-          
-          <p style="color: #374151; font-size: 16px; line-height: 1.6;">
-            ${greeting}
-          </p>
-          
-          <p style="color: #374151; font-size: 16px; line-height: 1.6;">
-            <strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${escapeHtml(tournamentName)}</strong> as a ${escapeHtml(roleLabel)}.
-          </p>
-          
-          ${eventsSection}
-          
-          <p style="color: #374151; font-size: 16px; line-height: 1.6;">
-            ${role === 'EVENT_SUPERVISOR' 
-              ? 'As an Event Supervisor, you\'ll be able to create and manage tests for your assigned events using our built-in test editor.' 
-              : 'As a Tournament Director, you\'ll have full access to manage the tournament, invite staff, and oversee all operations.'}
-          </p>
-          
-          <div style="text-align: center; padding: 24px 0;">
-            <a href="${portalUrl}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-              Accept Invitation & Sign In
-            </a>
-          </div>
-          
-          <p style="color: #6b7280; font-size: 14px; text-align: center;">
-            Or copy and paste this link into your browser:<br/>
-            <a href="${portalUrl}" style="color: #3b82f6; word-break: break-all;">${portalUrl}</a>
-          </p>
-          
-          <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;" />
-          
-          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
-            Teamy • Science Olympiad Tournament Management
-          </p>
-        </div>
-      `,
+      subject: `You're invited as ${roleLabel} for ${tournamentName}`,
+      html,
     })
 
     if (error) {
@@ -172,16 +298,18 @@ export interface SendAnnouncementEmailParams {
 }
 
 /**
- * Format event time for email display
+ * Format event time for email display.
  */
 function formatEventTimeForEmail(startUTC: Date, endUTC: Date): string {
   const startDate = new Date(startUTC)
   const endDate = new Date(endUTC)
-  
-  // Check if it's an all-day event
-  const isAllDay = startDate.getHours() === 0 && startDate.getMinutes() === 0 && 
-                   endDate.getHours() === 23 && endDate.getMinutes() === 59
-  
+
+  const isAllDay =
+    startDate.getHours() === 0 &&
+    startDate.getMinutes() === 0 &&
+    endDate.getHours() === 23 &&
+    endDate.getMinutes() === 59
+
   if (isAllDay) {
     if (startDate.toDateString() === endDate.toDateString()) {
       return startDate.toLocaleDateString('en-US', {
@@ -190,41 +318,41 @@ function formatEventTimeForEmail(startUTC: Date, endUTC: Date): string {
         month: 'long',
         day: 'numeric',
       })
-    } else {
-      const startDay = startDate.getDate()
-      const endDay = endDate.getDate()
-      const startMonth = startDate.toLocaleDateString('en-US', { month: 'long' })
-      const endMonth = endDate.toLocaleDateString('en-US', { month: 'long' })
-      const startYear = startDate.getFullYear()
-      const endYear = endDate.getFullYear()
-      
-      if (startMonth === endMonth && startYear === endYear) {
-        return `${startMonth} ${startDay}-${endDay}, ${startYear}`
-      } else if (startYear === endYear) {
-        return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${startYear}`
-      } else {
-        return `${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`
-      }
     }
-  } else {
-    return `${startDate.toLocaleString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })} - ${endDate.toLocaleString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })}`
+
+    const startDay = startDate.getDate()
+    const endDay = endDate.getDate()
+    const startMonth = startDate.toLocaleDateString('en-US', { month: 'long' })
+    const endMonth = endDate.toLocaleDateString('en-US', { month: 'long' })
+    const startYear = startDate.getFullYear()
+    const endYear = endDate.getFullYear()
+
+    if (startMonth === endMonth && startYear === endYear) {
+      return `${startMonth} ${startDay}-${endDay}, ${startYear}`
+    }
+    if (startYear === endYear) {
+      return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${startYear}`
+    }
+    return `${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`
   }
+
+  return `${startDate.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })} - ${endDate.toLocaleString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })}`
 }
 
 /**
- * Send announcement email to users
+ * Send announcement email to users.
  */
 export async function sendAnnouncementEmail({
   to,
@@ -239,43 +367,65 @@ export async function sendAnnouncementEmail({
   calendarEvent,
 }: SendAnnouncementEmailParams): Promise<{ messageId: string | null }> {
   try {
-    // Validate we have the API key
     if (!resend) {
       console.error('RESEND_API_KEY is not configured')
       return { messageId: null }
     }
 
-    // Validate we have at least one recipient
     if (!to || to.length === 0) {
       console.error('No primary recipients provided')
       return { messageId: null }
     }
 
-    // Build the club stream URL
     const baseUrl = getBaseUrl()
     const clubStreamUrl = `${baseUrl}/club/${clubId}?tab=stream`
 
-    // Build event details section if this is an event announcement
     let eventDetailsHtml = ''
     if (calendarEvent) {
       const formattedTime = formatEventTimeForEmail(calendarEvent.startUTC, calendarEvent.endUTC)
       eventDetailsHtml = `
-        <div style="background-color: #f3f4f6; border-left: 4px solid #3b82f6; padding: 16px; margin-bottom: 24px; border-radius: 4px;">
-          <h2 style="color: #1f2937; font-size: 16px; margin-top: 0; margin-bottom: 12px;">📅 Event Details</h2>
-          <div style="color: #374151; font-size: 14px; line-height: 1.8;">
-            <p style="margin: 8px 0;"><strong>When:</strong> ${escapeHtml(formattedTime)}</p>
-            ${calendarEvent.location ? `<p style="margin: 8px 0;"><strong>Where:</strong> ${escapeHtml(calendarEvent.location)}</p>` : ''}
-          </div>
-          ${calendarEvent.rsvpEnabled ? `
-          <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #d1d5db;">
-            <p style="color: #6b7280; font-size: 13px; margin: 0;">
-              💬 <strong>Please RSVP on the club stream</strong> to let us know if you're coming!
-            </p>
-          </div>
-          ` : ''}
+        <div style="background:${EMAIL_THEME.accentSoft}; border:1px solid ${EMAIL_THEME.accentBorder}; border-radius:12px; padding:14px 16px; margin:0 0 18px 0;">
+          <p style="margin:0 0 10px 0; color:${EMAIL_THEME.title}; font-size:14px; font-weight:700;">Event details</p>
+          <p style="margin:0 0 6px 0; color:${EMAIL_THEME.body}; font-size:14px; line-height:1.6;"><strong style="color:${EMAIL_THEME.title};">When:</strong> ${escapeHtml(formattedTime)}</p>
+          ${calendarEvent.location ? `<p style="margin:0; color:${EMAIL_THEME.body}; font-size:14px; line-height:1.6;"><strong style="color:${EMAIL_THEME.title};">Where:</strong> ${escapeHtml(calendarEvent.location)}</p>` : ''}
+          ${
+            calendarEvent.rsvpEnabled
+              ? `<p style="margin:10px 0 0 0; color:${EMAIL_THEME.muted}; font-size:13px; line-height:1.5;">RSVP is enabled. Respond from the club stream.</p>`
+              : ''
+          }
         </div>
       `
     }
+
+    const safeContent = escapeHtmlWithLineBreaks(content)
+    const bodyHtml = `
+      <p style="margin:0 0 12px 0; color:${EMAIL_THEME.body}; font-size:15px; line-height:1.65;">
+        New post in <strong style="color:${EMAIL_THEME.title};">${escapeHtml(clubName)}</strong>.
+      </p>
+      ${eventDetailsHtml}
+      <div style="margin:0; padding:14px 16px; background:#091329; border:1px solid ${EMAIL_THEME.cardBorder}; border-radius:12px; color:${EMAIL_THEME.body}; font-size:14px; line-height:1.72; word-break:break-word;">
+        ${safeContent}
+      </div>
+    `
+
+    const actionHintHtml = `
+      <p style="margin:14px 0 0 0; color:${EMAIL_THEME.muted}; font-size:12px; line-height:1.6; text-align:center;">
+        Open in Teamy:<br />
+        <a href="${escapeHtml(clubStreamUrl)}" style="color:#8ec5ff; word-break:break-all;">${escapeHtml(clubStreamUrl)}</a>
+      </p>
+    `
+
+    const html = renderTeamyEmailLayout({
+      preheader: `New announcement in ${clubName}: ${title}`,
+      label: 'Club Announcement',
+      title,
+      subtitle: `Posted in ${clubName}`,
+      bodyHtml,
+      actionLabel: 'Open Club Stream',
+      actionUrl: clubStreamUrl,
+      actionHintHtml,
+      footerText: 'Teamy • Club Management Platform',
+    })
 
     console.log('Sending email via Resend:', {
       to: to.length,
@@ -289,39 +439,9 @@ export async function sendAnnouncementEmail({
       to,
       cc,
       bcc,
-      replyTo: replyTo,
+      replyTo,
       subject: `[${clubName}] ${title}`,
-      html: `
-        <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-top: 0;">
-            ${escapeHtml(title)}
-          </h1>
-          <p style="color: #6b7280; font-size: 14px; margin-bottom: 24px;">
-            Posted in <strong>${escapeHtml(clubName)}</strong>
-          </p>
-          
-          ${eventDetailsHtml}
-          
-          <div style="color: #374151; line-height: 1.6; white-space: pre-wrap; margin-bottom: 32px;">
-            ${escapeHtml(content)}
-          </div>
-          
-          <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;" />
-          
-          <div style="text-align: center; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
-            <p style="color: #6b7280; font-size: 14px; margin: 0 0 12px 0;">
-              View and respond to this announcement on your club stream
-            </p>
-            <a href="${clubStreamUrl}" style="display: inline-block; background-color: #3b82f6; color: white; padding: 10px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">
-              Go to Club Stream
-            </a>
-          </div>
-          
-          <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 20px;">
-            Teamy • Club Management Platform
-          </p>
-        </div>
-      `,
+      html,
     })
 
     if (error) {

@@ -73,11 +73,13 @@ export default async function TDPortalPage() {
     [key: string]: unknown
   }> = []
 
-  // Add hosting requests
+  // Add all hosting requests so users can access TD portal immediately
+  // after submitting (even before a tournament record exists).
   for (const request of requests) {
-    if (request.tournament && !tournamentIds.has(request.tournament.id)) {
+    allAccess.push(request)
+
+    if (request.tournament) {
       tournamentIds.add(request.tournament.id)
-      allAccess.push(request)
     }
   }
 
@@ -127,4 +129,3 @@ export default async function TDPortalPage() {
 
   return <TDPortalClient user={session.user} requests={serializedRequests as unknown as TournamentRequest[]} />
 }
-

@@ -158,6 +158,16 @@ const TAB_DETAILS = {
 } satisfies Record<string, { title: string; description: string }>
 
 type ClubTab = keyof typeof TAB_DETAILS
+const NOTIFICATION_TABS = ['stream', 'calendar', 'attendance', 'finance', 'tests', 'people'] as const
+type NotificationTab = (typeof NOTIFICATION_TABS)[number]
+const NOTIFICATION_TAB_SET = new Set<string>(NOTIFICATION_TABS)
+const NOTIFICATION_SYNC_CHANNEL = 'club-notification-seen-sync'
+
+function parseTimestamp(raw: string | null | undefined): Date | null {
+  if (!raw) return null
+  const parsed = new Date(raw)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
 
 function isClubTab(tab: string): tab is ClubTab {
   return tab in TAB_DETAILS
@@ -182,6 +192,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   const [totalUnreadCount, setTotalUnreadCount] = useState(0)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [personalBackground, setPersonalBackground] = useState(currentMembership.preferences ?? null)
+  const notificationSyncChannelRef = useRef<BroadcastChannel | null>(null)
   const DEFAULT_BACKGROUND = {
     backgroundType: 'grid',
     backgroundColor: '#f8fafc',
@@ -192,10 +203,60 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     backgroundImageUrl: null as string | null,
   }
 
-  const persistTabSeenTime = useCallback((tab: string) => {
-    if (typeof window === 'undefined') return
-    const key = `lastCleared_${club.id}_${tab}_${user.id}`
-    localStorage.setItem(key, new Date().toISOString())
+  const isNotificationTab = useCallback((tab: string): tab is NotificationTab => {
+    return NOTIFICATION_TAB_SET.has(tab)
+  }, [])
+
+  const getTabSeenStorageKey = useCallback((tab: string) => {
+    return `lastCleared_${club.id}_${tab}_${user.id}`
+  }, [club.id, user.id])
+
+  const markTabNotificationSeen = useCallback((tab: string) => {
+    setTabNotifications(prev => {
+      if (!prev[tab]) return prev
+      const updated = { ...prev, [tab]: false }
+      const totalCount = Object.values(updated).filter(Boolean).length
+      setTotalUnreadCount(totalCount)
+      return updated
+    })
+  }, [])
+
+  const persistTabSeenTime = useCallback((tab: string, seenAt?: Date): string | null => {
+    if (typeof window === 'undefined') return null
+    const key = getTabSeenStorageKey(tab)
+    const timestamp = (seenAt ?? new Date()).toISOString()
+    const previousSeenAt = parseTimestamp(localStorage.getItem(key))
+    const nextSeenAt = parseTimestamp(timestamp)
+
+    if (!nextSeenAt) return null
+    if (!previousSeenAt || nextSeenAt.getTime() > previousSeenAt.getTime()) {
+      localStorage.setItem(key, timestamp)
+    }
+
+    return timestamp
+  }, [getTabSeenStorageKey])
+
+  const syncSeenTimestampToServer = useCallback(async (tab: NotificationTab, seenAt: string) => {
+    try {
+      await fetch(`/api/clubs/${club.id}/notifications/seen`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tab, seenAt }),
+        keepalive: true,
+      })
+    } catch (error) {
+      console.error('Failed to sync notification seen timestamp:', error)
+    }
+  }, [club.id])
+
+  const broadcastTabSeen = useCallback((tab: NotificationTab, seenAt: string) => {
+    notificationSyncChannelRef.current?.postMessage({
+      type: 'tab-seen',
+      tab,
+      seenAt,
+      clubId: club.id,
+      userId: user.id,
+    })
   }, [club.id, user.id])
 
   // Save current club as last visited
@@ -215,7 +276,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   // Get last cleared time for a tab from localStorage
   const getLastClearedTime = useCallback((tab: string): Date => {
     if (typeof window === 'undefined') return new Date(0)
-    const key = `lastCleared_${club.id}_${tab}_${user.id}`
+    const key = getTabSeenStorageKey(tab)
     const stored = localStorage.getItem(key)
     if (stored) {
       return new Date(stored)
@@ -224,28 +285,45 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     // New members should not inherit historical club activity as unread.
     const membershipCreatedAt = new Date(currentMembership.createdAt)
     return Number.isNaN(membershipCreatedAt.getTime()) ? new Date(0) : membershipCreatedAt
-  }, [club.id, user.id, currentMembership.createdAt])
+  }, [getTabSeenStorageKey, currentMembership.createdAt])
 
   // Clear notification for a tab when it's opened
   const clearTabNotification = useCallback((tab: string) => {
-    persistTabSeenTime(tab)
-    setTabNotifications(prev => {
-      const updated = { ...prev, [tab]: false }
-      const totalCount = Object.values(updated).filter(Boolean).length
-      setTotalUnreadCount(totalCount)
-      return updated
-    })
-  }, [persistTabSeenTime])
+    const seenAt = persistTabSeenTime(tab)
+    markTabNotificationSeen(tab)
+
+    if (!seenAt || !isNotificationTab(tab)) return
+    broadcastTabSeen(tab, seenAt)
+    void syncSeenTimestampToServer(tab, seenAt)
+  }, [broadcastTabSeen, isNotificationTab, markTabNotificationSeen, persistTabSeenTime, syncSeenTimestampToServer])
 
   const dismissTabNotification = useCallback((tab: string) => {
-    setTabNotifications(prev => {
-      if (!prev[tab]) return prev
-      const updated = { ...prev, [tab]: false }
-      const totalCount = Object.values(updated).filter(Boolean).length
-      setTotalUnreadCount(totalCount)
-      return updated
-    })
-  }, [])
+    markTabNotificationSeen(tab)
+  }, [markTabNotificationSeen])
+
+  const syncSeenFromServer = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/clubs/${club.id}/notifications/seen`, { cache: 'no-store' })
+      if (!response.ok) return
+
+      const data = (await response.json()) as { seen?: Record<string, string> }
+      const seenByTab = data.seen ?? {}
+
+      for (const [tab, seenAtRaw] of Object.entries(seenByTab)) {
+        if (!isNotificationTab(tab)) continue
+        const seenAt = parseTimestamp(seenAtRaw)
+        if (!seenAt) continue
+
+        const localSeenAt = getLastClearedTime(tab)
+        if (seenAt.getTime() <= localSeenAt.getTime()) continue
+
+        persistTabSeenTime(tab, seenAt)
+        markTabNotificationSeen(tab)
+      }
+    } catch (error) {
+      console.error('Failed to sync notification seen timestamps:', error)
+    }
+  }, [club.id, getLastClearedTime, isNotificationTab, markTabNotificationSeen, persistTabSeenTime])
 
   // Keep active tab in a ref so polling interval doesn't restart during navigation.
   const activeTabRef = useRef(activeTab)
@@ -264,14 +342,93 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     previousActiveTabRef.current = activeTab
   }, [activeTab, clearTabNotification, dismissTabNotification])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const keyPrefix = `lastCleared_${club.id}_`
+    const keySuffix = `_${user.id}`
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.storageArea !== window.localStorage || !event.key || !event.newValue) return
+      if (!event.key.startsWith(keyPrefix) || !event.key.endsWith(keySuffix)) return
+
+      const tab = event.key.slice(keyPrefix.length, event.key.length - keySuffix.length)
+      if (!isNotificationTab(tab)) return
+      markTabNotificationSeen(tab)
+    }
+
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [club.id, isNotificationTab, markTabNotificationSeen, user.id])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return
+
+    const channel = new BroadcastChannel(NOTIFICATION_SYNC_CHANNEL)
+    notificationSyncChannelRef.current = channel
+
+    const onMessage = (event: MessageEvent<unknown>) => {
+      const payload = event.data
+      if (!payload || typeof payload !== 'object') return
+
+      const value = payload as {
+        type?: string
+        tab?: string
+        seenAt?: string
+        clubId?: string
+        userId?: string
+      }
+
+      if (value.type !== 'tab-seen' || value.clubId !== club.id || value.userId !== user.id) return
+      if (!value.tab || !isNotificationTab(value.tab)) return
+
+      const seenAt = parseTimestamp(value.seenAt)
+      if (seenAt) {
+        persistTabSeenTime(value.tab, seenAt)
+      }
+      markTabNotificationSeen(value.tab)
+    }
+
+    channel.addEventListener('message', onMessage)
+    return () => {
+      channel.removeEventListener('message', onMessage)
+      channel.close()
+      if (notificationSyncChannelRef.current === channel) {
+        notificationSyncChannelRef.current = null
+      }
+    }
+  }, [club.id, isNotificationTab, markTabNotificationSeen, persistTabSeenTime, user.id])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const syncOnFocus = () => { void syncSeenFromServer() }
+    window.addEventListener('focus', syncOnFocus)
+    return () => {
+      window.removeEventListener('focus', syncOnFocus)
+    }
+  }, [syncSeenFromServer])
+
   // Persist "seen" timestamp for the currently open tab when page is backgrounded/unloaded.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const persistCurrentTab = () => {
       const currentTab = activeTabRef.current
-      if (currentTab) {
-        persistTabSeenTime(currentTab)
+      if (!currentTab) return
+
+      const seenAt = persistTabSeenTime(currentTab)
+      if (!seenAt || !isNotificationTab(currentTab)) return
+
+      const payload = JSON.stringify({ tab: currentTab, seenAt })
+      const endpoint = `/api/clubs/${club.id}/notifications/seen`
+      const usedBeacon =
+        typeof navigator !== 'undefined' &&
+        typeof navigator.sendBeacon === 'function' &&
+        navigator.sendBeacon(endpoint, new Blob([payload], { type: 'application/json' }))
+
+      if (!usedBeacon) {
+        void syncSeenTimestampToServer(currentTab, seenAt)
       }
     }
 
@@ -288,16 +445,16 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
       window.removeEventListener('beforeunload', persistCurrentTab)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [persistTabSeenTime])
+  }, [club.id, isNotificationTab, persistTabSeenTime, syncSeenTimestampToServer])
 
   // Check for new content with a single lightweight API call.
   useEffect(() => {
     let isMounted = true
-    const notificationTabs = ['stream', 'calendar', 'attendance', 'finance', 'tests', 'people']
 
     const checkForNewContent = async () => {
       if (!isMounted) return
-      const tabsToCheck = notificationTabs.filter(tab => tab !== activeTabRef.current)
+      await syncSeenFromServer()
+      const tabsToCheck = NOTIFICATION_TABS.filter(tab => tab !== activeTabRef.current)
       if (tabsToCheck.length === 0) return
 
       const query = new URLSearchParams()
@@ -334,7 +491,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
       isMounted = false
       clearInterval(interval)
     }
-  }, [club.id, getLastClearedTime])
+  }, [club.id, getLastClearedTime, syncSeenFromServer])
 
   useEffect(() => {
     const tabParam = searchParams.get('tab')
