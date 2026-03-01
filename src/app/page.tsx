@@ -7,6 +7,7 @@ import { DiscordBanner } from '@/components/discord-banner'
 import { HomeHero } from '@/components/home-hero'
 import { PublicPageTools } from '@/components/public-page-tools'
 import { prisma } from '@/lib/prisma'
+import { getPreferredClubPathForUser } from '@/lib/club-routing'
 import { cookies } from 'next/headers'
 
 async function getBannerSettings() {
@@ -37,37 +38,10 @@ async function getBannerSettings() {
 
 async function getLoggedInUserRedirect(userId: string): Promise<string> {
   try {
-    // Get user's clubs
-    const memberships = await prisma.membership.findMany({
-      where: { userId },
-      select: {
-        club: {
-          select: {
-            id: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
-
-    // If no clubs, go to no-clubs page
-    if (memberships.length === 0) {
-      return '/no-clubs'
-    }
-
-    // Try to get last visited club from cookie
     const cookieStore = await cookies()
     const lastClubId = cookieStore.get('lastVisitedClub')?.value
 
-    // If there's a last visited club and user is still a member, redirect there
-    if (lastClubId && memberships.some(m => m.club.id === lastClubId)) {
-      return `/club/${lastClubId}`
-    }
-
-    // Otherwise redirect to the first club (most recently joined)
-    return `/club/${memberships[0].club.id}`
+    return await getPreferredClubPathForUser(userId, { lastVisitedClubId: lastClubId })
   } catch (error) {
     console.error('Error getting user redirect:', error)
     return '/no-clubs'

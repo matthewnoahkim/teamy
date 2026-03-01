@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { verifyInviteCode } from '@/lib/invite-codes'
+import { getPreferredClubIdForUser } from '@/lib/club-routing'
 
 type JoinPageProps = {
   searchParams?: Promise<{
@@ -19,31 +20,9 @@ type InviteClubRecord = {
 }
 
 async function getLoggedInUserClubRedirect(userId: string): Promise<string | null> {
-  const memberships = await prisma.membership.findMany({
-    where: { userId },
-    select: {
-      club: {
-        select: {
-          id: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  })
-
-  if (memberships.length === 0) {
-    return null
-  }
-
   const cookieStore = await cookies()
   const lastClubId = cookieStore.get('lastVisitedClub')?.value
-  if (lastClubId && memberships.some((membership) => membership.club.id === lastClubId)) {
-    return lastClubId
-  }
-
-  return memberships[0].club.id
+  return getPreferredClubIdForUser(userId, { lastVisitedClubId: lastClubId })
 }
 
 async function resolveInviteClubId(code: string, preferredClubId?: string): Promise<string | null> {

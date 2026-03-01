@@ -3,7 +3,7 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { LogOut, Pencil, Settings, CreditCard, ChevronDown, Plus, Users as UsersIcon } from 'lucide-react'
+import { LogOut, Pencil, Settings, CreditCard, ChevronDown, Plus, Users as UsersIcon, Star } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +18,7 @@ import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import { CreateClubDialog } from '@/components/create-club-dialog'
 import { JoinClubDialog } from '@/components/join-club-dialog'
 import { useState, useEffect } from 'react'
+import { useToast } from '@/components/ui/use-toast'
 
 interface Club {
   id: string
@@ -46,12 +47,15 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { toast } = useToast()
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
   const [createClubOpen, setCreateClubOpen] = useState(false)
   const [joinClubOpen, setJoinClubOpen] = useState(false)
   const [joinInitialCode, setJoinInitialCode] = useState('')
   const [joinInitialInviteClubId, setJoinInitialInviteClubId] = useState('')
+  const [primaryClubId, setPrimaryClubId] = useState<string | null>(null)
+  const [savingPrimaryClub, setSavingPrimaryClub] = useState(false)
   
   // Show customization and billing on club pages OR when explicitly set
   const isOnClubPage = pathname?.startsWith('/club/')
@@ -88,6 +92,38 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   }, [router, showCustomizationBilling, customizationHref, billingHref])
 
   useEffect(() => {
+    let isMounted = true
+
+    const loadPrimaryClub = async () => {
+      try {
+        const response = await fetch('/api/user/preferences', {
+          cache: 'no-store',
+        })
+        if (!response.ok) return
+
+        const data = await response.json()
+        const rawPrimaryClubId = data?.preferences?.primaryClubId
+        const resolvedPrimaryClubId =
+          typeof rawPrimaryClubId === 'string' && rawPrimaryClubId.trim().length > 0
+            ? rawPrimaryClubId.trim()
+            : null
+
+        if (isMounted) {
+          setPrimaryClubId(resolvedPrimaryClubId)
+        }
+      } catch (error) {
+        console.error('Failed to load primary club preference', error)
+      }
+    }
+
+    void loadPrimaryClub()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
     if (!inviteCodeFromUrl || !pathname) return
 
     setJoinInitialCode(inviteCodeFromUrl)
@@ -119,6 +155,43 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
     }
   }
 
+  const handleSetPrimaryClub = async (targetClubId: string) => {
+    if (!targetClubId || savingPrimaryClub) return
+
+    setSavingPrimaryClub(true)
+    try {
+      const response = await fetch('/api/user/preferences', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          primaryClubId: targetClubId,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to set primary club')
+      }
+
+      setPrimaryClubId(targetClubId)
+      document.cookie = `lastVisitedClub=${targetClubId}; path=/; max-age=${60 * 60 * 24 * 365}`
+      toast({
+        title: 'Primary club updated',
+        description: 'This club will now be your default when loading Teamy.',
+      })
+    } catch (error) {
+      toast({
+        title: 'Unable to update primary club',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingPrimaryClub(false)
+    }
+  }
+
   return (
     <>
       <header className="floating-bar-shell floating-bar-shell-top" suppressHydrationWarning>
@@ -144,9 +217,31 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
                       className={club.id === clubId ? 'bg-accent' : ''}
                     >
                       <UsersIcon className="mr-2 h-4 w-4" />
-                      {club.name}
+                      <span className="flex-1 truncate">{club.name}</span>
+                      {primaryClubId === club.id && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Star className="h-3.5 w-3.5 fill-current" />
+                          Primary
+                        </span>
+                      )}
                     </DropdownMenuItem>
                   ))}
+                  {clubId && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => void handleSetPrimaryClub(clubId)}
+                        disabled={savingPrimaryClub || primaryClubId === clubId}
+                      >
+                        <Star className="mr-2 h-4 w-4" />
+                        {primaryClubId === clubId
+                          ? 'Current Club Is Primary'
+                          : savingPrimaryClub
+                            ? 'Saving Primary Club...'
+                            : 'Set Current Club as Primary'}
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => {
                     setJoinInitialCode('')
