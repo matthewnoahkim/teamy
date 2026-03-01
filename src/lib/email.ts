@@ -23,6 +23,7 @@ export interface TeamyEmailLayoutParams {
   label: string
   title: string
   subtitle?: string
+  logoUrl?: string
   bodyHtml: string
   actionLabel?: string
   actionUrl?: string
@@ -66,6 +67,7 @@ export function renderTeamyEmailLayout({
   label,
   title,
   subtitle,
+  logoUrl,
   bodyHtml,
   actionLabel,
   actionUrl,
@@ -76,6 +78,7 @@ export function renderTeamyEmailLayout({
   const safeLabel = escapeHtml(label)
   const safeTitle = escapeHtml(title)
   const safeSubtitle = subtitle ? escapeHtml(subtitle) : null
+  const safeLogoUrl = escapeHtml(logoUrl || `${getBaseUrl()}/logo.png`)
   const safeActionLabel = actionLabel ? escapeHtml(actionLabel) : null
   const safeActionUrl = actionUrl ? escapeHtml(actionUrl) : null
   const footer = escapeHtml(footerText ?? 'Teamy • Science Olympiad Management Platform')
@@ -115,7 +118,7 @@ export function renderTeamyEmailLayout({
               <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td valign="middle" style="width:44px;">
-                    <div style="height:32px; width:32px; border-radius:8px; background:${EMAIL_THEME.primary}; color:#ffffff; font-weight:700; font-size:14px; line-height:32px; text-align:center;">T</div>
+                    <img src="${safeLogoUrl}" alt="Teamy logo" width="32" height="32" style="display:block; width:32px; height:32px; border-radius:8px;" />
                   </td>
                   <td valign="middle">
                     <p style="margin:0; color:${EMAIL_THEME.title}; font-size:18px; font-weight:700; letter-spacing:0.1px;">Teamy</p>
@@ -221,23 +224,19 @@ export async function sendStaffInviteEmail({
     const bodyHtml = `
       <p style="margin:0 0 14px 0; color:${EMAIL_THEME.body}; font-size:15px; line-height:1.7;">${greeting}</p>
       <p style="margin:0 0 14px 0; color:${EMAIL_THEME.body}; font-size:15px; line-height:1.7;">
-        <strong style="color:${EMAIL_THEME.title};">${escapeHtml(inviterName)}</strong> invited you to join
-        <strong style="color:${EMAIL_THEME.title};">${escapeHtml(tournamentName)}</strong> as a
+        <strong style="color:${EMAIL_THEME.title};">${escapeHtml(inviterName)}</strong> invited you to
+        <strong style="color:${EMAIL_THEME.title};">${escapeHtml(tournamentName)}</strong> as
         <strong style="color:${EMAIL_THEME.title};">${escapeHtml(roleLabel)}</strong>.
       </p>
       ${eventsSection}
-      <p style="margin:0; color:${EMAIL_THEME.body}; font-size:15px; line-height:1.7;">
-        ${
-          role === 'EVENT_SUPERVISOR'
-            ? "You will be able to create and manage tests for your assigned events in Teamy's event supervisor portal."
-            : "You will have full tournament administration access, including staff invites, event oversight, and tournament operations."
-        }
+      <p style="margin:0; color:${EMAIL_THEME.muted}; font-size:13px; line-height:1.65;">
+        Use the same email address this invite was sent to when signing in.
       </p>
     `
 
     const actionHintHtml = `
-      <p style="margin:14px 0 0 0; color:${EMAIL_THEME.muted}; font-size:12px; line-height:1.6; text-align:center;">
-        If the button does not work, copy this link:<br />
+      <p style="margin:12px 0 0 0; color:${EMAIL_THEME.muted}; font-size:12px; line-height:1.6; text-align:center;">
+        Direct link:<br />
         <a href="${escapeHtml(portalUrl)}" style="color:#8ec5ff; word-break:break-all;">${escapeHtml(portalUrl)}</a>
       </p>
     `
@@ -246,7 +245,7 @@ export async function sendStaffInviteEmail({
       preheader: `${roleLabel} invite for ${tournamentName}`,
       label: 'Tournament Invitation',
       title: `${roleLabel} Invitation`,
-      subtitle: `Join ${tournamentName} on Teamy`,
+      subtitle: tournamentName,
       bodyHtml,
       actionLabel: 'Accept Invitation',
       actionUrl: portalUrl,
@@ -259,7 +258,7 @@ export async function sendStaffInviteEmail({
     const { data, error } = await resend.emails.send({
       from: 'Teamy <no-reply@teamy.site>',
       to,
-      subject: `You're invited as ${roleLabel} for ${tournamentName}`,
+      subject: `Invitation: ${tournamentName} (${roleLabel})`,
       html,
     })
 
@@ -399,9 +398,6 @@ export async function sendAnnouncementEmail({
 
     const safeContent = escapeHtmlWithLineBreaks(content)
     const bodyHtml = `
-      <p style="margin:0 0 12px 0; color:${EMAIL_THEME.body}; font-size:15px; line-height:1.65;">
-        New post in <strong style="color:${EMAIL_THEME.title};">${escapeHtml(clubName)}</strong>.
-      </p>
       ${eventDetailsHtml}
       <div style="margin:0; padding:14px 16px; background:#091329; border:1px solid ${EMAIL_THEME.cardBorder}; border-radius:12px; color:${EMAIL_THEME.body}; font-size:14px; line-height:1.72; word-break:break-word;">
         ${safeContent}
@@ -409,8 +405,8 @@ export async function sendAnnouncementEmail({
     `
 
     const actionHintHtml = `
-      <p style="margin:14px 0 0 0; color:${EMAIL_THEME.muted}; font-size:12px; line-height:1.6; text-align:center;">
-        Open in Teamy:<br />
+      <p style="margin:12px 0 0 0; color:${EMAIL_THEME.muted}; font-size:12px; line-height:1.6; text-align:center;">
+        Direct link:<br />
         <a href="${escapeHtml(clubStreamUrl)}" style="color:#8ec5ff; word-break:break-all;">${escapeHtml(clubStreamUrl)}</a>
       </p>
     `
@@ -419,7 +415,7 @@ export async function sendAnnouncementEmail({
       preheader: `New announcement in ${clubName}: ${title}`,
       label: 'Club Announcement',
       title,
-      subtitle: `Posted in ${clubName}`,
+      subtitle: clubName,
       bodyHtml,
       actionLabel: 'Open Club Stream',
       actionUrl: clubStreamUrl,

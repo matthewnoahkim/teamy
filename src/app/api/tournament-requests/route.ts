@@ -173,15 +173,10 @@ async function handlePOST(request: NextRequest) {
             Hi ${escapeHtml(data.directorName)},
           </p>
           <p style="margin:0 0 14px 0; color:#c6d5ee; font-size:15px; line-height:1.65;">
-            We received your request to host <strong style="color:#f3f7ff;">${escapeHtml(data.tournamentName)}</strong>. Your request is now in review.
+            We received your request for <strong style="color:#f3f7ff;">${escapeHtml(data.tournamentName)}</strong>. Status: <strong style="color:#f3f7ff;">Pending review</strong>.
           </p>
-          <div style="background:#0f244a; border:1px solid #2e5ba4; border-radius:12px; padding:12px 14px; margin:0 0 18px 0;">
-            <p style="margin:0; color:#d9e6ff; font-size:13px; line-height:1.5;">
-              Typical review time is 2-3 business days. We will email you when your request is approved or if we need more details.
-            </p>
-          </div>
           <div style="background:#091329; border:1px solid #244a88; border-radius:12px; padding:14px 16px;">
-            <p style="margin:0 0 8px 0; color:#f3f7ff; font-size:14px; font-weight:700;">Request details</p>
+            <p style="margin:0 0 8px 0; color:#f3f7ff; font-size:14px; font-weight:700;">Submitted details</p>
             <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
               <tr>
                 <td style="padding:5px 0; color:#9bb0d1; font-size:13px; width:148px;">Tournament</td>
@@ -214,8 +209,7 @@ async function handlePOST(request: NextRequest) {
             </table>
           </div>
           <p style="margin:16px 0 0 0; color:#9bb0d1; font-size:13px; line-height:1.6;">
-            Questions? Reply to this email or contact
-            <a href="mailto:teamysite@gmail.com" style="color:#8ec5ff;">teamysite@gmail.com</a>.
+            Typical review time: 2-3 business days.
           </p>
         `
 
@@ -224,7 +218,7 @@ async function handlePOST(request: NextRequest) {
           preheader: `Tournament hosting request received for ${data.tournamentName}`,
           label: 'Tournament Request',
           title: 'Request Received',
-          subtitle: `We received your ${data.tournamentName} submission`,
+          subtitle: data.tournamentName,
           bodyHtml,
           actionLabel: 'Open TD Portal',
           actionUrl,
