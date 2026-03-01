@@ -32,8 +32,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   ChevronDown,
   ChevronUp,
+  CheckCircle2,
+  Circle,
+  Clock3,
   Eye,
   Image as ImageIcon,
+  ListChecks,
   Plus,
   Trash2,
   Send,
@@ -1814,6 +1818,45 @@ export function NewTestBuilder({
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
   }
 
+  const totalPoints = useMemo(() => {
+    return questions.reduce((sum, question) => {
+      if (question.type === 'LONG_TEXT' && question.frqParts && question.frqParts.length > 0) {
+        return sum + question.frqParts.reduce((partSum, part) => partSum + (Number.isFinite(part.points) ? part.points : 0), 0)
+      }
+      return sum + (Number.isFinite(question.points) ? question.points : 0)
+    }, 0)
+  }, [questions])
+
+  const setupChecklist = useMemo(() => {
+    const overviewReady = details.name.trim().length > 0 && details.durationMinutes >= 1
+    const hasQuestions = questions.length > 0
+    const gradableQuestions = questions.filter((question) =>
+      question.type === 'MCQ_SINGLE' ||
+      question.type === 'MCQ_MULTI' ||
+      question.type === 'TRUE_FALSE' ||
+      question.type === 'FILL_BLANK',
+    )
+    const answerKeyReady = hasQuestions && (gradableQuestions.length === 0 || gradableQuestions.every((question) => {
+      if (question.type === 'FILL_BLANK') {
+        return (question.blankAnswers || []).some((answer) => answer.trim().length > 0)
+      }
+      return question.options.length >= 2 &&
+        question.options.every((option) => option.label.trim().length > 0) &&
+        question.options.some((option) => option.isCorrect)
+    }))
+    const publishReady = publishValidation.errors.length === 0
+
+    return [
+      { label: 'Overview complete', done: overviewReady },
+      { label: 'Question bank started', done: hasQuestions },
+      { label: 'Answer keys configured', done: answerKeyReady },
+      { label: 'Publish requirements met', done: publishReady },
+    ]
+  }, [details.durationMinutes, details.name, publishValidation.errors.length, questions])
+
+  const completedSetupSteps = setupChecklist.filter((step) => step.done).length
+  const setupProgress = Math.round((completedSetupSteps / setupChecklist.length) * 100)
+
   return (
     <div className="max-w-6xl mx-auto pb-24 space-y-8 relative">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1918,6 +1961,62 @@ export function NewTestBuilder({
           </div>
         </TooltipProvider>
       </div>
+
+      <Card className="border-border/60 bg-card/70">
+        <CardContent className="pt-5">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Questions</p>
+                <p className="text-xl font-semibold">{questions.length}</p>
+              </div>
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Total points</p>
+                <p className="text-xl font-semibold">{totalPoints}</p>
+              </div>
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 col-span-2 sm:col-span-1">
+                <p className="text-xs text-muted-foreground">Duration</p>
+                <p className="text-xl font-semibold flex items-center gap-1.5">
+                  <Clock3 className="h-4 w-4 text-muted-foreground" />
+                  {details.durationMinutes} min
+                </p>
+              </div>
+            </div>
+
+            <div className="w-full lg:max-w-[420px] space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <ListChecks className="h-4 w-4 text-muted-foreground" />
+                  Setup Progress
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {completedSetupSteps}/{setupChecklist.length} complete
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${setupProgress}%` }}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {setupChecklist.map((step) => (
+                  <div key={step.label} className="flex items-center gap-2 text-xs">
+                    {step.done ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <Circle className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                    <span className={step.done ? 'text-foreground' : 'text-muted-foreground'}>
+                      {step.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="space-y-6">
         <Card className="border-primary/10">
@@ -2173,12 +2272,12 @@ export function NewTestBuilder({
                   variant="outline" 
                   onClick={handleImportFromDocx}
                   disabled={importing}
-                  className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 hover:from-purple-500/20 hover:to-blue-500/20 border-purple-500/30 hover:border-purple-500/50 transition-all duration-200"
+                  className="border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors"
                 >
-                  <Sparkles className="mr-2 h-4 w-4 text-purple-500" />
+                  <Sparkles className="mr-2 h-4 w-4 text-primary" />
                   {importing 
                     ? `Importing with AI... ${elapsedSeconds}s / ~${estimatedTimeSeconds}s` 
-                    : 'Automatically Import Test from .docx with AI'}
+                    : 'Import .docx with AI'}
                 </Button>
               </div>
             </CardHeader>

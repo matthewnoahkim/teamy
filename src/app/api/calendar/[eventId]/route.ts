@@ -67,13 +67,22 @@ export async function PATCH(
 
     const body = await req.json()
     const validatedData = updateEventSchema.parse(body)
+    const effectiveStartUTC = validatedData.startUTC ? new Date(validatedData.startUTC) : event.startUTC
+    const effectiveEndUTC = validatedData.endUTC ? new Date(validatedData.endUTC) : event.endUTC
+
+    if (effectiveEndUTC <= effectiveStartUTC) {
+      return NextResponse.json(
+        { error: 'End time must be after start time' },
+        { status: 400 },
+      )
+    }
 
     // Build update data
     const updateData: Record<string, unknown> = {}
     if (validatedData.title !== undefined) updateData.title = validatedData.title
     if (validatedData.description !== undefined) updateData.description = validatedData.description
-    if (validatedData.startUTC !== undefined) updateData.startUTC = new Date(validatedData.startUTC)
-    if (validatedData.endUTC !== undefined) updateData.endUTC = new Date(validatedData.endUTC)
+    if (validatedData.startUTC !== undefined) updateData.startUTC = effectiveStartUTC
+    if (validatedData.endUTC !== undefined) updateData.endUTC = effectiveEndUTC
     if (validatedData.location !== undefined) updateData.location = validatedData.location
     if (validatedData.color !== undefined) updateData.color = validatedData.color
     if (validatedData.scope !== undefined) updateData.scope = validatedData.scope
@@ -230,4 +239,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

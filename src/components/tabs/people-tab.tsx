@@ -210,7 +210,7 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
     setEventCoverageFilter('all')
   }, [selectedTeam?.id])
 
-  const fetchEvents = async () => {
+  async function fetchEvents() {
     try {
       const response = await fetch(`/api/events?division=${club.division}`)
       if (response.ok) {
@@ -222,7 +222,7 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
     }
   }
 
-  const fetchConflictGroups = async () => {
+  async function fetchConflictGroups() {
     try {
       const response = await fetch(`/api/conflicts?division=${club.division}`)
       if (response.ok) {
@@ -234,7 +234,7 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
     }
   }
 
-  const fetchAssignments = () => {
+  function fetchAssignments() {
     const allAssignments: RosterAssignmentWithMembership[] = []
     club.memberships.forEach((m) => {
       m.rosterAssignments.forEach((a) => {
@@ -959,15 +959,15 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
                 <CardTitle className="text-xl sm:text-2xl">All Club Members</CardTitle>
                 {isAdmin && (
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    Use the actions menu to manage teams and roles
+                    Use action controls to manage roles and team assignments
                   </p>
                 )}
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <div className="flex items-center gap-2">
                   <Label className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Sort by:</Label>
                   <Select value={memberSortBy} onValueChange={(value) => setMemberSortBy(value as typeof memberSortBy)}>
-                    <SelectTrigger className="text-xs sm:text-sm flex-1 sm:flex-none h-9 w-full sm:w-auto">
+                    <SelectTrigger className="text-xs sm:text-sm h-9 w-full min-w-[170px]">
                       <SelectValue placeholder="Alphabetical" />
                     </SelectTrigger>
                     <SelectContent>
@@ -978,9 +978,10 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Order:</Label>
                   <Select value={memberSortDirection} onValueChange={(value) => setMemberSortDirection(value as typeof memberSortDirection)}>
-                    <SelectTrigger className="text-xs sm:text-sm h-9 w-full sm:w-auto">
+                    <SelectTrigger className="text-xs sm:text-sm h-9 w-full min-w-[150px]">
                       <SelectValue placeholder="Low to High" />
                     </SelectTrigger>
                     <SelectContent>
@@ -997,51 +998,66 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
               {getSortedMembers().map((member) => {
                 const eventCount = member.rosterAssignments?.length || 0
                 const memberRoles: string[] = Array.isArray(member.roles) ? member.roles : []
-  return (
-                  <div key={member.id} className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-lg border p-4 sm:p-3">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <Avatar className="h-12 w-12 sm:h-10 sm:w-10 flex-shrink-0">
-            <AvatarImage src={member.user.image || ''} />
-            <AvatarFallback className="text-sm sm:text-base">
-              {member.user.name?.charAt(0) || member.user.email.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-base sm:text-sm break-words">{member.user.name || member.user.email}</p>
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground mt-1">
-              {String(member.role).toUpperCase() === 'ADMIN' && (
+                return (
+                  <div
+                    key={member.id}
+                    className="flex flex-col gap-3 rounded-lg border border-border/70 bg-background/30 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-3"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <Avatar className="h-12 w-12 sm:h-10 sm:w-10 flex-shrink-0">
+                        <AvatarImage src={member.user.image || ''} />
+                        <AvatarFallback className="text-sm sm:text-base">
+                          {member.user.name?.charAt(0) || member.user.email.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-base sm:text-sm break-words">{member.user.name || member.user.email}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground mt-1">
+                          {String(member.role).toUpperCase() === 'ADMIN' && (
                             <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase px-1.5 py-0.5">Admin</Badge>
-              )}
-              {memberRoles.includes('COACH') && (
-                <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase px-1.5 py-0.5">Coach</Badge>
-              )}
-              {memberRoles.includes('CAPTAIN') && (
-                <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase px-1.5 py-0.5">Captain</Badge>
-              )}
-              {memberRoles.includes('MEMBER') && (
-                <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase px-1.5 py-0.5">Member</Badge>
-              )}
-              <span className="whitespace-nowrap">{(memberRoles.length > 0 || String(member.role).toUpperCase() === 'ADMIN') ? '• ' : ''}{eventCount} event{eventCount !== 1 ? 's' : ''}</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2 sm:flex-shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation()
-              window.location.href = `mailto:${member.user.email}`
-            }}
-            className="w-full sm:w-auto justify-start sm:justify-center h-9"
-          >
-            <Mail className="h-4 w-4 sm:mr-0 mr-2" />
-            <span className="sm:hidden">Email</span>
-          </Button>
-          {isAdmin && (
-                        <>
-                          <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <Label htmlFor={`role-${member.id}`} className="text-xs text-muted-foreground whitespace-nowrap">Role:</Label>
+                          )}
+                          {memberRoles.includes('COACH') && (
+                            <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase px-1.5 py-0.5">Coach</Badge>
+                          )}
+                          {memberRoles.includes('CAPTAIN') && (
+                            <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase px-1.5 py-0.5">Captain</Badge>
+                          )}
+                          {memberRoles.includes('MEMBER') && (
+                            <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase px-1.5 py-0.5">Member</Badge>
+                          )}
+                          <span className="whitespace-nowrap">
+                            {(memberRoles.length > 0 || String(member.role).toUpperCase() === 'ADMIN') ? '• ' : ''}
+                            {eventCount} event{eventCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="w-full sm:w-auto sm:min-w-[360px] flex flex-col gap-2">
+                      <div className="flex items-center justify-between sm:justify-end gap-2">
+                        {isAdmin && (
+                          <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                            Actions
+                          </Badge>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.location.href = `mailto:${member.user.email}`
+                          }}
+                          className="h-9"
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          Email
+                        </Button>
+                      </div>
+
+                      {isAdmin && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-md border border-border/60 bg-muted/20 p-2">
+                          <div className="space-y-1">
+                            <Label htmlFor={`role-${member.id}`} className="text-xs text-muted-foreground">Role</Label>
                             <Select
                               value={
                                 memberRoles.includes('COACH') ? 'COACH' :
@@ -1051,7 +1067,11 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
                               }
                               onValueChange={(value) => handleUpdateRole(member.id, value as 'COACH' | 'CAPTAIN' | 'MEMBER' | 'UNASSIGNED')}
                             >
-                              <SelectTrigger id={`role-${member.id}`} className="text-xs sm:text-sm h-9 flex-1 sm:flex-none sm:w-auto" onClick={(e) => e.stopPropagation()}>
+                              <SelectTrigger
+                                id={`role-${member.id}`}
+                                className="text-xs sm:text-sm h-9 w-full"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <SelectValue placeholder="Unassigned" />
                               </SelectTrigger>
                               <SelectContent onClick={(e) => e.stopPropagation()}>
@@ -1062,20 +1082,25 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <Label htmlFor={`team-${member.id}`} className="text-xs text-muted-foreground whitespace-nowrap">Team:</Label>
+
+                          <div className="space-y-1">
+                            <Label htmlFor={`team-${member.id}`} className="text-xs text-muted-foreground">Team</Label>
                             <Select
                               value={member.teamId || 'UNASSIGNED'}
                               onValueChange={(value) => handleAssignToTeamFromMenu(member.id, value === 'UNASSIGNED' ? null : value, member.user.name || member.user.email)}
                             >
-                              <SelectTrigger id={`team-${member.id}`} className="text-xs sm:text-sm h-9 flex-1 sm:flex-none sm:w-auto" onClick={(e) => e.stopPropagation()}>
+                              <SelectTrigger
+                                id={`team-${member.id}`}
+                                className="text-xs sm:text-sm h-9 w-full"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <SelectValue placeholder="Unassigned" />
                               </SelectTrigger>
                               <SelectContent onClick={(e) => e.stopPropagation()}>
                                 <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
                                 {club.teams.map((team) => (
-                                  <SelectItem 
-                                    key={team.id} 
+                                  <SelectItem
+                                    key={team.id}
                                     value={team.id}
                                     disabled={team.id !== member.teamId && team.members.length >= 15}
                                   >
@@ -1085,7 +1110,7 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
                               </SelectContent>
                             </Select>
                           </div>
-                        </>
+                        </div>
                       )}
                     </div>
                   </div>

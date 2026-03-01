@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LogOut, Pencil, Settings, CreditCard, ChevronDown, Plus, Users as UsersIcon } from 'lucide-react'
@@ -45,10 +45,13 @@ interface AppHeaderProps {
 export function AppHeader({ user, showBackButton: _showBackButton = false, backHref: _backHref, title, clubId, clubs, allClubs, onClubChange: _onClubChange, showCustomizationBilling: showCustomizationBillingProp, currentPath }: AppHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
   const [createClubOpen, setCreateClubOpen] = useState(false)
   const [joinClubOpen, setJoinClubOpen] = useState(false)
+  const [joinInitialCode, setJoinInitialCode] = useState('')
+  const [joinInitialInviteClubId, setJoinInitialInviteClubId] = useState('')
   
   // Show customization and billing on club pages OR when explicitly set
   const isOnClubPage = pathname?.startsWith('/club/')
@@ -58,6 +61,12 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   const currentClub = clubs?.find(c => c.id === clubId)
   const effectiveClubs = clubs || allClubs || []
   const effectivePath = currentPath || pathname
+  const inviteCodeFromUrl = pathname?.startsWith('/club/')
+    ? (searchParams.get('join') || searchParams.get('code') || '')
+    : ''
+  const inviteClubFromUrl = pathname?.startsWith('/club/')
+    ? (searchParams.get('inviteClub') || '')
+    : ''
 
   useEffect(() => {
     // Warm route cache for quick club switching.
@@ -67,6 +76,22 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
       }
     }
   }, [effectiveClubs, clubId, router])
+
+  useEffect(() => {
+    if (!inviteCodeFromUrl || !pathname) return
+
+    setJoinInitialCode(inviteCodeFromUrl)
+    setJoinInitialInviteClubId(inviteClubFromUrl)
+    setJoinClubOpen(true)
+
+    const cleanedParams = new URLSearchParams(searchParams.toString())
+    cleanedParams.delete('join')
+    cleanedParams.delete('code')
+    cleanedParams.delete('inviteClub')
+    const cleanedQuery = cleanedParams.toString()
+    const nextUrl = cleanedQuery ? `${pathname}?${cleanedQuery}` : pathname
+    router.replace(nextUrl)
+  }, [inviteCodeFromUrl, inviteClubFromUrl, pathname, router, searchParams])
 
   const handleSignOut = async () => {
     try {
@@ -113,7 +138,11 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setJoinClubOpen(true)}>
+                  <DropdownMenuItem onClick={() => {
+                    setJoinInitialCode('')
+                    setJoinInitialInviteClubId('')
+                    setJoinClubOpen(true)
+                  }}>
                     <UsersIcon className="mr-2 h-4 w-4" />
                     Join Club
                   </DropdownMenuItem>
@@ -229,7 +258,12 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
       />
 
       <CreateClubDialog open={createClubOpen} onOpenChange={setCreateClubOpen} />
-      <JoinClubDialog open={joinClubOpen} onOpenChange={setJoinClubOpen} />
+      <JoinClubDialog
+        open={joinClubOpen}
+        onOpenChange={setJoinClubOpen}
+        initialCode={joinInitialCode}
+        initialInviteClubId={joinInitialInviteClubId}
+      />
     </>
   )
 }

@@ -1,18 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion, useScroll, useSpring } from 'framer-motion'
 import { ChevronUp } from 'lucide-react'
 
 export function PublicPageTools() {
-  const { scrollYProgress } = useScroll()
   const [showBackToTop, setShowBackToTop] = useState(false)
-
-  const progressScaleX = useSpring(scrollYProgress, {
-    stiffness: 130,
-    damping: 22,
-    mass: 0.15,
-  })
 
   useEffect(() => {
     const onScroll = () => {
@@ -27,12 +19,6 @@ export function PublicPageTools() {
 
   return (
     <>
-      <motion.div
-        aria-hidden
-        className="fixed left-0 top-0 z-[10005] h-0.5 w-full origin-left bg-teamy-primary"
-        style={{ scaleX: progressScaleX }}
-      />
-
       {showBackToTop && (
         <button
           type="button"

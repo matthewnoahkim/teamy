@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PageLoading, ButtonLoading } from '@/components/ui/loading-spinner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -121,7 +121,7 @@ interface CalendarTabProps {
   initialEvents?: CalendarEvent[]
 }
 
-type ViewMode = 'month' | 'week'
+type ViewMode = 'month' | 'week' | 'day'
 
 export function CalendarTab({ clubId, division, currentMembership, isAdmin, user, initialEvents }: CalendarTabProps) {
   const { toast } = useToast()
@@ -345,14 +345,10 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
       } else {
         // Regular event with specific time
         const startDateTime = new Date(formData.date + 'T' + formData.startTime + ':00')
-        let endDateTime = new Date(formData.date + 'T' + formData.endTime + ':00')
-        
-        // If end time is before or equal to start time, it's likely the next day
-        // (e.g., 11 PM to 12 AM, or 2 PM to 1 PM)
+        const endDateTime = new Date(formData.date + 'T' + formData.endTime + ':00')
+
         if (endDateTime <= startDateTime) {
-          // Add one day to the end date
-          endDateTime = new Date(endDateTime)
-          endDateTime.setDate(endDateTime.getDate() + 1)
+          throw new Error('End time must be after start time')
         }
         
         startISO = startDateTime.toISOString()
@@ -519,14 +515,10 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
       } else {
         // Regular event with specific time
         const startDateTime = new Date(formData.date + 'T' + formData.startTime + ':00')
-        let endDateTime = new Date(formData.date + 'T' + formData.endTime + ':00')
-        
-        // If end time is before or equal to start time, it's likely the next day
-        // (e.g., 11 PM to 12 AM, or 2 PM to 1 PM)
+        const endDateTime = new Date(formData.date + 'T' + formData.endTime + ':00')
+
         if (endDateTime <= startDateTime) {
-          // Add one day to the end date
-          endDateTime = new Date(endDateTime)
-          endDateTime.setDate(endDateTime.getDate() + 1)
+          throw new Error('End time must be after start time')
         }
         
         startISO = startDateTime.toISOString()
@@ -626,8 +618,9 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   }
 
   const canEditEvent = (event: CalendarEvent) => {
-    // Only the creator can edit their own events
-    return event.creatorId === currentMembership.id
+    if (event.creatorId === currentMembership.id) return true
+    if (isAdmin && event.scope !== 'PERSONAL') return true
+    return false
   }
 
   const canDeleteEvent = (event: CalendarEvent) => {
@@ -745,12 +738,53 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
     return `${start} - ${end}`
   }
 
+  const getDayLabel = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
+
   const isSameDay = (date1: Date, date2: Date) => {
     return (
       date1.getFullYear() === date2.getFullYear() &&
       date1.getMonth() === date2.getMonth() &&
       date1.getDate() === date2.getDate()
     )
+  }
+
+  const getDateOnly = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+  const getEventSpanDays = (start: Date, end: Date) => {
+    const startDate = getDateOnly(start)
+    const endDate = getDateOnly(end)
+    return Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  }
+
+  const getEventDaySegment = (event: CalendarEvent, date: Date) => {
+    const eventStart = new Date(event.startUTC)
+    const eventEnd = new Date(event.endUTC)
+    const currentDate = getDateOnly(date)
+    const eventStartDate = getDateOnly(eventStart)
+    const eventEndDate = getDateOnly(eventEnd)
+
+    if (currentDate < eventStartDate || currentDate > eventEndDate) {
+      return null
+    }
+
+    const isStartDay = isSameDay(eventStart, currentDate)
+    const isEndDay = isSameDay(eventEnd, currentDate)
+    const startMinutes = isStartDay ? eventStart.getHours() * 60 + eventStart.getMinutes() : 0
+    const endMinutes = isEndDay ? eventEnd.getHours() * 60 + eventEnd.getMinutes() : 24 * 60
+
+    return {
+      startMinutes,
+      endMinutes: Math.max(endMinutes, startMinutes + 1),
+      isStartDay,
+      isEndDay,
+    }
   }
 
   const getEventsForDay = (date: Date) => {
@@ -783,8 +817,8 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
                         bEnd.getHours() === 23 && bEnd.getMinutes() === 59
       
       // Calculate duration in days (fix: use proper date difference)
-      const aDuration = Math.ceil((aEnd.getTime() - aStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-      const bDuration = Math.ceil((bEnd.getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+      const aDuration = getEventSpanDays(aStart, aEnd)
+      const bDuration = getEventSpanDays(bStart, bEnd)
       
       // Check if events are multi-day
       const aIsMultiDay = aDuration > 1
@@ -813,6 +847,10 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   const navigatePrevious = () => {
     if (viewMode === 'month') {
       setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
+    } else if (viewMode === 'day') {
+      const newDate = new Date(currentDate)
+      newDate.setDate(newDate.getDate() - 1)
+      setCurrentDate(newDate)
     } else {
       const newDate = new Date(currentDate)
       newDate.setDate(newDate.getDate() - 7)
@@ -823,6 +861,10 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   const navigateNext = () => {
     if (viewMode === 'month') {
       setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
+    } else if (viewMode === 'day') {
+      const newDate = new Date(currentDate)
+      newDate.setDate(newDate.getDate() + 1)
+      setCurrentDate(newDate)
     } else {
       const newDate = new Date(currentDate)
       newDate.setDate(newDate.getDate() + 7)
@@ -833,6 +875,30 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   const goToToday = () => {
     setCurrentDate(new Date())
   }
+
+  const formatDateInput = (date: Date) => {
+    const year = date.getFullYear()
+    const month = `${date.getMonth() + 1}`.padStart(2, '0')
+    const day = `${date.getDate()}`.padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const summaryEvents = useMemo(
+    () => (showImportantOnly ? events.filter((event) => event.important) : events),
+    [events, showImportantOnly],
+  )
+
+  const scopeSummary = useMemo(() => {
+    return summaryEvents.reduce(
+      (acc, event) => {
+        if (event.scope === 'PERSONAL') acc.personal += 1
+        else if (event.scope === 'TEAM') acc.team += 1
+        else if (event.scope === 'CLUB') acc.club += 1
+        return acc
+      },
+      { personal: 0, team: 0, club: 0 },
+    )
+  }, [summaryEvents])
 
   const handleDayClick = (date: Date) => {
     setFormData(getInitialFormData(date))
@@ -1194,19 +1260,23 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   }
 
   // Helper function to calculate overlapping event layouts (Google Calendar style)
-  const calculateEventLayout = (events: CalendarEvent[]) => {
+  const calculateEventLayout = (events: CalendarEvent[], date: Date) => {
     if (events.length === 0) return []
     
     // Convert events to intervals with start/end times in minutes
-    const intervals = events.map(event => {
-      const start = new Date(event.startUTC)
-      const end = new Date(event.endUTC)
-      return {
-        event,
-        startMinutes: start.getHours() * 60 + start.getMinutes(),
-        endMinutes: end.getHours() * 60 + end.getMinutes()
-      }
-    })
+    const intervals: EventInterval[] = events
+      .map((event) => {
+        const segment = getEventDaySegment(event, date)
+        if (!segment) return null
+        return {
+          event,
+          startMinutes: segment.startMinutes,
+          endMinutes: segment.endMinutes,
+        }
+      })
+      .filter((interval): interval is EventInterval => interval !== null)
+
+    if (intervals.length === 0) return []
     
     // Sort by start time, then by duration (longer first)
     intervals.sort((a, b) => {
@@ -1279,17 +1349,17 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
     })
   }
 
-  const renderWeekView = () => {
-    const weekDates = getWeekDates(currentDate)
+  const renderWeekView = (visibleDates: Date[]) => {
     const today = new Date()
     const hours = Array.from({ length: 24 }, (_, i) => i)
+    const gridTemplateColumns = `52px repeat(${visibleDates.length}, minmax(0, 1fr))`
 
     return (
       <div className="border rounded-lg overflow-hidden">
         {/* Header */}
-        <div className="grid grid-cols-8 gap-0">
+        <div className="grid gap-0" style={{ gridTemplateColumns }}>
           <div className="bg-card py-1 px-1 border-b border-r border-border" />
-          {weekDates.map((date) => {
+          {visibleDates.map((date) => {
             const isToday = isSameDay(date, today)
             return (
               <div
@@ -1308,11 +1378,11 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
         </div>
 
         {/* All-day events section */}
-        <div className="grid grid-cols-8 gap-0 border-b border-border bg-card">
+        <div className="grid gap-0 border-b border-border bg-card" style={{ gridTemplateColumns }}>
           <div className="py-1 px-1 text-xs text-muted-foreground text-right border-r border-border leading-tight flex items-center justify-end bg-card">
             All Day
           </div>
-          {weekDates.map((date) => {
+          {visibleDates.map((date) => {
             const allDayEvents = events.filter((event) => {
               // Apply important filter if enabled
               if (showImportantOnly && !event.important) {
@@ -1342,8 +1412,8 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
               const bEnd = new Date(b.endUTC)
               
               // Calculate duration in days (fix: use proper end date and add 1)
-              const aDuration = Math.ceil((aEnd.getTime() - aStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-              const bDuration = Math.ceil((bEnd.getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+              const aDuration = getEventSpanDays(aStart, aEnd)
+              const bDuration = getEventSpanDays(bStart, bEnd)
               
               // Check if events are multi-day
               const aIsMultiDay = aDuration > 1
@@ -1418,11 +1488,11 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
         {/* Time slots */}
         <div>
           {hours.map((hour) => (
-            <div key={hour} className="grid grid-cols-8 gap-0">
+            <div key={hour} className="grid gap-0" style={{ gridTemplateColumns }}>
               <div className="py-1 px-1 text-xs text-muted-foreground text-right border-r border-border leading-tight flex items-center justify-end bg-card">
                 {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
               </div>
-              {weekDates.map((date) => {
+              {visibleDates.map((date) => {
                 const slotDate = new Date(date)
                 slotDate.setHours(hour, 0, 0, 0)
                 const slotEvents = events.filter((event) => {
@@ -1438,52 +1508,31 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
                   const isAllDay = eventStart.getHours() === 0 && eventStart.getMinutes() === 0 && 
                                   eventEnd.getHours() === 23 && eventEnd.getMinutes() === 59
                   if (isAllDay) return false
-                  
-                  // Normalize dates for comparison
-                  const eventStartDate = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate())
-                  const eventEndDate = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate())
-                  const currentDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-                  
-                  // For multi-day events, show them on all days they span
-                  // For single-day events, only show in the start hour slot (will span with CSS)
-                  if (isSameDay(eventStart, eventEnd)) {
-                    // Single day event - only show in start hour slot
-                    return isSameDay(eventStart, date) && eventStart.getHours() === hour
-                  } else {
-                    // Multi-day event - show on all days it spans
-                    return currentDate >= eventStartDate && currentDate <= eventEndDate
-                  }
+
+                  const segment = getEventDaySegment(event, date)
+                  if (!segment) return false
+
+                  return Math.floor(segment.startMinutes / 60) === hour
                 }).sort((a, b) => {
-                  const aStart = new Date(a.startUTC)
-                  const aEnd = new Date(a.endUTC)
-                  const bStart = new Date(b.startUTC)
-                  const bEnd = new Date(b.endUTC)
-                  
-                  // Check if events are all-day
-                  const aIsAllDay = aStart.getHours() === 0 && aStart.getMinutes() === 0 && 
-                                    aEnd.getHours() === 23 && aEnd.getMinutes() === 59
-                  const bIsAllDay = bStart.getHours() === 0 && bStart.getMinutes() === 0 && 
-                                    bEnd.getHours() === 23 && bEnd.getMinutes() === 59
-                  
-                  // Calculate duration in days
-                  const aDuration = Math.ceil((aEnd.getTime() - aStart.getTime()) / (1000 * 60 * 60 * 24))
-                  const bDuration = Math.ceil((bEnd.getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24))
-                  
-                  // Prioritize all-day events
-                  if (aIsAllDay && !bIsAllDay) return -1
-                  if (!aIsAllDay && bIsAllDay) return 1
-                  
-                  // If both are all-day, prioritize longer duration
-                  if (aIsAllDay && bIsAllDay) {
-                    if (aDuration !== bDuration) return bDuration - aDuration
+                  const aSegment = getEventDaySegment(a, date)
+                  const bSegment = getEventDaySegment(b, date)
+                  if (!aSegment || !bSegment) return 0
+
+                  if (aSegment.startMinutes !== bSegment.startMinutes) {
+                    return aSegment.startMinutes - bSegment.startMinutes
                   }
-                  
-                  // For regular events or same duration all-day events, sort by start time
-                  return aStart.getTime() - bStart.getTime()
+
+                  const aDuration = aSegment.endMinutes - aSegment.startMinutes
+                  const bDuration = bSegment.endMinutes - bSegment.startMinutes
+                  if (aDuration !== bDuration) {
+                    return bDuration - aDuration
+                  }
+
+                  return new Date(a.startUTC).getTime() - new Date(b.startUTC).getTime()
                 })
 
                 // Calculate event layouts for overlapping events
-                const eventLayouts = calculateEventLayout(slotEvents)
+                const eventLayouts = calculateEventLayout(slotEvents, date)
                 
                 return (
                   <div
@@ -1498,11 +1547,11 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
                       const isMultiDay = !isSameDay(eventStart, eventEnd)
                       const isStartDay = isSameDay(eventStart, date)
                       const isEndDay = isSameDay(eventEnd, date)
+                      const segment = getEventDaySegment(event, date)
+                      if (!segment) return null
                       
-                      // Calculate event duration in minutes for single-day events
-                      const eventDurationMinutes = isSameDay(eventStart, eventEnd) 
-                        ? (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60) // Convert to minutes
-                        : 60 // Default to 1 hour for multi-day events
+                      // Calculate event duration in minutes for this day segment
+                      const eventDurationMinutes = segment.endMinutes - segment.startMinutes
                       
                       // Calculate precise height based on actual duration (35px per hour)
                       // Use much smaller minimum for very short events
@@ -1657,64 +1706,86 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
     )
   }
 
+  const visibleDates = viewMode === 'day' ? [new Date(currentDate)] : getWeekDates(currentDate)
+  const currentRangeLabel =
+    viewMode === 'month'
+      ? getMonthYear(currentDate)
+      : viewMode === 'week'
+        ? getWeekRange(currentDate)
+        : getDayLabel(currentDate)
+  const selectedDayEvents = getEventsForDay(currentDate)
+
   return (
     <div className="space-y-4">
       {/* Header Controls */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-          <Button variant="outline" size="sm" onClick={goToToday} className="text-xs sm:text-sm">
-            Today
-          </Button>
-          <div className="flex items-center gap-1 sm:gap-2">
-            <Button variant="outline" size="icon" onClick={navigatePrevious} className="h-8 w-8 sm:h-10 sm:w-10">
-              <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+      <div className="rounded-lg border bg-card/40 p-3 sm:p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+            <Button variant="outline" size="sm" onClick={goToToday} className="h-9 text-xs sm:text-sm">
+              Today
             </Button>
-            <Button variant="outline" size="icon" onClick={navigateNext} className="h-8 w-8 sm:h-10 sm:w-10">
-              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Button variant="outline" size="icon" onClick={navigatePrevious} className="h-9 w-9 sm:h-10 sm:w-10">
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={navigateNext} className="h-9 w-9 sm:h-10 sm:w-10">
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+            </div>
+            <h2 className="text-lg sm:text-2xl font-bold">
+              {currentRangeLabel}
+            </h2>
           </div>
-          <h2 className="text-lg sm:text-2xl font-bold">
-            {viewMode === 'month' ? getMonthYear(currentDate) : getWeekRange(currentDate)}
-          </h2>
-        </div>
 
-        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-          <div className="flex border rounded-lg overflow-hidden">
+          <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+            <div className="flex border rounded-lg overflow-hidden">
+              <Button
+                variant={viewMode === 'month' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('month')}
+                className="rounded-none h-9 text-xs sm:text-sm"
+              >
+                Month
+              </Button>
+              <Button
+                variant={viewMode === 'week' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('week')}
+                className="rounded-none h-9 text-xs sm:text-sm"
+              >
+                Week
+              </Button>
+              <Button
+                variant={viewMode === 'day' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('day')}
+                className="rounded-none h-9 text-xs sm:text-sm"
+              >
+                Day
+              </Button>
+            </div>
             <Button
-              variant={viewMode === 'month' ? 'default' : 'ghost'}
+              variant={showImportantOnly ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setViewMode('month')}
-              className="rounded-none text-xs sm:text-sm"
+              onClick={() => setShowImportantOnly(!showImportantOnly)}
+              className="h-9 text-xs sm:text-sm"
             >
-              Month
+              <span className="hidden sm:inline">Important Only</span>
+              <span className="sm:hidden">Important</span>
             </Button>
-            <Button
-              variant={viewMode === 'week' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('week')}
-              className="rounded-none text-xs sm:text-sm"
-            >
-              Week
+            <Button onClick={() => {
+              setFormData(getInitialFormData())
+              setCreateOpen(true)
+            }} size="sm" className="h-9 text-xs sm:text-sm">
+              <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Create Event</span>
+              <span className="sm:hidden">New</span>
             </Button>
           </div>
-          <Button
-            variant={showImportantOnly ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowImportantOnly(!showImportantOnly)}
-            className="text-xs sm:text-sm"
-          >
-            <span className="hidden sm:inline">Important Only</span>
-            <span className="sm:hidden">Important</span>
-          </Button>
-          <Button onClick={() => {
-            setFormData(getInitialFormData())
-            setCreateOpen(true)
-          }} size="sm" className="text-xs sm:text-sm">
-            <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">New Event</span>
-            <span className="sm:hidden">Event</span>
-          </Button>
         </div>
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          {showImportantOnly ? 'Showing important events only.' : 'Showing all events.'} Use visibility and targeting when creating events to control who gets notified.
+        </p>
       </div>
 
       {/* Calendar View */}
@@ -1724,10 +1795,79 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
           description="Fetching your events and schedule..."
           variant="orbit"
         />
-      ) : viewMode === 'month' ? (
-        renderMonthView()
       ) : (
-        renderWeekView()
+        <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <aside className="hidden lg:flex lg:flex-col gap-4">
+            <div className="rounded-lg border bg-card/60 p-3 space-y-3">
+              <h3 className="text-sm font-semibold">Jump to date</h3>
+              <Input
+                type="date"
+                value={formatDateInput(currentDate)}
+                onChange={(e) => {
+                  if (!e.target.value) return
+                  const [year, month, day] = e.target.value.split('-').map((part) => parseInt(part, 10))
+                  if (!year || !month || !day) return
+                  setCurrentDate(new Date(year, month - 1, day))
+                }}
+                className="h-9"
+              />
+              <Button variant="outline" size="sm" className="w-full h-9" onClick={goToToday}>
+                Today
+              </Button>
+            </div>
+
+            <div className="rounded-lg border bg-card/60 p-3 space-y-2">
+              <h3 className="text-sm font-semibold">Calendars</h3>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">Personal ({scopeSummary.personal})</Badge>
+                <Badge variant="outline">Team ({scopeSummary.team})</Badge>
+                <Badge variant="outline">Club ({scopeSummary.club})</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total events: {summaryEvents.length}
+              </p>
+            </div>
+
+            <div className="rounded-lg border bg-card/60 p-3 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold">Agenda</h3>
+                <p className="text-xs text-muted-foreground">{getDayLabel(currentDate)}</p>
+              </div>
+              <div className="space-y-2 max-h-[260px] overflow-y-auto">
+                {selectedDayEvents.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No events on this date.</p>
+                )}
+                {selectedDayEvents.slice(0, 8).map((event) => {
+                  const start = new Date(event.startUTC)
+                  const end = new Date(event.endUTC)
+                  const isAllDay = start.getHours() === 0 && start.getMinutes() === 0 && end.getHours() === 23 && end.getMinutes() === 59
+                  return (
+                    <button
+                      type="button"
+                      key={event.id}
+                      onClick={() => handleEventClick(event)}
+                      className="w-full text-left rounded-md border border-border/60 p-2 hover:bg-muted/40 transition-colors"
+                    >
+                      <p className="text-sm font-medium truncate">{event.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {isAllDay
+                          ? 'All day'
+                          : `${start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                      </p>
+                    </button>
+                  )
+                })}
+                {selectedDayEvents.length > 8 && (
+                  <p className="text-xs text-muted-foreground">+{selectedDayEvents.length - 8} more</p>
+                )}
+              </div>
+            </div>
+          </aside>
+
+          <div className="min-w-0">
+            {viewMode === 'month' ? renderMonthView() : renderWeekView(visibleDates)}
+          </div>
+        </div>
       )}
 
       {/* Create Event Dialog */}
@@ -1988,7 +2128,13 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
                               ` on ${formData.recurrenceDaysOfWeek.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}`}
                             {formData.recurrenceRule === 'WEEKLY' && (!formData.recurrenceDaysOfWeek || formData.recurrenceDaysOfWeek.length === 0) && ' (select days)'}
                             {formData.recurrenceEndType === 'date' 
-                              ? ` until ${new Date(formData.recurrenceEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                              ? (() => {
+                                  const recurrenceEndDate = new Date(formData.recurrenceEndDate)
+                                  if (Number.isNaN(recurrenceEndDate.getTime())) {
+                                    return ' (choose an end date)'
+                                  }
+                                  return ` until ${recurrenceEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                                })()
                               : ` for ${formData.recurrenceCount} occurrence${formData.recurrenceCount !== 1 ? 's' : ''}`}
                           </p>
                         </div>
@@ -2030,29 +2176,32 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
               {/* Visibility Section */}
               <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
                 <h4 className="text-sm font-semibold">Visibility</h4>
-                <RadioGroup 
+                <RadioGroup
                   value={formData.scope} 
                   onValueChange={(value) => setFormData({ ...formData, scope: value as 'PERSONAL' | 'TEAM' | 'CLUB', teamId: '' })}
                   className="space-y-2"
                 >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="PERSONAL" id="scope-personal" />
-                    <Label htmlFor="scope-personal" className="cursor-pointer font-normal text-sm">
-                      Personal event (only you can see)
+                  <div className={`flex items-start gap-3 rounded-md border p-3 transition-colors ${formData.scope === 'PERSONAL' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent/30'}`}>
+                    <RadioGroupItem value="PERSONAL" id="scope-personal" className="mt-0.5" />
+                    <Label htmlFor="scope-personal" className="cursor-pointer">
+                      <span className="block text-sm font-medium">Personal</span>
+                      <span className="block text-xs text-muted-foreground">Only you can see this event</span>
                     </Label>
                   </div>
                   {isAdmin && (
                     <>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="CLUB" id="scope-club" />
-                        <Label htmlFor="scope-club" className="cursor-pointer font-normal text-sm">
-                          Entire club
+                      <div className={`flex items-start gap-3 rounded-md border p-3 transition-colors ${formData.scope === 'CLUB' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent/30'}`}>
+                        <RadioGroupItem value="CLUB" id="scope-club" className="mt-0.5" />
+                        <Label htmlFor="scope-club" className="cursor-pointer">
+                          <span className="block text-sm font-medium">Entire Club</span>
+                          <span className="block text-xs text-muted-foreground">Visible to all members in this club</span>
                         </Label>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="TEAM" id="scope-team" />
-                        <Label htmlFor="scope-team" className="cursor-pointer font-normal text-sm">
-                          Specific team
+                      <div className={`flex items-start gap-3 rounded-md border p-3 transition-colors ${formData.scope === 'TEAM' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent/30'}`}>
+                        <RadioGroupItem value="TEAM" id="scope-team" className="mt-0.5" />
+                        <Label htmlFor="scope-team" className="cursor-pointer">
+                          <span className="block text-sm font-medium">Specific Team</span>
+                          <span className="block text-xs text-muted-foreground">Visible only to one selected team</span>
                         </Label>
                       </div>
                     </>
@@ -2087,19 +2236,25 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
                       />
                       <span className="text-sm">Enable RSVP tracking</span>
                     </label>
+                    <p className="text-xs text-muted-foreground mt-1.5 ml-6">
+                      Members can respond Yes or No, and admins can review attendance.
+                    </p>
                   </div>
                 )}
               </div>
 
               {/* Options */}
-              <div className="flex items-center gap-4">
-                <label className="inline-flex items-center gap-2 cursor-pointer">
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <label className="inline-flex items-start gap-2 cursor-pointer">
                   <Checkbox
                     id="important"
                     checked={formData.important}
                     onCheckedChange={(checked) => setFormData({ ...formData, important: checked as boolean })}
                   />
-                  <span className="text-sm font-medium">Mark as important</span>
+                  <span>
+                    <span className="block text-sm font-medium">Mark as important</span>
+                    <span className="block text-xs text-muted-foreground">Highlights this event in calendar and list views.</span>
+                  </span>
                 </label>
               </div>
 
@@ -2651,31 +2806,34 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
                   Mark as important
                 </Label>
               </div>
-              <div>
-                <Label>Scope</Label>
-                <RadioGroup 
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                <h4 className="text-sm font-semibold">Visibility</h4>
+                <RadioGroup
                   value={formData.scope} 
                   onValueChange={(value) => setFormData({ ...formData, scope: value as 'PERSONAL' | 'TEAM' | 'CLUB', teamId: '' })}
-                  className="mt-2 space-y-2"
+                  className="space-y-2"
                 >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="PERSONAL" id="edit-scope-personal" />
-                    <Label htmlFor="edit-scope-personal" className="cursor-pointer font-normal text-sm">
-                      Personal event
+                  <div className={`flex items-start gap-3 rounded-md border p-3 transition-colors ${formData.scope === 'PERSONAL' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent/30'}`}>
+                    <RadioGroupItem value="PERSONAL" id="edit-scope-personal" className="mt-0.5" />
+                    <Label htmlFor="edit-scope-personal" className="cursor-pointer">
+                      <span className="block text-sm font-medium">Personal</span>
+                      <span className="block text-xs text-muted-foreground">Only you can see this event</span>
                     </Label>
                   </div>
                   {isAdmin && (
                     <>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="TEAM" id="edit-scope-team" />
-                        <Label htmlFor="edit-scope-team" className="cursor-pointer font-normal text-sm">
-                          Entire club
+                      <div className={`flex items-start gap-3 rounded-md border p-3 transition-colors ${formData.scope === 'CLUB' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent/30'}`}>
+                        <RadioGroupItem value="CLUB" id="edit-scope-club" className="mt-0.5" />
+                        <Label htmlFor="edit-scope-club" className="cursor-pointer">
+                          <span className="block text-sm font-medium">Entire Club</span>
+                          <span className="block text-xs text-muted-foreground">Visible to all members in this club</span>
                         </Label>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="TEAM" id="edit-scope-team" />
-                        <Label htmlFor="edit-scope-team" className="cursor-pointer font-normal text-sm">
-                          Specific team
+                      <div className={`flex items-start gap-3 rounded-md border p-3 transition-colors ${formData.scope === 'TEAM' ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent/30'}`}>
+                        <RadioGroupItem value="TEAM" id="edit-scope-team" className="mt-0.5" />
+                        <Label htmlFor="edit-scope-team" className="cursor-pointer">
+                          <span className="block text-sm font-medium">Specific Team</span>
+                          <span className="block text-xs text-muted-foreground">Visible only to one selected team</span>
                         </Label>
                       </div>
                     </>
@@ -2712,6 +2870,9 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
                         Enable RSVP for this event
                       </Label>
                     </div>
+                    <p className="text-xs text-muted-foreground mt-1.5 ml-6">
+                      RSVP responses remain visible to admins in event details.
+                    </p>
                   </div>
                 )}
               </div>

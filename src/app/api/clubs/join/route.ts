@@ -9,7 +9,122 @@ import { Role } from '@prisma/client'
 
 const joinSchema = z.object({
   code: z.string().min(1),
+  clubId: z.string().min(1).optional(),
 })
+
+const previewSchema = z.object({
+  code: z.string().min(1),
+  clubId: z.string().min(1).optional(),
+})
+
+async function resolveInviteCodeForClub(code: string, clubId: string) {
+  const club = await prisma.club.findUnique({
+    where: { id: clubId },
+    select: {
+      id: true,
+      name: true,
+      adminInviteCodeHash: true,
+      memberInviteCodeHash: true,
+    },
+  })
+
+  if (!club) {
+    return null
+  }
+
+  const isAdminCode = await verifyInviteCode(code, club.adminInviteCodeHash)
+  if (isAdminCode) {
+    return { club, role: Role.ADMIN }
+  }
+
+  const isMemberCode = await verifyInviteCode(code, club.memberInviteCodeHash)
+  if (isMemberCode) {
+    return { club, role: Role.MEMBER }
+  }
+
+  return null
+}
+
+async function resolveInviteCode(code: string, clubId?: string) {
+  if (clubId) {
+    const directMatch = await resolveInviteCodeForClub(code, clubId)
+    if (directMatch) {
+      return directMatch
+    }
+  }
+
+  const clubs = await prisma.club.findMany({
+    select: {
+      id: true,
+      name: true,
+      adminInviteCodeHash: true,
+      memberInviteCodeHash: true,
+    },
+  })
+
+  for (const club of clubs) {
+    const isAdminCode = await verifyInviteCode(code, club.adminInviteCodeHash)
+    if (isAdminCode) {
+      return { club, role: Role.ADMIN }
+    }
+
+    const isMemberCode = await verifyInviteCode(code, club.memberInviteCodeHash)
+    if (isMemberCode) {
+      return { club, role: Role.MEMBER }
+    }
+  }
+
+  return null
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const searchParams = req.nextUrl.searchParams
+    const parsed = previewSchema.safeParse({
+      code: searchParams.get('code') ?? '',
+      clubId: searchParams.get('clubId') ?? undefined,
+    })
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invite code is required' }, { status: 400 })
+    }
+
+    const resolved = await resolveInviteCode(parsed.data.code, parsed.data.clubId)
+    if (!resolved) {
+      return NextResponse.json(
+        { error: 'Invalid or expired invite code', code: 'INVALID_CODE' },
+        { status: 404 }
+      )
+    }
+
+    const existingMembership = await prisma.membership.findUnique({
+      where: {
+        userId_clubId: {
+          userId: session.user.id,
+          clubId: resolved.club.id,
+        },
+      },
+      select: { id: true },
+    })
+
+    return NextResponse.json({
+      club: {
+        id: resolved.club.id,
+        name: resolved.club.name,
+      },
+      role: resolved.role,
+      alreadyMember: Boolean(existingMembership),
+    })
+  } catch (error) {
+    console.error('Join invite preview error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,29 +134,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { code } = joinSchema.parse(body)
+    const { code, clubId } = joinSchema.parse(body)
 
-    // Find all clubs and check which one this code belongs to
-    const clubs = await prisma.club.findMany()
-    
-    let matchedClub: typeof clubs[0] | null = null
-    let role: Role | null = null
-
-    for (const club of clubs) {
-      const isAdminCode = await verifyInviteCode(code, club.adminInviteCodeHash)
-      if (isAdminCode) {
-        matchedClub = club
-        role = Role.ADMIN
-        break
-      }
-
-      const isMemberCode = await verifyInviteCode(code, club.memberInviteCodeHash)
-      if (isMemberCode) {
-        matchedClub = club
-        role = Role.MEMBER
-        break
-      }
-    }
+    const resolvedInvite = await resolveInviteCode(code, clubId)
+    const matchedClub = resolvedInvite?.club ?? null
+    const role = resolvedInvite?.role ?? null
 
     if (!matchedClub || !role) {
       return NextResponse.json(
@@ -148,4 +245,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

@@ -122,7 +122,7 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
     }
   }, [clubId, initialForms])
 
-  const fetchForms = async () => {
+  async function fetchForms() {
     try {
       // Add timeout to prevent hanging requests
       const controller = new AbortController()
@@ -871,4 +871,3 @@ function ViewSubmissionsDialog({
     </Dialog>
   )
 }
-

@@ -101,10 +101,78 @@ interface ClubPageProps {
   initialData?: Partial<ClubPageInitialData>
 }
 
+const TAB_DETAILS = {
+  home: {
+    title: 'Home',
+    description: 'Overview of announcements, upcoming items, and team activity.',
+  },
+  stream: {
+    title: 'Stream',
+    description: 'Post updates and keep club communication organized in one place.',
+  },
+  people: {
+    title: 'People',
+    description: 'Manage members, roles, and team assignments.',
+  },
+  calendar: {
+    title: 'Calendar',
+    description: 'Plan practices, meetings, and key deadlines.',
+  },
+  attendance: {
+    title: 'Attendance',
+    description: 'Track participation and review attendance trends.',
+  },
+  finance: {
+    title: 'Finance',
+    description: 'Monitor budgets, requests, and club spending.',
+  },
+  tests: {
+    title: 'Tests',
+    description: 'Create, schedule, and review assessments.',
+  },
+  gallery: {
+    title: 'Gallery',
+    description: 'Organize club photos and media.',
+  },
+  paperwork: {
+    title: 'Paperwork',
+    description: 'Collect forms and manage submission status.',
+  },
+  todos: {
+    title: 'To-Do List',
+    description: 'Coordinate tasks and follow through on action items.',
+  },
+  tools: {
+    title: 'Tools',
+    description: 'Access calculators, resources, and study utilities.',
+  },
+  stats: {
+    title: 'Stats & Analytics',
+    description: 'Review performance and usage insights.',
+  },
+  settings: {
+    title: 'Settings',
+    description: 'Configure club preferences, branding, and defaults.',
+  },
+} satisfies Record<string, { title: string; description: string }>
+
+type ClubTab = keyof typeof TAB_DETAILS
+
+function isClubTab(tab: string): tab is ClubTab {
+  return tab in TAB_DETAILS
+}
+
+function resolveTab(tab: string | null, isAdmin: boolean): ClubTab {
+  if (!tab || !isClubTab(tab)) return 'home'
+  if (tab === 'stats' && !isAdmin) return 'home'
+  return tab
+}
+
 export function ClubPage({ club, currentMembership, user, clubs, initialData }: ClubPageProps) {
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'home')
+  const isAdmin = currentMembership.role === 'ADMIN'
+  const [activeTab, setActiveTab] = useState<ClubTab>(() => resolveTab(searchParams.get('tab'), isAdmin))
   const [editClubNameOpen, setEditClubNameOpen] = useState(false)
   const [currentClubName, setCurrentClubName] = useState(club.name)
   const [newClubName, setNewClubName] = useState(club.name)
@@ -122,7 +190,6 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
     gradientDirection: null as string | null,
     backgroundImageUrl: null as string | null,
   }
-  const isAdmin = currentMembership.role === 'ADMIN'
 
   const persistTabSeenTime = useCallback((tab: string) => {
     if (typeof window === 'undefined') return
@@ -270,12 +337,18 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
 
   useEffect(() => {
     const tabParam = searchParams.get('tab')
-    if (tabParam) {
-      setActiveTab(tabParam)
-    }
-  }, [searchParams])
+    const resolvedTab = resolveTab(tabParam, isAdmin)
 
-  const handleTabChange = useCallback((newTab: string) => {
+    setActiveTab(prev => (prev === resolvedTab ? prev : resolvedTab))
+
+    if (tabParam && tabParam !== resolvedTab && typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', resolvedTab)
+      window.history.replaceState(window.history.state, '', url.pathname + url.search)
+    }
+  }, [searchParams, isAdmin])
+
+  const handleTabChange = useCallback((newTab: ClubTab) => {
     dismissTabNotification(newTab)
     setActiveTab(newTab)
     setMobileMenuOpen(false)
@@ -774,4 +847,3 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData }: 
 
 // Keep backward compatibility export
 export { ClubPage as TeamPage }
-

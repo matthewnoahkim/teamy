@@ -20,13 +20,31 @@ interface JoinClubDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialCode?: string
+  initialInviteClubId?: string
 }
 
-export function JoinClubDialog({ open, onOpenChange, initialCode = '' }: JoinClubDialogProps) {
+interface InvitePreview {
+  club: {
+    id: string
+    name: string
+  }
+  role: 'ADMIN' | 'MEMBER'
+  alreadyMember: boolean
+}
+
+export function JoinClubDialog({
+  open,
+  onOpenChange,
+  initialCode = '',
+  initialInviteClubId = '',
+}: JoinClubDialogProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [code, setCode] = useState(initialCode)
+  const [invitePreview, setInvitePreview] = useState<InvitePreview | null>(null)
+  const [resolvingInvite, setResolvingInvite] = useState(false)
+  const isAlreadyMember = Boolean(invitePreview?.alreadyMember)
 
   // Update code when initialCode changes
   useEffect(() => {
@@ -34,6 +52,48 @@ export function JoinClubDialog({ open, onOpenChange, initialCode = '' }: JoinClu
       setCode(initialCode)
     }
   }, [initialCode])
+
+  useEffect(() => {
+    if (!open || !initialCode) {
+      if (!open) {
+        setInvitePreview(null)
+        setResolvingInvite(false)
+      }
+      return
+    }
+
+    const controller = new AbortController()
+    const resolveInvitePreview = async () => {
+      setResolvingInvite(true)
+      try {
+        const previewParams = new URLSearchParams({
+          code: initialCode,
+          ...(initialInviteClubId ? { clubId: initialInviteClubId } : {}),
+        })
+        const response = await fetch(`/api/clubs/join?${previewParams.toString()}`, {
+          signal: controller.signal,
+        })
+        if (!response.ok) {
+          setInvitePreview(null)
+          return
+        }
+        const data: InvitePreview = await response.json()
+        setInvitePreview(data)
+      } catch {
+        setInvitePreview(null)
+      } finally {
+        if (!controller.signal.aborted) {
+          setResolvingInvite(false)
+        }
+      }
+    }
+
+    resolveInvitePreview()
+
+    return () => {
+      controller.abort()
+    }
+  }, [open, initialCode, initialInviteClubId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,7 +103,10 @@ export function JoinClubDialog({ open, onOpenChange, initialCode = '' }: JoinClu
       const response = await fetch('/api/clubs/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim() }),
+        body: JSON.stringify({
+          code: code.trim(),
+          ...(initialInviteClubId ? { clubId: initialInviteClubId } : {}),
+        }),
       })
 
       const data = await response.json()
@@ -85,7 +148,13 @@ export function JoinClubDialog({ open, onOpenChange, initialCode = '' }: JoinClu
           <div className="space-y-4 py-4">
             {initialCode && (
               <div className="rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-3 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-100">
-                Invite link detected. We&apos;ve pre-filled the code below for you.
+                {resolvingInvite
+                  ? 'Invite link detected. Verifying invite details...'
+                  : invitePreview
+                    ? isAlreadyMember
+                      ? `You are already a member of ${invitePreview.club.name}.`
+                      : `Invite link detected for ${invitePreview.club.name} (${invitePreview.role === 'ADMIN' ? 'admin' : 'member'} access). We've pre-filled the code below for you.`
+                    : "Invite link detected. We've pre-filled the code below for you."}
               </div>
             )}
             <div className="space-y-2">
@@ -103,10 +172,22 @@ export function JoinClubDialog({ open, onOpenChange, initialCode = '' }: JoinClu
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !code.trim()}>
-              {loading && <ButtonLoading />}
-              {loading ? 'Joining...' : 'Join Club'}
-            </Button>
+            {isAlreadyMember && invitePreview ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  onOpenChange(false)
+                  router.push(`/club/${invitePreview.club.id}`)
+                }}
+              >
+                Go to Club
+              </Button>
+            ) : (
+              <Button type="submit" disabled={loading || !code.trim()}>
+                {loading && <ButtonLoading />}
+                {loading ? 'Joining...' : 'Join Club'}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
@@ -116,4 +197,3 @@ export function JoinClubDialog({ open, onOpenChange, initialCode = '' }: JoinClu
 
 // Keep backward compatibility export
 export { JoinClubDialog as JoinTeamDialog }
-

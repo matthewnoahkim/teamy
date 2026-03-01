@@ -12,55 +12,72 @@ import { CalendarScope, Prisma } from '@prisma/client'
 // Helper function to generate recurring event occurrences
 function generateRecurrenceInstances(
   startDate: Date,
-  endDate: Date,
   recurrenceRule: string,
   recurrenceInterval: number,
   recurrenceDaysOfWeek: number[] | undefined,
   recurrenceEndDate: Date | undefined,
   recurrenceCount: number | undefined
 ): Date[] {
-  const instances: Date[] = []
-  const _eventDuration = endDate.getTime() - startDate.getTime()
-  const currentDate = new Date(startDate)
-  let count = 0
+  const instances: Date[] = [new Date(startDate)]
   const maxIterations = recurrenceCount || 365 // Safety limit
   const endLimit = recurrenceEndDate || new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000) // 1 year max
+  let count = 1
 
-  while (count < maxIterations && currentDate <= endLimit) {
-    // For weekly recurrence, check if current day matches selected days
-    if (recurrenceRule === 'WEEKLY' && recurrenceDaysOfWeek && recurrenceDaysOfWeek.length > 0) {
-      const dayOfWeek = currentDate.getDay()
-      if (recurrenceDaysOfWeek.includes(dayOfWeek)) {
-        instances.push(new Date(currentDate))
+  if (count >= maxIterations || startDate >= endLimit) {
+    return instances
+  }
+
+  if (recurrenceRule === 'WEEKLY' && recurrenceDaysOfWeek && recurrenceDaysOfWeek.length > 0) {
+    const sortedDays = [...new Set(recurrenceDaysOfWeek)].sort((a, b) => a - b)
+    const weekCursor = new Date(startDate)
+    weekCursor.setDate(weekCursor.getDate() - weekCursor.getDay())
+
+    while (count < maxIterations) {
+      for (const dayOfWeek of sortedDays) {
+        const candidate = new Date(weekCursor)
+        candidate.setDate(weekCursor.getDate() + dayOfWeek)
+
+        if (candidate <= startDate) continue
+        if (candidate > endLimit) return instances
+
+        instances.push(candidate)
         count++
-      }
-      // Always increment by 1 day for weekly with specific days
-      currentDate.setDate(currentDate.getDate() + 1)
-    } else {
-      // Add current instance
-      instances.push(new Date(currentDate))
-      count++
 
-      // Move to next occurrence
-      switch (recurrenceRule) {
-        case 'DAILY':
-          currentDate.setDate(currentDate.getDate() + recurrenceInterval)
-          break
-        case 'WEEKLY':
-          currentDate.setDate(currentDate.getDate() + (7 * recurrenceInterval))
-          break
-        case 'MONTHLY':
-          currentDate.setMonth(currentDate.getMonth() + recurrenceInterval)
-          break
-        case 'YEARLY':
-          currentDate.setFullYear(currentDate.getFullYear() + recurrenceInterval)
-          break
+        if (recurrenceCount && count >= recurrenceCount) {
+          return instances
+        }
       }
+
+      weekCursor.setDate(weekCursor.getDate() + 7 * recurrenceInterval)
+      if (weekCursor > endLimit) break
     }
 
-    // Stop if we've reached the count limit or end date
+    return instances
+  }
+
+  const currentDate = new Date(startDate)
+  while (count < maxIterations) {
+    switch (recurrenceRule) {
+      case 'DAILY':
+        currentDate.setDate(currentDate.getDate() + recurrenceInterval)
+        break
+      case 'WEEKLY':
+        currentDate.setDate(currentDate.getDate() + (7 * recurrenceInterval))
+        break
+      case 'MONTHLY':
+        currentDate.setMonth(currentDate.getMonth() + recurrenceInterval)
+        break
+      case 'YEARLY':
+        currentDate.setFullYear(currentDate.getFullYear() + recurrenceInterval)
+        break
+    }
+
+    if (currentDate > endLimit) break
+
+    instances.push(new Date(currentDate))
+    count++
+
     if (recurrenceCount && count >= recurrenceCount) break
-    if (recurrenceEndDate && currentDate > recurrenceEndDate) break
   }
 
   return instances
@@ -98,6 +115,15 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const validated = createEventSchema.parse(body)
+    const startUTCDate = new Date(validated.startUTC)
+    const endUTCDate = new Date(validated.endUTC)
+
+    if (endUTCDate <= startUTCDate) {
+      return NextResponse.json(
+        { error: 'End time must be after start time' },
+        { status: 400 },
+      )
+    }
 
     await requireMember(session.user.id, validated.clubId)
 
@@ -137,8 +163,8 @@ export async function POST(req: NextRequest) {
       creatorId: membership.id,
       scope: validated.scope as CalendarScope,
       title: validated.title,
-      startUTC: new Date(validated.startUTC),
-      endUTC: new Date(validated.endUTC),
+      startUTC: startUTCDate,
+      endUTC: endUTCDate,
       color: validated.color || '#3b82f6',
       rsvpEnabled,
       important: validated.important || false,
@@ -234,8 +260,7 @@ export async function POST(req: NextRequest) {
     // Create child events for recurring events
     if (validated.isRecurring && validated.recurrenceRule) {
       const instances = generateRecurrenceInstances(
-        new Date(validated.startUTC),
-        new Date(validated.endUTC),
+        startUTCDate,
         validated.recurrenceRule,
         validated.recurrenceInterval || 1,
         validated.recurrenceDaysOfWeek,
@@ -245,7 +270,7 @@ export async function POST(req: NextRequest) {
 
       // Skip the first instance (that's the parent event)
       const childInstances = instances.slice(1)
-      const eventDuration = new Date(validated.endUTC).getTime() - new Date(validated.startUTC).getTime()
+      const eventDuration = endUTCDate.getTime() - startUTCDate.getTime()
 
       // Create child events
       if (childInstances.length > 0) {

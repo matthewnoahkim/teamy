@@ -554,10 +554,11 @@ export function SettingsTab({
   }
 
   const getInviteLink = (codeValue: string) => {
+    const query = `code=${encodeURIComponent(codeValue)}&inviteClub=${encodeURIComponent(club.id)}`
     if (typeof window === 'undefined') {
-      return `/join?code=${encodeURIComponent(codeValue)}`
+      return `/join?${query}`
     }
-    return `${window.location.origin}/join?code=${encodeURIComponent(codeValue)}`
+    return `${window.location.origin}/join?${query}`
   }
 
   const handleCopy = async (code: string, type: 'Admin' | 'Member', variant: 'code' | 'link' = 'code') => {
@@ -632,8 +633,8 @@ export function SettingsTab({
         description: 'The team and all its data have been permanently removed',
       })
 
-      // Redirect to no-clubs page after successful deletion
-      router.push('/no-clubs')
+      // Route through home so logged-in users are redirected to another club when available.
+      router.push('/')
       router.refresh()
     } catch (error: unknown) {
       toast({
@@ -663,8 +664,8 @@ export function SettingsTab({
         description: 'You have successfully left the club',
       })
 
-      // Navigate to no-clubs page or another club
-      router.push('/no-clubs')
+      // Route through home so logged-in users are redirected to another club when available.
+      router.push('/')
       router.refresh()
     } catch (error: unknown) {
       toast({
@@ -1654,4 +1655,3 @@ export function SettingsTab({
     </div>
   )
 }
-

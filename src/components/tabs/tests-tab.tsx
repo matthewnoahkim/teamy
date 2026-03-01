@@ -903,27 +903,38 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     )
   }
 
+  const visibleTestCount = (isAdmin ? drafts.length : 0) + scheduled.length + opened.length + completed.length
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <div>
+      <div className="rounded-lg border bg-card/40 p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
+          <div className="space-y-1">
             <h2 className="text-2xl font-bold">Tests</h2>
             <p className="text-muted-foreground">
-              {isAdmin ? 'Create and manage tests for your team' : 'View and take available tests'}
+              {isAdmin ? 'Create, publish, and manage tests for your team.' : 'View and take available tests.'}
             </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Badge variant="outline">Visible: {visibleTestCount}</Badge>
+              {isAdmin && <Badge variant="outline">Drafts: {drafts.length}</Badge>}
+              <Badge variant="outline">Open: {opened.length}</Badge>
+              <Badge variant="outline">Scheduled: {scheduled.length}</Badge>
+            </div>
           </div>
           {isAdmin && (
-            <Button onClick={() => router.push(`/club/${clubId}/tests/new`)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Test
-            </Button>
+            <div className="flex flex-col items-stretch sm:items-end gap-1.5">
+              <Button onClick={() => router.push(`/club/${clubId}/tests/new`)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Open Test Builder
+              </Button>
+              <p className="text-xs text-muted-foreground">Create drafts, build questions, then publish.</p>
+            </div>
           )}
         </div>
 
         {/* Search and Filter */}
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10 shrink-0 will-change-transform" />
             <Input
@@ -935,7 +946,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
             />
           </div>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
-            <SelectTrigger className="h-12 w-[180px]">
+            <SelectTrigger className="h-12 w-full sm:w-[190px]">
               <SelectValue placeholder="All Tests" />
             </SelectTrigger>
             <SelectContent>
@@ -1127,4 +1138,3 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     </div>
   )
 }
-

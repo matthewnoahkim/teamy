@@ -17,9 +17,10 @@ interface NoClubsClientProps {
     image?: string | null
   }
   initialCode?: string
+  initialInviteClubId?: string
 }
 
-export function NoClubsClient({ user, initialCode = '' }: NoClubsClientProps) {
+export function NoClubsClient({ user, initialCode = '', initialInviteClubId = '' }: NoClubsClientProps) {
   const [createOpen, setCreateOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
 
@@ -70,6 +71,7 @@ export function NoClubsClient({ user, initialCode = '' }: NoClubsClientProps) {
           open={joinOpen} 
           onOpenChange={setJoinOpen} 
           initialCode={initialCode}
+          initialInviteClubId={initialInviteClubId}
         />
       </main>
     </div>

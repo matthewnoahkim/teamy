@@ -90,20 +90,27 @@ interface TournamentTestsClientProps {
   }
 }
 
-// Helper function to highlight search terms in text (exact copy from dev panel)
+const regexCache = new Map<string, RegExp>()
+
+// Helper function to highlight search terms in text.
 const highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
   if (!text || !searchQuery) return text || ''
   
   const query = searchQuery.trim()
   if (!query) return text
   
-  // Escape special regex characters
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const regex = new RegExp(`(${escapedQuery})`, 'gi')
+  let regex = regexCache.get(query)
+  if (!regex) {
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    regex = new RegExp(`(${escapedQuery})`, 'gi')
+    if (regexCache.size < 50) {
+      regexCache.set(query, regex)
+    }
+  }
   const parts = text.split(regex)
   
-  return parts.map((part, index) => 
-    regex.test(part) ? (
+  return parts.map((part, index) =>
+    index % 2 === 1 ? (
       <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-foreground px-0.5 rounded">
         {part}
       </mark>
@@ -129,7 +136,8 @@ export function TournamentTestsClient({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [testToDelete, setTestToDelete] = useState<TournamentTest | null>(null)
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
-  const [assigningTest, setAssigningTest] = useState<string | null>(null)
+  const [selectedAssignTest, setSelectedAssignTest] = useState<TournamentTest | null>(null)
+  const [assigning, setAssigning] = useState(false)
   const [selectedAssignEventId, setSelectedAssignEventId] = useState<string>('')
   const [warningDismissed, setWarningDismissed] = useState(false)
 
@@ -208,7 +216,22 @@ export function TournamentTestsClient({
     }
   }
 
-  const handleAssignTest = async (testId: string) => {
+  const handleAssignClick = (tournamentTest: TournamentTest) => {
+    setSelectedAssignTest(tournamentTest)
+    setSelectedAssignEventId(tournamentTest.eventId ?? '')
+    setAssignDialogOpen(true)
+  }
+
+  const handleAssignTest = async () => {
+    if (!selectedAssignTest) {
+      toast({
+        title: 'Error',
+        description: 'No test selected',
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (!selectedAssignEventId) {
       toast({
         title: 'Error',
@@ -219,12 +242,12 @@ export function TournamentTestsClient({
     }
 
     try {
-      setAssigningTest(testId)
+      setAssigning(true)
       const response = await fetch(`/api/tournaments/${tournamentId}/assign-tests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          testId,
+          testId: selectedAssignTest.testId,
           eventId: selectedAssignEventId,
         }),
       })
@@ -241,7 +264,7 @@ export function TournamentTestsClient({
       })
 
       setAssignDialogOpen(false)
-      setAssigningTest(null)
+      setSelectedAssignTest(null)
       setSelectedAssignEventId('')
       loadTournamentTests()
     } catch (error: unknown) {
@@ -251,7 +274,7 @@ export function TournamentTestsClient({
         variant: 'destructive',
       })
     } finally {
-      setAssigningTest(null)
+      setAssigning(false)
     }
   }
 
@@ -391,6 +414,14 @@ export function TournamentTestsClient({
               <Button
                 size="sm"
                 variant="ghost"
+                onClick={() => handleAssignClick(tournamentTest)}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Assign
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
                 onClick={() => handleViewTest(tournamentTest)}
               >
                 {test.status === 'DRAFT' ? (
@@ -449,6 +480,7 @@ export function TournamentTestsClient({
   }
 
   const allTests = [...drafts, ...scheduled, ...opened, ...completed]
+  const visibleTestCount = drafts.length + scheduled.length + opened.length + completed.length
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 grid-pattern">
@@ -463,25 +495,34 @@ export function TournamentTestsClient({
 
         <div className="space-y-6">
           {/* Header */}
-          <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-              <div>
+          <div className="rounded-lg border bg-card/40 p-4 sm:p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
+              <div className="space-y-1">
                 <h2 className="text-2xl font-bold">Tests</h2>
                 <p className="text-muted-foreground">
                   Create and manage tests for {tournamentName}
                 </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Badge variant="outline">Visible: {visibleTestCount}</Badge>
+                  <Badge variant="outline">Drafts: {drafts.length}</Badge>
+                  <Badge variant="outline">Open: {opened.length}</Badge>
+                  <Badge variant="outline">Scheduled: {scheduled.length}</Badge>
+                </div>
               </div>
-              <Button onClick={() => {
-                sessionStorage.setItem('tournamentId', tournamentId)
-                router.push(`/tournaments/${tournamentId}/tests/new`)
-              }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Test
-              </Button>
+              <div className="flex flex-col items-stretch sm:items-end gap-1.5">
+                <Button onClick={() => {
+                  sessionStorage.setItem('tournamentId', tournamentId)
+                  router.push(`/tournaments/${tournamentId}/tests/new`)
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Open Test Builder
+                </Button>
+                <p className="text-xs text-muted-foreground">Build once, then assign tests to events.</p>
+              </div>
             </div>
 
             {/* Search and Filter */}
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10 shrink-0" />
                 <Input
@@ -493,7 +534,7 @@ export function TournamentTestsClient({
                 />
               </div>
               <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | 'draft' | 'scheduled' | 'opened' | 'completed')}>
-                <SelectTrigger className="h-12 w-[180px]">
+                <SelectTrigger className="h-12 w-full sm:w-[190px]">
                   <SelectValue placeholder="All Tests" />
                 </SelectTrigger>
                 <SelectContent>
@@ -671,12 +712,21 @@ export function TournamentTestsClient({
         </Dialog>
 
         {/* Assign Test Dialog */}
-        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <Dialog
+          open={assignDialogOpen}
+          onOpenChange={(open) => {
+            setAssignDialogOpen(open)
+            if (!open && !assigning) {
+              setSelectedAssignTest(null)
+              setSelectedAssignEventId('')
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Assign Test to Event</DialogTitle>
               <DialogDescription>
-                Assign this test to all teams registered for the selected event. The test will be assigned to team members who have this event in their roster.
+                Assign {selectedAssignTest ? `"${selectedAssignTest.test.name}"` : 'this test'} to all teams registered for the selected event. The test will be assigned to team members who have this event in their roster.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -705,17 +755,17 @@ export function TournamentTestsClient({
                 onClick={() => {
                   setAssignDialogOpen(false)
                   setSelectedAssignEventId('')
-                  setAssigningTest(null)
+                  setSelectedAssignTest(null)
                 }}
-                disabled={!!assigningTest}
+                disabled={assigning}
               >
                 Cancel
               </Button>
               <Button
-                onClick={() => assigningTest && handleAssignTest(assigningTest)}
-                disabled={!!assigningTest || !selectedAssignEventId}
+                onClick={handleAssignTest}
+                disabled={assigning || !selectedAssignEventId || !selectedAssignTest}
               >
-                {assigningTest ? 'Assigning...' : 'Assign Test'}
+                {assigning ? 'Assigning...' : 'Assign Test'}
               </Button>
             </DialogFooter>
           </DialogContent>

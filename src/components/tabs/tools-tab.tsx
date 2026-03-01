@@ -1260,7 +1260,7 @@ function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, i
     fetchClubResources()
   }, [clubId])
 
-  const fetchClubResources = async () => {
+  async function fetchClubResources() {
     try {
       setLoadingResources(true)
       const response = await fetch(`/api/resources?clubId=${clubId}`)

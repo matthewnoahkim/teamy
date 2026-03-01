@@ -6,6 +6,7 @@ import { NoClubsClient } from '@/components/no-clubs-client'
 type NoClubsPageProps = {
   searchParams?: Promise<{
     code?: string
+    inviteClub?: string
   }>
 }
 
@@ -18,6 +19,7 @@ export default async function NoClubsPage({ searchParams }: NoClubsPageProps) {
 
   const resolvedSearchParams = await searchParams
   const code = resolvedSearchParams?.code?.toString() ?? ''
+  const inviteClub = resolvedSearchParams?.inviteClub?.toString() ?? ''
 
-  return <NoClubsClient user={session.user} initialCode={code} />
+  return <NoClubsClient user={session.user} initialCode={code} initialInviteClubId={inviteClub} />
 }
