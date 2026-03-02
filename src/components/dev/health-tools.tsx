@@ -151,6 +151,7 @@ export function HealthTools() {
   const [userLoading, setUserLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<Record<string, unknown> | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
 
   // Email whitelist
   const [whitelistEmails, setWhitelistEmails] = useState<Array<{ email: string; name: string | null; image: string | null }>>([])
@@ -589,6 +590,7 @@ export function HealthTools() {
   // Handle delete user
   const handleDeleteUser = async () => {
     if (!userToDelete) return
+    if (deleteConfirmation !== 'DELETE') return
 
     try {
       const response = await fetch(`/api/dev/users/${userToDelete.id}`, {
@@ -618,6 +620,7 @@ export function HealthTools() {
     } finally {
       setDeleteDialogOpen(false)
       setUserToDelete(null)
+      setDeleteConfirmation('')
     }
   }
 
@@ -1278,6 +1281,7 @@ export function HealthTools() {
                             onClick={(e) => {
                               e.stopPropagation()
                               setUserToDelete(user)
+                              setDeleteConfirmation('')
                               setDeleteDialogOpen(true)
                             }}
                             title="Delete user"
@@ -1397,21 +1401,43 @@ export function HealthTools() {
       </Tabs>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open)
+          if (!open) setDeleteConfirmation('')
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete User</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete {String(userToDelete?.name || userToDelete?.email)}?
-              This will permanently delete all their data including memberships, events, and posts.
+              This will permanently delete all associated account data, including memberships, tests, uploads, and activity history.
               This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-2 py-1">
+            <Label htmlFor="delete-user-confirmation">Type DELETE to confirm</Label>
+            <Input
+              id="delete-user-confirmation"
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              placeholder="DELETE"
+              autoComplete="off"
+            />
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false)
+                setDeleteConfirmation('')
+              }}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteUser}>
+            <Button variant="destructive" onClick={handleDeleteUser} disabled={deleteConfirmation !== 'DELETE'}>
               Delete User
             </Button>
           </DialogFooter>

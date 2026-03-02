@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireDevAccess } from '@/lib/dev/guard'
+import { deleteUserAccountData } from '@/lib/user-account-deletion'
 
 // WARNING: This endpoint allows deleting users. Protected by requireDevAccess (session whitelist or INTERNAL_API_KEY).
 
@@ -14,75 +15,21 @@ export async function DELETE(
   const resolvedParams = await params
   try {
     const { userId } = resolvedParams
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    })
 
-    // Handle teams where this user is the creator
-    // Transfer ownership to another admin before deleting the user
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
     await prisma.$transaction(async (tx) => {
-      // Find all clubs created by this user
-      const clubsCreatedByUser = await tx.club.findMany({
-        where: { createdById: userId },
-        include: {
-          memberships: {
-            where: {
-              role: 'ADMIN',
-              userId: { not: userId }, // Exclude the user being deleted
-            },
-            take: 1,
-            orderBy: { createdAt: 'asc' }, // Get the oldest admin (likely most trusted)
-          },
-        },
-      })
-
-      // For each club, transfer ownership to another admin if available
-      for (const club of clubsCreatedByUser) {
-        if (club.memberships.length > 0) {
-          // Transfer to first available admin
-          await tx.club.update({
-            where: { id: club.id },
-            data: { createdById: club.memberships[0].userId },
-          })
-        } else {
-          // No other admin exists - find any member to transfer to
-          const anyMember = await tx.membership.findFirst({
-            where: {
-              clubId: club.id,
-              userId: { not: userId },
-            },
-            orderBy: { createdAt: 'asc' },
-          })
-
-          if (anyMember) {
-            // Transfer to first available member and make them admin
-            await tx.club.update({
-              where: { id: club.id },
-              data: { createdById: anyMember.userId },
-            })
-            await tx.membership.update({
-              where: { id: anyMember.id },
-              data: { role: 'ADMIN' },
-            })
-          } else {
-            // No other members - this club will be orphaned
-            // In dev panel, we allow this - the club will be deleted when user is deleted
-            // due to cascade, but createdById constraint will prevent it
-            // So we need to delete the club first or handle the constraint
-            // For now, we'll try to delete the club if it has no other members
-            try {
-              await tx.club.delete({
-                where: { id: club.id },
-              })
-            } catch (_e) {
-              // If club deletion fails, we can't proceed with user deletion
-              throw new Error(`Cannot delete user: club "${club.name}" has no other members and cannot be transferred`)
-            }
-          }
-        }
-      }
-
-      // Now delete user and all related data (cascade delete)
-      await tx.user.delete({
-        where: { id: userId },
-      })
+      await deleteUserAccountData(tx, userId)
     })
 
     // Log the deletion
@@ -90,11 +37,11 @@ export async function DELETE(
       await prisma.activityLog.create({
         data: {
           action: 'USER_DELETED',
-          description: `User with ID ${userId} was deleted from dev panel`,
+          description: `User ${targetUser.email} (${targetUser.id}) was deleted from dev panel`,
           logType: 'ADMIN_ACTION',
           severity: 'WARNING',
           route: '/api/dev/users/[userId]',
-          metadata: { userId },
+          metadata: { userId, email: targetUser.email, name: targetUser.name },
         },
       })
     } catch (logError) {
@@ -123,4 +70,3 @@ export async function DELETE(
     )
   }
 }
-

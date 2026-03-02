@@ -17,6 +17,7 @@ import { signOut } from 'next-auth/react'
 import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import { CreateClubDialog } from '@/components/create-club-dialog'
 import { JoinClubDialog } from '@/components/join-club-dialog'
+import { AccountSecurityMenuItem } from '@/components/account-security-menu-item'
 import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/use-toast'
 
@@ -65,6 +66,8 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   const currentClub = clubs?.find(c => c.id === clubId)
   const effectiveClubs = clubs || allClubs || []
   const effectivePath = currentPath || pathname
+  const clubMenuTriggerId = clubId ? `club-switcher-trigger-${clubId}` : 'club-switcher-trigger'
+  const userMenuTriggerId = `user-menu-trigger-${user.id}`
   const fromPath = pathname || '/'
   const customizationHref = `/customization?from=${encodeURIComponent(fromPath)}`
   const billingHref = `/billing?from=${encodeURIComponent(fromPath)}`
@@ -201,7 +204,7 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
             
             {showClubDropdown ? (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+                <DropdownMenuTrigger asChild id={clubMenuTriggerId}>
                   <button className="flex items-center gap-2 px-3 py-1.5 text-sm sm:text-base md:text-lg text-white font-semibold hover:bg-white/10 rounded-lg transition-colors truncate max-w-[150px] sm:max-w-[200px] md:max-w-[300px]">
                     <span className="truncate">{currentClub?.name || 'Clubs'}</span>
                     <ChevronDown className="h-4 w-4 flex-shrink-0" />
@@ -302,7 +305,7 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
           
           <div className="flex items-center gap-2 md:gap-3">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild id={userMenuTriggerId}>
                 <button className="flex items-center gap-2 sm:gap-3 outline-none">
                   <Avatar 
                     className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all"
@@ -353,6 +356,7 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
                   <ThemeToggle variant="menu" />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <AccountSecurityMenuItem email={user.email} />
                 <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign Out

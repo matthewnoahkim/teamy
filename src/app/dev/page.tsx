@@ -42,6 +42,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { AccountSecurityMenuItem } from '@/components/account-security-menu-item'
 
 type Section = 'blog' | 'security' | 'tournaments' | 'email' | 'analytics' | 'payments' | 'resources' | 'banner' | 'promo' | 'audit'
 
@@ -243,7 +244,7 @@ export default function DevPage() {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild id={`dev-user-menu-trigger-${session?.user?.email || 'unknown'}`}>
                 <button className="flex items-center gap-2 sm:gap-3 outline-none">
                   <Avatar className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all">
                     <AvatarImage src={session?.user?.image || ''} />
@@ -270,6 +271,7 @@ export default function DevPage() {
                   <ThemeToggle variant="menu" />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <AccountSecurityMenuItem email={session?.user?.email || ''} />
                 <DropdownMenuItem
                   onClick={() => {
                     signOut({ callbackUrl: '/dev' })

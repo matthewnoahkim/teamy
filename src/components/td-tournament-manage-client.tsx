@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { AccountSecurityMenuItem } from '@/components/account-security-menu-item'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -1749,7 +1750,7 @@ export function TDTournamentManageClient({
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild id={`td-manage-user-menu-trigger-${user.id}`}>
                 <button className="flex items-center gap-2 sm:gap-3 outline-none">
                   <Avatar className="h-8 w-8 sm:h-9 sm:w-9 cursor-pointer ring-2 ring-white/30 hover:ring-white/50 transition-all">
                     <AvatarImage src={user.image || ''} />
@@ -1776,6 +1777,7 @@ export function TDTournamentManageClient({
                   <ThemeToggle variant="menu" />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <AccountSecurityMenuItem email={user.email} />
                 <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600">
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign Out
@@ -4737,4 +4739,3 @@ export function TDTournamentManageClient({
     </div>
   )
 }
-
