@@ -124,16 +124,41 @@ interface CalendarTabProps {
 type ViewMode = 'month' | 'week' | 'day'
 
 const calendarEventsCache = new Map<string, CalendarEvent[]>()
+const calendarTeamsCache = new Map<string, CalendarTeam[]>()
+const divisionEventsCache = new Map<string, SciOlyEvent[]>()
+
+function getDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function isAllDayEvent(start: Date, end: Date): boolean {
+  return (
+    start.getHours() === 0 &&
+    start.getMinutes() === 0 &&
+    end.getHours() === 23 &&
+    end.getMinutes() === 59
+  )
+}
 
 export function CalendarTab({ clubId, division, currentMembership, isAdmin, user, initialEvents }: CalendarTabProps) {
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
   const seedEvents = calendarEventsCache.get(clubId) ?? initialEvents ?? []
+  const seedTeams = calendarTeamsCache.get(clubId) ?? []
+  const seedAvailableEvents = divisionEventsCache.get(division) ?? []
   const [events, setEvents] = useState<CalendarEvent[]>(seedEvents)
-  const [teams, setTeams] = useState<CalendarTeam[]>([])
-  const [availableEvents, setAvailableEvents] = useState<SciOlyEvent[]>([])
-  const [loading, setLoading] = useState(!initialEvents)
+  const [teams, setTeams] = useState<CalendarTeam[]>(seedTeams)
+  const [availableEvents, setAvailableEvents] = useState<SciOlyEvent[]>(seedAvailableEvents)
+  const [loading, setLoading] = useState(seedEvents.length === 0)
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('month')
@@ -152,6 +177,18 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   useEffect(() => {
     calendarEventsCache.set(clubId, events)
   }, [clubId, events])
+
+  useEffect(() => {
+    if (teams.length > 0) {
+      calendarTeamsCache.set(clubId, teams)
+    }
+  }, [clubId, teams])
+
+  useEffect(() => {
+    if (availableEvents.length > 0) {
+      divisionEventsCache.set(division, availableEvents)
+    }
+  }, [availableEvents, division])
 
   // Helper function to format date for datetime-local input
   const _formatDateTimeLocal = (date: Date) => {
@@ -264,11 +301,20 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   }, [clubId])
 
   const fetchTeams = useCallback(async () => {
+    const cachedTeams = calendarTeamsCache.get(clubId)
+    if (cachedTeams && cachedTeams.length > 0) {
+      setTeams(cachedTeams)
+    }
+
     try {
       const response = await fetch(`/api/clubs/${clubId}/teams`)
       if (response.ok) {
         const data = await response.json()
-        setTeams(data.teams)
+        const nextTeams = data.teams || []
+        setTeams(nextTeams)
+        if (nextTeams.length > 0) {
+          calendarTeamsCache.set(clubId, nextTeams)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch teams:', error)
@@ -276,11 +322,20 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   }, [clubId])
 
   const fetchAvailableEvents = useCallback(async () => {
+    const cachedEvents = divisionEventsCache.get(division)
+    if (cachedEvents && cachedEvents.length > 0) {
+      setAvailableEvents(cachedEvents)
+    }
+
     try {
       const eventsResponse = await fetch(`/api/events?division=${division}`)
       if (eventsResponse.ok) {
         const eventsData = await eventsResponse.json()
-        setAvailableEvents(eventsData.events || [])
+        const nextEvents = eventsData.events || []
+        setAvailableEvents(nextEvents)
+        if (nextEvents.length > 0) {
+          divisionEventsCache.set(division, nextEvents)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch Science Olympiad events:', error)
@@ -794,63 +849,6 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
     }
   }
 
-  const getEventsForDay = (date: Date) => {
-    return events.filter((event) => {
-      // Apply important filter if enabled
-      if (showImportantOnly && !event.important) {
-        return false
-      }
-      
-      const eventStart = new Date(event.startUTC)
-      const eventEnd = new Date(event.endUTC)
-      
-      // Normalize dates to just the date part (no time) for comparison
-      const eventStartDate = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate())
-      const eventEndDate = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate())
-      const currentDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-      
-      // Check if the date falls within the event's date range
-      return currentDate >= eventStartDate && currentDate <= eventEndDate
-    }).sort((a, b) => {
-      const aStart = new Date(a.startUTC)
-      const aEnd = new Date(a.endUTC)
-      const bStart = new Date(b.startUTC)
-      const bEnd = new Date(b.endUTC)
-      
-      // Check if events are all-day
-      const aIsAllDay = aStart.getHours() === 0 && aStart.getMinutes() === 0 && 
-                        aEnd.getHours() === 23 && aEnd.getMinutes() === 59
-      const bIsAllDay = bStart.getHours() === 0 && bStart.getMinutes() === 0 && 
-                        bEnd.getHours() === 23 && bEnd.getMinutes() === 59
-      
-      // Calculate duration in days (fix: use proper date difference)
-      const aDuration = getEventSpanDays(aStart, aEnd)
-      const bDuration = getEventSpanDays(bStart, bEnd)
-      
-      // Check if events are multi-day
-      const aIsMultiDay = aDuration > 1
-      const bIsMultiDay = bDuration > 1
-      
-      // Prioritize multi-day events over single-day events
-      if (aIsMultiDay && !bIsMultiDay) return -1
-      if (!aIsMultiDay && bIsMultiDay) return 1
-      
-      // If both are multi-day, prioritize longer duration
-      if (aIsMultiDay && bIsMultiDay && aDuration !== bDuration) {
-        return bDuration - aDuration
-      }
-      
-      // If both are single-day, prioritize all-day events
-      if (!aIsMultiDay && !bIsMultiDay) {
-        if (aIsAllDay && !bIsAllDay) return -1
-        if (!aIsAllDay && bIsAllDay) return 1
-      }
-      
-      // For same duration or same type, sort by start time
-      return aStart.getTime() - bStart.getTime()
-    })
-  }
-
   const navigatePrevious = () => {
     if (viewMode === 'month') {
       setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
@@ -894,6 +892,157 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
     () => (showImportantOnly ? events.filter((event) => event.important) : events),
     [events, showImportantOnly],
   )
+
+  const eventBuckets = useMemo(() => {
+    const eventsByDay = new Map<string, CalendarEvent[]>()
+    const allDayEventsByDay = new Map<string, CalendarEvent[]>()
+    const timedEventsByDayHour = new Map<string, Map<number, CalendarEvent[]>>()
+    const eventMetaById = new Map<
+      string,
+      { start: Date; end: Date; isAllDay: boolean; durationDays: number }
+    >()
+
+    const pushEvent = (map: Map<string, CalendarEvent[]>, key: string, event: CalendarEvent) => {
+      const existing = map.get(key)
+      if (existing) {
+        existing.push(event)
+      } else {
+        map.set(key, [event])
+      }
+    }
+
+    for (const event of summaryEvents) {
+      const start = new Date(event.startUTC)
+      const end = new Date(event.endUTC)
+      const startDateOnly = getDateOnly(start)
+      const endDateOnly = getDateOnly(end)
+      const allDay = isAllDayEvent(start, end)
+      const durationDays = getEventSpanDays(start, end)
+
+      eventMetaById.set(event.id, {
+        start,
+        end,
+        isAllDay: allDay,
+        durationDays,
+      })
+
+      for (
+        const dayCursor = new Date(startDateOnly);
+        dayCursor <= endDateOnly;
+        dayCursor.setDate(dayCursor.getDate() + 1)
+      ) {
+        const dayKey = getDateKey(dayCursor)
+        pushEvent(eventsByDay, dayKey, event)
+
+        if (allDay) {
+          pushEvent(allDayEventsByDay, dayKey, event)
+          continue
+        }
+
+        const daySegment = getEventDaySegment(event, dayCursor)
+        if (!daySegment) continue
+
+        const hour = Math.floor(daySegment.startMinutes / 60)
+        const hourBuckets = timedEventsByDayHour.get(dayKey)
+        if (hourBuckets) {
+          const hourEvents = hourBuckets.get(hour)
+          if (hourEvents) {
+            hourEvents.push(event)
+          } else {
+            hourBuckets.set(hour, [event])
+          }
+        } else {
+          timedEventsByDayHour.set(dayKey, new Map([[hour, [event]]]))
+        }
+      }
+    }
+
+    const compareEventsForDay = (a: CalendarEvent, b: CalendarEvent) => {
+      const aMeta = eventMetaById.get(a.id)
+      const bMeta = eventMetaById.get(b.id)
+      if (!aMeta || !bMeta) return 0
+
+      const aIsMultiDay = aMeta.durationDays > 1
+      const bIsMultiDay = bMeta.durationDays > 1
+
+      if (aIsMultiDay && !bIsMultiDay) return -1
+      if (!aIsMultiDay && bIsMultiDay) return 1
+
+      if (aIsMultiDay && bIsMultiDay && aMeta.durationDays !== bMeta.durationDays) {
+        return bMeta.durationDays - aMeta.durationDays
+      }
+
+      if (!aIsMultiDay && !bIsMultiDay) {
+        if (aMeta.isAllDay && !bMeta.isAllDay) return -1
+        if (!aMeta.isAllDay && bMeta.isAllDay) return 1
+      }
+
+      return aMeta.start.getTime() - bMeta.start.getTime()
+    }
+
+    const compareAllDayEvents = (a: CalendarEvent, b: CalendarEvent) => {
+      const aMeta = eventMetaById.get(a.id)
+      const bMeta = eventMetaById.get(b.id)
+      if (!aMeta || !bMeta) return 0
+
+      const aIsMultiDay = aMeta.durationDays > 1
+      const bIsMultiDay = bMeta.durationDays > 1
+
+      if (aIsMultiDay && !bIsMultiDay) return -1
+      if (!aIsMultiDay && bIsMultiDay) return 1
+
+      if (aIsMultiDay && bIsMultiDay && aMeta.durationDays !== bMeta.durationDays) {
+        return bMeta.durationDays - aMeta.durationDays
+      }
+
+      return aMeta.start.getTime() - bMeta.start.getTime()
+    }
+
+    for (const [dayKey, dayEvents] of eventsByDay) {
+      dayEvents.sort(compareEventsForDay)
+
+      const allDayEvents = allDayEventsByDay.get(dayKey)
+      if (allDayEvents) {
+        allDayEvents.sort(compareAllDayEvents)
+      }
+
+      const hourBuckets = timedEventsByDayHour.get(dayKey)
+      if (hourBuckets) {
+        const dayDate = parseDateKey(dayKey)
+        for (const hourEvents of hourBuckets.values()) {
+          hourEvents.sort((a, b) => {
+            const aSegment = getEventDaySegment(a, dayDate)
+            const bSegment = getEventDaySegment(b, dayDate)
+            if (!aSegment || !bSegment) return 0
+
+            if (aSegment.startMinutes !== bSegment.startMinutes) {
+              return aSegment.startMinutes - bSegment.startMinutes
+            }
+
+            const aDuration = aSegment.endMinutes - aSegment.startMinutes
+            const bDuration = bSegment.endMinutes - bSegment.startMinutes
+            if (aDuration !== bDuration) {
+              return bDuration - aDuration
+            }
+
+            const aStart = eventMetaById.get(a.id)?.start.getTime() ?? 0
+            const bStart = eventMetaById.get(b.id)?.start.getTime() ?? 0
+            return aStart - bStart
+          })
+        }
+      }
+    }
+
+    return {
+      eventsByDay,
+      allDayEventsByDay,
+      timedEventsByDayHour,
+    }
+  }, [summaryEvents])
+
+  const getEventsForDay = useCallback((date: Date) => {
+    return eventBuckets.eventsByDay.get(getDateKey(date)) || []
+  }, [eventBuckets])
 
   const scopeSummary = useMemo(() => {
     return summaryEvents.reduce(
@@ -1390,54 +1539,7 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
             All Day
           </div>
           {visibleDates.map((date) => {
-            const allDayEvents = events.filter((event) => {
-              // Apply important filter if enabled
-              if (showImportantOnly && !event.important) {
-                return false
-              }
-              
-              const eventStart = new Date(event.startUTC)
-              const eventEnd = new Date(event.endUTC)
-              
-              // Check if it's an all-day event
-              const isAllDay = eventStart.getHours() === 0 && eventStart.getMinutes() === 0 && 
-                              eventEnd.getHours() === 23 && eventEnd.getMinutes() === 59
-              
-              if (!isAllDay) return false
-              
-              // Normalize dates for comparison
-              const eventStartDate = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate())
-              const eventEndDate = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate())
-              const currentDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-              
-              // Show on all days it spans
-              return currentDate >= eventStartDate && currentDate <= eventEndDate
-            }).sort((a, b) => {
-              const aStart = new Date(a.startUTC)
-              const aEnd = new Date(a.endUTC)
-              const bStart = new Date(b.startUTC)
-              const bEnd = new Date(b.endUTC)
-              
-              // Calculate duration in days (fix: use proper end date and add 1)
-              const aDuration = getEventSpanDays(aStart, aEnd)
-              const bDuration = getEventSpanDays(bStart, bEnd)
-              
-              // Check if events are multi-day
-              const aIsMultiDay = aDuration > 1
-              const bIsMultiDay = bDuration > 1
-              
-              // Prioritize multi-day events over single-day events
-              if (aIsMultiDay && !bIsMultiDay) return -1
-              if (!aIsMultiDay && bIsMultiDay) return 1
-              
-              // If both are multi-day, prioritize longer duration
-              if (aIsMultiDay && bIsMultiDay && aDuration !== bDuration) {
-                return bDuration - aDuration
-              }
-              
-              // For same duration or same type, sort by start time
-              return aStart.getTime() - bStart.getTime()
-            })
+            const allDayEvents = eventBuckets.allDayEventsByDay.get(getDateKey(date)) || []
 
             return (
               <div
@@ -1502,41 +1604,7 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
               {visibleDates.map((date) => {
                 const slotDate = new Date(date)
                 slotDate.setHours(hour, 0, 0, 0)
-                const slotEvents = events.filter((event) => {
-                  // Apply important filter if enabled
-                  if (showImportantOnly && !event.important) {
-                    return false
-                  }
-                  
-                  const eventStart = new Date(event.startUTC)
-                  const eventEnd = new Date(event.endUTC)
-                  
-                  // Exclude all-day events (they're shown in the all-day section)
-                  const isAllDay = eventStart.getHours() === 0 && eventStart.getMinutes() === 0 && 
-                                  eventEnd.getHours() === 23 && eventEnd.getMinutes() === 59
-                  if (isAllDay) return false
-
-                  const segment = getEventDaySegment(event, date)
-                  if (!segment) return false
-
-                  return Math.floor(segment.startMinutes / 60) === hour
-                }).sort((a, b) => {
-                  const aSegment = getEventDaySegment(a, date)
-                  const bSegment = getEventDaySegment(b, date)
-                  if (!aSegment || !bSegment) return 0
-
-                  if (aSegment.startMinutes !== bSegment.startMinutes) {
-                    return aSegment.startMinutes - bSegment.startMinutes
-                  }
-
-                  const aDuration = aSegment.endMinutes - aSegment.startMinutes
-                  const bDuration = bSegment.endMinutes - bSegment.startMinutes
-                  if (aDuration !== bDuration) {
-                    return bDuration - aDuration
-                  }
-
-                  return new Date(a.startUTC).getTime() - new Date(b.startUTC).getTime()
-                })
+                const slotEvents = eventBuckets.timedEventsByDayHour.get(getDateKey(date))?.get(hour) || []
 
                 // Calculate event layouts for overlapping events
                 const eventLayouts = calculateEventLayout(slotEvents, date)

@@ -3,6 +3,10 @@
 
 @layer base {
   :root {
+    --font-inter: system-ui;
+    --font-nunito: system-ui;
+    --font-quicksand: system-ui;
+
     /* Teamy Brand Colors */
     --teamy-primary: #0056C7;
     --teamy-primary-dark: #003A8C;

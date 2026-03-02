@@ -279,6 +279,21 @@ interface SettingsTabProps {
   onBackgroundUpdate?: (preferences: BackgroundPreferences | null) => void
 }
 
+type InviteCodes = { adminCode: string; memberCode: string }
+
+const HIDDEN_CODE = '••••••••••••'
+const inviteCodesCache = new Map<string, InviteCodes>()
+
+function hasRealInviteCodes(codes: InviteCodes | null | undefined): codes is InviteCodes {
+  return Boolean(
+    codes &&
+      codes.adminCode &&
+      codes.memberCode &&
+      codes.adminCode !== HIDDEN_CODE &&
+      codes.memberCode !== HIDDEN_CODE,
+  )
+}
+
 async function copyToClipboard(text: string): Promise<boolean> {
   if (typeof window === 'undefined') return false
 
@@ -322,13 +337,14 @@ export function SettingsTab({
 }: SettingsTabProps) {
   const { toast } = useToast()
   const router = useRouter()
-  const [adminCode, setAdminCode] = useState<string>(initialInviteCodes?.adminCode || '••••••••••••')
-  const [memberCode, setMemberCode] = useState<string>(initialInviteCodes?.memberCode || '••••••••••••')
+  const seedInviteCodes = inviteCodesCache.get(club.id) ?? initialInviteCodes ?? null
+  const [adminCode, setAdminCode] = useState<string>(seedInviteCodes?.adminCode || HIDDEN_CODE)
+  const [memberCode, setMemberCode] = useState<string>(seedInviteCodes?.memberCode || HIDDEN_CODE)
   const [showAdminCode, setShowAdminCode] = useState(false)
   const [showMemberCode, setShowMemberCode] = useState(false)
   const [codesLoading, setCodesLoading] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [codesFetched, setCodesFetched] = useState(Boolean(initialInviteCodes?.adminCode && initialInviteCodes?.memberCode))
+  const [codesFetched, setCodesFetched] = useState(Boolean(seedInviteCodes?.adminCode && seedInviteCodes?.memberCode))
   const codesFetchPromiseRef = useRef<Promise<{ adminCode: string; memberCode: string } | null> | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
@@ -365,13 +381,18 @@ export function SettingsTab({
 
   useEffect(() => {
     // Reset invite-code state when switching clubs.
-    setAdminCode(initialInviteCodes?.adminCode || '••••••••••••')
-    setMemberCode(initialInviteCodes?.memberCode || '••••••••••••')
+    const nextInviteCodes = inviteCodesCache.get(club.id) ?? initialInviteCodes ?? null
+    setAdminCode(nextInviteCodes?.adminCode || HIDDEN_CODE)
+    setMemberCode(nextInviteCodes?.memberCode || HIDDEN_CODE)
     setShowAdminCode(false)
     setShowMemberCode(false)
-    setCodesFetched(Boolean(initialInviteCodes?.adminCode && initialInviteCodes?.memberCode))
+    setCodesFetched(Boolean(nextInviteCodes?.adminCode && nextInviteCodes?.memberCode))
     setCodesLoading(false)
     codesFetchPromiseRef.current = null
+
+    if (hasRealInviteCodes(nextInviteCodes)) {
+      inviteCodesCache.set(club.id, nextInviteCodes)
+    }
   }, [club.id, initialInviteCodes?.adminCode, initialInviteCodes?.memberCode])
   
   const memberPreferences = personalBackground ?? currentMembership.preferences ?? null
@@ -546,6 +567,9 @@ export function SettingsTab({
         setAdminCode(normalized.adminCode)
         setMemberCode(normalized.memberCode)
         setCodesFetched(true)
+        if (hasRealInviteCodes(normalized)) {
+          inviteCodesCache.set(club.id, normalized)
+        }
 
         return normalized
       } catch (_error) {
@@ -618,6 +642,13 @@ export function SettingsTab({
       }
 
       setCodesFetched(true) // Mark codes as fetched after regeneration
+      const nextCodes = {
+        adminCode: codeTypeToRegenerate === 'admin' ? data.code : adminCode,
+        memberCode: codeTypeToRegenerate === 'member' ? data.code : memberCode,
+      }
+      if (hasRealInviteCodes(nextCodes)) {
+        inviteCodesCache.set(club.id, nextCodes)
+      }
 
       toast({
         title: 'Code regenerated',

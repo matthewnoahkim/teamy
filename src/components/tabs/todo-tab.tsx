@@ -108,12 +108,21 @@ const PRIORITY_CONFIG = {
   URGENT: { label: 'Urgent', color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300', icon: AlertTriangle },
 }
 
+const todoListCache = new Map<string, Todo[]>()
+const todoTeamMembersCache = new Map<string, TeamMember[]>()
+
+function getTodoCacheKey(clubId: string, showAll: boolean, selectedMemberId: string): string {
+  return `${clubId}:${showAll ? 'all' : 'my'}:${showAll ? selectedMemberId : 'all'}`
+}
+
 export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, initialTodos }: TodoTabProps) {
   const { toast } = useToast()
-  const [todos, setTodos] = useState<Todo[]>(initialTodos || [])
+  const seedTodos = todoListCache.get(getTodoCacheKey(clubId, false, 'all')) ?? initialTodos ?? []
+  const seedTeamMembers = todoTeamMembersCache.get(clubId) ?? []
+  const [todos, setTodos] = useState<Todo[]>(seedTodos)
   const [allTodos, setAllTodos] = useState<Todo[]>([])
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [loading, setLoading] = useState(!initialTodos)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(seedTeamMembers)
+  const [loading, setLoading] = useState(seedTodos.length === 0)
   const [submitting, setSubmitting] = useState(false)
   
   // Filter state
@@ -137,9 +146,22 @@ export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, ini
     membershipId: '',
   })
 
-  const fetchTodos = useCallback(async () => {
+  const fetchTodos = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true)
+    }
     try {
       const showAll = viewMode === 'all' && isAdmin
+      const cacheKey = getTodoCacheKey(clubId, showAll, selectedMemberId)
+      const cachedTodos = todoListCache.get(cacheKey)
+      if (cachedTodos && cachedTodos.length > 0) {
+        if (showAll) {
+          setAllTodos(cachedTodos)
+        } else {
+          setTodos(cachedTodos)
+        }
+      }
+
       const params = new URLSearchParams({ clubId })
       if (showAll) {
         params.append('showAll', 'true')
@@ -151,12 +173,14 @@ export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, ini
       const response = await fetch(`/api/todos?${params}`)
       if (!response.ok) throw new Error('Failed to fetch todos')
       const data = await response.json()
+      const nextTodos = data.todos || []
       
       if (showAll) {
-        setAllTodos(data.todos || [])
+        setAllTodos(nextTodos)
       } else {
-        setTodos(data.todos || [])
+        setTodos(nextTodos)
       }
+      todoListCache.set(cacheKey, nextTodos)
     } catch (error) {
       console.error('Failed to fetch todos:', error)
       toast({
@@ -171,14 +195,19 @@ export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, ini
 
   const fetchTeamMembers = useCallback(async () => {
     if (!isAdmin) return
+    const cachedMembers = todoTeamMembersCache.get(clubId)
+    if (cachedMembers && cachedMembers.length > 0) {
+      setTeamMembers(cachedMembers)
+    }
     try {
-      const response = await fetch(`/api/clubs/${clubId}/teams`)
-      if (!response.ok) return
-      // We need to fetch memberships separately
       const membersResponse = await fetch(`/api/memberships?clubId=${clubId}`)
       if (membersResponse.ok) {
         const data = await membersResponse.json()
-        setTeamMembers(data.memberships || [])
+        const nextMembers = data.memberships || []
+        setTeamMembers(nextMembers)
+        if (nextMembers.length > 0) {
+          todoTeamMembersCache.set(clubId, nextMembers)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch team members:', error)
@@ -186,20 +215,28 @@ export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, ini
   }, [clubId, isAdmin])
 
   useEffect(() => {
-    // If we have initial todos and are in 'my' view mode, skip fetching
-    if (initialTodos && viewMode === 'my' && !isAdmin) {
-      setLoading(false)
-      if (isAdmin) {
-        fetchTeamMembers()
-      }
-      return
-    }
-    // Fetch todos and team members in parallel
-    Promise.all([
-      fetchTodos(),
-      isAdmin ? fetchTeamMembers() : Promise.resolve()
-    ])
-  }, [fetchTodos, fetchTeamMembers, isAdmin, initialTodos, viewMode])
+    const showAll = viewMode === 'all' && isAdmin
+    const cacheKey = getTodoCacheKey(clubId, showAll, selectedMemberId)
+    const hasSeedData =
+      (todoListCache.get(cacheKey)?.length ?? 0) > 0 ||
+      (!showAll && (initialTodos?.length ?? 0) > 0)
+
+    void fetchTodos({ silent: hasSeedData })
+  }, [clubId, fetchTodos, initialTodos, isAdmin, selectedMemberId, viewMode])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    void fetchTeamMembers()
+  }, [fetchTeamMembers, isAdmin])
+
+  useEffect(() => {
+    todoListCache.set(getTodoCacheKey(clubId, false, 'all'), todos)
+  }, [clubId, todos])
+
+  useEffect(() => {
+    if (!isAdmin || viewMode !== 'all') return
+    todoListCache.set(getTodoCacheKey(clubId, true, selectedMemberId), allTodos)
+  }, [allTodos, clubId, isAdmin, selectedMemberId, viewMode])
 
   const handleCreateTodo = async () => {
     if (!formData.title.trim()) {
@@ -879,4 +916,3 @@ function TodoItem({
     </Card>
   )
 }
-

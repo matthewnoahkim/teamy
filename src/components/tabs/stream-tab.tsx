@@ -61,6 +61,9 @@ type ApiErrorResponse = {
   message?: string
 }
 
+const streamAnnouncementsCache = new Map<string, AnnouncementFull[]>()
+const streamEventsCache = new Map<string, StreamEvent[]>()
+
 async function performRequest(url: string, options: RequestInit = {}, fallbackMessage: string) {
   const response = await fetch(url, options)
   if (!response.ok) {
@@ -73,8 +76,10 @@ async function performRequest(url: string, options: RequestInit = {}, fallbackMe
 
 export function StreamTab({ clubId, division, currentMembership, teams, isAdmin, user, initialAnnouncements }: StreamTabProps) {
   const { toast } = useToast()
-  const [announcements, setAnnouncements] = useState<AnnouncementFull[]>(initialAnnouncements || [])
-  const [loading, setLoading] = useState(!initialAnnouncements)
+  const seedAnnouncements = streamAnnouncementsCache.get(clubId) ?? initialAnnouncements ?? []
+  const seedDivisionEvents = streamEventsCache.get(division) ?? []
+  const [announcements, setAnnouncements] = useState<AnnouncementFull[]>(seedAnnouncements)
+  const [loading, setLoading] = useState(seedAnnouncements.length === 0)
   const [posting, setPosting] = useState(false)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -82,7 +87,7 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
   const [selectedTeams, setSelectedTeams] = useState<string[]>([])
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [selectedEvents, setSelectedEvents] = useState<string[]>([])
-  const [availableEvents, setAvailableEvents] = useState<StreamEvent[]>([])
+  const [availableEvents, setAvailableEvents] = useState<StreamEvent[]>(seedDivisionEvents)
   const [sendEmail, setSendEmail] = useState(false)
   const [important, setImportant] = useState(false)
   const [isPostSectionCollapsed, setIsPostSectionCollapsed] = useState(true)
@@ -152,13 +157,13 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
   }, [clubId])
 
   useEffect(() => {
-    // Always sync once on mount so the stream stays fresh after tab switches.
-    if (initialAnnouncements) {
-      fetchAnnouncements({ silent: true })
-      return
-    }
-    fetchAnnouncements()
-  }, [fetchAnnouncements, initialAnnouncements])
+    const hasSeedData = (streamAnnouncementsCache.get(clubId)?.length ?? 0) > 0 || (initialAnnouncements?.length ?? 0) > 0
+    void fetchAnnouncements({ silent: hasSeedData })
+  }, [clubId, fetchAnnouncements, initialAnnouncements])
+
+  useEffect(() => {
+    streamAnnouncementsCache.set(clubId, announcements)
+  }, [announcements, clubId])
 
   useBackgroundRefresh(
     () => fetchAnnouncements({ silent: true }),
@@ -170,6 +175,11 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
 
   // Fetch events for the team's division - defer to not block initial render
   useEffect(() => {
+    const cachedEvents = streamEventsCache.get(division)
+    if (cachedEvents && cachedEvents.length > 0) {
+      setAvailableEvents(cachedEvents)
+    }
+
     // Defer this fetch slightly to prioritize announcements
     const timer = setTimeout(() => {
       const fetchEvents = async () => {
@@ -177,7 +187,11 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
           const eventsResponse = await fetch(`/api/events?division=${division}`)
           if (eventsResponse.ok) {
             const eventsData = await eventsResponse.json()
-            setAvailableEvents(eventsData.events || [])
+            const nextEvents = eventsData.events || []
+            setAvailableEvents(nextEvents)
+            if (nextEvents.length > 0) {
+              streamEventsCache.set(division, nextEvents)
+            }
           }
         } catch (error) {
           console.error('Failed to fetch events:', error)
@@ -802,17 +816,18 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
 
       const data = (await response.json().catch(() => null)) as { rsvp?: CalendarEventRSVP } | null
       if (data?.rsvp) {
+        const confirmedRsvp = data.rsvp
         updateEventRsvps(eventId, (currentRsvps) => {
           const withoutTemp = currentRsvps.filter((rsvp) => rsvp.id !== tempId)
           const existingIndex = withoutTemp.findIndex((rsvp) => rsvp.userId === currentMembership.userId)
 
           if (existingIndex >= 0) {
             return withoutTemp.map((rsvp, index) =>
-              index === existingIndex ? data.rsvp! : rsvp,
+              index === existingIndex ? confirmedRsvp : rsvp,
             )
           }
 
-          return [...withoutTemp, data.rsvp]
+          return [...withoutTemp, confirmedRsvp]
         })
       }
 

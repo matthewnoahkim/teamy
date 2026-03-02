@@ -66,10 +66,13 @@ interface AttendanceTabProps {
   initialAttendances?: AttendanceFull[]
 }
 
+const attendanceCache = new Map<string, AttendanceFull[]>()
+
 export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: AttendanceTabProps) {
   const { toast } = useToast()
-  const [attendances, setAttendances] = useState<AttendanceFull[]>(initialAttendances || [])
-  const [loading, setLoading] = useState(false)
+  const seedAttendances = attendanceCache.get(clubId) ?? initialAttendances ?? []
+  const [attendances, setAttendances] = useState<AttendanceFull[]>(seedAttendances)
+  const [loading, setLoading] = useState(seedAttendances.length === 0)
   const [selectedAttendance, setSelectedAttendance] = useState<AttendanceFull | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [checkInOpen, setCheckInOpen] = useState(false)
@@ -95,7 +98,9 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
       const response = await fetch(`/api/attendance?clubId=${clubId}`)
       if (response.ok) {
         const data = await response.json()
-        setAttendances(data.attendances)
+        const nextAttendances = data.attendances || []
+        setAttendances(nextAttendances)
+        attendanceCache.set(clubId, nextAttendances)
       } else {
         throw new Error('Failed to fetch attendances')
       }
@@ -114,11 +119,9 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
   }, [clubId, toast])
 
   useEffect(() => {
-    // Skip initial fetch if we already have data from server
-    if (!initialAttendances) {
-      fetchAttendances()
-    }
-  }, [fetchAttendances, initialAttendances])
+    const hasSeedData = (attendanceCache.get(clubId)?.length ?? 0) > 0 || (initialAttendances?.length ?? 0) > 0
+    void fetchAttendances({ silent: hasSeedData })
+  }, [clubId, fetchAttendances, initialAttendances])
 
   useBackgroundRefresh(
     () => fetchAttendances({ silent: true }),
@@ -890,4 +893,3 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
     </div>
   )
 }
-

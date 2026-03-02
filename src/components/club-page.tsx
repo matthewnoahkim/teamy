@@ -216,7 +216,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
       if (!prev[tab]) return prev
       const updated = { ...prev, [tab]: false }
       const totalCount = Object.values(updated).filter(Boolean).length
-      setTotalUnreadCount(totalCount)
+      setTotalUnreadCount(current => (current === totalCount ? current : totalCount))
       return updated
     })
   }, [])
@@ -474,9 +474,20 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
 
         if (!isMounted) return
         setTabNotifications(prev => {
-          const updated = { ...prev, ...notifications }
+          let changed = false
+          const updated = { ...prev }
+          for (const [tab, hasUnread] of Object.entries(notifications)) {
+            const nextValue = Boolean(hasUnread)
+            if (updated[tab] !== nextValue) {
+              updated[tab] = nextValue
+              changed = true
+            }
+          }
+
+          if (!changed) return prev
+
           const totalCount = Object.values(updated).filter(Boolean).length
-          setTotalUnreadCount(totalCount)
+          setTotalUnreadCount(current => (current === totalCount ? current : totalCount))
           return updated
         })
       } catch (error) {

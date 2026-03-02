@@ -1,0 +1,47 @@
+{
+  "ci": {
+    "collect": {
+      "numberOfRuns": 1,
+      "startServerCommand": "npm run start -- --hostname 127.0.0.1 --port 3000",
+      "startServerReadyPattern": "Ready",
+      "url": [
+        "http://127.0.0.1:3000/",
+        "http://127.0.0.1:3000/features",
+        "http://127.0.0.1:3000/pricing",
+        "http://127.0.0.1:3000/tournament-listings"
+      ],
+      "settings": {
+        "preset": "desktop",
+        "throttlingMethod": "simulate"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": [
+          "error",
+          {
+            "minScore": 0.55
+          }
+        ],
+        "largest-contentful-paint": [
+          "error",
+          {
+            "maxNumericValue": 6000
+          }
+        ],
+        "cumulative-layout-shift": [
+          "error",
+          {
+            "maxNumericValue": 0.25
+          }
+        ],
+        "total-blocking-time": [
+          "error",
+          {
+            "maxNumericValue": 1200
+          }
+        ]
+      }
+    }
+  }
+}

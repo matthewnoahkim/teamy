@@ -1,0 +1,88 @@
+name: Perf And Smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      smoke_base_url:
+        description: "Optional staging/prod-like base URL (e.g. https://staging.example.com)"
+        required: false
+        type: string
+      smoke_club_id:
+        description: "Optional clubId used for dynamic route/api smoke"
+        required: false
+        type: string
+      smoke_tournament_param:
+        description: "Optional tournament [param] used for dynamic route smoke"
+        required: false
+        type: string
+
+jobs:
+  build-and-budgets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: API Tests
+        run: npm run test:api
+
+      - name: Production Build
+        run: npm run build
+
+      - name: Lighthouse Perf Budgets
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: ./.lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Bundle Budget Check
+        run: npm run perf:bundle-budgets
+
+  smoke-runtime:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.smoke_base_url != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Route Smoke
+        env:
+          SMOKE_BASE_URL: ${{ inputs.smoke_base_url }}
+          SMOKE_CLUB_ID: ${{ inputs.smoke_club_id }}
+          SMOKE_TOURNAMENT_PARAM: ${{ inputs.smoke_tournament_param }}
+        run: npm run smoke:routes
+
+      - name: API Latency Budget Check
+        env:
+          SMOKE_BASE_URL: ${{ inputs.smoke_base_url }}
+          SMOKE_CLUB_ID: ${{ inputs.smoke_club_id }}
+          SMOKE_TOURNAMENT_PARAM: ${{ inputs.smoke_tournament_param }}
+        run: npm run perf:api-latency

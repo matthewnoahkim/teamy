@@ -32,12 +32,13 @@ async function resolveInviteCodeForClub(code: string, clubId: string) {
     return null
   }
 
-  const isAdminCode = await verifyInviteCode(code, club.adminInviteCodeHash)
+  const [isAdminCode, isMemberCode] = await Promise.all([
+    verifyInviteCode(code, club.adminInviteCodeHash),
+    verifyInviteCode(code, club.memberInviteCodeHash),
+  ])
   if (isAdminCode) {
     return { club, role: Role.ADMIN }
   }
-
-  const isMemberCode = await verifyInviteCode(code, club.memberInviteCodeHash)
   if (isMemberCode) {
     return { club, role: Role.MEMBER }
   }
@@ -63,12 +64,13 @@ async function resolveInviteCode(code: string, clubId?: string) {
   })
 
   for (const club of clubs) {
-    const isAdminCode = await verifyInviteCode(code, club.adminInviteCodeHash)
+    const [isAdminCode, isMemberCode] = await Promise.all([
+      verifyInviteCode(code, club.adminInviteCodeHash),
+      verifyInviteCode(code, club.memberInviteCodeHash),
+    ])
     if (isAdminCode) {
       return { club, role: Role.ADMIN }
     }
-
-    const isMemberCode = await verifyInviteCode(code, club.memberInviteCodeHash)
     if (isMemberCode) {
       return { club, role: Role.MEMBER }
     }

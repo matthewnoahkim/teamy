@@ -63,6 +63,19 @@ interface UserAttemptInfo {
   hasReachedLimit: boolean
 }
 
+interface NoteSheetInfo {
+  status: string
+  rejectionReason: string | null
+}
+
+type TestsTabCacheEntry = {
+  tests: Test[]
+  userAttempts: Record<string, UserAttemptInfo>
+  noteSheets: Record<string, NoteSheetInfo>
+}
+
+const testsTabCache = new Map<string, TestsTabCacheEntry>()
+
 // Memoized regex cache for highlightText
 const regexCache = new Map<string, RegExp>()
 
@@ -114,12 +127,18 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
       },
     })) || []
   }, [initialTests])
-  const [tests, setTests] = useState<Test[]>(normalizedInitialTests as Test[])
-  const [loading, setLoading] = useState(!initialTests) // Only show loading if we don't have initial data
+  const cachedTestsEntry = testsTabCache.get(clubId)
+  const seedTests = cachedTestsEntry?.tests ?? (normalizedInitialTests as Test[])
+  const [tests, setTests] = useState<Test[]>(seedTests)
+  const [loading, setLoading] = useState(seedTests.length === 0)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'opened' | 'completed'>('all')
-  const [userAttempts, setUserAttempts] = useState<Map<string, UserAttemptInfo>>(new Map())
-  const [noteSheets, setNoteSheets] = useState<Map<string, { status: string; rejectionReason: string | null }>>(new Map())
+  const [userAttempts, setUserAttempts] = useState<Map<string, UserAttemptInfo>>(
+    () => new Map(Object.entries(cachedTestsEntry?.userAttempts ?? {})),
+  )
+  const [noteSheets, setNoteSheets] = useState<Map<string, NoteSheetInfo>>(
+    () => new Map(Object.entries(cachedTestsEntry?.noteSheets ?? {})),
+  )
 
   // Delete Dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -161,7 +180,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
   }
 
   // Batch fetch user attempts and note sheets (now included in tests API response)
-  const updateUserAttemptsAndNoteSheets = useCallback((userAttemptsData: Record<string, UserAttemptInfo>, noteSheetsData: Record<string, { status: string; rejectionReason: string | null }>) => {
+  const updateUserAttemptsAndNoteSheets = useCallback((userAttemptsData: Record<string, UserAttemptInfo>, noteSheetsData: Record<string, NoteSheetInfo>) => {
     setUserAttempts(new Map(Object.entries(userAttemptsData)))
     setNoteSheets(new Map(Object.entries(noteSheetsData)))
   }, [])
@@ -204,39 +223,12 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
         setLoading(false)
       }
     }
-  }, [clubId, isAdmin, toast, updateUserAttemptsAndNoteSheets])
+  }, [clubId, toast, updateUserAttemptsAndNoteSheets])
 
   useEffect(() => {
-    // Skip initial fetch if we already have data from server
-    if (!initialTests) {
-      fetchTests()
-    } else {
-      // With initialTests, we still need to fetch user attempts and note sheets
-      // Only fetch if we don't already have this data (avoid duplicate calls)
-      if (userAttempts.size === 0 && noteSheets.size === 0) {
-        const loadInitialData = async () => {
-          try {
-            const response = await fetch(`/api/tests?clubId=${clubId}`)
-            if (response.ok) {
-              const data = await response.json()
-              updateUserAttemptsAndNoteSheets(
-                data.userAttempts || {},
-                data.noteSheets || {}
-              )
-            }
-          } catch (error) {
-            console.error('Failed to fetch user attempts and note sheets:', error)
-          } finally {
-            setLoading(false)
-          }
-        }
-        loadInitialData()
-      } else {
-        // Already have data, just set loading to false
-        setLoading(false)
-      }
-    }
-  }, [fetchTests, initialTests, clubId, updateUserAttemptsAndNoteSheets, userAttempts.size, noteSheets.size])
+    const hasSeedData = (testsTabCache.get(clubId)?.tests.length ?? 0) > 0 || (normalizedInitialTests.length > 0)
+    void fetchTests({ silent: hasSeedData })
+  }, [clubId, fetchTests, normalizedInitialTests.length])
 
   useBackgroundRefresh(
     () => fetchTests({ silent: true }),
@@ -246,20 +238,19 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     },
   )
 
+  useEffect(() => {
+    testsTabCache.set(clubId, {
+      tests,
+      userAttempts: Object.fromEntries(userAttempts),
+      noteSheets: Object.fromEntries(noteSheets),
+    })
+  }, [clubId, noteSheets, tests, userAttempts])
+
   // Refresh attempts and note sheets when page becomes visible (user returns from test submission)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && tests.length > 0) {
-        // Refresh user attempts and note sheets via single API call
-        fetch(`/api/tests?clubId=${clubId}`)
-          .then(res => res.json())
-          .then(data => {
-            updateUserAttemptsAndNoteSheets(
-              data.userAttempts || {},
-              data.noteSheets || {}
-            )
-          })
-          .catch(err => console.error('Failed to refresh attempts and note sheets:', err))
+        void fetchTests({ silent: true })
       }
     }
 
@@ -267,7 +258,7 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [tests, clubId, updateUserAttemptsAndNoteSheets])
+  }, [fetchTests, tests.length])
 
   // Handle hash navigation - set up listener once, check hash when loading completes
   useEffect(() => {

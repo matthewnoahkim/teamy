@@ -5,27 +5,6 @@ import { Toaster } from '@/components/ui/toaster'
 import { FaviconLoader } from '@/components/favicon-loader'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
-import { Inter, Nunito, Quicksand } from 'next/font/google'
-
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-})
-
-const nunito = Nunito({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  display: 'swap',
-  variable: '--font-nunito',
-})
-
-const quicksand = Quicksand({
-  subsets: ['latin'],
-  weight: ['500', '600', '700'],
-  display: 'swap',
-  variable: '--font-quicksand',
-})
 
 export const metadata: Metadata = {
   title: 'Teamy',
@@ -49,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${nunito.variable} ${quicksand.variable} font-sans`} suppressHydrationWarning>
+    <html lang="en" className="font-sans" suppressHydrationWarning>
       <body className="font-sans antialiased grid-pattern" suppressHydrationWarning>
         <script
           dangerouslySetInnerHTML={{

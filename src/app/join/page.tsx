@@ -29,10 +29,12 @@ async function resolveInviteClubId(code: string, preferredClubId?: string): Prom
   const verifyAgainstClub = async (club: InviteClubRecord | null): Promise<string | null> => {
     if (!club) return null
 
-    const adminMatch = await verifyInviteCode(code, club.adminInviteCodeHash)
+    const [adminMatch, memberMatch] = await Promise.all([
+      verifyInviteCode(code, club.adminInviteCodeHash),
+      verifyInviteCode(code, club.memberInviteCodeHash),
+    ])
     if (adminMatch) return club.id
 
-    const memberMatch = await verifyInviteCode(code, club.memberInviteCodeHash)
     if (memberMatch) return club.id
 
     return null
