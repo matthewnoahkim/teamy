@@ -54,7 +54,13 @@ export function AccountSecurityMenuItem({
 
   return (
     <>
-      <DropdownMenuItem onClick={() => setAccountSecurityDialogOpen(true)}>
+      <DropdownMenuItem
+        onSelect={(event) => {
+          // Keep the dropdown mounted long enough for the account dialog to open.
+          event.preventDefault()
+          setAccountSecurityDialogOpen(true)
+        }}
+      >
         <Shield className="mr-2 h-4 w-4" />
         Account & Security
       </DropdownMenuItem>
