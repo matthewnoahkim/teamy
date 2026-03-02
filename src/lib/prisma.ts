@@ -8,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 
 const connectionString = normalizePgConnectionString(process.env.DATABASE_URL)
 const adapter =
-  typeof window === 'undefined' && connectionString
+  typeof window === 'undefined'
     ? new PrismaPg({ connectionString })
     : undefined
 
