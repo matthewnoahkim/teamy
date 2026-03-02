@@ -266,41 +266,6 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
               </h1>
             ) : null}
             
-            {showCustomizationBilling && (
-              <>
-                <div className="hidden lg:block h-6 w-px bg-white/20 mx-1" />
-                <button
-                  onMouseEnter={() => router.prefetch(customizationHref)}
-                  onFocus={() => router.prefetch(customizationHref)}
-                  onClick={() => {
-                    router.push(customizationHref)
-                  }}
-                  className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
-                    effectivePath === '/customization'
-                      ? 'bg-white/20 text-white font-semibold'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  <span>Customization</span>
-                </button>
-                <button
-                  onMouseEnter={() => router.prefetch(billingHref)}
-                  onFocus={() => router.prefetch(billingHref)}
-                  onClick={() => {
-                    router.push(billingHref)
-                  }}
-                  className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors rounded-lg ${
-                    effectivePath === '/billing'
-                      ? 'bg-white/20 text-white font-semibold'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  <CreditCard className="h-3.5 w-3.5" />
-                  <span>Billing</span>
-                </button>
-              </>
-            )}
           </div>
           
           <div className="flex items-center gap-2 md:gap-3">
@@ -334,20 +299,24 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
                     <DropdownMenuItem 
                       onMouseEnter={() => router.prefetch(customizationHref)}
                       onFocus={() => router.prefetch(customizationHref)}
-                      onClick={() => router.push(customizationHref)} 
-                      className="lg:hidden"
+                      onClick={() => router.push(customizationHref)}
                     >
                       <Settings className="mr-2 h-4 w-4" />
                       Customization
+                      {effectivePath === '/customization' ? (
+                        <span className="ml-auto text-xs text-muted-foreground">Current</span>
+                      ) : null}
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onMouseEnter={() => router.prefetch(billingHref)}
                       onFocus={() => router.prefetch(billingHref)}
-                      onClick={() => router.push(billingHref)} 
-                      className="lg:hidden"
+                      onClick={() => router.push(billingHref)}
                     >
                       <CreditCard className="mr-2 h-4 w-4" />
                       Billing
+                      {effectivePath === '/billing' ? (
+                        <span className="ml-auto text-xs text-muted-foreground">Current</span>
+                      ) : null}
                     </DropdownMenuItem>
                   </>
                 )}
