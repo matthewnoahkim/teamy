@@ -66,6 +66,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { useFaviconBadge } from '@/hooks/use-favicon-badge'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 import type {
   ClubWithMembers,
   ClubWithMembersLite,
@@ -193,6 +194,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [personalBackground, setPersonalBackground] = useState(currentMembership.preferences ?? null)
   const notificationSyncChannelRef = useRef<BroadcastChannel | null>(null)
+  const activeTabRef = useRef(activeTab)
+  const previousActiveTabRef = useRef<string | null>(null)
   const DEFAULT_BACKGROUND = {
     backgroundType: 'grid',
     backgroundColor: '#f8fafc',
@@ -325,9 +328,49 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     }
   }, [club.id, getLastClearedTime, isNotificationTab, markTabNotificationSeen, persistTabSeenTime])
 
+  const refreshTabNotifications = useCallback(async () => {
+    await syncSeenFromServer()
+    const tabsToCheck = NOTIFICATION_TABS.filter(tab => tab !== activeTabRef.current)
+    if (tabsToCheck.length === 0) return
+
+    const query = new URLSearchParams()
+    query.set('tabs', tabsToCheck.join(','))
+    for (const tab of tabsToCheck) {
+      query.set(`${tab}Since`, getLastClearedTime(tab).toISOString())
+    }
+
+    try {
+      const response = await fetch(`/api/clubs/${club.id}/notifications?${query.toString()}`, {
+        cache: 'no-store',
+      })
+      if (!response.ok) return
+
+      const data = (await response.json()) as { notifications?: Record<string, boolean> }
+      const notifications = data.notifications ?? {}
+
+      setTabNotifications(prev => {
+        let changed = false
+        const updated = { ...prev }
+        for (const [tab, hasUnread] of Object.entries(notifications)) {
+          const nextValue = Boolean(hasUnread)
+          if (updated[tab] !== nextValue) {
+            updated[tab] = nextValue
+            changed = true
+          }
+        }
+
+        if (!changed) return prev
+
+        const totalCount = Object.values(updated).filter(Boolean).length
+        setTotalUnreadCount(current => (current === totalCount ? current : totalCount))
+        return updated
+      })
+    } catch (error) {
+      console.error('Failed to fetch tab notifications:', error)
+    }
+  }, [club.id, getLastClearedTime, syncSeenFromServer])
+
   // Keep active tab in a ref so polling interval doesn't restart during navigation.
-  const activeTabRef = useRef(activeTab)
-  const previousActiveTabRef = useRef<string | null>(null)
   useEffect(() => {
     activeTabRef.current = activeTab
   }, [activeTab])
@@ -447,62 +490,16 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     }
   }, [club.id, isNotificationTab, persistTabSeenTime, syncSeenTimestampToServer])
 
-  // Check for new content with a single lightweight API call.
-  useEffect(() => {
-    let isMounted = true
-
-    const checkForNewContent = async () => {
-      if (!isMounted) return
-      await syncSeenFromServer()
-      const tabsToCheck = NOTIFICATION_TABS.filter(tab => tab !== activeTabRef.current)
-      if (tabsToCheck.length === 0) return
-
-      const query = new URLSearchParams()
-      query.set('tabs', tabsToCheck.join(','))
-      for (const tab of tabsToCheck) {
-        query.set(`${tab}Since`, getLastClearedTime(tab).toISOString())
-      }
-
-      try {
-        const response = await fetch(`/api/clubs/${club.id}/notifications?${query.toString()}`, {
-          cache: 'no-store',
-        })
-        if (!response.ok) return
-
-        const data = (await response.json()) as { notifications?: Record<string, boolean> }
-        const notifications = data.notifications ?? {}
-
-        if (!isMounted) return
-        setTabNotifications(prev => {
-          let changed = false
-          const updated = { ...prev }
-          for (const [tab, hasUnread] of Object.entries(notifications)) {
-            const nextValue = Boolean(hasUnread)
-            if (updated[tab] !== nextValue) {
-              updated[tab] = nextValue
-              changed = true
-            }
-          }
-
-          if (!changed) return prev
-
-          const totalCount = Object.values(updated).filter(Boolean).length
-          setTotalUnreadCount(current => (current === totalCount ? current : totalCount))
-          return updated
-        })
-      } catch (error) {
-        console.error('Failed to fetch tab notifications:', error)
-      }
-    }
-
-    checkForNewContent()
-    const interval = setInterval(checkForNewContent, 30000)
-
-    return () => {
-      isMounted = false
-      clearInterval(interval)
-    }
-  }, [club.id, getLastClearedTime, syncSeenFromServer])
+  // Keep tab notifications in sync without requiring a full page reload.
+  useBackgroundRefresh(
+    () => refreshTabNotifications(),
+    {
+      intervalMs: 8_000,
+      runOnMount: true,
+      refreshOnFocus: true,
+      refreshOnReconnect: true,
+    },
+  )
 
   useEffect(() => {
     const tabParam = searchParams.get('tab')
