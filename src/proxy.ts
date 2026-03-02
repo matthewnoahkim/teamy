@@ -9,6 +9,50 @@ import {
 } from '@/lib/rate-limit'
 import { getSecurityHeaders } from '@/lib/security-config'
 import { shouldRejectPotentialCsrf } from '@/lib/csrf-guard'
+import { getConfiguredAppOrigins } from '@/lib/url-safety'
+
+function normalizeOriginCandidate(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const withProtocol =
+    trimmed.startsWith('http://') || trimmed.startsWith('https://')
+      ? trimmed
+      : `https://${trimmed}`
+
+  try {
+    const parsed = new URL(withProtocol)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null
+    }
+    return parsed.origin
+  } catch {
+    return null
+  }
+}
+
+export function getAllowedOriginsForRequest(request: NextRequest): string[] {
+  const origins = new Set(getConfiguredAppOrigins())
+  const addOrigin = (value: string | null | undefined) => {
+    if (!value) return
+    const normalized = normalizeOriginCandidate(value)
+    if (normalized) {
+      origins.add(normalized)
+    }
+  }
+
+  // Always trust the current deployment origin so authenticated same-site
+  // mutations work across production/custom/preview hosts.
+  addOrigin(request.nextUrl.origin)
+
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  if (forwardedProto && forwardedHost) {
+    addOrigin(`${forwardedProto}://${forwardedHost}`)
+  }
+
+  return [...origins]
+}
 
 /**
  * Middleware for API protection and security hardening
@@ -57,6 +101,7 @@ export default async function proxy(request: NextRequest) {
         cookieHeader: request.headers.get('cookie'),
         originHeader: request.headers.get('origin'),
         refererHeader: request.headers.get('referer'),
+        allowedOrigins: getAllowedOriginsForRequest(request),
       })
     ) {
       const forbidden = NextResponse.json(
