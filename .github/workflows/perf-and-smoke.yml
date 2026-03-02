@@ -48,6 +48,10 @@ jobs:
 
       - name: Lighthouse Perf Budgets
         uses: treosh/lighthouse-ci-action@v12
+        env:
+          NEXTAUTH_SECRET: ci-lighthouse-nextauth-secret-please-replace-if-needed-2026
+          INVITE_CODE_ENCRYPTION_KEY: ci-lighthouse-invite-encryption-key-please-replace-2026
+          NEXTAUTH_URL: http://127.0.0.1:3000
         with:
           configPath: ./.lighthouserc.json
           uploadArtifacts: true
