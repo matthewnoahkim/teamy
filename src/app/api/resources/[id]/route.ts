@@ -68,9 +68,8 @@ export async function DELETE(
   } catch (error: unknown) {
     console.error('Error deleting resource:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete resource' },
+      { error: 'Failed to delete resource' },
       { status: 500 }
     )
   }
 }
-

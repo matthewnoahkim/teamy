@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { verifyInviteCode } from '@/lib/invite-codes'
 import { logActivity } from '@/lib/activity-log'
+import { createRateLimitResponse, rateLimitRequest } from '@/lib/rate-limit-api'
 import { z } from 'zod'
 import { Role } from '@prisma/client'
 
@@ -16,6 +17,18 @@ const previewSchema = z.object({
   code: z.string().min(1),
   clubId: z.string().min(1).optional(),
 })
+
+const JOIN_PREVIEW_RATE_LIMIT = {
+  limit: 20,
+  window: 60,
+  identifier: 'invite preview',
+}
+
+const JOIN_SUBMIT_RATE_LIMIT = {
+  limit: 10,
+  window: 60,
+  identifier: 'club join',
+}
 
 async function resolveInviteCodeForClub(code: string, clubId: string) {
   const club = await prisma.club.findUnique({
@@ -86,6 +99,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const rateLimitResult = await rateLimitRequest(
+      req,
+      session.user.id,
+      JOIN_PREVIEW_RATE_LIMIT,
+      '/api/clubs/join:preview'
+    )
+    const limited = createRateLimitResponse(rateLimitResult, JOIN_PREVIEW_RATE_LIMIT)
+    if (limited) {
+      return limited
+    }
+
     const searchParams = req.nextUrl.searchParams
     const parsed = previewSchema.safeParse({
       code: searchParams.get('code') ?? '',
@@ -133,6 +157,17 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const rateLimitResult = await rateLimitRequest(
+      req,
+      session.user.id,
+      JOIN_SUBMIT_RATE_LIMIT,
+      '/api/clubs/join:submit'
+    )
+    const limited = createRateLimitResponse(rateLimitResult, JOIN_SUBMIT_RATE_LIMIT)
+    if (limited) {
+      return limited
     }
 
     const body = await req.json()

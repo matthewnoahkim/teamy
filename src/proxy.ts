@@ -8,6 +8,7 @@ import {
   getRateLimitHeaders,
 } from '@/lib/rate-limit'
 import { getSecurityHeaders } from '@/lib/security-config'
+import { shouldRejectPotentialCsrf } from '@/lib/csrf-guard'
 
 /**
  * Middleware for API protection and security hardening
@@ -49,6 +50,22 @@ export default async function proxy(request: NextRequest) {
   }
 
   try {
+    if (
+      shouldRejectPotentialCsrf({
+        method: request.method,
+        pathname,
+        cookieHeader: request.headers.get('cookie'),
+        originHeader: request.headers.get('origin'),
+        refererHeader: request.headers.get('referer'),
+      })
+    ) {
+      const forbidden = NextResponse.json(
+        { error: 'Forbidden', message: 'Potential CSRF request was blocked.' },
+        { status: 403 }
+      )
+      return applySecurityHeaders(forbidden)
+    }
+
     // Get rate limit configuration based on method and path
     const config = getRateLimitConfig(request.method, pathname)
 

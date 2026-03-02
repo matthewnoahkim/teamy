@@ -24,7 +24,7 @@ const sections = [
 export default function TermsOfServicePage() {
   return (
     <PublicPageLayout>
-      <LegalDocumentShell title="Terms of Service" lastUpdated="February 25, 2026" sections={sections}>
+      <LegalDocumentShell title="Terms of Service" lastUpdated="March 2, 2026" sections={sections}>
           <section id="acceptance" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p>
@@ -127,6 +127,9 @@ export default function TermsOfServicePage() {
             </p>
             <p className="mt-4">
               Your use of third-party services is also subject to those providers&apos; terms and privacy policies.
+            </p>
+            <p className="mt-4">
+              We are not responsible for downtime, outages, policy changes, or data practices of third-party providers.
             </p>
           </section>
 

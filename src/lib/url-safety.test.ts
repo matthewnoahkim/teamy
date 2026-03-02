@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isTrustedOrigin, resolveSafeCallbackPath } from '@/lib/url-safety'
+import {
+  isTrustedOrigin,
+  normalizeSafeExternalHttpUrl,
+  resolveSafeCallbackPath,
+} from '@/lib/url-safety'
 
 test('resolveSafeCallbackPath keeps safe relative paths', () => {
   const result = resolveSafeCallbackPath('/club/abc?tab=tests', '/auth/callback', [])
@@ -35,4 +39,15 @@ test('isTrustedOrigin allows trusted origins and rejects untrusted ones', () => 
   assert.equal(isTrustedOrigin('https://teamy.site', ['https://teamy.site']), true)
   assert.equal(isTrustedOrigin('https://evil.example', ['https://teamy.site']), false)
   assert.equal(isTrustedOrigin('not-a-url', ['https://teamy.site']), false)
+})
+
+test('normalizeSafeExternalHttpUrl allows only http(s) URLs', () => {
+  assert.equal(
+    normalizeSafeExternalHttpUrl('https://example.com/docs?q=1'),
+    'https://example.com/docs?q=1'
+  )
+  assert.equal(normalizeSafeExternalHttpUrl('javascript:alert(1)'), null)
+  assert.equal(normalizeSafeExternalHttpUrl('data:text/html,hello'), null)
+  assert.equal(normalizeSafeExternalHttpUrl(''), null)
+  assert.equal(normalizeSafeExternalHttpUrl(null), null)
 })

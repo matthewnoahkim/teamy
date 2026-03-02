@@ -9,7 +9,10 @@ import { resolveSafePublicUploadPath } from '@/lib/upload-security'
 
 const updateMediaSchema = z.object({
   caption: z.string().optional(),
-  albumId: z.string().nullable().optional(),
+  albumId: z.preprocess(
+    (value) => (value === '' ? null : value),
+    z.string().min(1).nullable().optional()
+  ),
 })
 
 // PATCH - Update media item
@@ -44,6 +47,24 @@ export async function PATCH(
         { error: 'Only the uploader or admin can update this media' },
         { status: 403 }
       )
+    }
+
+    if (validated.albumId) {
+      const targetAlbum = await prisma.album.findUnique({
+        where: { id: validated.albumId },
+        select: { id: true, clubId: true },
+      })
+
+      if (!targetAlbum) {
+        return NextResponse.json({ error: 'Album not found' }, { status: 404 })
+      }
+
+      if (targetAlbum.clubId !== existingMedia.clubId) {
+        return NextResponse.json(
+          { error: 'Album does not belong to this media club' },
+          { status: 400 }
+        )
+      }
     }
 
     const mediaItem = await prisma.mediaItem.update({
@@ -129,4 +150,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

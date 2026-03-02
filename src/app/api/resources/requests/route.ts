@@ -7,6 +7,7 @@ import {
   validateEnum,
 } from '@/lib/input-validation'
 import { requireDevAccess } from '@/lib/dev/guard'
+import { normalizeSafeExternalHttpUrl } from '@/lib/url-safety'
 
 // Create a resource request (also creates club-visible resource immediately)
 export async function POST(req: NextRequest) {
@@ -22,6 +23,14 @@ export async function POST(req: NextRequest) {
     if (!name || !tag || !category || !clubId) {
       return NextResponse.json(
         { error: 'Missing required fields: name, tag, category, clubId' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedUrl = normalizeSafeExternalHttpUrl(url)
+    if (typeof url === 'string' && url.trim().length > 0 && !normalizedUrl) {
+      return NextResponse.json(
+        { error: 'Invalid URL. Only http(s) links are allowed.' },
         { status: 400 }
       )
     }
@@ -55,7 +64,7 @@ export async function POST(req: NextRequest) {
         data: {
           name,
           tag,
-          url: url || null,
+          url: normalizedUrl,
           category,
           scope: 'CLUB',
           clubId,
@@ -76,7 +85,7 @@ export async function POST(req: NextRequest) {
         data: {
           name,
           tag,
-          url: url || null,
+          url: normalizedUrl,
           category,
           scope: 'PUBLIC',
           clubId,
@@ -100,7 +109,7 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     console.error('Error creating resource request:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create resource request' },
+      { error: 'Failed to create resource request' },
       { status: 500 }
     )
   }
@@ -162,11 +171,16 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ requests })
+    const sanitizedRequests = requests.map((request) => ({
+      ...request,
+      url: normalizeSafeExternalHttpUrl(request.url),
+    }))
+
+    return NextResponse.json({ requests: sanitizedRequests })
   } catch (error: unknown) {
     console.error('Error fetching resource requests:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch resource requests' },
+      { error: 'Failed to fetch resource requests' },
       { status: 500 }
     )
   }

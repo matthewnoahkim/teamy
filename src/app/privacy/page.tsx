@@ -20,7 +20,7 @@ const sections = [
 export default function PrivacyPolicyPage() {
   return (
     <PublicPageLayout>
-      <LegalDocumentShell title="Privacy Policy" lastUpdated="February 25, 2026" sections={sections}>
+      <LegalDocumentShell title="Privacy Policy" lastUpdated="March 2, 2026" sections={sections}>
           <section id="overview" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Overview</h2>
             <p>
@@ -88,7 +88,7 @@ export default function PrivacyPolicyPage() {
               <li><strong>Business transfers:</strong> In connection with a merger, acquisition, financing, or asset sale</li>
             </ul>
             <p className="mt-4">
-              Uploaded files may be accessible to anyone with a direct link if sharing links are distributed outside your organization.
+              Uploaded files are currently served from URL-based paths. Anyone who obtains a valid file URL may be able to access that file. Do not upload highly sensitive information unless your organization has approved that risk.
             </p>
           </section>
 
@@ -117,7 +117,7 @@ export default function PrivacyPolicyPage() {
               We use administrative, technical, and organizational measures designed to protect information, including transport encryption and authentication controls.
             </p>
             <p className="mt-4">
-              No method of transmission or storage is completely secure. We cannot guarantee absolute security.
+              Security controls reduce risk but do not eliminate it, and effectiveness depends in part on correct configuration and third-party provider security. No method of transmission or storage is completely secure.
             </p>
           </section>
 

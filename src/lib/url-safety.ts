@@ -61,3 +61,23 @@ export function isTrustedOrigin(
     return false
   }
 }
+
+/**
+ * Normalize user-provided external URLs for safe storage/use in anchors.
+ * Returns null when the input is empty or not an http(s) URL.
+ */
+export function normalizeSafeExternalHttpUrl(rawUrl: unknown): string | null {
+  if (typeof rawUrl !== 'string') return null
+  const trimmed = rawUrl.trim()
+  if (!trimmed) return null
+
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null
+    }
+    return parsed.toString()
+  } catch {
+    return null
+  }
+}

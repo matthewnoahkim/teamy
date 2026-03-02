@@ -35,6 +35,24 @@ export async function POST(req: NextRequest) {
     // Check if user is a member of the team
     await requireMember(session.user.id, teamId)
 
+    if (albumId) {
+      const album = await prisma.album.findUnique({
+        where: { id: albumId },
+        select: { id: true, clubId: true },
+      })
+
+      if (!album) {
+        return NextResponse.json({ error: 'Album not found' }, { status: 404 })
+      }
+
+      if (album.clubId !== teamId) {
+        return NextResponse.json(
+          { error: 'Album does not belong to this club' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
@@ -123,4 +141,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

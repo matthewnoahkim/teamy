@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { normalizeSafeExternalHttpUrl } from '@/lib/url-safety'
 
 // Get resources for a club
 export async function GET(req: NextRequest) {
@@ -61,7 +62,12 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ resources })
+    const sanitizedResources = resources.map((resource) => ({
+      ...resource,
+      url: normalizeSafeExternalHttpUrl(resource.url),
+    }))
+
+    return NextResponse.json({ resources: sanitizedResources })
   } catch (error: unknown) {
     console.error('Error fetching resources:', error)
     // If the error is about the model not existing, return empty array
@@ -71,7 +77,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ resources: [] })
     }
     return NextResponse.json(
-      { error: errMessage || 'Failed to fetch resources' },
+      { error: 'Failed to fetch resources' },
       { status: 500 }
     )
   }

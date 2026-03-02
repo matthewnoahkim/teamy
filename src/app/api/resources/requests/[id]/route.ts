@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireDevAccess } from '@/lib/dev/guard'
+import { normalizeSafeExternalHttpUrl } from '@/lib/url-safety'
+
+function normalizeOptionalResourceUrl(input: unknown): { valid: boolean; value: string | null } {
+  if (input == null) {
+    return { valid: true, value: null }
+  }
+  if (typeof input !== 'string') {
+    return { valid: false, value: null }
+  }
+  if (!input.trim()) {
+    return { valid: true, value: null }
+  }
+
+  const normalized = normalizeSafeExternalHttpUrl(input)
+  if (!normalized) {
+    return { valid: false, value: null }
+  }
+
+  return { valid: true, value: normalized }
+}
 
 // Approve or reject a resource request
 export async function PATCH(
@@ -29,6 +49,8 @@ export async function PATCH(
     if (!request) {
       return NextResponse.json({ error: 'Resource request not found' }, { status: 404 })
     }
+
+    const storedRequestUrl = normalizeSafeExternalHttpUrl(request.url)
 
     // Handle reset action - can reset approved or rejected requests back to pending
     if (action === 'reset') {
@@ -66,7 +88,7 @@ export async function PATCH(
               data: {
                 name: request.name,
                 tag: request.tag,
-                url: request.url,
+                url: storedRequestUrl,
                 category: request.category,
                 scope: 'CLUB',
                 clubId: request.clubId,
@@ -79,7 +101,7 @@ export async function PATCH(
             data: {
               name: request.name,
               tag: request.tag,
-              url: request.url,
+              url: storedRequestUrl,
               category: request.category,
               scope: 'CLUB',
               clubId: request.clubId,
@@ -113,7 +135,17 @@ export async function PATCH(
       // Use edited values if provided, otherwise fall back to original values
       const finalName = editedName || request.name
       const finalTag = editedTag || request.tag
-      const finalUrl = editedUrl !== undefined ? editedUrl : request.url
+      let finalUrl: string | null = storedRequestUrl
+      if (editedUrl !== undefined) {
+        const normalizedEditedUrl = normalizeOptionalResourceUrl(editedUrl)
+        if (!normalizedEditedUrl.valid) {
+          return NextResponse.json(
+            { error: 'Invalid URL. Only http(s) links are allowed.' },
+            { status: 400 }
+          )
+        }
+        finalUrl = normalizedEditedUrl.value
+      }
 
       // Find the existing CLUB-scoped resource that was created when the request was submitted
       const existingResource = await prisma.resource.findFirst({
@@ -206,7 +238,7 @@ export async function PATCH(
   } catch (error: unknown) {
     console.error('Error processing resource request:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to process resource request' },
+      { error: 'Failed to process resource request' },
       { status: 500 }
     )
   }
@@ -275,7 +307,7 @@ export async function DELETE(
   } catch (error: unknown) {
     console.error('Error deleting resource request:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete resource request' },
+      { error: 'Failed to delete resource request' },
       { status: 500 }
     )
   }
