@@ -636,8 +636,8 @@ export default async function ClubDetailPage({
         adminCode: decryptInviteCode(inviteCodeRecord.adminInviteCodeEncrypted),
         memberCode: decryptInviteCode(inviteCodeRecord.memberInviteCodeEncrypted),
       }
-    } catch (error) {
-      console.error('Failed to decrypt initial invite codes:', error)
+    } catch {
+      console.warn('Failed to decrypt initial invite codes; regeneration required.')
     }
   }
 

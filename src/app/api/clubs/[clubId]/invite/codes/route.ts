@@ -53,9 +53,18 @@ export async function GET(
       })
     }
 
-    // Decrypt the codes
-    const adminCode = decryptInviteCode(membership.club.adminInviteCodeEncrypted)
-    const memberCode = decryptInviteCode(membership.club.memberInviteCodeEncrypted)
+    let adminCode: string
+    let memberCode: string
+    try {
+      adminCode = decryptInviteCode(membership.club.adminInviteCodeEncrypted)
+      memberCode = decryptInviteCode(membership.club.memberInviteCodeEncrypted)
+    } catch (error) {
+      console.warn('Invite code decryption failed; marking as needs regeneration.', error)
+      return NextResponse.json({
+        needsRegeneration: true,
+        message: 'Invite codes need to be regenerated',
+      })
+    }
 
     return NextResponse.json({
       needsRegeneration: false,

@@ -152,10 +152,12 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
   }, [clubId])
 
   useEffect(() => {
-    // Skip initial fetch if we already have data from server
-    if (!initialAnnouncements) {
-      fetchAnnouncements()
+    // Always sync once on mount so the stream stays fresh after tab switches.
+    if (initialAnnouncements) {
+      fetchAnnouncements({ silent: true })
+      return
     }
+    fetchAnnouncements()
   }, [fetchAnnouncements, initialAnnouncements])
 
   useBackgroundRefresh(
@@ -732,8 +734,60 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
     return false
   }
 
+  const updateEventRsvps = useCallback(
+    (eventId: string, updater: (current: CalendarEventRSVP[]) => CalendarEventRSVP[]) => {
+      setAnnouncements((prev) =>
+        prev.map((announcement) => {
+          if (!announcement.calendarEvent || announcement.calendarEvent.id !== eventId) {
+            return announcement
+          }
+
+          const currentRsvps = (announcement.calendarEvent.rsvps || []) as CalendarEventRSVP[]
+          return {
+            ...announcement,
+            calendarEvent: {
+              ...announcement.calendarEvent,
+              rsvps: updater(currentRsvps),
+            },
+          }
+        }),
+      )
+    },
+    [],
+  )
+
   const handleRSVP = async (eventId: string, status: 'YES' | 'NO') => {
     setRsvping((prev) => ({ ...prev, [eventId]: true }))
+
+    const previousRsvps =
+      announcements.find((announcement) => announcement.calendarEvent?.id === eventId)?.calendarEvent?.rsvps || []
+
+    const tempId = `temp-${eventId}-${currentMembership.userId}`
+    updateEventRsvps(eventId, (currentRsvps) => {
+      const hasExisting = currentRsvps.some((rsvp) => rsvp.userId === currentMembership.userId)
+      if (hasExisting) {
+        return currentRsvps.map((rsvp) =>
+          rsvp.userId === currentMembership.userId
+            ? { ...rsvp, status, id: rsvp.id || tempId }
+            : rsvp,
+        )
+      }
+
+      return [
+        ...currentRsvps,
+        {
+          id: tempId,
+          userId: currentMembership.userId,
+          status,
+          user: {
+            id: currentMembership.userId,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+          },
+        } as CalendarEventRSVP,
+      ]
+    })
 
     try {
       const response = await fetch(`/api/calendar/${eventId}/rsvp`, {
@@ -746,13 +800,27 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
         throw new Error('Failed to RSVP')
       }
 
+      const data = (await response.json().catch(() => null)) as { rsvp?: CalendarEventRSVP } | null
+      if (data?.rsvp) {
+        updateEventRsvps(eventId, (currentRsvps) => {
+          const withoutTemp = currentRsvps.filter((rsvp) => rsvp.id !== tempId)
+          const existingIndex = withoutTemp.findIndex((rsvp) => rsvp.userId === currentMembership.userId)
+
+          if (existingIndex >= 0) {
+            return withoutTemp.map((rsvp, index) =>
+              index === existingIndex ? data.rsvp! : rsvp,
+            )
+          }
+
+          return [...withoutTemp, data.rsvp]
+        })
+      }
+
       toast({
         title: status === 'YES' ? 'RSVP: Going' : 'RSVP: Not Going',
       })
-
-      // Refresh announcements to get updated RSVP data
-      await fetchAnnouncements()
     } catch (_error) {
+      updateEventRsvps(eventId, () => previousRsvps as CalendarEventRSVP[])
       toast({
         title: 'Error',
         description: 'Failed to update RSVP',
@@ -766,6 +834,15 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
   const handleRemoveRSVP = async (eventId: string) => {
     setRsvping((prev) => ({ ...prev, [eventId]: true }))
 
+    const previousRsvps =
+      announcements.find((announcement) => announcement.calendarEvent?.id === eventId)?.calendarEvent?.rsvps || []
+
+    updateEventRsvps(
+      eventId,
+      (currentRsvps) =>
+        currentRsvps.filter((rsvp) => rsvp.userId !== currentMembership.userId),
+    )
+
     try {
       const response = await fetch(`/api/calendar/${eventId}/rsvp`, {
         method: 'DELETE',
@@ -778,10 +855,8 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
       toast({
         title: 'RSVP removed',
       })
-
-      // Refresh announcements to get updated RSVP data
-      await fetchAnnouncements()
     } catch (_error) {
+      updateEventRsvps(eventId, () => previousRsvps as CalendarEventRSVP[])
       toast({
         title: 'Error',
         description: 'Failed to remove RSVP',
@@ -1609,4 +1684,3 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
     </div>
   )
 }
-

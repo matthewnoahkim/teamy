@@ -123,11 +123,14 @@ interface CalendarTabProps {
 
 type ViewMode = 'month' | 'week' | 'day'
 
+const calendarEventsCache = new Map<string, CalendarEvent[]>()
+
 export function CalendarTab({ clubId, division, currentMembership, isAdmin, user, initialEvents }: CalendarTabProps) {
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [events, setEvents] = useState<CalendarEvent[]>(initialEvents || [])
+  const seedEvents = calendarEventsCache.get(clubId) ?? initialEvents ?? []
+  const [events, setEvents] = useState<CalendarEvent[]>(seedEvents)
   const [teams, setTeams] = useState<CalendarTeam[]>([])
   const [availableEvents, setAvailableEvents] = useState<SciOlyEvent[]>([])
   const [loading, setLoading] = useState(!initialEvents)
@@ -146,6 +149,10 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploadingFiles, setUploadingFiles] = useState(false)
   
+  useEffect(() => {
+    calendarEventsCache.set(clubId, events)
+  }, [clubId, events])
+
   // Helper function to format date for datetime-local input
   const _formatDateTimeLocal = (date: Date) => {
     const year = date.getFullYear()
@@ -283,11 +290,11 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
   useEffect(() => {
     // Fetch missing data in parallel
     const promises: Promise<void>[] = []
-    
-    // Skip initial fetch if we already have data from server
-    if (!initialEvents) {
-      promises.push(fetchEvents())
-    }
+
+    const hasSeedData = (calendarEventsCache.get(clubId)?.length ?? 0) > 0 || (initialEvents?.length ?? 0) > 0
+
+    // Always do one sync fetch on mount to avoid stale data after tab switches.
+    promises.push(fetchEvents({ silent: hasSeedData }))
     
     promises.push(
       fetchTeams(),
