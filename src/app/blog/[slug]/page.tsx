@@ -7,6 +7,8 @@ import { format } from 'date-fns'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { PublicPageLayout } from '@/components/public-page-layout'
 
+export const dynamic = 'force-dynamic'
+
 interface Props {
   params: Promise<{ slug: string }>
 }
