@@ -165,7 +165,7 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
     },
     {
       intervalMs: 40_000,
-      runOnMount: true,
+      runOnMount: false,
     },
   )
 

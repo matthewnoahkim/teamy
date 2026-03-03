@@ -193,7 +193,7 @@ export function StatsTab({ clubId, division: _division, initialStats }: StatsTab
     () => fetchStats({ silent: true }),
     {
       intervalMs: 45_000,
-      runOnMount: true,
+      runOnMount: false,
     },
   )
 

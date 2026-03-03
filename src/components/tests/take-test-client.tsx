@@ -738,15 +738,15 @@ export function TakeTestClient({
         }
       }
 
-      // Use window.location for full page navigation to ensure tab parameter is preserved
+      // Navigate back to the caller context without a full page reload.
       if (testingPortal) {
-        window.location.href = '/testing'
+        router.replace('/testing')
       } else if (tournamentId) {
-        window.location.href = `/tournaments/${tournamentId}/tests`
+        router.replace(`/tournaments/${tournamentId}/tests`)
       } else {
         // Extract clubId from membership or current URL path
         const clubId = membership?.clubId || window.location.pathname.split('/')[2]
-        window.location.href = `/club/${clubId}?tab=tests`
+        router.replace(`/club/${clubId}?tab=tests`)
       }
     } catch (error: unknown) {
       toast({
@@ -760,7 +760,7 @@ export function TakeTestClient({
         document.documentElement.requestFullscreen().catch(() => {})
       }
     }
-  }, [attempt, test.id, membership.clubId, test.requireFullscreen, toast, answers, saveAnswer, tournamentId, testingPortal])
+  }, [attempt, test.id, membership.clubId, test.requireFullscreen, toast, answers, saveAnswer, tournamentId, testingPortal, router])
 
   const handleTimeUp = useCallback(() => {
     const currentAttempt = attemptRef.current
@@ -1475,14 +1475,13 @@ export function TakeTestClient({
                 
                 // Navigate away - fullscreen will NOT be re-entered
                 setShowSaveExitDialog(false)
-                // Use full page navigation to preserve query params/state consistently.
                 if (testingPortal) {
-                  window.location.href = '/testing'
+                  router.replace('/testing')
                 } else if (tournamentIdRef.current) {
-                  window.location.href = `/tournaments/${tournamentIdRef.current}/tests`
+                  router.replace(`/tournaments/${tournamentIdRef.current}/tests`)
                 } else {
                   const clubId = membership?.clubId || window.location.pathname.split('/')[2]
-                  window.location.href = `/club/${clubId}?tab=tests`
+                  router.replace(`/club/${clubId}?tab=tests`)
                 }
               }}
             >

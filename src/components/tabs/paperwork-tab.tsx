@@ -161,7 +161,7 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
     () => fetchForms({ silent: true }),
     {
       intervalMs: 45_000,
-      runOnMount: true,
+      runOnMount: false,
     },
   )
 

@@ -380,18 +380,18 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
   const handleViewTest = useCallback((test: Test) => {
     // Navigate to test detail page
     // The page will automatically show the builder for drafts or detail view for published tests
-    window.location.href = `/club/${clubId}/tests/${test.id}`
-  }, [clubId])
+    router.push(`/club/${clubId}/tests/${test.id}`)
+  }, [clubId, router])
 
   const handleViewResponses = useCallback((test: Test) => {
     // Navigate to test detail page with Responses tab (default)
-    window.location.href = `/club/${clubId}/tests/${test.id}`
-  }, [clubId])
+    router.push(`/club/${clubId}/tests/${test.id}`)
+  }, [clubId, router])
 
   const handleViewSettings = useCallback((test: Test) => {
     // Navigate to test detail page with Settings tab
-    window.location.href = `/club/${clubId}/tests/${test.id}?view=test`
-  }, [clubId])
+    router.push(`/club/${clubId}/tests/${test.id}?view=test`)
+  }, [clubId, router])
 
   const handleDuplicateTest = useCallback(async (testId: string) => {
     try {
@@ -423,8 +423,8 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
 
   const handleTakeTest = useCallback((test: Test) => {
     // Navigate to test player
-    window.location.href = `/club/${clubId}/tests/${test.id}/take`
-  }, [clubId])
+    router.push(`/club/${clubId}/tests/${test.id}/take`)
+  }, [clubId, router])
 
   const handleNoteSheetUpload = useCallback((testId: string) => {
     const test = tests.find(t => t.id === testId)

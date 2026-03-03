@@ -22,7 +22,7 @@ import { PageLoading } from '@/components/ui/loading-spinner'
 import { Calendar, MapPin, Trophy, FileText, ChevronRight, LogOut, Pencil, ChevronDown, Clock, HelpCircle, ListChecks, AlertCircle, Calculator, FileCheck, Play, ArrowRight, Upload, CheckCircle2, XCircle, Eye } from 'lucide-react'
 import { formatDivision } from '@/lib/utils'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { isTestAvailable } from '@/lib/test-availability'
 import { NoteSheetUpload } from '@/components/tests/note-sheet-upload'
@@ -167,6 +167,7 @@ const STORAGE_KEY = 'testing-portal-selected-tournament'
 
 export function TestingPortalClient({ user }: TestingPortalClientProps) {
   const { toast } = useToast()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
@@ -418,7 +419,7 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
 
   const handleTakeTest = (testId: string, _clubId: string, _isESTest?: boolean) => {
     // Use the new universal testing portal route for tournament tests
-    window.location.href = `/testing/tests/${testId}/take`
+    router.push(`/testing/tests/${testId}/take`)
   }
 
   const handleSignOut = () => {

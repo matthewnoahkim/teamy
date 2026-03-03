@@ -346,7 +346,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
     },
     {
       intervalMs: 35_000,
-      runOnMount: true,
+      runOnMount: false,
     },
   )
 
