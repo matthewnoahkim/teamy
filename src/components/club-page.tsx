@@ -188,6 +188,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   const [editClubNameOpen, setEditClubNameOpen] = useState(false)
   const [currentClubName, setCurrentClubName] = useState(club.name)
   const [newClubName, setNewClubName] = useState(club.name)
+  const [clubMemberCount, setClubMemberCount] = useState(club.memberships.length)
   const [updatingClubName, setUpdatingClubName] = useState(false)
   const [tabNotifications, setTabNotifications] = useState<Record<string, boolean>>({})
   const [totalUnreadCount, setTotalUnreadCount] = useState(0)
@@ -209,6 +210,15 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   const isNotificationTab = useCallback((tab: string): tab is NotificationTab => {
     return NOTIFICATION_TAB_SET.has(tab)
   }, [])
+
+  useEffect(() => {
+    setCurrentClubName(club.name)
+    setNewClubName(club.name)
+  }, [club.id, club.name])
+
+  useEffect(() => {
+    setClubMemberCount(club.memberships.length)
+  }, [club.id, club.memberships.length])
 
   const getTabSeenStorageKey = useCallback((tab: string) => {
     return `lastCleared_${club.id}_${tab}_${user.id}`
@@ -370,6 +380,31 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     }
   }, [club.id, getLastClearedTime, syncSeenFromServer])
 
+  const refreshClubSummary = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/clubs/${club.id}`, { cache: 'no-store' })
+      if (!response.ok) return
+
+      const data = (await response.json()) as {
+        club?: {
+          name?: string
+          memberships?: Array<unknown>
+        }
+      }
+
+      if (typeof data.club?.name === 'string') {
+        const nextName = data.club.name
+        setCurrentClubName((prev) => (prev === nextName ? prev : nextName))
+      }
+      if (Array.isArray(data.club?.memberships)) {
+        const nextCount = data.club.memberships.length
+        setClubMemberCount((prev) => (prev === nextCount ? prev : nextCount))
+      }
+    } catch (error) {
+      console.error('Failed to refresh club summary:', error)
+    }
+  }, [club.id])
+
   // Keep active tab in a ref so polling interval doesn't restart during navigation.
   useEffect(() => {
     activeTabRef.current = activeTab
@@ -495,6 +530,16 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     () => refreshTabNotifications(),
     {
       intervalMs: 8_000,
+      runOnMount: true,
+      refreshOnFocus: true,
+      refreshOnReconnect: true,
+    },
+  )
+
+  useBackgroundRefresh(
+    () => refreshClubSummary(),
+    {
+      intervalMs: 20_000,
       runOnMount: true,
       refreshOnFocus: true,
       refreshOnReconnect: true,
@@ -811,7 +856,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-2">
                       <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                      {club.memberships.length} member{club.memberships.length !== 1 ? 's' : ''}
+                      {clubMemberCount} member{clubMemberCount !== 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
@@ -946,6 +991,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
                 initialInviteCodes={initialInviteCodes}
                 personalBackground={personalBackground as BackgroundPreferences | null | undefined}
                 onBackgroundUpdate={handleBackgroundUpdate as ((preferences: BackgroundPreferences | null) => void) | undefined}
+                onMembershipCountChange={setClubMemberCount}
               />
             )}
           </div>

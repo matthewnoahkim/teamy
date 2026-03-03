@@ -32,6 +32,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDateTime } from '@/lib/utils'
 import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 import type { SessionUser } from '@/types/models'
 
 export interface MediaItem {
@@ -112,7 +113,7 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
     }
   }, [clubId, selectedAlbum, filterType, initialMediaItems, initialAlbums])
 
-  const fetchMedia = async () => {
+  const fetchMedia = async (options?: { silent?: boolean }) => {
     try {
       let url = `/api/media?clubId=${clubId}`
       if (selectedAlbum) {
@@ -130,26 +131,43 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
       setMediaItems(data.mediaItems || [])
     } catch (error) {
       console.error('Failed to fetch media:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load media',
-        variant: 'destructive',
-      })
+      if (!options?.silent) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load media',
+          variant: 'destructive',
+        })
+      }
     }
   }
 
-  const fetchAlbums = async () => {
+  const fetchAlbums = async (options?: { silent?: boolean }) => {
     try {
       const response = await fetch(`/api/albums?clubId=${clubId}`)
       if (!response.ok) throw new Error('Failed to fetch albums')
       const data = await response.json()
       setAlbums(data.albums || [])
     } catch (error) {
-      console.error('Failed to fetch albums:', error)
+      if (!options?.silent) {
+        console.error('Failed to fetch albums:', error)
+      }
     } finally {
       setLoading(false)
     }
   }
+
+  useBackgroundRefresh(
+    async () => {
+      await Promise.all([
+        fetchMedia({ silent: true }),
+        fetchAlbums({ silent: true }),
+      ])
+    },
+    {
+      intervalMs: 40_000,
+      runOnMount: true,
+    },
+  )
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -733,5 +751,3 @@ function MediaViewerDialog({ open, onOpenChange, media, canDelete, onDelete }: M
     </Dialog>
   )
 }
-
-

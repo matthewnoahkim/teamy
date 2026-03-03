@@ -46,6 +46,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { format, isPast, isToday, isTomorrow } from 'date-fns'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 
 interface TodoTabProps {
   clubId: string
@@ -183,11 +184,13 @@ export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, ini
       todoListCache.set(cacheKey, nextTodos)
     } catch (error) {
       console.error('Failed to fetch todos:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load todos',
-        variant: 'destructive',
-      })
+      if (!options?.silent) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load todos',
+          variant: 'destructive',
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -237,6 +240,19 @@ export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, ini
     if (!isAdmin || viewMode !== 'all') return
     todoListCache.set(getTodoCacheKey(clubId, true, selectedMemberId), allTodos)
   }, [allTodos, clubId, isAdmin, selectedMemberId, viewMode])
+
+  useBackgroundRefresh(
+    async () => {
+      await fetchTodos({ silent: true })
+      if (isAdmin) {
+        await fetchTeamMembers()
+      }
+    },
+    {
+      intervalMs: 30_000,
+      runOnMount: false,
+    },
+  )
 
   const handleCreateTodo = async () => {
     if (!formData.title.trim()) {

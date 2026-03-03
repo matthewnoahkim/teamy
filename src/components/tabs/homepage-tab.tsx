@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { PageLoading } from '@/components/ui/loading-spinner'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 
 // Import all widget components
 import { WelcomeWidget } from '@/components/widgets/welcome-widget'
@@ -267,7 +268,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
     })
   }, [announcements.length, events.length, tests.length, club.memberships?.length])
 
-  const fetchWidgets = async () => {
+  const fetchWidgets = async (options?: { silent?: boolean }) => {
     try {
       const response = await fetch(`/api/widgets?clubId=${clubId}`)
       if (!response.ok) throw new Error('Failed to fetch widgets')
@@ -275,22 +276,27 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       setWidgets(data.widgets || [])
     } catch (error) {
       console.error('Failed to fetch widgets:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load widgets',
-        variant: 'destructive',
-      })
+      if (!options?.silent) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load widgets',
+          variant: 'destructive',
+        })
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchData = async () => {
+  const fetchData = async (options?: { force?: boolean }) => {
     try {
       // Batch fetch all missing data in parallel
       const promises: Promise<void>[] = []
+      const shouldFetchAnnouncements = options?.force || !initialAnnouncements
+      const shouldFetchEvents = options?.force || !initialEvents
+      const shouldFetchTests = options?.force || !initialTests
       
-      if (!initialAnnouncements) {
+      if (shouldFetchAnnouncements) {
         promises.push(
           fetch(`/api/announcements?clubId=${clubId}`)
             .then(res => res.ok ? res.json() : null)
@@ -299,7 +305,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
         )
       }
 
-      if (!initialEvents) {
+      if (shouldFetchEvents) {
         promises.push(
           fetch(`/api/calendar?clubId=${clubId}`)
             .then(res => res.ok ? res.json() : null)
@@ -308,7 +314,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
         )
       }
 
-      if (!initialTests) {
+      if (shouldFetchTests) {
         promises.push(
           fetch(`/api/tests?clubId=${clubId}`)
             .then(res => res.ok ? res.json() : null)
@@ -330,6 +336,19 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       console.error('Failed to fetch widget data:', error)
     }
   }
+
+  useBackgroundRefresh(
+    async () => {
+      await Promise.all([
+        fetchWidgets({ silent: true }),
+        fetchData({ force: true }),
+      ])
+    },
+    {
+      intervalMs: 35_000,
+      runOnMount: true,
+    },
+  )
 
   const handleAddWidget = async (widgetData: WidgetData) => {
     try {
@@ -964,4 +983,3 @@ function EditWidgetDialog({ open, onOpenChange, widget, onUpdate }: EditWidgetDi
     </Dialog>
   )
 }
-

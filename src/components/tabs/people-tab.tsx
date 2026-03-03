@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
 import { Plus, Pencil, Trash2, ArrowLeft, X, FileSpreadsheet, Mail, Grid3x3, Layers, Search } from 'lucide-react'
 import { groupEventsByCategory, categoryOrder, type EventCategory } from '@/lib/event-categories'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 import type { ClubWithMembers, ClubWithMembersLite, MembershipWithPreferences } from '@/types/models'
 
 // ---------------------------------------------------------------------------
@@ -83,6 +84,7 @@ function normalizePeopleClub(club: ClubInput): ClubWithMembers {
 
 export function PeopleTab({ club: initialClubInput, currentMembership: _currentMembership, isAdmin }: PeopleTabProps) {
   const { toast } = useToast()
+  const clubId = initialClubInput.id
   
   // Local club state for immediate updates
   const [club, setClub] = useState<ClubWithMembers>(() => normalizePeopleClub(initialClubInput))
@@ -128,6 +130,36 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
     }
   }
 
+  const fetchFullClubData = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoadingClubData(true)
+    }
+
+    try {
+      const response = await fetch(`/api/clubs/${clubId}`)
+      if (!response.ok) {
+        throw new Error('Failed to load full club data')
+      }
+
+      const data = (await response.json()) as { club?: ClubWithMembers }
+      if (!data.club) return
+      setClub(normalizePeopleClub(data.club))
+    } catch (error) {
+      if (!options?.silent) {
+        console.error('Failed to fetch full people tab club data:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to load full roster data',
+          variant: 'destructive',
+        })
+      }
+    } finally {
+      if (!options?.silent) {
+        setLoadingClubData(false)
+      }
+    }
+  }, [clubId, toast])
+
   useEffect(() => {
     if (hasFullPeopleData(initialClubInput)) {
       setClub(normalizePeopleClub(initialClubInput))
@@ -135,37 +167,8 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
       return
     }
 
-    let isMounted = true
-    const fetchFullClubData = async () => {
-      setLoadingClubData(true)
-      try {
-        const response = await fetch(`/api/clubs/${initialClubInput.id}`)
-        if (!response.ok) {
-          throw new Error('Failed to load full club data')
-        }
-
-        const data = (await response.json()) as { club?: ClubWithMembers }
-        if (!isMounted || !data.club) return
-        setClub(normalizePeopleClub(data.club))
-      } catch (error) {
-        console.error('Failed to fetch full people tab club data:', error)
-        toast({
-          title: 'Error',
-          description: 'Failed to load full roster data',
-          variant: 'destructive',
-        })
-      } finally {
-        if (isMounted) {
-          setLoadingClubData(false)
-        }
-      }
-    }
-
-    fetchFullClubData()
-    return () => {
-      isMounted = false
-    }
-  }, [initialClubInput, toast])
+    void fetchFullClubData()
+  }, [initialClubInput, fetchFullClubData])
 
   useEffect(() => {
     fetchEvents()
@@ -233,6 +236,20 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
       console.error('Failed to fetch conflict groups:', error)
     }
   }
+
+  useBackgroundRefresh(
+    async () => {
+      await Promise.all([
+        fetchFullClubData({ silent: true }),
+        fetchEvents(),
+        fetchConflictGroups(),
+      ])
+    },
+    {
+      intervalMs: 30_000,
+      runOnMount: true,
+    },
+  )
 
   function fetchAssignments() {
     const allAssignments: RosterAssignmentWithMembership[] = []

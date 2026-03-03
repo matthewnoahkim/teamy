@@ -34,6 +34,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { formatDateTime } from '@/lib/utils'
 import { format } from 'date-fns'
 import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 import type { SessionUser } from '@/types/models'
 
 interface FormSubmission {
@@ -122,7 +123,7 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
     }
   }, [clubId, initialForms])
 
-  async function fetchForms() {
+  async function fetchForms(options?: { silent?: boolean }) {
     try {
       // Add timeout to prevent hanging requests
       const controller = new AbortController()
@@ -143,16 +144,26 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
         return
       }
       
-      console.error('Failed to fetch forms:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load forms. Please refresh the page.',
-        variant: 'destructive',
-      })
+      if (!options?.silent) {
+        console.error('Failed to fetch forms:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to load forms. Please refresh the page.',
+          variant: 'destructive',
+        })
+      }
     } finally {
       setLoading(false)
     }
   }
+
+  useBackgroundRefresh(
+    () => fetchForms({ silent: true }),
+    {
+      intervalMs: 45_000,
+      runOnMount: true,
+    },
+  )
 
   const handleUploadForm = async (formData: FormData) => {
     setUploading(true)

@@ -46,6 +46,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { PageLoading } from '@/components/ui/loading-spinner'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 
 export interface StatsTabInitialStats {
   clubId: string
@@ -155,9 +156,11 @@ export function StatsTab({ clubId, division: _division, initialStats }: StatsTab
   const [aiInstructions, setAiInstructions] = useState('')
   const [expandedMembers, setExpandedMembers] = useState<Set<string>>(new Set())
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (options?: { silent?: boolean }) => {
     try {
-      setLoading(true)
+      if (!options?.silent) {
+        setLoading(true)
+      }
       const response = await fetch(`/api/stats?clubId=${clubId}`)
       if (!response.ok) throw new Error('Failed to fetch stats')
       const data = await response.json()
@@ -166,13 +169,17 @@ export function StatsTab({ clubId, division: _division, initialStats }: StatsTab
       setTeams(data.teams || [])
     } catch (error) {
       console.error('Failed to fetch stats:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load stats',
-        variant: 'destructive',
-      })
+      if (!options?.silent) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load stats',
+          variant: 'destructive',
+        })
+      }
     } finally {
-      setLoading(false)
+      if (!options?.silent) {
+        setLoading(false)
+      }
     }
   }, [clubId, toast])
 
@@ -181,6 +188,14 @@ export function StatsTab({ clubId, division: _division, initialStats }: StatsTab
       fetchStats()
     }
   }, [fetchStats, initialStats])
+
+  useBackgroundRefresh(
+    () => fetchStats({ silent: true }),
+    {
+      intervalMs: 45_000,
+      runOnMount: true,
+    },
+  )
 
   const handleEditMember = (member: MemberStats) => {
     setEditingMember(member.membershipId)
@@ -322,7 +337,7 @@ export function StatsTab({ clubId, division: _division, initialStats }: StatsTab
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => { void fetchStats() }} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 transition-transform duration-300 ${loading ? 'animate-spin' : 'hover:rotate-180'}`} />
             Refresh
           </Button>
@@ -868,4 +883,3 @@ export function StatsTab({ clubId, division: _division, initialStats }: StatsTab
     </div>
   )
 }
-

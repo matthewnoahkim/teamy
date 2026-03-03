@@ -43,6 +43,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 import type { ClubWithMembers, ClubWithMembersLite, MembershipWithPreferences } from '@/types/models'
 
 export interface BackgroundPreferences {
@@ -277,9 +278,11 @@ interface SettingsTabProps {
   initialInviteCodes?: { adminCode: string; memberCode: string } | null
   personalBackground?: BackgroundPreferences | null
   onBackgroundUpdate?: (preferences: BackgroundPreferences | null) => void
+  onMembershipCountChange?: (count: number) => void
 }
 
 type InviteCodes = { adminCode: string; memberCode: string }
+type SettingsMembership = SettingsTabProps['club']['memberships'][number]
 
 const HIDDEN_CODE = '••••••••••••'
 const inviteCodesCache = new Map<string, InviteCodes>()
@@ -334,6 +337,7 @@ export function SettingsTab({
   initialInviteCodes,
   personalBackground,
   onBackgroundUpdate,
+  onMembershipCountChange,
 }: SettingsTabProps) {
   const { toast } = useToast()
   const router = useRouter()
@@ -351,6 +355,9 @@ export function SettingsTab({
   const [deleting, setDeleting] = useState(false)
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  const [clubName, setClubName] = useState(club.name)
+  const [teamCount, setTeamCount] = useState(club.teams.length)
+  const [memberships, setMemberships] = useState<SettingsMembership[]>(club.memberships as SettingsMembership[])
   const [removingMember, setRemovingMember] = useState<string | null>(null)
   const [removeMemberDialogOpen, setRemoveMemberDialogOpen] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null)
@@ -359,10 +366,10 @@ export function SettingsTab({
   const [selectedAdminTransferId, setSelectedAdminTransferId] = useState('')
   const [transferringAdmin, setTransferringAdmin] = useState(false)
   const [dismissedTransferPrompt, setDismissedTransferPrompt] = useState(false)
-  const adminMemberships = club.memberships.filter(
+  const adminMemberships = memberships.filter(
     (membership) => String(membership.role).toUpperCase() === 'ADMIN'
   )
-  const regularMembers = club.memberships.filter(
+  const regularMembers = memberships.filter(
     (membership) =>
       membership.id !== currentMembership.id && String(membership.role).toUpperCase() === 'MEMBER'
   )
@@ -370,6 +377,53 @@ export function SettingsTab({
     String(currentMembership.role).toUpperCase() === 'ADMIN' && adminMemberships.length === 1
   const shouldShowTransferPrompt =
     isSoleAdmin && regularMembers.length > 0 && !dismissedTransferPrompt
+
+  useEffect(() => {
+    setClubName(club.name)
+    setTeamCount(club.teams.length)
+    setMemberships(club.memberships as SettingsMembership[])
+  }, [club.id, club.name, club.teams.length, club.memberships])
+
+  useEffect(() => {
+    onMembershipCountChange?.(memberships.length)
+  }, [memberships.length, onMembershipCountChange])
+
+  const refreshMemberships = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    try {
+      const response = await fetch(`/api/clubs/${club.id}`, { cache: 'no-store' })
+      if (!response.ok) {
+        throw new Error('Failed to load club members')
+      }
+
+      const data = (await response.json()) as {
+        club?: {
+          name?: string
+          memberships?: SettingsMembership[]
+          teams?: Array<{ id: string }>
+        }
+      }
+      setClubName(data.club?.name ?? club.name)
+      setTeamCount(data.club?.teams?.length ?? club.teams.length)
+      setMemberships((data.club?.memberships ?? []) as SettingsMembership[])
+    } catch (error) {
+      if (!silent) {
+        console.error('Failed to refresh club members:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to refresh club members',
+          variant: 'destructive',
+        })
+      }
+    }
+  }, [club.id, toast])
+
+  useBackgroundRefresh(
+    () => refreshMemberships({ silent: true }),
+    {
+      intervalMs: 20_000,
+      runOnMount: true,
+    },
+  )
 
   useEffect(() => {
     if (!leaveDialogOpen) {
@@ -514,10 +568,10 @@ export function SettingsTab({
         description: `${memberToRemove.name} has been removed from the club`,
       })
 
+      setMemberships((prev) => prev.filter((membership) => membership.id !== memberToRemove.id))
       setRemoveMemberDialogOpen(false)
       setMemberToRemove(null)
-      // Refresh to update the members list
-      router.refresh()
+      void refreshMemberships({ silent: true })
     } catch (error: unknown) {
       toast({
         title: 'Error',
@@ -704,7 +758,7 @@ export function SettingsTab({
   }
 
   const handleDeleteTeam = async () => {
-    if (deleteConfirmation !== club.name) {
+    if (deleteConfirmation !== clubName) {
       toast({
         title: 'Error',
         description: 'Team name does not match',
@@ -804,9 +858,22 @@ export function SettingsTab({
         description: 'Selected member now has admin access.',
       })
 
+      setMemberships((prev) =>
+        prev.map((membership) =>
+          membership.id === selectedAdminTransferId
+            ? {
+                ...membership,
+                role: 'ADMIN',
+                roles: Array.isArray(membership.roles)
+                  ? Array.from(new Set([...membership.roles, 'ADMIN']))
+                  : ['ADMIN'],
+              }
+            : membership,
+        ),
+      )
       setSelectedAdminTransferId('')
       setDismissedTransferPrompt(true)
-      router.refresh()
+      void refreshMemberships({ silent: true })
     } catch (error: unknown) {
       toast({
         title: 'Error',
@@ -1321,7 +1388,7 @@ export function SettingsTab({
         <CardContent className="space-y-4">
           <div>
             <p className="text-sm font-medium">Club Name</p>
-            <p className="text-lg">{club.name}</p>
+            <p className="text-lg">{clubName}</p>
           </div>
           <div>
             <p className="text-sm font-medium">Division</p>
@@ -1329,11 +1396,11 @@ export function SettingsTab({
           </div>
           <div>
             <p className="text-sm font-medium">Members</p>
-            <p className="text-lg">{club.memberships.length}</p>
+            <p className="text-lg">{memberships.length}</p>
           </div>
           <div>
             <p className="text-sm font-medium">Teams</p>
-            <p className="text-lg">{club.teams.length}</p>
+            <p className="text-lg">{teamCount}</p>
           </div>
         </CardContent>
       </Card>
@@ -1349,7 +1416,7 @@ export function SettingsTab({
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {club.memberships.map((membership) => (
+              {memberships.map((membership) => (
                 <div
                   key={membership.id}
                   className="flex items-center justify-between p-3 rounded-lg border"
@@ -1522,7 +1589,7 @@ export function SettingsTab({
         </>
       )}
 
-      {club.memberships.length > 1 && (
+      {memberships.length > 1 && (
         <Card className="border-destructive/50">
           <CardHeader>
             <CardTitle className="text-destructive">Leave Club</CardTitle>
@@ -1578,7 +1645,7 @@ export function SettingsTab({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="delete-confirmation">
-                Type <span className="font-bold">{club.name}</span> to confirm
+                Type <span className="font-bold">{clubName}</span> to confirm
               </Label>
               <Input
                 id="delete-confirmation"
@@ -1602,7 +1669,7 @@ export function SettingsTab({
             <Button
               variant="destructive"
               onClick={handleDeleteTeam}
-              disabled={deleting || deleteConfirmation !== club.name}
+              disabled={deleting || deleteConfirmation !== clubName}
             >
               {deleting ? 'Deleting...' : 'Delete Club Permanently'}
             </Button>
@@ -1615,7 +1682,7 @@ export function SettingsTab({
           <DialogHeader>
             <DialogTitle>Leave Club</DialogTitle>
             <DialogDescription>
-              Are you sure you want to leave {club.name}? You will need an invite code to rejoin.
+              Are you sure you want to leave {clubName}? You will need an invite code to rejoin.
             </DialogDescription>
           </DialogHeader>
           {shouldShowTransferPrompt && (
@@ -1688,7 +1755,7 @@ export function SettingsTab({
           <DialogHeader>
             <DialogTitle>Remove Member</DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove <strong>{memberToRemove?.name}</strong> from {club.name}? 
+              Are you sure you want to remove <strong>{memberToRemove?.name}</strong> from {clubName}? 
               This action cannot be undone and they will need an invite code to rejoin.
             </DialogDescription>
           </DialogHeader>
