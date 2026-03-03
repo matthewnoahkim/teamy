@@ -78,7 +78,7 @@ export function renderTeamyEmailLayout({
   const safeLabel = escapeHtml(label)
   const safeTitle = escapeHtml(title)
   const safeSubtitle = subtitle ? escapeHtml(subtitle) : null
-  const safeLogoUrl = escapeHtml(logoUrl || `${getBaseUrl()}/logo.png`)
+  const safeLogoUrl = escapeHtml(logoUrl || `${getBaseUrl()}/logo-64.png`)
   const safeActionLabel = actionLabel ? escapeHtml(actionLabel) : null
   const safeActionUrl = actionUrl ? escapeHtml(actionUrl) : null
   const footer = escapeHtml(footerText ?? 'Teamy • Science Olympiad Management Platform')

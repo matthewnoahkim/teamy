@@ -19,14 +19,17 @@ const sizeMap = {
   sm: {
     container: 'h-8 w-8',
     text: 'text-lg',
+    image: '32px',
   },
   md: {
     container: 'h-10 w-10',
     text: 'text-xl',
+    image: '40px',
   },
   lg: {
     container: 'h-14 w-14',
     text: 'text-3xl',
+    image: '56px',
   },
 }
 
@@ -80,13 +83,12 @@ export function Logo({
       >
         {!imageError ? (
           <Image
-            src="/logo.png"
+            src="/logo-64.png"
             alt="Teamy Logo"
             width={64}
             height={64}
+            sizes={sizes.image}
             className="w-full h-full object-contain"
-            priority
-            unoptimized
             onError={() => setImageError(true)}
           />
         ) : (

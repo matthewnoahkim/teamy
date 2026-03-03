@@ -6,7 +6,7 @@
 export function updateFaviconBadge(count: number) {
   // Use the actual logo image instead of drawing from scratch
   // Fire and forget - errors are handled internally
-  updateFaviconBadgeWithImage(count, '/logo.png').catch(() => {
+  updateFaviconBadgeWithImage(count, '/logo-64.png').catch(() => {
     // Error already logged in updateFaviconBadgeWithImage
   })
 }
@@ -15,7 +15,7 @@ export function updateFaviconBadge(count: number) {
  * Loads the actual favicon image and draws a badge on it
  * This is more accurate than drawing from scratch
  */
-export async function updateFaviconBadgeWithImage(count: number, faviconUrl: string = '/logo.png') {
+export async function updateFaviconBadgeWithImage(count: number, faviconUrl: string = '/logo-64.png') {
   try {
     // Load the favicon image
     const img = new Image()
@@ -43,7 +43,7 @@ export async function updateFaviconBadgeWithImage(count: number, faviconUrl: str
         document.head.appendChild(link)
         reject(new Error('Logo not found'))
       }
-      img.src = faviconUrl + '?t=' + Date.now() // Cache bust
+      img.src = faviconUrl
     })
 
     // Create canvas - use larger size for better quality
@@ -106,4 +106,3 @@ export async function updateFaviconBadgeWithImage(count: number, faviconUrl: str
     console.warn('Failed to load logo for favicon:', error)
   }
 }
-
