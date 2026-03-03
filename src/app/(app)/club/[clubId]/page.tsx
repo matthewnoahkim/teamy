@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { ClubPage } from '@/components/club-page'
 import { Suspense } from 'react'
 import { PageLoading } from '@/components/ui/loading-spinner'
+import { DelayedRender } from '@/components/ui/delayed-render'
 import { CalendarScope, AnnouncementScope, Role } from '@prisma/client'
 import { userSelectFields } from '@/types/models'
 import { hasAnnouncementTargetAccess, hasTestAssignmentAccess } from '@/lib/club-authz'
@@ -643,12 +644,16 @@ export default async function ClubDetailPage({
 
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-background grid-pattern flex items-center justify-center px-4 py-12">
-        <PageLoading 
-          title="Loading club" 
-          description="Fetching club data and member information..." 
-          variant="orbit" 
-        />
+      <div className="min-h-screen bg-background grid-pattern">
+        <DelayedRender delayMs={200}>
+          <div className="min-h-screen flex items-center justify-center px-4 py-12">
+            <PageLoading
+              title="Loading club"
+              description="Fetching club data and member information..."
+              variant="orbit"
+            />
+          </div>
+        </DelayedRender>
       </div>
     }>
       <ClubPage

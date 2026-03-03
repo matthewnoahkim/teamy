@@ -7,47 +7,62 @@ import { Badge } from '@/components/ui/badge'
 import { Home, MessageSquare, Users, Calendar, Settings, ClipboardCheck, DollarSign, FileText, Pencil, Image, File, Menu, CheckSquare, BarChart3, Wrench } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
 import { PageLoading } from '@/components/ui/loading-spinner'
+import { DelayedRender } from '@/components/ui/delayed-render'
 import dynamic from 'next/dynamic'
 
 // Lazy load heavy tab components for better initial load performance
+const LOADING_INDICATOR_DELAY_MS = 180
+const delayedTabLoading = (title: string, description: string) => {
+  function TabLoading() {
+    return (
+      <DelayedRender delayMs={LOADING_INDICATOR_DELAY_MS}>
+        <PageLoading title={title} description={description} variant="orbit" />
+      </DelayedRender>
+    )
+  }
+
+  TabLoading.displayName = `${title}TabLoading`
+  return TabLoading
+}
+
 const HomePageTab = dynamic(() => import('@/components/tabs/homepage-tab').then(mod => ({ default: mod.HomePageTab })), {
-  loading: () => <PageLoading title="Loading dashboard" description="Preparing widgets and updates..." variant="orbit" />
+  loading: delayedTabLoading('Loading dashboard', 'Preparing widgets and updates...'),
 })
 const StreamTab = dynamic(() => import('@/components/tabs/stream-tab').then(mod => ({ default: mod.StreamTab })), {
-  loading: () => <PageLoading title="Loading stream" description="Fetching announcements and posts..." variant="orbit" />
+  loading: delayedTabLoading('Loading stream', 'Fetching announcements and posts...'),
 })
 const PeopleTab = dynamic(() => import('@/components/tabs/people-tab').then(mod => ({ default: mod.PeopleTab })), {
-  loading: () => <PageLoading title="Loading people" description="Fetching club members and rosters..." variant="orbit" />
+  loading: delayedTabLoading('Loading people', 'Fetching club members and rosters...'),
 })
 const CalendarTab = dynamic(() => import('@/components/tabs/calendar-tab').then(mod => ({ default: mod.CalendarTab })), {
-  loading: () => <PageLoading title="Loading calendar" description="Fetching events and schedules..." variant="orbit" />
+  loading: delayedTabLoading('Loading calendar', 'Fetching events and schedules...'),
 })
 const AttendanceTab = dynamic(() => import('@/components/tabs/attendance-tab').then(mod => ({ default: mod.AttendanceTab })), {
-  loading: () => <PageLoading title="Loading attendance" description="Fetching attendance records..." variant="orbit" />
+  loading: delayedTabLoading('Loading attendance', 'Fetching attendance records...'),
 })
 const SettingsTab = dynamic(() => import('@/components/tabs/settings-tab').then(mod => ({ default: mod.SettingsTab })), {
-  loading: () => <PageLoading title="Loading settings" description="Fetching club configuration..." variant="orbit" />
+  loading: delayedTabLoading('Loading settings', 'Fetching club configuration...'),
 })
 const FinanceTab = dynamic(() => import('@/components/tabs/finance-tab'), {
-  loading: () => <PageLoading title="Loading finance" description="Fetching expenses and budgets..." variant="orbit" />
+  loading: delayedTabLoading('Loading finance', 'Fetching expenses and budgets...'),
 })
 const TestsTab = dynamic(() => import('@/components/tabs/tests-tab'), {
-  loading: () => <PageLoading title="Loading tests" description="Fetching assessments and submissions..." variant="orbit" />
+  loading: delayedTabLoading('Loading tests', 'Fetching assessments and submissions...'),
 })
 const GalleryTab = dynamic(() => import('@/components/tabs/gallery-tab').then(mod => ({ default: mod.GalleryTab })), {
-  loading: () => <PageLoading title="Loading gallery" description="Fetching photos and videos..." variant="orbit" />
+  loading: delayedTabLoading('Loading gallery', 'Fetching photos and videos...'),
 })
 const PaperworkTab = dynamic(() => import('@/components/tabs/paperwork-tab').then(mod => ({ default: mod.PaperworkTab })), {
-  loading: () => <PageLoading title="Loading paperwork" description="Fetching forms and submissions..." variant="orbit" />
+  loading: delayedTabLoading('Loading paperwork', 'Fetching forms and submissions...'),
 })
 const TodoTab = dynamic(() => import('@/components/tabs/todo-tab').then(mod => ({ default: mod.TodoTab })), {
-  loading: () => <PageLoading title="Loading to-do list" description="Fetching tasks and reminders..." variant="orbit" />
+  loading: delayedTabLoading('Loading to-do list', 'Fetching tasks and reminders...'),
 })
 const StatsTab = dynamic(() => import('@/components/tabs/stats-tab').then(mod => ({ default: mod.StatsTab })).catch(() => ({ default: () => <div>Failed to load stats tab</div> })), {
-  loading: () => <PageLoading title="Loading stats" description="Fetching analytics and insights..." variant="orbit" />
+  loading: delayedTabLoading('Loading stats', 'Fetching analytics and insights...'),
 })
 const ToolsTab = dynamic(() => import('@/components/tabs/tools-tab').then(mod => ({ default: mod.ToolsTab })), {
-  loading: () => <PageLoading title="Loading tools" description="Preparing study tools..." variant="orbit" />
+  loading: delayedTabLoading('Loading tools', 'Preparing study tools...'),
 })
 import {
   Dialog,
