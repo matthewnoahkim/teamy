@@ -529,7 +529,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   useBackgroundRefresh(
     () => refreshTabNotifications(),
     {
-      intervalMs: 8_000,
+      intervalMs: 20_000,
       runOnMount: true,
       refreshOnFocus: true,
       refreshOnReconnect: true,
@@ -539,8 +539,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   useBackgroundRefresh(
     () => refreshClubSummary(),
     {
-      intervalMs: 20_000,
-      runOnMount: true,
+      intervalMs: 60_000,
+      runOnMount: false,
       refreshOnFocus: true,
       refreshOnReconnect: true,
     },

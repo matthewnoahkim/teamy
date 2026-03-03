@@ -7,10 +7,21 @@ import { format } from 'date-fns'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { PublicPageLayout } from '@/components/public-page-layout'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
 interface Props {
   params: Promise<{ slug: string }>
+}
+
+export async function generateStaticParams() {
+  const posts = await prisma.blogPost.findMany({
+    where: { published: true },
+    select: { slug: true },
+  })
+
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
 }
 
 export default async function BlogPostPage({ params }: Props) {

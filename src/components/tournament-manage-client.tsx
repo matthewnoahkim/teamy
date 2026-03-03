@@ -199,7 +199,7 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
   const loadTournament = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/tournaments/${tournamentId}?_t=${Date.now()}`, {
+      const response = await fetch(`/api/tournaments/${tournamentId}`, {
         cache: 'no-store',
       })
       if (!response.ok) throw new Error('Failed to load tournament')
@@ -1319,4 +1319,3 @@ export function TournamentManageClient({ tournamentId, user }: TournamentManageC
     </div>
   )
 }
-

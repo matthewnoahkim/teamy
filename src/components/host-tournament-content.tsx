@@ -30,17 +30,14 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { SignInButton } from '@/components/signin-button'
-import { useSession } from 'next-auth/react'
 import { DemoRequestDialog } from '@/components/demo-request-dialog'
 
 interface HostTournamentContentProps {
-  isAuthenticated: boolean
+  isAuthenticated?: boolean
 }
 
-export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated }: HostTournamentContentProps) {
-  const { status } = useSession()
-  // Use client-side session check if available, otherwise fall back to server-side prop during loading
-  const isAuthenticated = status === 'authenticated' || (status === 'loading' ? initialIsAuthenticated : false)
+export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated = false }: HostTournamentContentProps) {
+  const [isAuthenticated, setIsAuthenticated] = useState(initialIsAuthenticated)
   const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -64,6 +61,35 @@ export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated 
     directorPhone: '',
     otherNotes: '',
   })
+
+  useEffect(() => {
+    let mounted = true
+
+    const loadSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session', { cache: 'no-store' })
+        if (!response.ok) {
+          if (mounted) setIsAuthenticated(false)
+          return
+        }
+
+        const session = (await response.json()) as { user?: unknown } | null
+        if (mounted) {
+          setIsAuthenticated(Boolean(session?.user))
+        }
+      } catch {
+        if (mounted) {
+          setIsAuthenticated(false)
+        }
+      }
+    }
+
+    void loadSession()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   // Check slug availability
   const checkSlugAvailability = async (slug: string) => {
@@ -851,4 +877,3 @@ export function HostTournamentContent({ isAuthenticated: initialIsAuthenticated 
     </div>
   )
 }
-

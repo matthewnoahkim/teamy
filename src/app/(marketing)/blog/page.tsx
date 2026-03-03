@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { PublicPageLayout } from '@/components/public-page-layout'
 import { BlogPostList } from '@/components/blog-post-list'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
 export default async function BlogPage() {
   const posts = await prisma.blogPost.findMany({

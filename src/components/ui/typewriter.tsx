@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react"
-import { motion, Variants } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 
@@ -14,10 +13,6 @@ interface TypewriterProps {
   showCursor?: boolean
   hideCursorOnType?: boolean
   cursorChar?: string | React.ReactNode
-  cursorAnimationVariants?: {
-    initial: Variants["initial"]
-    animate: Variants["animate"]
-  }
   cursorClassName?: string
 }
 
@@ -33,18 +28,6 @@ const Typewriter = ({
   hideCursorOnType = false,
   cursorChar = "|",
   cursorClassName = "ml-1",
-  cursorAnimationVariants = {
-    initial: { opacity: 0 },
-    animate: {
-      opacity: 1,
-      transition: {
-        duration: 0.01,
-        repeat: Infinity,
-        repeatDelay: 0.4,
-        repeatType: "reverse",
-      },
-    },
-  },
 }: TypewriterProps) => {
   const [displayText, setDisplayText] = useState("")
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -112,24 +95,21 @@ const Typewriter = ({
     <div className={`inline whitespace-pre-wrap tracking-tight ${className}`}>
       <span>{displayText}</span>
       {showCursor && (
-        <motion.span
-          variants={cursorAnimationVariants}
+        <span
           className={cn(
+            "animate-pulse",
             cursorClassName,
             hideCursorOnType &&
               (currentIndex < texts[currentTextIndex].length || isDeleting)
               ? "hidden"
               : ""
           )}
-          initial="initial"
-          animate="animate"
         >
           {cursorChar}
-        </motion.span>
+        </span>
       )}
     </div>
   )
 }
 
 export { Typewriter }
-

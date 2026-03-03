@@ -77,19 +77,11 @@ export default async function proxy(request: NextRequest) {
 
   // Skip rate limiting for certain paths
   const skipPaths = [
-    '/_next',
-    '/favicon.ico',
-    '/static',
     '/api/auth/callback', // OAuth callbacks need to work
     '/api/auth/session', // Session checks are frequent
   ]
 
   if (skipPaths.some(path => pathname.startsWith(path))) {
-    return applySecurityHeaders(NextResponse.next())
-  }
-
-  // Apply security headers to all non-API routes without rate limiting.
-  if (!pathname.startsWith('/api')) {
     return applySecurityHeaders(NextResponse.next())
   }
 
@@ -155,13 +147,6 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
+  // Restrict middleware execution to API routes to avoid extra work on static/public pages.
+  matcher: ['/api/:path*'],
 }

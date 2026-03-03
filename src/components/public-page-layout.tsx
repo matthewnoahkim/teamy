@@ -4,18 +4,17 @@ import { HomeNav } from '@/components/home-nav'
 import { DiscordBanner } from '@/components/discord-banner'
 import { PublicPageTransition } from '@/components/public-page-transition'
 import { PublicPageTools } from '@/components/public-page-tools'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { getPreferredClubPathForUser } from '@/lib/club-routing'
-import { cookies } from 'next/headers'
+import { unstable_cache } from 'next/cache'
+import { PublicUserActions } from '@/components/public-user-actions'
 
 interface PublicPageLayoutProps {
   children: React.ReactNode
   hideFooter?: boolean
+  disableUserAwareNav?: boolean
 }
 
-async function getBannerSettings() {
+const getBannerSettings = unstable_cache(async () => {
   try {
     const [enabledSetting, textSetting, linkSetting, bgSetting] = await Promise.all([
       prisma.siteSetting.findUnique({ where: { key: 'banner_enabled' } }),
@@ -39,29 +38,48 @@ async function getBannerSettings() {
       backgroundColor: '#0056C7',
     }
   }
-}
+}, ['public-banner-settings'], { revalidate: 300 })
 
-async function getLoggedInUserRedirect(userId: string): Promise<string> {
-  try {
-    const cookieStore = await cookies()
-    const lastClubId = cookieStore.get('lastVisitedClub')?.value
-
-    return await getPreferredClubPathForUser(userId, { lastVisitedClubId: lastClubId })
-  } catch (error) {
-    console.error('Error getting user redirect:', error)
-    return '/no-clubs'
-  }
-}
-
-export async function PublicPageLayout({ children, hideFooter = false }: PublicPageLayoutProps) {
-  const session = await getServerSession(authOptions)
-  const isLoggedIn = !!session?.user
+export async function PublicPageLayout({
+  children,
+  hideFooter = false,
+  disableUserAwareNav = false,
+}: PublicPageLayoutProps) {
   const bannerSettings = await getBannerSettings()
-  
-  // Get the appropriate redirect URL for logged-in users
-  const loggedInRedirect = isLoggedIn && session?.user?.id 
-    ? await getLoggedInUserRedirect(session.user.id)
-    : '/login'
+
+  const guestMobileActions = (
+    <div className="space-y-2">
+      <Link
+        href="/login"
+        className="block w-full rounded-full border border-white/40 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-white/10"
+      >
+        Sign In
+      </Link>
+      <Link
+        href="/signup"
+        className="block w-full rounded-full bg-white px-4 py-2.5 text-center text-sm font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md"
+      >
+        Sign Up
+      </Link>
+    </div>
+  )
+
+  const guestDesktopActions = (
+    <div className="hidden md:flex items-center gap-3">
+      <Link
+        href="/login"
+        className="whitespace-nowrap px-2 py-2 text-xs font-semibold text-white/90 transition-colors hover:text-white md:px-3 md:text-sm"
+      >
+        Sign In
+      </Link>
+      <Link
+        href="/signup"
+        className="block whitespace-nowrap rounded-full bg-white px-5 py-2 text-xs font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md md:px-6 md:py-2.5 md:text-sm"
+      >
+        Sign Up
+      </Link>
+    </div>
+  )
 
   return (
     <div className="min-h-screen flex flex-col bg-background grid-pattern text-foreground">
@@ -83,55 +101,9 @@ export async function PublicPageLayout({ children, hideFooter = false }: PublicP
           <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">
             <HomeNav 
               variant="light" 
-              mobileButton={
-                isLoggedIn ? (
-                  <Link
-                    href={loggedInRedirect}
-                    className="block w-full rounded-full bg-white px-4 py-2.5 text-center text-sm font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md"
-                  >
-                    My Clubs
-                  </Link>
-                ) : (
-                  <div className="space-y-2">
-                    <Link
-                      href="/login"
-                      className="block w-full rounded-full border border-white/40 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-white/10"
-                    >
-                      Sign In
-                    </Link>
-                    <Link
-                      href="/signup"
-                      className="block w-full rounded-full bg-white px-4 py-2.5 text-center text-sm font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md"
-                    >
-                      Sign Up
-                    </Link>
-                  </div>
-                )
-              }
+              mobileButton={disableUserAwareNav ? guestMobileActions : <PublicUserActions variant="mobile" />}
             />
-            {isLoggedIn ? (
-              <Link
-                href={loggedInRedirect}
-                className="hidden whitespace-nowrap rounded-full bg-white px-5 py-2 text-xs font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md md:block md:px-6 md:py-2.5 md:text-sm"
-              >
-                My Clubs
-              </Link>
-            ) : (
-              <div className="hidden md:flex items-center gap-3">
-                <Link
-                  href="/login"
-                  className="whitespace-nowrap px-2 py-2 text-xs font-semibold text-white/90 transition-colors hover:text-white md:px-3 md:text-sm"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/signup"
-                  className="block whitespace-nowrap rounded-full bg-white px-5 py-2 text-xs font-semibold text-teamy-primary shadow-sm transition-all duration-200 hover:bg-white/90 hover:shadow-md md:px-6 md:py-2.5 md:text-sm"
-                >
-                  Sign Up
-                </Link>
-              </div>
-            )}
+            {disableUserAwareNav ? guestDesktopActions : <PublicUserActions variant="desktop" />}
           </div>
         </div>
       </header>

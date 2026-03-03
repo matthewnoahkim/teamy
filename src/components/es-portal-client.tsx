@@ -203,7 +203,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
   const hasInitialized = useRef(false)
   const hasFetchedTests = useRef(false)
   const lastFetchTime = useRef<number>(0)
-  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastActiveTournamentRef = useRef<string>('')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [testToDelete, setTestToDelete] = useState<Test | null>(null)
@@ -347,8 +346,8 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
     }
   }
 
-  // Fetch tests organized by event
-  // Only fetch if enough time has passed since last fetch (debounce)
+  // Fetch tests organized by event.
+  // Throttle repeat calls without introducing delayed retries.
   const fetchTests = async (force = false) => {
     const now = Date.now()
     const timeSinceLastFetch = now - lastFetchTime.current
@@ -356,13 +355,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
     
     // Prevent too-frequent fetches unless forced
     if (!force && timeSinceLastFetch < MIN_FETCH_INTERVAL) {
-      // Schedule a fetch after the minimum interval
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current)
-      }
-      fetchTimeoutRef.current = setTimeout(() => {
-        fetchTests(true)
-      }, MIN_FETCH_INTERVAL - timeSinceLastFetch)
       return
     }
     
@@ -372,10 +364,9 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
     setLoadingTests(true)
     try {
       // Use includeQuestions=false to reduce payload size (we already have questions from server)
-      const url = force 
-        ? `/api/es/tests?includeQuestions=false&t=${Date.now()}` 
-        : '/api/es/tests?includeQuestions=false'
-      const res = await fetch(url)
+      const res = await fetch('/api/es/tests?includeQuestions=false', {
+        cache: force ? 'no-store' : 'default',
+      })
       if (res.ok) {
         const data = await res.json()
         setStaffMembershipsWithTests(data.staffMemberships)
@@ -462,15 +453,6 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
       setActiveTournament('')
     }
   }, [searchParams])
-  
-  useEffect(() => {
-    // Clean up any pending fetch timeout on unmount
-    return () => {
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current)
-      }
-    }
-  }, [])
   
   useEffect(() => {
     if (activeTournament) {

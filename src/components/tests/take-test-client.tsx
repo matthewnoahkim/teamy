@@ -708,9 +708,6 @@ export function TakeTestClient({
       )
       await Promise.all(savePromises)
 
-      // Small delay to ensure DB writes complete
-      await new Promise(resolve => setTimeout(resolve, 100))
-
       const response = await fetch(`/api/tests/${test.id}/attempts/${attempt.id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

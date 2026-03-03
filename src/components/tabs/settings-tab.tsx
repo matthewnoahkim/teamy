@@ -420,8 +420,8 @@ export function SettingsTab({
   useBackgroundRefresh(
     () => refreshMemberships({ silent: true }),
     {
-      intervalMs: 20_000,
-      runOnMount: true,
+      intervalMs: 60_000,
+      runOnMount: false,
     },
   )
 

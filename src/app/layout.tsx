@@ -1,10 +1,5 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
-import { Providers } from '@/components/providers'
-import { Toaster } from '@/components/ui/toaster'
-import { FaviconLoader } from '@/components/favicon-loader'
-import { SpeedInsights } from '@vercel/speed-insights/next'
-import { Analytics } from '@vercel/analytics/next'
 
 export const metadata: Metadata = {
   title: 'Teamy',
@@ -55,13 +50,7 @@ export default function RootLayout({
             `,
           }}
         />
-        <FaviconLoader />
-        <Providers>
-          {children}
-          <Toaster />
-          <SpeedInsights />
-          <Analytics />
-        </Providers>
+        {children}
       </body>
     </html>
   )

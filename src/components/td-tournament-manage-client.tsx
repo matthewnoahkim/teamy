@@ -1526,7 +1526,9 @@ export function TDTournamentManageClient({
   const fetchAuditLogs = async () => {
     setLoadingAuditLogs(true)
     try {
-      const res = await fetch(`/api/td/tournaments/${tournament.id}/audit-logs?t=${Date.now()}`)
+      const res = await fetch(`/api/td/tournaments/${tournament.id}/audit-logs`, {
+        cache: 'no-store',
+      })
       if (res.ok) {
         const data = await res.json()
         setAuditLogs(data.auditLogs || [])
@@ -1642,10 +1644,14 @@ export function TDTournamentManageClient({
     // Set up auto-refresh every 5 seconds (silent, no loading indicator)
     const interval = setInterval(() => {
       // Fetch without showing loading state for auto-refresh
-      fetch(`/api/td/tournaments/${tournament.id}/audit-logs?t=${Date.now()}`)
-        .then(res => res.json())
+      fetch(`/api/td/tournaments/${tournament.id}/audit-logs`, {
+        cache: 'no-store',
+      })
+        .then(res => (res.ok ? res.json() : null))
         .then(data => {
-          setAuditLogs(data.auditLogs || [])
+          if (data) {
+            setAuditLogs(data.auditLogs || [])
+          }
         })
         .catch(err => {
           console.error('Auto-refresh audit logs error:', err)

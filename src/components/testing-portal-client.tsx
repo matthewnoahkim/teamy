@@ -222,12 +222,12 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
     }
   }
 
-  const loadTournaments = async (forceRefresh = false) => {
+  const loadTournaments = async () => {
     try {
       setLoading(true)
-      // Add cache-busting query param if forcing refresh
-      const url = forceRefresh ? `/api/testing/tournaments?t=${Date.now()}` : '/api/testing/tournaments'
-      const response = await fetch(url)
+      const response = await fetch('/api/testing/tournaments', {
+        cache: 'no-store',
+      })
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || errorData.details || 'Failed to load tournaments')
