@@ -7,6 +7,7 @@ import { PublicPageTools } from '@/components/public-page-tools'
 import { prisma } from '@/lib/prisma'
 import { unstable_cache } from 'next/cache'
 import { PublicUserActions } from '@/components/public-user-actions'
+import { serverSession } from '@/lib/server-session'
 
 interface PublicPageLayoutProps {
   children: React.ReactNode
@@ -45,7 +46,11 @@ export async function PublicPageLayout({
   hideFooter = false,
   disableUserAwareNav = false,
 }: PublicPageLayoutProps) {
-  const bannerSettings = await getBannerSettings()
+  const [bannerSettings, session] = await Promise.all([
+    getBannerSettings(),
+    disableUserAwareNav ? Promise.resolve(null) : serverSession.get(),
+  ])
+  const isAuthenticated = Boolean(session?.user)
 
   const guestMobileActions = (
     <div className="space-y-2">
@@ -101,9 +106,9 @@ export async function PublicPageLayout({
           <div className="flex items-center gap-2 sm:gap-4 md:gap-6 flex-shrink-0">
             <HomeNav 
               variant="light" 
-              mobileButton={disableUserAwareNav ? guestMobileActions : <PublicUserActions variant="mobile" />}
+              mobileButton={disableUserAwareNav ? guestMobileActions : <PublicUserActions variant="mobile" isAuthenticated={isAuthenticated} />}
             />
-            {disableUserAwareNav ? guestDesktopActions : <PublicUserActions variant="desktop" />}
+            {disableUserAwareNav ? guestDesktopActions : <PublicUserActions variant="desktop" isAuthenticated={isAuthenticated} />}
           </div>
         </div>
       </header>

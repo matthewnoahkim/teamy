@@ -1,44 +1,11 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 type PublicUserActionsProps = {
   variant: 'mobile' | 'desktop'
+  isAuthenticated: boolean
 }
 
-export function PublicUserActions({ variant }: PublicUserActionsProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-
-  useEffect(() => {
-    let mounted = true
-
-    const loadSession = async () => {
-      try {
-        const response = await fetch('/api/auth/session', { cache: 'no-store' })
-        if (!response.ok) {
-          if (mounted) setIsAuthenticated(false)
-          return
-        }
-
-        const session = (await response.json()) as { user?: unknown } | null
-        if (mounted) {
-          setIsAuthenticated(Boolean(session?.user))
-        }
-      } catch {
-        if (mounted) {
-          setIsAuthenticated(false)
-        }
-      }
-    }
-
-    void loadSession()
-
-    return () => {
-      mounted = false
-    }
-  }, [])
-
+export function PublicUserActions({ variant, isAuthenticated }: PublicUserActionsProps) {
   if (variant === 'mobile') {
     if (isAuthenticated) {
       return (
