@@ -56,6 +56,7 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   const [joinInitialCode, setJoinInitialCode] = useState('')
   const [joinInitialInviteClubId, setJoinInitialInviteClubId] = useState('')
   const [primaryClubId, setPrimaryClubId] = useState<string | null>(null)
+  const [primaryClubLoaded, setPrimaryClubLoaded] = useState(false)
   const [savingPrimaryClub, setSavingPrimaryClub] = useState(false)
   
   // Show customization and billing on club pages OR when explicitly set
@@ -102,20 +103,24 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
         const response = await fetch('/api/user/preferences', {
           cache: 'no-store',
         })
-        if (!response.ok) return
+        if (response.ok) {
+          const data = await response.json()
+          const rawPrimaryClubId = data?.preferences?.primaryClubId
+          const resolvedPrimaryClubId =
+            typeof rawPrimaryClubId === 'string' && rawPrimaryClubId.trim().length > 0
+              ? rawPrimaryClubId.trim()
+              : null
 
-        const data = await response.json()
-        const rawPrimaryClubId = data?.preferences?.primaryClubId
-        const resolvedPrimaryClubId =
-          typeof rawPrimaryClubId === 'string' && rawPrimaryClubId.trim().length > 0
-            ? rawPrimaryClubId.trim()
-            : null
-
-        if (isMounted) {
-          setPrimaryClubId(resolvedPrimaryClubId)
+          if (isMounted) {
+            setPrimaryClubId(resolvedPrimaryClubId)
+          }
         }
       } catch (error) {
         console.error('Failed to load primary club preference', error)
+      } finally {
+        if (isMounted) {
+          setPrimaryClubLoaded(true)
+        }
       }
     }
 
@@ -158,8 +163,8 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
     }
   }
 
-  const handleSetPrimaryClub = async (targetClubId: string) => {
-    if (!targetClubId || savingPrimaryClub) return
+  const handleSetPrimaryClub = async (targetClubId: string | null) => {
+    if (savingPrimaryClub) return
 
     setSavingPrimaryClub(true)
     try {
@@ -169,7 +174,7 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          primaryClubId: targetClubId,
+          primaryClubId: targetClubId ?? null,
         }),
       })
 
@@ -179,10 +184,14 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
       }
 
       setPrimaryClubId(targetClubId)
-      document.cookie = `lastVisitedClub=${targetClubId}; path=/; max-age=${60 * 60 * 24 * 365}`
+      if (targetClubId) {
+        document.cookie = `lastVisitedClub=${targetClubId}; path=/; max-age=${60 * 60 * 24 * 365}`
+      }
       toast({
-        title: 'Primary club updated',
-        description: 'This club will now be your default when loading Teamy.',
+        title: targetClubId ? 'Primary club updated' : 'Primary club removed',
+        description: targetClubId
+          ? 'This club will now be your default when loading Teamy.'
+          : 'No club is set as your default anymore.',
       })
     } catch (error) {
       toast({
@@ -229,19 +238,23 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
                       )}
                     </DropdownMenuItem>
                   ))}
-                  {clubId && (
+                  {clubId && primaryClubLoaded && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={() => void handleSetPrimaryClub(clubId)}
-                        disabled={savingPrimaryClub || primaryClubId === clubId}
+                        onClick={() =>
+                          void handleSetPrimaryClub(primaryClubId === clubId ? null : clubId)
+                        }
+                        disabled={savingPrimaryClub}
                       >
                         <Star className="mr-2 h-4 w-4" />
                         {primaryClubId === clubId
-                          ? 'Current Club Is Primary'
+                          ? savingPrimaryClub
+                            ? 'Removing Primary Club...'
+                            : 'Remove as Primary'
                           : savingPrimaryClub
                             ? 'Saving Primary Club...'
-                            : 'Set Current Club as Primary'}
+                            : 'Set as Primary'}
                       </DropdownMenuItem>
                     </>
                   )}
