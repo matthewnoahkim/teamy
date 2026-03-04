@@ -59,9 +59,9 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   const [primaryClubLoaded, setPrimaryClubLoaded] = useState(false)
   const [savingPrimaryClub, setSavingPrimaryClub] = useState(false)
   
-  // Show customization and billing on club pages OR when explicitly set
+  // Show customization and billing on all app-header pages by default.
   const isOnClubPage = pathname?.startsWith('/club/')
-  const showCustomizationBilling = showCustomizationBillingProp ?? isOnClubPage
+  const showCustomizationBilling = showCustomizationBillingProp ?? true
   const showClubDropdown = (isOnClubPage && clubs && clubs.length > 0) || (allClubs && allClubs.length > 1)
 
   const currentClub = clubs?.find(c => c.id === clubId)
