@@ -14,14 +14,20 @@ interface Props {
 }
 
 export async function generateStaticParams() {
-  const posts = await prisma.blogPost.findMany({
-    where: { published: true },
-    select: { slug: true },
-  })
+  try {
+    const posts = await prisma.blogPost.findMany({
+      where: { published: true },
+      select: { slug: true },
+    })
 
-  return posts.map((post) => ({
-    slug: post.slug,
-  }))
+    return posts.map((post) => ({
+      slug: post.slug,
+    }))
+  } catch (error) {
+    // Keep builds green when DB access is unavailable during static generation.
+    console.error('Failed to generate static blog params:', error)
+    return []
+  }
 }
 
 export default async function BlogPostPage({ params }: Props) {
@@ -39,6 +45,9 @@ export default async function BlogPostPage({ params }: Props) {
       createdAt: true,
       published: true,
     },
+  }).catch((error) => {
+    console.error(`Failed to load blog post for slug "${resolvedParams.slug}":`, error)
+    return null
   })
 
   if (!post || !post.published) {

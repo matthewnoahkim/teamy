@@ -17,6 +17,10 @@ export default async function BlogPage() {
       authorName: true,
       createdAt: true,
     },
+  }).catch((error) => {
+    // Keep marketing builds resilient when DB access is unavailable.
+    console.error('Failed to load published blog posts:', error)
+    return []
   })
 
   return (
