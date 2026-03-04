@@ -124,7 +124,13 @@ export async function POST(
         // If the column doesn't exist, skip this test
         const errCode = (error as Record<string, unknown>)?.code
         const errMessage = error instanceof Error ? error.message : undefined
-        if (errCode === 'P2025' || errMessage?.includes('does not exist')) {
+        if (
+          errCode === 'P2022' ||
+          errCode === 'P2025' ||
+          errMessage?.includes('does not exist') ||
+          errMessage?.includes('Unknown argument') ||
+          errMessage?.includes('Unknown field')
+        ) {
           console.warn(`scoresReleased column does not exist for test ${test.id}`)
         } else {
           console.error(`Error updating ESTest ${test.id}:`, error)

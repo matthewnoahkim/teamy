@@ -105,6 +105,19 @@ interface TimelineItem {
   type: string
 }
 
+interface EventRankingRow {
+  eventId: string | null
+  eventName: string
+  eventDivision: string
+  testId: string
+  testName: string
+  rank: number
+  participantName: string
+  clubName: string
+  score: number
+  submittedAt: string | null
+}
+
 interface EventInfo {
   id: string
   name: string
@@ -553,6 +566,9 @@ export function TDTournamentManageClient({
   const [searchQuery, setSearchQuery] = useState('')
   const [eventFilter, setEventFilter] = useState<string>('all')
   const [divisionFilter, setDivisionFilter] = useState<string>('all')
+  const [eventRankingRows, setEventRankingRows] = useState<EventRankingRow[]>([])
+  const [fullyGradedTestCount, setFullyGradedTestCount] = useState(0)
+  const [loadingRankings, setLoadingRankings] = useState(false)
   const [auditLogs, setAuditLogs] = useState<Array<{
     id: string
     testId: string
@@ -1522,6 +1538,34 @@ export function TDTournamentManageClient({
     }
   }
 
+  const fetchEventRankings = async () => {
+    setLoadingRankings(true)
+    try {
+      const res = await fetch(`/api/tournaments/${tournament.id}/event-rankings`, {
+        cache: 'no-store',
+      })
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to fetch event rankings')
+      }
+
+      const data = await res.json()
+      setEventRankingRows(data.rows || [])
+      setFullyGradedTestCount(data.fullyGradedTestCount || 0)
+    } catch (error) {
+      console.error('Failed to fetch event rankings:', error)
+      setEventRankingRows([])
+      setFullyGradedTestCount(0)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to fetch event rankings',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingRankings(false)
+    }
+  }
+
   // Fetch audit logs
   const fetchAuditLogs = async () => {
     setLoadingAuditLogs(true)
@@ -1575,6 +1619,7 @@ export function TDTournamentManageClient({
         })
         // Refresh events to show updated status
         fetchEventsWithTests()
+        fetchEventRankings()
       } else {
         const errorData = await res.json()
         throw new Error(errorData.error || 'Failed to release scores')
@@ -1621,6 +1666,7 @@ export function TDTournamentManageClient({
         })
         // Refresh events to show updated status
         fetchEventsWithTests()
+        fetchEventRankings()
       } else {
         const errorData = await res.json()
         throw new Error(errorData.error || 'Failed to release scores')
@@ -1668,6 +1714,12 @@ export function TDTournamentManageClient({
     }
   }, [activeTab])
 
+  useEffect(() => {
+    if (activeTab === 'events') {
+      fetchEventRankings()
+    }
+  }, [activeTab, tournament.id])
+
   // Fetch registrations when teams tab is activated
   useEffect(() => {
     if (activeTab === 'teams') {
@@ -1699,6 +1751,7 @@ export function TDTournamentManageClient({
 
       // Refresh tests list
       fetchEventsWithTests()
+      fetchEventRankings()
     } catch (error: unknown) {
       console.error('Failed to duplicate test:', error)
       toast({
@@ -1733,6 +1786,7 @@ export function TDTournamentManageClient({
       
       // Refresh tests list
       fetchEventsWithTests()
+      fetchEventRankings()
     } catch (error: unknown) {
       toast({
         title: 'Error',
@@ -2647,7 +2701,13 @@ export function TDTournamentManageClient({
                       <History className="h-4 w-4 mr-2" />
                       View Audit Log
                     </Button>
-                    <Button onClick={fetchEventsWithTests} variant="outline">
+                    <Button
+                      onClick={() => {
+                        fetchEventsWithTests()
+                        fetchEventRankings()
+                      }}
+                      variant="outline"
+                    >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh
                     </Button>
@@ -2667,6 +2727,61 @@ export function TDTournamentManageClient({
                   </div>
                 ) : (
                   <div className="space-y-6">
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <h3 className="font-semibold text-base">Event Rankings</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Ranked by score (1 = highest). Fully graded tests only ({fullyGradedTestCount}).
+                        </p>
+                      </div>
+                      {loadingRankings ? (
+                        <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                          <RefreshCw className="h-6 w-6 mx-auto mb-2 animate-spin" />
+                          <p className="text-sm">Loading rankings...</p>
+                        </div>
+                      ) : eventRankingRows.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                          <p className="text-sm">No fully graded tests with submissions yet.</p>
+                        </div>
+                      ) : (
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="max-h-[420px] overflow-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Event</TableHead>
+                                  <TableHead>Test</TableHead>
+                                  <TableHead>Rank</TableHead>
+                                  <TableHead>Participant</TableHead>
+                                  <TableHead>Club</TableHead>
+                                  <TableHead className="text-right">Score</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {eventRankingRows.map((row) => (
+                                  <TableRow key={`${row.testId}-${row.rank}-${row.participantName}-${row.submittedAt || 'na'}`}>
+                                    <TableCell className="font-medium">
+                                      {row.eventName}
+                                      {tournament.division === 'B&C' && (
+                                        <Badge variant="outline" className="ml-2 text-xs">
+                                          Div {row.eventDivision}
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>{row.testName}</TableCell>
+                                    <TableCell>{row.rank}</TableCell>
+                                    <TableCell>{row.participantName}</TableCell>
+                                    <TableCell>{row.clubName}</TableCell>
+                                    <TableCell className="text-right">{row.score.toFixed(2)}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Search and Filter Controls */}
                     <div className="flex flex-col sm:flex-row gap-3 pb-4 border-b border-border">
                       <div className="flex-1 relative">

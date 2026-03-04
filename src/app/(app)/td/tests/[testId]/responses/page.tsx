@@ -30,6 +30,7 @@ export default async function TDTestResponsesPage({ params }: Props) {
       id: true,
       name: true,
       description: true,
+      scoresReleased: true,
       tournamentId: true,
       staff: {
         include: {

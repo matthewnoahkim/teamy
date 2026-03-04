@@ -103,7 +103,13 @@ export async function POST(
       // If the column doesn't exist, that's okay - the feature just won't work until migration is run
       const errCode = (error as Record<string, unknown>)?.code
       const errMessage = error instanceof Error ? error.message : undefined
-      if (errCode === 'P2025' || errMessage?.includes('does not exist')) {
+      if (
+        errCode === 'P2022' ||
+        errCode === 'P2025' ||
+        errMessage?.includes('does not exist') ||
+        errMessage?.includes('Unknown argument') ||
+        errMessage?.includes('Unknown field')
+      ) {
         console.warn('scoresReleased column does not exist yet. Migration may need to be run.')
         // Continue anyway - the feature will work once migration is run
       } else {

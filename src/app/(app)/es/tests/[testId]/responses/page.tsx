@@ -30,6 +30,7 @@ export default async function ESTestResponsesPage({ params }: Props) {
       id: true,
       name: true,
       description: true,
+      scoresReleased: true,
       tournamentId: true,
       staff: {
         include: {
@@ -108,4 +109,3 @@ export default async function ESTestResponsesPage({ params }: Props) {
     </div>
   )
 }
-

@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AccountSecurityMenuItem } from '@/components/account-security-menu-item'
@@ -123,6 +124,19 @@ interface TimelineItem {
   type: string
 }
 
+interface EventRankingRow {
+  eventId: string | null
+  eventName: string
+  eventDivision: string
+  testId: string
+  testName: string
+  rank: number
+  participantName: string
+  clubName: string
+  score: number
+  submittedAt: string | null
+}
+
 interface ESPortalClientProps {
   user: {
     id: string
@@ -212,6 +226,9 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
   const [deleting, setDeleting] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [eventFilter, setEventFilter] = useState<string>('all')
+  const [eventRankingRows, setEventRankingRows] = useState<EventRankingRow[]>([])
+  const [fullyGradedTestCount, setFullyGradedTestCount] = useState(0)
+  const [loadingRankings, setLoadingRankings] = useState(false)
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
   const [noteSheetReviewOpen, setNoteSheetReviewOpen] = useState<string | null>(null)
@@ -306,6 +323,9 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
       
       // Refresh tests list (force fetch after delete)
       fetchTests(true)
+      if (activeTournament) {
+        fetchEventRankings(activeTournament)
+      }
     } catch (error: unknown) {
       toast({
         title: 'Error',
@@ -335,6 +355,9 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
 
       // Refresh tests list
       fetchTests(true)
+      if (activeTournament) {
+        fetchEventRankings(activeTournament)
+      }
     } catch (error: unknown) {
       console.error('Failed to duplicate test:', error)
       toast({
@@ -399,6 +422,29 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
       console.error('Failed to fetch tests:', error)
     } finally {
       setLoadingTests(false)
+    }
+  }
+
+  const fetchEventRankings = async (tournamentId: string) => {
+    setLoadingRankings(true)
+    try {
+      const res = await fetch(`/api/tournaments/${tournamentId}/event-rankings`, {
+        cache: 'no-store',
+      })
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to fetch event rankings')
+      }
+
+      const data = await res.json()
+      setEventRankingRows(data.rows || [])
+      setFullyGradedTestCount(data.fullyGradedTestCount || 0)
+    } catch (error) {
+      console.error('Failed to fetch event rankings:', error)
+      setEventRankingRows([])
+      setFullyGradedTestCount(0)
+    } finally {
+      setLoadingRankings(false)
     }
   }
 
@@ -481,11 +527,20 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
     }
   }, [activeTournament])
 
+  useEffect(() => {
+    if (activeTournament && activeContentTab === 'events') {
+      fetchEventRankings(activeTournament)
+    }
+  }, [activeTournament, activeContentTab])
+
   useBackgroundRefresh(
     async () => {
       await fetchTests(true)
       if (activeTournament) {
         await fetchTimeline(activeTournament, true)
+        if (activeContentTab === 'events') {
+          await fetchEventRankings(activeTournament)
+        }
       }
       router.refresh()
     },
@@ -647,6 +702,61 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
                               </div>
                             ) : (
                               <div className="space-y-6">
+                                <div className="space-y-3">
+                                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <h3 className="font-semibold text-base">Event Rankings</h3>
+                                    <p className="text-xs text-muted-foreground">
+                                      Ranked by score (1 = highest). Fully graded tests only ({fullyGradedTestCount}).
+                                    </p>
+                                  </div>
+                                  {loadingRankings ? (
+                                    <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                                      <RefreshCw className="h-6 w-6 mx-auto mb-2 animate-spin" />
+                                      <p className="text-sm">Loading rankings...</p>
+                                    </div>
+                                  ) : eventRankingRows.length === 0 ? (
+                                    <div className="text-center py-6 text-muted-foreground border rounded-lg">
+                                      <p className="text-sm">No fully graded tests with submissions yet.</p>
+                                    </div>
+                                  ) : (
+                                    <div className="border rounded-lg overflow-hidden">
+                                      <div className="max-h-[420px] overflow-auto">
+                                        <Table>
+                                          <TableHeader>
+                                            <TableRow>
+                                              <TableHead>Event</TableHead>
+                                              <TableHead>Test</TableHead>
+                                              <TableHead>Rank</TableHead>
+                                              <TableHead>Participant</TableHead>
+                                              <TableHead>Club</TableHead>
+                                              <TableHead className="text-right">Score</TableHead>
+                                            </TableRow>
+                                          </TableHeader>
+                                          <TableBody>
+                                            {eventRankingRows.map((row) => (
+                                              <TableRow key={`${row.testId}-${row.rank}-${row.participantName}-${row.submittedAt || 'na'}`}>
+                                                <TableCell className="font-medium">
+                                                  {row.eventName}
+                                                  {membership.tournament.division === 'B&C' && (
+                                                    <Badge variant="outline" className="ml-2 text-xs">
+                                                      Div {row.eventDivision}
+                                                    </Badge>
+                                                  )}
+                                                </TableCell>
+                                                <TableCell>{row.testName}</TableCell>
+                                                <TableCell>{row.rank}</TableCell>
+                                                <TableCell>{row.participantName}</TableCell>
+                                                <TableCell>{row.clubName}</TableCell>
+                                                <TableCell className="text-right">{row.score.toFixed(2)}</TableCell>
+                                              </TableRow>
+                                            ))}
+                                          </TableBody>
+                                        </Table>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
                                 {/* Search and Filter Controls */}
                                 <div className="flex flex-col sm:flex-row gap-3 pb-4 border-b border-border">
                                   <div className="flex-1 relative">
