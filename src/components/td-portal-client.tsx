@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +35,7 @@ import {
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { formatDivision } from '@/lib/utils'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 
 export interface TournamentRequest {
   id: string
@@ -70,9 +72,23 @@ interface TDPortalClientProps {
 }
 
 export function TDPortalClient({ user, requests }: TDPortalClientProps) {
+  const router = useRouter()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
+
+  useBackgroundRefresh(
+    () => {
+      router.refresh()
+    },
+    {
+      intervalMs: 45_000,
+      runOnMount: false,
+      refreshOnFocus: true,
+      refreshOnReconnect: true,
+      enabled: true,
+    },
+  )
 
   // Helper functions for formatting
   const getLevelLabel = (level: string) => {

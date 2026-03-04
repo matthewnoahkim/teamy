@@ -26,6 +26,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { isTestAvailable } from '@/lib/test-availability'
 import { NoteSheetUpload } from '@/components/tests/note-sheet-upload'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 
 interface Tournament {
   tournament: {
@@ -223,9 +224,17 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
     }
   }
 
-  const loadTournaments = async () => {
+  const loadTournaments = async ({
+    showLoading = true,
+    notifyOnError = true,
+  }: {
+    showLoading?: boolean
+    notifyOnError?: boolean
+  } = {}) => {
     try {
-      setLoading(true)
+      if (showLoading) {
+        setLoading(true)
+      }
       const response = await fetch('/api/testing/tournaments', {
         cache: 'no-store',
       })
@@ -241,15 +250,35 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
       await loadNoteSheetStatuses(data.tournaments || [])
     } catch (error: unknown) {
       console.error('Failed to load tournaments:', error)
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to load tournaments',
-        variant: 'destructive',
-      })
+      if (notifyOnError) {
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to load tournaments',
+          variant: 'destructive',
+        })
+      }
     } finally {
-      setLoading(false)
+      if (showLoading) {
+        setLoading(false)
+      }
     }
   }
+
+  useBackgroundRefresh(
+    async () => {
+      await loadTournaments({
+        showLoading: false,
+        notifyOnError: false,
+      })
+    },
+    {
+      intervalMs: 45_000,
+      runOnMount: false,
+      refreshOnFocus: true,
+      refreshOnReconnect: true,
+      enabled: !loading,
+    },
+  )
 
   const loadNoteSheetStatuses = async (tournaments: Tournament[]) => {
     const statusMap = new Map<string, { status: string | null, hasNoteSheet: boolean, rejectionReason: string | null }>()
@@ -331,6 +360,15 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
   const selectedTournamentData = selectedTournament
     ? tournaments.find((t) => t.tournament.id === selectedTournament)
     : null
+
+  useEffect(() => {
+    if (loading || !selectedTournament) return
+    const tournamentExists = tournaments.some(t => t.tournament.id === selectedTournament)
+    if (!tournamentExists) {
+      setSelectedTournament(null)
+      localStorage.removeItem(STORAGE_KEY)
+    }
+  }, [loading, selectedTournament, tournaments])
 
   const _formatDate = (dateString: string) => {
     try {
@@ -1758,6 +1796,21 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
           </div>
         )}
       </main>
+
+      <footer className="border-t border-border bg-card py-4 mt-auto">
+        <div className="container mx-auto px-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-2">
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+            </div>
+            <div className="flex flex-col items-center md:items-end gap-1">
+              <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Teamy. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* Edit Username Dialog */}
       <EditUsernameDialog

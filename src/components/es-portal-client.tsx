@@ -51,6 +51,7 @@ import {
 import { format, isPast, isToday } from 'date-fns'
 import Link from 'next/link'
 import { formatDivision } from '@/lib/utils'
+import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 
 interface Test {
   id: string
@@ -134,6 +135,24 @@ interface ESPortalClientProps {
   initialTournamentId?: string | null
 }
 
+const normalizeMembershipTests = (memberships: StaffMembership[]): StaffMembership[] => {
+  const hasTestsInProps = memberships.some(m =>
+    m.events.some(e => 'tests' in e && Array.isArray((e as unknown as Record<string, unknown>).tests)),
+  )
+
+  if (hasTestsInProps) {
+    return memberships
+  }
+
+  return memberships.map((membership) => ({
+    ...membership,
+    events: membership.events.map((eventAssignment) => ({
+      ...eventAssignment,
+      tests: [],
+    })),
+  }))
+}
+
 // Helper function to highlight search terms in text
 const highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
   if (!text || !searchQuery) return text || ''
@@ -145,9 +164,10 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
   const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${escapedQuery})`, 'gi')
   const parts = text.split(regex)
+  const normalizedQuery = query.toLowerCase()
   
   return parts.map((part, index) => 
-    regex.test(part) ? (
+    part.toLowerCase() === normalizedQuery ? (
       <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-foreground px-0.5 rounded">
         {part}
       </mark>
@@ -178,27 +198,10 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
   const [isHydrated, setIsHydrated] = useState(false)
   const [timelines, setTimelines] = useState<Record<string, TimelineItem[]>>(() => initialTimelines)
   const [loadingTimelines, setLoadingTimelines] = useState<Set<string>>(new Set())
-  // Initialize with tests from server-side props (server-side fetch includes tests, so use them directly)
-  const [staffMembershipsWithTests, setStaffMembershipsWithTests] = useState<StaffMembership[]>(() => {
-    // Check if tests are already included in the props (from server-side fetch)
-    const hasTestsInProps = staffMemberships.some(m => 
-      m.events.some(e => 'tests' in e && Array.isArray((e as unknown as Record<string, unknown>).tests))
-    )
-    
-    if (hasTestsInProps) {
-      // Tests already loaded from server, use them
-      return staffMemberships as StaffMembership[]
-    }
-    
-    // No tests in props, initialize with empty arrays (client-side fetch will populate)
-    return staffMemberships.map(membership => ({
-      ...membership,
-      events: membership.events.map(e => ({
-        ...e,
-        tests: [],
-      })),
-    }))
-  })
+  const [staffMembershipsWithTests, setStaffMembershipsWithTests] = useState<StaffMembership[]>(() =>
+    normalizeMembershipTests(staffMemberships),
+  )
+  const memberships = staffMembershipsWithTests
   const [loadingTests, setLoadingTests] = useState(false)
   const hasInitialized = useRef(false)
   const hasFetchedTests = useRef(false)
@@ -214,21 +217,39 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
   const [noteSheetReviewOpen, setNoteSheetReviewOpen] = useState<string | null>(null)
   const { toast } = useToast()
 
-  // Load saved content tab from localStorage on mount and mark as hydrated
   useEffect(() => {
+    setStaffMembershipsWithTests(normalizeMembershipTests(staffMemberships))
+  }, [staffMemberships])
+
+  useEffect(() => {
+    setTimelines(prev => ({ ...prev, ...initialTimelines }))
+  }, [initialTimelines])
+
+  // Mark as hydrated for localStorage access
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  // Load saved content tab whenever tournament changes
+  useEffect(() => {
+    if (!isHydrated) return
+
     try {
       if (activeTournament) {
         const storageKey = `es-portal-tab-${activeTournament}`
         const savedTab = localStorage.getItem(storageKey) as 'events' | 'timeline' | null
         if (savedTab && (savedTab === 'events' || savedTab === 'timeline')) {
           setActiveContentTab(savedTab)
+        } else {
+          setActiveContentTab('events')
         }
+        return
       }
     } catch (_e) {
       // localStorage not available
     }
-    setIsHydrated(true)
-  }, [])
+    setActiveContentTab('events')
+  }, [activeTournament, isHydrated])
 
   // Save content tab to localStorage when it changes
   useEffect(() => {
@@ -325,8 +346,8 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
   }
 
   // Fetch timeline for a tournament
-  const fetchTimeline = async (tournamentId: string) => {
-    if (loadingTimelines.has(tournamentId) || timelines[tournamentId]) return
+  const fetchTimeline = async (tournamentId: string, force = false) => {
+    if (loadingTimelines.has(tournamentId) || (!force && timelines[tournamentId])) return
     
     setLoadingTimelines(prev => new Set([...prev, tournamentId]))
     try {
@@ -384,7 +405,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
   // Helper to check if we have tests data for the active tournament
   const hasTestsForActiveTournament = () => {
     if (!activeTournament) return false
-    const membership = staffMembershipsWithTests.find(m => m.tournament.id === activeTournament)
+    const membership = memberships.find(m => m.tournament.id === activeTournament)
     if (!membership) return false
     // Check if we have any events with tests data loaded
     return membership.events.some(e => Array.isArray(e.tests))
@@ -410,7 +431,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
   // Initial fetch on mount only if we don't have server-side data
   useEffect(() => {
     // Check if tests are already in the initial state (from server-side)
-    const hasServerSideTests = staffMembershipsWithTests.some(m => 
+    const hasServerSideTests = memberships.some(m => 
       m.events.some(e => Array.isArray(e.tests) && e.tests.length > 0)
     )
     
@@ -432,7 +453,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
     const tournamentIdFromUrl = searchParams.get('tournament')
     
     // If URL has a tournament param, set activeTournament to it
-    if (tournamentIdFromUrl && staffMemberships.some(m => m.tournament.id === tournamentIdFromUrl)) {
+    if (tournamentIdFromUrl && memberships.some(m => m.tournament.id === tournamentIdFromUrl)) {
       setActiveTournament(tournamentIdFromUrl)
     } else if (!tournamentIdFromUrl) {
       // No tournament in URL, clear activeTournament
@@ -446,19 +467,36 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
     
     const tournamentIdFromUrl = searchParams.get('tournament')
     
-    if (tournamentIdFromUrl && tournamentIdFromUrl !== activeTournament && staffMemberships.some(m => m.tournament.id === tournamentIdFromUrl)) {
+    if (tournamentIdFromUrl && tournamentIdFromUrl !== activeTournament && memberships.some(m => m.tournament.id === tournamentIdFromUrl)) {
       setActiveTournament(tournamentIdFromUrl)
     } else if (!tournamentIdFromUrl && activeTournament) {
       // URL param was removed, clear activeTournament
       setActiveTournament('')
     }
-  }, [searchParams])
+  }, [activeTournament, memberships, searchParams])
   
   useEffect(() => {
     if (activeTournament) {
       fetchTimeline(activeTournament)
     }
   }, [activeTournament])
+
+  useBackgroundRefresh(
+    async () => {
+      await fetchTests(true)
+      if (activeTournament) {
+        await fetchTimeline(activeTournament, true)
+      }
+      router.refresh()
+    },
+    {
+      intervalMs: 45_000,
+      runOnMount: false,
+      refreshOnFocus: true,
+      refreshOnReconnect: true,
+      enabled: true,
+    },
+  )
 
   const getTimelineStatus = (dueDate: string) => {
     const date = new Date(dueDate)
@@ -529,7 +567,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
         </div>
 
         {/* Show detail view if tournament is selected, otherwise show tournament cards */}
-        {activeTournament && staffMemberships.some(m => m.tournament.id === activeTournament) ? (
+        {activeTournament && memberships.some(m => m.tournament.id === activeTournament) ? (
           <div className="space-y-6">
             <Button
               variant="ghost"
@@ -544,7 +582,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
             </Button>
             
             {(() => {
-              const membership = staffMembershipsWithTests.find(m => m.tournament.id === activeTournament) || staffMemberships.find(m => m.tournament.id === activeTournament)!
+              const membership = memberships.find(m => m.tournament.id === activeTournament)!
               return (
                 <>
                   {/* Tournament Info */}
@@ -970,7 +1008,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
           <div className="space-y-6">
             <h2 className="text-xl font-semibold">Your Tournaments</h2>
             
-            {staffMemberships.length === 0 ? (
+            {memberships.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
@@ -982,7 +1020,7 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
               </Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
-                {staffMemberships.map((membership) => (
+                {memberships.map((membership) => (
                   <Link
                     key={membership.tournament.id}
                     href={`/es?tournament=${membership.tournament.id}`}
