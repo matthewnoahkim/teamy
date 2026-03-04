@@ -97,6 +97,14 @@ interface PaperworkTabProps {
   initialForms?: PaperworkForm[]
 }
 
+function getFormDownloadUrl(formId: string): string {
+  return `/api/forms/${formId}/download`
+}
+
+function getSubmissionDownloadUrl(submissionId: string): string {
+  return `/api/submissions/${submissionId}/download`
+}
+
 export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: PaperworkTabProps) {
   const { toast } = useToast()
   const [forms, setForms] = useState<PaperworkForm[]>(initialForms || [])
@@ -337,14 +345,6 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
     return { submitted: false }
   }
 
-  const getFormDownloadUrl = (form: PaperworkForm) => {
-    return `/api/forms/${form.id}/download`
-  }
-
-  const getSubmissionDownloadUrl = (submission: Pick<FormSubmission, 'id'>) => {
-    return `/api/submissions/${submission.id}/download`
-  }
-
   if (loading) {
     return (
       <PageLoading
@@ -479,7 +479,7 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <a href={getFormDownloadUrl(form)} download={form.originalFilename}>
+                      <a href={getFormDownloadUrl(form.id)} download={form.originalFilename}>
                         <Button size="sm" variant="outline">
                           <Download className="h-4 w-4 mr-2" />
                           Download Form
@@ -487,9 +487,7 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
                       </a>
                       {status.submitted ? (
                         <a
-                          href={getSubmissionDownloadUrl({
-                            id: status.submissionId!,
-                          })}
+                          href={getSubmissionDownloadUrl(status.submissionId!)}
                           download={status.originalFilename}
                         >
                           <Button size="sm" variant="outline">
@@ -851,9 +849,7 @@ function ViewSubmissionsDialog({
                           </Badge>
                         )}
                         <a
-                          href={getSubmissionDownloadUrl({
-                            id: submission.id,
-                          })}
+                          href={getSubmissionDownloadUrl(submission.id)}
                           download={submission.originalFilename}
                         >
                           <Button size="sm" variant="outline">
