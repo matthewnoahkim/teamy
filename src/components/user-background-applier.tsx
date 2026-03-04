@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useTheme } from 'next-themes'
 import { useUserPreferences } from '@/hooks/use-user-preferences'
@@ -10,7 +10,8 @@ const USER_BACKGROUND_AUTH_KEY = 'teamy.user-background.auth.v1'
 
 export function UserBackgroundApplier() {
   const { data: session, status } = useSession()
-  const { setTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
+  const lastSyncedThemeRef = useRef<string | null>(null)
   const { data: userPreferencesData, refetch: refetchUserPreferences } = useUserPreferences({
     enabled: status === 'authenticated' && Boolean(session?.user?.id),
   })
@@ -115,6 +116,7 @@ export function UserBackgroundApplier() {
         }
 
         if (status !== 'authenticated' || !session?.user?.id) {
+          lastSyncedThemeRef.current = null
           clearBackgroundCache()
           styleEl!.textContent = headerCss + `
             html {
@@ -153,7 +155,14 @@ export function UserBackgroundApplier() {
         // Sync theme from account preferences so it follows the user across browser profiles/devices
         const savedTheme = preferences?.theme as string | undefined
         if (savedTheme === 'light' || savedTheme === 'dark') {
-          setTheme(savedTheme)
+          // Only sync when the server-provided theme value changes.
+          // This prevents stale preference data from overriding a live user toggle.
+          if (lastSyncedThemeRef.current !== savedTheme) {
+            lastSyncedThemeRef.current = savedTheme
+            if (theme !== savedTheme) {
+              setTheme(savedTheme)
+            }
+          }
         }
         cacheBackgroundPreferences(preferences)
 
@@ -428,7 +437,7 @@ export function UserBackgroundApplier() {
       window.removeEventListener('userBackgroundUpdated', handleBackgroundUpdate)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [refetchUserPreferences, session?.user?.id, status, setTheme, userPreferencesData?.preferences])
+  }, [refetchUserPreferences, session?.user?.id, status, theme, setTheme, userPreferencesData?.preferences])
 
   return null
 }
