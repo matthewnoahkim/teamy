@@ -9,3 +9,5 @@ README.md
 .env*.local
 .vercel
 
+.env*
+.env.test
