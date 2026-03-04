@@ -3,10 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, unlink } from 'fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
 import { z } from 'zod'
+import {
+  buildPrivateUploadPath,
+  ensurePrivateUploadDir,
+  resolveSafeStoredUploadPath,
+} from '@/lib/upload-security'
 
 const MAX_PDF_SIZE = 50 * 1024 * 1024 // 50MB for PDFs
 
@@ -14,6 +18,25 @@ const _createNoteSheetSchema = z.object({
   type: z.enum(['CREATED', 'UPLOADED']),
   content: z.string().optional(), // For CREATED type
 })
+
+async function deleteNoteSheetAndFile(noteSheet: { id: string; filePath?: string | null }) {
+  if (noteSheet.filePath) {
+    try {
+      const absolutePath = resolveSafeStoredUploadPath(noteSheet.filePath)
+      if (absolutePath) {
+        await unlink(absolutePath)
+      }
+    } catch (err) {
+      console.error('Failed to delete old note sheet file:', err)
+    }
+  }
+
+  await prisma.noteSheet.delete({
+    where: {
+      id: noteSheet.id,
+    },
+  })
+}
 
 // POST - Create or upload note sheet
 export async function POST(
@@ -143,32 +166,9 @@ export async function POST(
           },
         })
 
-        // Helper function to delete old note sheet and its file
-        const deleteOldNoteSheet = async (noteSheet: { id: string; filePath?: string | null }) => {
-          if (noteSheet.filePath) {
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
-              const fs = require('fs')
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
-              const path = require('path')
-              const filePath = path.join(process.cwd(), 'public', noteSheet.filePath)
-              if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath)
-              }
-            } catch (err) {
-              console.error('Failed to delete old note sheet file:', err)
-            }
-          }
-          await prisma.noteSheet.delete({
-            where: {
-              id: noteSheet.id,
-            },
-          })
-        }
-
         // If there's an existing note sheet, delete it to allow replacement
         if (existingNoteSheet) {
-          await deleteOldNoteSheet(existingNoteSheet)
+          await deleteNoteSheetAndFile(existingNoteSheet)
         }
 
         // Also delete note sheets for other tests in the same event (to replace them all)
@@ -197,7 +197,7 @@ export async function POST(
             })
 
             if (existingOtherNoteSheet) {
-              await deleteOldNoteSheet(existingOtherNoteSheet)
+              await deleteNoteSheetAndFile(existingOtherNoteSheet)
             }
           }
         }
@@ -311,11 +311,8 @@ export async function POST(
           const extension = 'pdf'
           const filename = `note-sheet-${timestamp}-${randomString}.${extension}`
 
-          // Create uploads directory if it doesn't exist
-          const uploadsDir = join(process.cwd(), 'public', 'uploads', 'note-sheets')
-          if (!existsSync(uploadsDir)) {
-            await mkdir(uploadsDir, { recursive: true })
-          }
+          // Store note sheets in private storage, never under public/ static assets.
+          const uploadsDir = await ensurePrivateUploadDir('note-sheets')
 
           // Save file
           const filePath = join(uploadsDir, filename)
@@ -328,7 +325,7 @@ export async function POST(
               esTestId: resolvedParams.testId,
               membershipId: membership.id,
               type: 'UPLOADED',
-              filePath: `/uploads/note-sheets/${filename}`,
+              filePath: buildPrivateUploadPath('note-sheets', filename),
               filename: file.name,
               fileSize: file.size,
               mimeType: file.type,
@@ -383,7 +380,7 @@ export async function POST(
                     esTestId: otherTest.id,
                     membershipId: membership.id,
                     type: 'UPLOADED',
-                    filePath: `/uploads/note-sheets/${filename}`, // Same file
+                    filePath: buildPrivateUploadPath('note-sheets', filename), // Same file
                     filename: file.name,
                     fileSize: file.size,
                     mimeType: file.type,
@@ -444,32 +441,9 @@ export async function POST(
       },
     })
 
-    // Helper function to delete old note sheet and its file
-    const deleteOldNoteSheet = async (noteSheet: { id: string; filePath?: string | null }) => {
-      if (noteSheet.filePath) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const fs = require('fs')
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const path = require('path')
-          const filePath = path.join(process.cwd(), 'public', noteSheet.filePath)
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath)
-          }
-        } catch (err) {
-          console.error('Failed to delete old note sheet file:', err)
-        }
-      }
-      await prisma.noteSheet.delete({
-        where: {
-          id: noteSheet.id,
-        },
-      })
-    }
-
     // If there's an existing note sheet, delete it to allow replacement
     if (existingNoteSheet) {
-      await deleteOldNoteSheet(existingNoteSheet)
+      await deleteNoteSheetAndFile(existingNoteSheet)
     }
 
     // Also delete note sheets for other tests in the same event (to replace them all)
@@ -505,7 +479,7 @@ export async function POST(
         })
 
         if (existingOtherNoteSheet) {
-          await deleteOldNoteSheet(existingOtherNoteSheet)
+          await deleteNoteSheetAndFile(existingOtherNoteSheet)
         }
       }
     }
@@ -629,11 +603,8 @@ export async function POST(
       const extension = 'pdf'
       const filename = `note-sheet-${timestamp}-${randomString}.${extension}`
 
-      // Create uploads directory if it doesn't exist
-      const uploadsDir = join(process.cwd(), 'public', 'uploads', 'note-sheets')
-      if (!existsSync(uploadsDir)) {
-        await mkdir(uploadsDir, { recursive: true })
-      }
+      // Store note sheets in private storage, never under public/ static assets.
+      const uploadsDir = await ensurePrivateUploadDir('note-sheets')
 
       // Save file
       const filePath = join(uploadsDir, filename)
@@ -647,7 +618,7 @@ export async function POST(
           esTestId: null, // Not an ESTest
           membershipId: membership.id,
           type: 'UPLOADED',
-          filePath: `/uploads/note-sheets/${filename}`,
+          filePath: buildPrivateUploadPath('note-sheets', filename),
           filename: file.name,
           fileSize: file.size,
           mimeType: file.type,
@@ -711,7 +682,7 @@ export async function POST(
                     esTestId: null,
                     membershipId: membership.id,
                     type: 'UPLOADED',
-                    filePath: `/uploads/note-sheets/${filename}`, // Same file
+                    filePath: buildPrivateUploadPath('note-sheets', filename), // Same file
                     filename: file.name,
                     fileSize: file.size,
                     mimeType: file.type,
@@ -998,4 +969,3 @@ export async function GET(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

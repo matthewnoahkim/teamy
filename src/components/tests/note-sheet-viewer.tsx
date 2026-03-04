@@ -30,6 +30,7 @@ export function NoteSheetViewer({ testId }: NoteSheetViewerProps) {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [noteSheet, setNoteSheet] = useState<{
+    id: string
     type: string
     content?: string
     filePath?: string
@@ -84,6 +85,11 @@ export function NoteSheetViewer({ testId }: NoteSheetViewerProps) {
     }
   }
 
+  const getDownloadUrl = () => {
+    if (!noteSheet?.filePath) return null
+    return `/api/tests/${testId}/note-sheets/${noteSheet.id}/download`
+  }
+
   return (
     <>
       <Button
@@ -109,9 +115,9 @@ export function NoteSheetViewer({ testId }: NoteSheetViewerProps) {
             
             ) : noteSheet?.type === 'UPLOADED' ? (
               <div className="w-full h-full">
-                {noteSheet.filePath ? (
+                {getDownloadUrl() ? (
                   <iframe
-                    src={noteSheet.filePath}
+                    src={getDownloadUrl()!}
                     className="w-full h-[calc(90vh-8rem)] border rounded-lg"
                     title={noteSheet.filename || 'Note Sheet PDF'}
                   />
@@ -134,4 +140,3 @@ export function NoteSheetViewer({ testId }: NoteSheetViewerProps) {
     </>
   )
 }
-

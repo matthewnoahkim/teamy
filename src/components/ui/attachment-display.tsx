@@ -51,11 +51,16 @@ export function AttachmentDisplay({ attachments, canDelete = false, onDelete }: 
     }
   }
 
+  const getAttachmentUrl = (attachment: Attachment) => {
+    return `/api/attachments/${attachment.id}/download`
+  }
+
   return (
     <div className="space-y-2">
       {attachments.map((attachment) => {
         const isImageFile = isImage(attachment.mimeType)
         const showAsImage = isImageFile && !failedImages[attachment.id]
+        const attachmentUrl = getAttachmentUrl(attachment)
         
         return (
           <div key={attachment.id}>
@@ -64,7 +69,7 @@ export function AttachmentDisplay({ attachments, canDelete = false, onDelete }: 
               <div className="border rounded-md overflow-hidden hover:bg-muted/50 transition-colors">
                 <div className="relative group">
                   <Image
-                    src={attachment.filePath}
+                    src={attachmentUrl}
                     alt={attachment.originalFilename}
                     width={1200}
                     height={900}
@@ -84,7 +89,7 @@ export function AttachmentDisplay({ attachments, canDelete = false, onDelete }: 
                       variant="secondary"
                       size="sm"
                       className="h-8 w-8 p-0 bg-background/90"
-                      onClick={() => window.open(attachment.filePath, '_blank')}
+                      onClick={() => window.open(attachmentUrl, '_blank')}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -124,7 +129,7 @@ export function AttachmentDisplay({ attachments, canDelete = false, onDelete }: 
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0"
-                    onClick={() => window.open(attachment.filePath, '_blank')}
+                    onClick={() => window.open(attachmentUrl, '_blank')}
                   >
                     <Download className="h-4 w-4" />
                   </Button>
@@ -148,4 +153,3 @@ export function AttachmentDisplay({ attachments, canDelete = false, onDelete }: 
     </div>
   )
 }
-

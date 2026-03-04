@@ -327,6 +327,7 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
       const submission = form.submissions[0]
       return {
         submitted: true,
+        submissionId: submission.id,
         status: submission.status,
         submittedAt: submission.submittedAt,
         filePath: submission.filePath,
@@ -334,6 +335,14 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
       }
     }
     return { submitted: false }
+  }
+
+  const getFormDownloadUrl = (form: PaperworkForm) => {
+    return `/api/forms/${form.id}/download`
+  }
+
+  const getSubmissionDownloadUrl = (submission: Pick<FormSubmission, 'id'>) => {
+    return `/api/submissions/${submission.id}/download`
   }
 
   if (loading) {
@@ -470,14 +479,19 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <a href={form.filePath} download={form.originalFilename}>
+                      <a href={getFormDownloadUrl(form)} download={form.originalFilename}>
                         <Button size="sm" variant="outline">
                           <Download className="h-4 w-4 mr-2" />
                           Download Form
                         </Button>
                       </a>
                       {status.submitted ? (
-                        <a href={status.filePath} download={status.originalFilename}>
+                        <a
+                          href={getSubmissionDownloadUrl({
+                            id: status.submissionId!,
+                          })}
+                          download={status.originalFilename}
+                        >
                           <Button size="sm" variant="outline">
                             <Download className="h-4 w-4 mr-2" />
                             View Submission
@@ -836,7 +850,12 @@ function ViewSubmissionsDialog({
                             Rejected
                           </Badge>
                         )}
-                        <a href={submission.filePath} download={submission.originalFilename}>
+                        <a
+                          href={getSubmissionDownloadUrl({
+                            id: submission.id,
+                          })}
+                          download={submission.originalFilename}
+                        >
                           <Button size="sm" variant="outline">
                             <Download className="h-4 w-4" />
                           </Button>

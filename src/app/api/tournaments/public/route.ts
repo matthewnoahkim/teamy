@@ -26,8 +26,6 @@ export async function GET(req: NextRequest) {
             division: true,
             tournamentLevel: true,
             tournamentFormat: true,
-            directorName: true,
-            directorEmail: true,
             preferredSlug: true,
           },
         },
@@ -55,4 +53,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

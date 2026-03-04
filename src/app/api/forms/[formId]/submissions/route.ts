@@ -3,10 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireMember, isAdmin, getUserMembership } from '@/lib/rbac'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
-import { extensionForMime } from '@/lib/upload-security'
+import { buildPrivateUploadPath, ensurePrivateUploadDir, extensionForMime } from '@/lib/upload-security'
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const ALLOWED_TYPES = [
@@ -174,11 +173,8 @@ export async function POST(
     const extension = extensionForMime(file.type)
     const filename = `submission-${timestamp}-${randomString}.${extension}`
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads')
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
-    }
+    // Store submissions in private storage, never under public/ static assets.
+    const uploadsDir = await ensurePrivateUploadDir('form-submissions')
 
     // Save file
     const filePath = join(uploadsDir, filename)
@@ -196,7 +192,7 @@ export async function POST(
         originalFilename: file.name,
         fileSize: file.size,
         mimeType: file.type,
-        filePath: `/uploads/${filename}`,
+        filePath: buildPrivateUploadPath('form-submissions', filename),
         notes,
       },
       include: {
@@ -220,4 +216,3 @@ export async function POST(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

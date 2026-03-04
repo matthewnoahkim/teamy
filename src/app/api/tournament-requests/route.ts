@@ -275,10 +275,34 @@ export async function GET(request: NextRequest) {
     // Allow public access only for approved listings without search.
     // All other request views are dev-panel-only and should not leak route/data.
     const isPublicApprovedListing = normalizedStatus === 'APPROVED' && !search
-    if (!isPublicApprovedListing) {
-      const guard = await requireDevAccess(request, '/api/tournament-requests')
-      if (!guard.allowed) return guard.response
+    if (isPublicApprovedListing) {
+      const publicRequests = await prisma.tournamentHostingRequest.findMany({
+        where: { status: 'APPROVED' },
+        select: {
+          id: true,
+          tournamentName: true,
+          tournamentLevel: true,
+          division: true,
+          tournamentFormat: true,
+          location: true,
+          preferredSlug: true,
+          status: true,
+          createdAt: true,
+          tournament: {
+            select: {
+              id: true,
+              published: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      return NextResponse.json({ requests: publicRequests })
     }
+
+    const guard = await requireDevAccess(request, '/api/tournament-requests')
+    if (!guard.allowed) return guard.response
 
     const where: Record<string, unknown> = {}
 
@@ -307,7 +331,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    // Dev panel users can fetch all statuses; public requests only reach APPROVED listing mode.
+    // Dev panel users can fetch all statuses with full request detail.
     return NextResponse.json({ requests })
   } catch (error) {
     console.error('Error fetching tournament hosting requests:', error)

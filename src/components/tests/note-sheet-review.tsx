@@ -179,6 +179,10 @@ export function NoteSheetReview({
     }
   }
 
+  const getDownloadUrl = (noteSheet: NoteSheet) => {
+    return `/api/tests/${testId}/note-sheets/${noteSheet.id}/download`
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -248,7 +252,7 @@ export function NoteSheetReview({
                           <p className="text-sm text-muted-foreground">
                             {noteSheet.filePath ? (
                               <a
-                                href={noteSheet.filePath}
+                                href={getDownloadUrl(noteSheet)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-primary hover:underline font-medium"
@@ -365,4 +369,3 @@ export function NoteSheetReview({
     </Dialog>
   )
 }
-

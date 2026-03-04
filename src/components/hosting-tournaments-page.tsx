@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Trophy, Plus, Loader2, CheckCircle2, Search, Monitor, User, Mail, ExternalLink, MapPin } from 'lucide-react'
+import { Trophy, Plus, Loader2, CheckCircle2, Search, Monitor, ExternalLink, MapPin } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,8 +37,6 @@ interface Tournament {
     division: string
     tournamentLevel: string
     tournamentFormat: string
-    directorName: string
-    directorEmail: string
     preferredSlug: string | null
   } | null
 }
@@ -341,9 +339,8 @@ export function HostingTournamentsPage({ isLoggedIn: _isLoggedIn = false }: Host
     if (search) {
       const searchLower = search.toLowerCase()
       const nameMatch = t.name.toLowerCase().includes(searchLower)
-      const directorMatch = hostingRequest.directorName.toLowerCase().includes(searchLower)
       const locationMatch = t.location?.toLowerCase().includes(searchLower) || false
-      if (!nameMatch && !directorMatch && !locationMatch) {
+      if (!nameMatch && !locationMatch) {
         return false
       }
     }
@@ -968,17 +965,6 @@ export function HostingTournamentsPage({ isLoggedIn: _isLoggedIn = false }: Host
                             <span>{getFormatLabel(hostingRequest.tournamentFormat)} Tournament</span>
                           </div>
                         ) : null}
-                        
-                        <div className="pt-3 border-t space-y-2">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <User className="h-4 w-4" />
-                            <span>Director: {highlightText(hostingRequest.directorName, search)}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Mail className="h-4 w-4" />
-                            <span>{hostingRequest.directorEmail}</span>
-                          </div>
-                        </div>
                       </CardContent>
                     </Card>
                   )
@@ -1000,4 +986,3 @@ export function HostingTournamentsPage({ isLoggedIn: _isLoggedIn = false }: Host
     </div>
   )
 }
-

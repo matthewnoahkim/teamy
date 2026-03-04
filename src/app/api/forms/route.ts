@@ -3,10 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireMember, isAdmin, getUserMembership } from '@/lib/rbac'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
-import { extensionForMime } from '@/lib/upload-security'
+import { buildPrivateUploadPath, ensurePrivateUploadDir, extensionForMime } from '@/lib/upload-security'
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const ALLOWED_TYPES = [
@@ -126,11 +125,8 @@ export async function POST(req: NextRequest) {
     const extension = extensionForMime(file.type)
     const filename = `form-${timestamp}-${randomString}.${extension}`
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads')
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
-    }
+    // Store forms in private storage, never under public/ static assets.
+    const uploadsDir = await ensurePrivateUploadDir('forms')
 
     // Save file
     const filePath = join(uploadsDir, filename)
@@ -148,7 +144,7 @@ export async function POST(req: NextRequest) {
         originalFilename: file.name,
         fileSize: file.size,
         mimeType: file.type,
-        filePath: `/uploads/${filename}`,
+        filePath: buildPrivateUploadPath('forms', filename),
         dueDate: dueDate ? new Date(dueDate) : null,
         isRequired,
         uploadedById: session.user.id,

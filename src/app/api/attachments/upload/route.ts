@@ -3,10 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
-import { writeFile, mkdir, unlink } from 'fs/promises'
+import { writeFile, unlink } from 'fs/promises'
 import { join } from 'path'
-import { existsSync } from 'fs'
-import { extensionForMime, resolveSafePublicUploadPath } from '@/lib/upload-security'
+import {
+  buildPrivateUploadPath,
+  ensurePrivateUploadDir,
+  extensionForMime,
+  resolveSafeStoredUploadPath,
+} from '@/lib/upload-security'
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 const ALLOWED_ATTACHMENT_TYPES = [
@@ -155,11 +159,8 @@ export async function POST(req: NextRequest) {
     const extension = extensionForMime(file.type)
     const filename = `${timestamp}-${randomString}.${extension}`
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads')
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
-    }
+    // Store attachments in private storage, never under public/ static assets.
+    const uploadsDir = await ensurePrivateUploadDir('attachments')
 
     // Save file
     const filePath = join(uploadsDir, filename)
@@ -174,7 +175,7 @@ export async function POST(req: NextRequest) {
         originalFilename: file.name,
         fileSize: file.size,
         mimeType: file.type,
-        filePath: `/uploads/${filename}`,
+        filePath: buildPrivateUploadPath('attachments', filename),
         announcementId: announcementId || null,
         calendarEventId: calendarEventId || null,
         uploadedById: session.user.id,
@@ -289,7 +290,7 @@ export async function DELETE(req: NextRequest) {
 
     // Delete file from filesystem
     try {
-      const safePath = resolveSafePublicUploadPath(attachment.filePath)
+      const safePath = resolveSafeStoredUploadPath(attachment.filePath)
       if (safePath) {
         await unlink(safePath)
       } else {
@@ -314,4 +315,3 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

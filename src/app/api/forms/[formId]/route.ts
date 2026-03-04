@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/rbac'
 import { unlink } from 'fs/promises'
 import { z } from 'zod'
-import { resolveSafePublicUploadPath } from '@/lib/upload-security'
+import { resolveSafeStoredUploadPath } from '@/lib/upload-security'
 
 const updateFormSchema = z.object({
   title: z.string().optional(),
@@ -111,7 +111,7 @@ export async function DELETE(
 
     // Delete file from filesystem
     try {
-      const filePath = resolveSafePublicUploadPath(existingForm.filePath)
+      const filePath = resolveSafeStoredUploadPath(existingForm.filePath)
       if (filePath) {
         await unlink(filePath)
       }
@@ -131,4 +131,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

@@ -4,6 +4,8 @@ import { Role, TestAssignmentScope } from '@prisma/client'
 import { GET as announcementsGet } from '@/app/api/announcements/route'
 import { GET as testsGet } from '@/app/api/tests/route'
 import { GET as notificationsGet } from '@/app/api/clubs/[clubId]/notifications/route'
+import { GET as tournamentRequestsGet } from '@/app/api/tournament-requests/route'
+import { GET as publicTournamentsGet } from '@/app/api/tournaments/public/route'
 
 const mockMethod = mock.method.bind(mock) as unknown as (
   object: object,
@@ -386,6 +388,113 @@ test('GET /api/clubs/[clubId]/notifications people shows other-user join activit
     assert.equal(response.status, 200)
     const data = (await response.json()) as { notifications: { people: boolean } }
     assert.equal(data.notifications.people, true)
+  } finally {
+    restoreAll(mocks)
+  }
+})
+
+test('GET /api/tournament-requests public listing uses allowlisted fields only', async () => {
+  const { prisma } = await getTestDeps()
+  const prismaAny = prisma as Record<string, { [key: string]: unknown }>
+  let capturedFindManyArgs: Record<string, unknown> | null = null
+
+  const mocks = [
+    overrideMethod(
+      prismaAny.tournamentHostingRequest as Record<string, unknown>,
+      'findMany',
+      async (args?: unknown) => {
+        capturedFindManyArgs = (args as Record<string, unknown>) || null
+        return [
+          {
+            id: 'req-1',
+            tournamentName: 'Regional Invitational',
+            tournamentLevel: 'regional',
+            division: 'C',
+            tournamentFormat: 'in-person',
+            location: 'CA',
+            preferredSlug: 'regional-invitational',
+            status: 'APPROVED',
+            createdAt: new Date().toISOString(),
+            tournament: { id: 'tour-1', published: true },
+          },
+        ] as never
+      },
+    ),
+  ]
+
+  try {
+    const response = await tournamentRequestsGet(
+      makeRequest('http://localhost/api/tournament-requests?status=APPROVED') as never
+    )
+    assert.equal(response.status, 200)
+
+    const select = (capturedFindManyArgs?.select || {}) as Record<string, unknown>
+    assert.equal(select.directorEmail, undefined)
+    assert.equal(select.directorPhone, undefined)
+    assert.equal(select.otherNotes, undefined)
+    assert.equal(select.reviewNotes, undefined)
+
+    const data = (await response.json()) as {
+      requests: Array<Record<string, unknown>>
+    }
+    assert.equal('directorEmail' in data.requests[0], false)
+    assert.equal('directorPhone' in data.requests[0], false)
+    assert.equal('otherNotes' in data.requests[0], false)
+    assert.equal('reviewNotes' in data.requests[0], false)
+  } finally {
+    restoreAll(mocks)
+  }
+})
+
+test('GET /api/tournaments/public excludes director contact fields from hostingRequest', async () => {
+  const { prisma } = await getTestDeps()
+  const prismaAny = prisma as Record<string, { [key: string]: unknown }>
+  let capturedFindManyArgs: Record<string, unknown> | null = null
+
+  const mocks = [
+    overrideMethod(
+      prismaAny.tournament as Record<string, unknown>,
+      'findMany',
+      async (args?: unknown) => {
+        capturedFindManyArgs = (args as Record<string, unknown>) || null
+        return [
+          {
+            id: 'tour-1',
+            name: 'State Invite',
+            division: 'C',
+            description: null,
+            isOnline: false,
+            location: 'CA',
+            hostingRequest: {
+              division: 'C',
+              tournamentLevel: 'state',
+              tournamentFormat: 'in-person',
+              preferredSlug: 'state-invite',
+            },
+            _count: { registrations: 2 },
+            startDate: new Date().toISOString(),
+          },
+        ] as never
+      },
+    ),
+  ]
+
+  try {
+    const response = await publicTournamentsGet(makeRequest('http://localhost/api/tournaments/public') as never)
+    assert.equal(response.status, 200)
+
+    const include = (capturedFindManyArgs?.include || {}) as Record<string, unknown>
+    const hostingRequest = (include.hostingRequest || {}) as Record<string, unknown>
+    const select = (hostingRequest.select || {}) as Record<string, unknown>
+
+    assert.equal(select.directorName, undefined)
+    assert.equal(select.directorEmail, undefined)
+
+    const data = (await response.json()) as {
+      tournaments: Array<{ hostingRequest: Record<string, unknown> }>
+    }
+    assert.equal('directorName' in data.tournaments[0].hostingRequest, false)
+    assert.equal('directorEmail' in data.tournaments[0].hostingRequest, false)
   } finally {
     restoreAll(mocks)
   }

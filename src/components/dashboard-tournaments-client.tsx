@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AppHeader } from '@/components/app-header'
 import { useToast } from '@/components/ui/use-toast'
 import { PageLoading } from '@/components/ui/loading-spinner'
-import { Search, MapPin, Trophy, Monitor, User, Mail, ExternalLink } from 'lucide-react'
+import { Search, MapPin, Trophy, Monitor, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import { formatDivision } from '@/lib/utils'
 
@@ -20,12 +20,8 @@ interface TournamentRequest {
   tournamentFormat: string
   location: string | null
   preferredSlug: string | null
-  directorName: string
-  directorEmail: string
-  directorPhone: string | null
-  otherNotes: string | null
+  otherNotes?: string | null
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
-  reviewNotes: string | null
   createdAt: string
 }
 
@@ -86,9 +82,8 @@ export function DashboardTournamentsClient({ user }: DashboardTournamentsClientP
     if (search) {
       const searchLower = search.toLowerCase()
       const nameMatch = t.tournamentName.toLowerCase().includes(searchLower)
-      const directorMatch = t.directorName.toLowerCase().includes(searchLower)
       const locationMatch = t.location?.toLowerCase().includes(searchLower) || false
-      if (!nameMatch && !directorMatch && !locationMatch) {
+      if (!nameMatch && !locationMatch) {
         return false
       }
     }
@@ -302,16 +297,6 @@ export function DashboardTournamentsClient({ user }: DashboardTournamentsClientP
                       </div>
                     ) : null}
                     
-                    <div className="pt-3 border-t space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <User className="h-4 w-4" />
-                        <span>Director: {highlightText(tournament.directorName, search)}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="h-4 w-4" />
-                        <span>{tournament.directorEmail}</span>
-                      </div>
-                    </div>
                   </CardContent>
                 </Card>
               </Link>
