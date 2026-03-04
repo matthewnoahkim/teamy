@@ -359,6 +359,7 @@ export function SettingsTab({
   const [teamCount, setTeamCount] = useState(club.teams.length)
   const [memberships, setMemberships] = useState<SettingsMembership[]>(club.memberships as SettingsMembership[])
   const [removingMember, setRemovingMember] = useState<string | null>(null)
+  const [updatingAccessMembershipId, setUpdatingAccessMembershipId] = useState<string | null>(null)
   const [removeMemberDialogOpen, setRemoveMemberDialogOpen] = useState(false)
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null)
   const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false)
@@ -580,6 +581,53 @@ export function SettingsTab({
       })
     } finally {
       setRemovingMember(null)
+    }
+  }
+
+  const handleUpdateMembershipRole = async (membershipId: string, role: 'ADMIN' | 'MEMBER') => {
+    setUpdatingAccessMembershipId(membershipId)
+
+    try {
+      const response = await fetch(`/api/memberships/${membershipId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      })
+
+      const data = (await response.json()) as { error?: string; membership?: SettingsMembership }
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update access level')
+      }
+
+      const updatedRole = String(data.membership?.role || role).toUpperCase() === 'ADMIN' ? 'ADMIN' : 'MEMBER'
+
+      setMemberships((prev) =>
+        prev.map((membership) =>
+          membership.id === membershipId ? { ...membership, role: updatedRole } : membership
+        ),
+      )
+
+      toast({
+        title: 'Access updated',
+        description:
+          updatedRole === 'ADMIN'
+            ? 'Member now has admin access.'
+            : 'Member is now a regular member.',
+      })
+
+      if (membershipId === currentMembership.id) {
+        router.refresh()
+      }
+
+      void refreshMemberships({ silent: true })
+    } catch (error: unknown) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update access level',
+        variant: 'destructive',
+      })
+    } finally {
+      setUpdatingAccessMembershipId(null)
     }
   }
 
@@ -1448,18 +1496,46 @@ export function SettingsTab({
                       </div>
                     </div>
                   </div>
-                  {membership.id !== currentMembership.id && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openRemoveMemberDialog(membership.id, membership.user.name || membership.user.email)}
-                      disabled={removingMember === membership.id}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Remove
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <div className="w-[170px]">
+                      <Label htmlFor={`settings-access-${membership.id}`} className="sr-only">Access</Label>
+                      <Select
+                        value={String(membership.role).toUpperCase() === 'ADMIN' ? 'ADMIN' : 'MEMBER'}
+                        onValueChange={(value) => {
+                          const nextRole = value as 'ADMIN' | 'MEMBER'
+                          const currentRole = String(membership.role).toUpperCase() === 'ADMIN' ? 'ADMIN' : 'MEMBER'
+                          if (nextRole === currentRole) return
+                          void handleUpdateMembershipRole(membership.id, nextRole)
+                        }}
+                        disabled={updatingAccessMembershipId === membership.id}
+                      >
+                        <SelectTrigger id={`settings-access-${membership.id}`} className="h-9">
+                          <SelectValue placeholder="Regular Member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem
+                            value="MEMBER"
+                            disabled={String(membership.role).toUpperCase() === 'ADMIN' && adminMemberships.length <= 1}
+                          >
+                            Regular Member
+                          </SelectItem>
+                          <SelectItem value="ADMIN">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {membership.id !== currentMembership.id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openRemoveMemberDialog(membership.id, membership.user.name || membership.user.email)}
+                        disabled={removingMember === membership.id || updatingAccessMembershipId === membership.id}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

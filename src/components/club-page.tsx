@@ -199,7 +199,12 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const isAdmin = currentMembership.role === 'ADMIN'
+  const [currentMembershipRole, setCurrentMembershipRole] = useState(currentMembership.role)
+  const isAdmin = currentMembershipRole === 'ADMIN'
+  const liveCurrentMembership = useMemo(
+    () => ({ ...currentMembership, role: currentMembershipRole }),
+    [currentMembership, currentMembershipRole],
+  )
   const [activeTab, setActiveTab] = useState<ClubTab>(() => resolveTab(searchParams.get('tab'), isAdmin))
   const [editClubNameOpen, setEditClubNameOpen] = useState(false)
   const [currentClubName, setCurrentClubName] = useState(club.name)
@@ -318,6 +323,10 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   useEffect(() => {
     setPersonalBackground(currentMembership.preferences ?? null)
   }, [currentMembership.preferences])
+
+  useEffect(() => {
+    setCurrentMembershipRole(currentMembership.role)
+  }, [currentMembership.role])
 
   // Update favicon badge with total unread count across all tabs
   useFaviconBadge(totalUnreadCount)
@@ -444,6 +453,34 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     }
   }, [club.id, handleMembershipLossStatus])
 
+  const refreshCurrentMembershipRole = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/memberships?clubId=${club.id}`, { cache: 'no-store' })
+      if (handleMembershipLossStatus(response)) return
+      if (!response.ok) return
+
+      const data = (await response.json()) as {
+        memberships?: Array<{ id: string; userId: string; role: string }>
+      }
+      const memberships = Array.isArray(data.memberships) ? data.memberships : []
+      setClubMemberCount((prev) => (prev === memberships.length ? prev : memberships.length))
+
+      const selfMembership =
+        memberships.find((membership) => membership.id === liveCurrentMembership.id) ||
+        memberships.find((membership) => membership.userId === user.id)
+
+      if (!selfMembership) {
+        redirectForMembershipLoss()
+        return
+      }
+
+      const nextRole = String(selfMembership.role).toUpperCase() === 'ADMIN' ? 'ADMIN' : 'MEMBER'
+      setCurrentMembershipRole((prev) => (prev === nextRole ? prev : nextRole))
+    } catch (error) {
+      console.error('Failed to refresh current membership role:', error)
+    }
+  }, [club.id, handleMembershipLossStatus, liveCurrentMembership.id, redirectForMembershipLoss, user.id])
+
   // Keep active tab in a ref so polling interval doesn't restart during navigation.
   useEffect(() => {
     activeTabRef.current = activeTab
@@ -567,6 +604,17 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   // Keep tab notifications in sync without requiring a full page reload.
   useBackgroundRefresh(
     () => refreshTabNotifications(),
+    {
+      intervalMs: 20_000,
+      runOnMount: true,
+      refreshOnFocus: true,
+      refreshOnReconnect: true,
+    },
+  )
+
+  // Keep permission-sensitive UI in sync when membership role changes (promote/demote).
+  useBackgroundRefresh(
+    () => refreshCurrentMembershipRole(),
     {
       intervalMs: 20_000,
       runOnMount: true,
@@ -918,7 +966,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
               <StreamTab
                 clubId={club.id}
                 division={club.division}
-                currentMembership={currentMembership}
+                currentMembership={liveCurrentMembership}
                 teams={club.teams}
                 isAdmin={isAdmin}
                 user={user}
@@ -929,7 +977,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
             {activeTab === 'people' && (
               <PeopleTab
                 club={club}
-                currentMembership={currentMembership}
+                currentMembership={liveCurrentMembership}
                 isAdmin={isAdmin}
               />
             )}
@@ -938,7 +986,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
               <CalendarTab
                 clubId={club.id}
                 division={club.division}
-                currentMembership={currentMembership}
+                currentMembership={liveCurrentMembership}
                 isAdmin={isAdmin}
                 user={user}
                 initialEvents={initialData?.calendarEvents as CalendarEvent[] | undefined}
@@ -958,8 +1006,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
               <FinanceTab
                 clubId={club.id}
                 isAdmin={isAdmin}
-                currentMembershipId={currentMembership.id}
-                currentMembershipTeamId={currentMembership.teamId}
+                currentMembershipId={liveCurrentMembership.id}
+                currentMembershipTeamId={liveCurrentMembership.teamId}
                 division={club.division}
                 initialExpenses={initialData?.expenses as Expense[] | undefined}
                 initialPurchaseRequests={initialData?.purchaseRequests as PurchaseRequest[] | undefined}
@@ -998,7 +1046,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
             {activeTab === 'todos' && (
               <TodoTab
                 clubId={club.id}
-                currentMembershipId={currentMembership.id}
+                currentMembershipId={liveCurrentMembership.id}
                 user={user}
                 isAdmin={isAdmin}
                 initialTodos={initialData?.todos as Todo[] | undefined}
@@ -1009,7 +1057,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
               <ToolsTab
                 clubId={club.id}
                 division={club.division}
-                currentMembershipId={currentMembership.id}
+                currentMembershipId={liveCurrentMembership.id}
                 isAdmin={isAdmin}
               />
             )}
@@ -1025,7 +1073,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
             {activeTab === 'settings' && (
               <SettingsTab
                 club={club}
-                currentMembership={currentMembership}
+                currentMembership={liveCurrentMembership}
                 isAdmin={isAdmin}
                 initialInviteCodes={initialInviteCodes}
                 personalBackground={personalBackground as BackgroundPreferences | null | undefined}
