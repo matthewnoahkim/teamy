@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Logo } from '@/components/logo'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { ClipboardList, AlertCircle, Calendar, Users } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -64,7 +63,6 @@ export function ESLoginClient({ unauthorized, email, inviteInfo, token }: ESLogi
             <div className="h-6 w-px bg-white/20" />
             <span className="text-white font-semibold">Event Supervisor Portal</span>
           </div>
-          <ThemeToggle variant="header" />
         </div>
       </header>
 
