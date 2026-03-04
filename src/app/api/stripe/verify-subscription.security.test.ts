@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type Stripe from 'stripe'
-import { isCheckoutSessionOwnedByUser } from '@/app/api/stripe/verify-subscription/route'
+import { isCheckoutSessionOwnedByUser } from '@/app/api/stripe/verify-subscription/ownership'
 
 function makeCheckoutSession(
   values: Partial<Pick<Stripe.Checkout.Session, 'client_reference_id' | 'metadata' | 'customer'>>

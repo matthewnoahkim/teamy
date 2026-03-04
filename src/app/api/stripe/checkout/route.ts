@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 import { getConfiguredAppOrigins, isTrustedOrigin } from '@/lib/url-safety'
+import { resolveTrustedBillingBaseUrl } from '@/app/api/stripe/checkout/base-url'
 
 // Initialize Stripe with secret key (server-side only)
 // Never expose this key to the client - it's only used server-side
@@ -26,47 +27,6 @@ const PRO_PRICE_IDS = [
 const PRICE_ID_TO_TYPE = new Map<string, 'pro'>(
   PRO_PRICE_IDS.map((priceId) => [priceId.trim(), 'pro'])
 )
-
-function normalizeAppOrigin(raw: string): string | null {
-  const candidate = raw.trim()
-  if (!candidate) return null
-
-  const withProtocol =
-    candidate.startsWith('http://') || candidate.startsWith('https://')
-      ? candidate
-      : `https://${candidate}`
-
-  try {
-    const parsed = new URL(withProtocol)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return null
-    }
-    return `${parsed.protocol}//${parsed.host}`
-  } catch {
-    return null
-  }
-}
-
-export function resolveTrustedBillingBaseUrl(): string | null {
-  const envCandidates = [
-    process.env.NEXT_PUBLIC_BASE_URL,
-    process.env.NEXTAUTH_URL,
-    process.env.APP_URL,
-    process.env.VERCEL_URL,
-  ]
-
-  for (const candidate of envCandidates) {
-    if (!candidate) continue
-    const normalized = normalizeAppOrigin(candidate)
-    if (normalized) return normalized
-  }
-
-  if (process.env.NODE_ENV !== 'production') {
-    return 'http://localhost:3000'
-  }
-
-  return null
-}
 
 export async function POST(req: NextRequest) {
   try {

@@ -23,6 +23,7 @@ const nextConfig = {
   experimental: {
     scrollRestoration: true, // Better scroll behavior on navigation
   },
+  turbopack: {},
   // Security headers
   async headers() {
     return [
@@ -56,8 +57,19 @@ const nextConfig = {
         ]
       }
     ]
-  }
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer && Array.isArray(config.plugins)) {
+      // Drop the legacy nomodule polyfill bundle to reduce unused/legacy JS in modern browsers.
+      config.plugins = config.plugins.filter((plugin) => {
+        if (!plugin || plugin.constructor?.name !== 'CopyFilePlugin') {
+          return true
+        }
+        return !String(plugin.filePath || '').includes('polyfill-nomodule')
+      })
+    }
+    return config
+  },
 }
 
 module.exports = nextConfig
-

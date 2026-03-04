@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveTrustedBillingBaseUrl } from '@/app/api/stripe/checkout/route'
+import { resolveTrustedBillingBaseUrl } from '@/app/api/stripe/checkout/base-url'
 
 function withEnv<T>(entries: Record<string, string | undefined>, fn: () => T): T {
   const previous = new Map<string, string | undefined>()

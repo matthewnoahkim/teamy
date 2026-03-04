@@ -4,6 +4,10 @@ import { authOptions } from '@/lib/auth'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
 import { getConfiguredAppOrigins, isTrustedOrigin } from '@/lib/url-safety'
+import {
+  getCheckoutCustomerIdForSession,
+  isCheckoutSessionOwnedByUser,
+} from '@/app/api/stripe/verify-subscription/ownership'
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
@@ -14,46 +18,6 @@ if (stripeSecretKey) {
   } catch (error) {
     console.error('Failed to initialize Stripe:', error)
   }
-}
-
-type CheckoutSessionOwnershipInput = Pick<
-  Stripe.Checkout.Session,
-  'client_reference_id' | 'metadata' | 'customer'
->
-
-type CheckoutSessionOwnershipContext = {
-  userId: string
-  userStripeCustomerId?: string | null
-}
-
-function getCheckoutCustomerId(checkoutSession: CheckoutSessionOwnershipInput): string | null {
-  return typeof checkoutSession.customer === 'string'
-    ? checkoutSession.customer
-    : checkoutSession.customer?.id ?? null
-}
-
-export function isCheckoutSessionOwnedByUser(
-  checkoutSession: CheckoutSessionOwnershipInput,
-  context: CheckoutSessionOwnershipContext
-): boolean {
-  if (checkoutSession.client_reference_id === context.userId) {
-    return true
-  }
-
-  if (checkoutSession.metadata?.userId === context.userId) {
-    return true
-  }
-
-  const checkoutCustomerId = getCheckoutCustomerId(checkoutSession)
-  if (
-    checkoutCustomerId &&
-    context.userStripeCustomerId &&
-    checkoutCustomerId === context.userStripeCustomerId
-  ) {
-    return true
-  }
-
-  return false
 }
 
 // POST /api/stripe/verify-subscription
@@ -223,7 +187,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Get customer ID from checkout session
-      const checkoutCustomerId = getCheckoutCustomerId(checkoutSession)
+      const checkoutCustomerId = getCheckoutCustomerIdForSession(checkoutSession)
 
       // Save customer ID if we don't have it
       if (checkoutCustomerId && !currentUser?.stripeCustomerId) {

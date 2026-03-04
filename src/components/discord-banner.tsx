@@ -69,13 +69,10 @@ export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
     [settings.text, settings.backgroundColor, settings.link]
   )
 
-  // Track if component has mounted to prevent hydration mismatch
-  const [mounted, setMounted] = useState(false)
-  const [isDismissed, setIsDismissed] = useState(true) // Start as true to prevent flash
+  const [isDismissed, setIsDismissed] = useState(false)
 
-  // Check dismissal state after mounting and when banner ID changes
+  // Sync dismissal state from localStorage after hydration.
   useEffect(() => {
-    setMounted(true)
     const dismissed = getDismissedBannerIds()
     setIsDismissed(dismissed.includes(bannerId))
   }, [bannerId])
@@ -125,8 +122,7 @@ export function DiscordBanner({ initialSettings }: DiscordBannerProps) {
     setIsDismissed(true)
   }
 
-  // Don't render until mounted to prevent hydration mismatch
-  if (!mounted || isDismissed || !settings.enabled) return null
+  if (isDismissed || !settings.enabled) return null
 
   const BannerContent = () => (
     <span className="font-medium">{settings.text}</span>
