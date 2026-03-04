@@ -24,7 +24,7 @@ const sections = [
 export default function TermsOfServicePage() {
   return (
     <PublicPageLayout>
-      <LegalDocumentShell title="Terms of Service" lastUpdated="March 2, 2026" sections={sections}>
+      <LegalDocumentShell title="Terms of Service" lastUpdated="March 4, 2026" sections={sections}>
           <section id="acceptance" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p>
@@ -56,7 +56,7 @@ export default function TermsOfServicePage() {
             <h2 className="font-heading text-xl font-semibold mb-4">3. Accounts and Eligibility</h2>
             <h3 className="text-lg font-semibold mb-3 mt-6">3.1 Account Access</h3>
             <p>
-              Accounts are accessed through Google OAuth. You are responsible for activity under your account and for keeping your account access secure.
+              Teamy currently supports sign-in through Google OAuth when OAuth is configured for the deployment. You are responsible for activity under your account and for keeping your account access secure.
             </p>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">3.2 Eligibility</h3>
@@ -110,10 +110,10 @@ export default function TermsOfServicePage() {
           <section id="subscriptions-and-payments" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">6. Subscriptions and Payments</h2>
             <p>
-              Some features may require payment. By purchasing a paid feature, you agree to pay the fees shown at checkout.
+              Some features may require payment, and some workspaces may not have paid features enabled. If you purchase a paid feature, you agree to pay the fees shown at checkout.
             </p>
             <p className="mt-4">
-              Payments are processed by Stripe. We do not store full payment card numbers on our servers.
+              Payments are processed by Stripe. We do not store full payment card numbers in our database. Stripe provides us limited billing data needed to operate subscriptions (for example customer and subscription identifiers and status).
             </p>
             <p className="mt-4">
               Unless otherwise stated, fees are non-refundable.
@@ -123,13 +123,13 @@ export default function TermsOfServicePage() {
           <section id="third-party-services" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">7. Third-Party Services</h2>
             <p>
-              The Service relies on third-party providers, including providers for authentication, hosting, email delivery, payment processing, analytics, and optional AI features.
+              The Service uses third-party providers for core functionality. Depending on configuration, this may include providers for authentication, hosting, email delivery, payment processing, analytics, and optional AI features.
             </p>
             <p className="mt-4">
-              Your use of third-party services is also subject to those providers&apos; terms and privacy policies.
+              As of this version of the Terms, examples include Google (sign-in), Stripe (billing), Resend (transactional email), OpenAI (optional AI features), Vercel services (analytics and performance telemetry), and Discord webhooks for certain inbound form notifications.
             </p>
             <p className="mt-4">
-              We are not responsible for downtime, outages, policy changes, or data practices of third-party providers.
+              Third-party services operate under their own terms and privacy policies, and their outages or policy changes may affect your use of Teamy.
             </p>
           </section>
 
@@ -153,17 +153,17 @@ export default function TermsOfServicePage() {
           <section id="warranties" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">10. Disclaimer of Warranties</h2>
             <p>
-              THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE,&quot; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+              The Service is provided &quot;as is&quot; and &quot;as available.&quot; To the extent permitted by law, we disclaim warranties of any kind, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement.
             </p>
           </section>
 
           <section id="limitation-of-liability" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">11. Limitation of Liability</h2>
             <p>
-              TO THE MAXIMUM EXTENT PERMITTED BY LAW, TEAMY WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR LOST PROFITS, REVENUES, DATA, OR GOODWILL.
+              To the maximum extent permitted by law, Teamy will not be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, revenues, data, or goodwill.
             </p>
             <p className="mt-4">
-              TO THE MAXIMUM EXTENT PERMITTED BY LAW, TEAMY&apos;S TOTAL LIABILITY FOR ALL CLAIMS RELATING TO THE SERVICE WILL NOT EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID TO TEAMY IN THE 12 MONTHS BEFORE THE CLAIM OR (B) USD $100.
+              To the maximum extent permitted by law, Teamy&apos;s total liability for all claims relating to the Service will not exceed the greater of (A) the amount you paid to Teamy in the 12 months before the claim or (B) USD $100.
             </p>
           </section>
 
@@ -187,7 +187,7 @@ export default function TermsOfServicePage() {
           <section id="governing-law" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">14. Governing Law</h2>
             <p>
-              These Terms are governed by the laws of the United States, without regard to conflict-of-law principles.
+              Unless applicable law requires otherwise, these Terms are governed by the laws of the United States, without regard to conflict-of-law principles.
             </p>
           </section>
 

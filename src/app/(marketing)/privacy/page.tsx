@@ -20,7 +20,7 @@ const sections = [
 export default function PrivacyPolicyPage() {
   return (
     <PublicPageLayout>
-      <LegalDocumentShell title="Privacy Policy" lastUpdated="March 2, 2026" sections={sections}>
+      <LegalDocumentShell title="Privacy Policy" lastUpdated="March 4, 2026" sections={sections}>
           <section id="overview" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">1. Overview</h2>
             <p>
@@ -39,7 +39,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-heading text-xl font-semibold mb-4">2. Information We Collect</h2>
             <h3 className="text-lg font-semibold mb-3 mt-6">2.1 Information You Provide</h3>
             <ul>
-              <li>Account information from Google sign-in (such as name, email address, and profile image)</li>
+              <li>Account information from Google sign-in when Google OAuth is enabled (such as name, email address, and profile image)</li>
               <li>Club, team, role, roster, and membership information</li>
               <li>Content you create in the Service (announcements, calendar entries, tests, submissions, files, attendance, forms, and similar content)</li>
               <li>Tournament and hosting information you submit</li>
@@ -52,12 +52,12 @@ export default function PrivacyPolicyPage() {
               <li>Basic request and device metadata (for example IP address, browser type, and user agent)</li>
               <li>Session and preference cookies (for example auth session, theme, and last visited club)</li>
               <li>Application and API logs used for operations, debugging, abuse prevention, and security</li>
-              <li>Usage analytics data from infrastructure and analytics providers</li>
+              <li>Usage and performance analytics data (for example Vercel Analytics and Speed Insights in the authenticated app)</li>
             </ul>
 
             <h3 className="text-lg font-semibold mb-3 mt-6">2.3 Payment Information</h3>
             <p>
-              Payments are handled by Stripe. We do not store full payment card numbers in our database. We store limited billing and subscription metadata needed to operate paid features.
+              Payments are handled by Stripe. We do not store full payment card numbers in our database. We store limited billing and subscription metadata needed to operate paid features, such as Stripe customer IDs, subscription IDs, subscription status, and period end dates.
             </p>
           </section>
 
@@ -82,20 +82,21 @@ export default function PrivacyPolicyPage() {
             <ul>
               <li><strong>Within your organization:</strong> Data is visible to authorized users based on product permissions and roles</li>
               <li><strong>Public pages you publish:</strong> Certain tournament or organizer information may be publicly visible if you choose to publish it</li>
-              <li><strong>Service providers:</strong> Providers for hosting, authentication, payments, email, analytics, and optional AI processing</li>
+              <li><strong>Service providers:</strong> Google for authentication, Stripe for billing, Resend for transactional email, OpenAI for optional AI features, and Vercel analytics/performance tooling</li>
+              <li><strong>Webhook processors:</strong> Some inbound forms (such as contact or demo requests) may be forwarded to Teamy-managed Discord webhook channels</li>
               <li><strong>Legal reasons:</strong> To comply with law, legal process, or valid government requests</li>
               <li><strong>Safety and abuse prevention:</strong> To protect rights, safety, and platform integrity</li>
               <li><strong>Business transfers:</strong> In connection with a merger, acquisition, financing, or asset sale</li>
             </ul>
             <p className="mt-4">
-              Uploaded files are currently served from URL-based paths. Anyone who obtains a valid file URL may be able to access that file. Do not upload highly sensitive information unless your organization has approved that risk.
+              File access depends on feature type. Some uploads (such as media and certain background images) are stored under public URL paths and may be accessible to anyone who obtains the URL. Other uploads (such as attachments, forms, form submissions, and note sheets) are stored in private paths and served through authenticated download routes.
             </p>
           </section>
 
           <section id="cookies" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">5. Cookies and Similar Technologies</h2>
             <p>
-              We use cookies and similar technologies for authentication, settings, analytics, and product performance. Most browsers allow you to control cookies, but disabling cookies may impact functionality.
+              We use cookies and local storage for authentication, settings (such as theme and last visited club), analytics, and product performance. Most browsers allow you to control cookies, but disabling cookies may impact functionality.
             </p>
           </section>
 
@@ -114,10 +115,10 @@ export default function PrivacyPolicyPage() {
           <section id="security" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">7. Security</h2>
             <p>
-              We use administrative, technical, and organizational measures designed to protect information, including transport encryption and authentication controls.
+              We use technical and organizational safeguards designed to reduce risk, including authentication controls, role-based access checks, input validation, and security headers.
             </p>
             <p className="mt-4">
-              Security controls reduce risk but do not eliminate it, and effectiveness depends in part on correct configuration and third-party provider security. No method of transmission or storage is completely secure.
+              In production deployments, transport security depends on HTTPS and hosting configuration. Security controls reduce risk but do not eliminate it, and no method of transmission or storage is completely secure.
             </p>
           </section>
 
@@ -148,14 +149,14 @@ export default function PrivacyPolicyPage() {
           <section id="international-access" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">10. International Access</h2>
             <p>
-              The Service is operated from the United States. If you access it from outside the U.S., your information may be processed and stored in the U.S. and other countries where our providers operate.
+              Teamy is operated by a U.S.-based team. Depending on your location and provider infrastructure, your information may be processed in the United States and other countries where our service providers operate.
             </p>
           </section>
 
           <section id="changes" className="mb-8 scroll-mt-28">
             <h2 className="font-heading text-xl font-semibold mb-4">11. Changes to This Policy</h2>
             <p>
-              We may update this Privacy Policy from time to time. We will post the current version on this page and update the &quot;Last updated&quot; date.
+              We may update this Privacy Policy from time to time to reflect product, legal, or operational changes. We will post the current version on this page and update the &quot;Last updated&quot; date.
             </p>
           </section>
 
