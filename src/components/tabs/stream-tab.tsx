@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useToast } from '@/components/ui/use-toast'
-import { formatDateTime } from '@/lib/utils'
+import { cn, formatDateTime } from '@/lib/utils'
 import { Plus, Send, Trash2, ChevronDown, ChevronUp, Edit, MessageCircle, X, Calendar, MapPin, Check, X as XIcon, Paperclip, Mail } from 'lucide-react'
 import { AttachmentDisplay } from '@/components/ui/attachment-display'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
@@ -1253,8 +1253,19 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
               </CardContent>
             </Card>
           ) : (
-            filteredAnnouncements.map((announcement) => (
-            <Card key={announcement.id} className="relative">
+            filteredAnnouncements.map((announcement) => {
+              const isPendingAnnouncement =
+                announcement.id.startsWith('temp-') &&
+                announcement.author.user.id === currentMembership.userId
+
+              return (
+                <Card
+                  key={announcement.id}
+                  className={cn(
+                    'relative transition-colors',
+                    isPendingAnnouncement && 'bg-muted/40 border-primary/20',
+                  )}
+                >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -1269,6 +1280,9 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
                         <p className="font-semibold">{announcement.title}</p>
                         {announcement.important && (
                           <Badge variant="destructive" className="text-xs">IMPORTANT</Badge>
+                        )}
+                        {isPendingAnnouncement && (
+                          <Badge variant="secondary" className="text-xs font-normal">Sending...</Badge>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -1495,8 +1509,19 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
                       {/* Existing Replies */}
                       {announcement.replies && announcement.replies.length > 0 && (
                         <div className="space-y-3">
-                          {announcement.replies.map((reply: AnnouncementReply) => (
-                            <div key={reply.id} className="flex gap-3 pl-4 border-l-2 border-muted">
+                          {announcement.replies.map((reply: AnnouncementReply) => {
+                            const isPendingReply =
+                              reply.id.startsWith('temp-') &&
+                              reply.author.user.id === currentMembership.userId
+
+                            return (
+                              <div
+                                key={reply.id}
+                                className={cn(
+                                  'flex gap-3 pl-4 border-l-2 rounded-md py-2 pr-2 transition-colors',
+                                  isPendingReply ? 'border-primary/30 bg-muted/40' : 'border-muted',
+                                )}
+                              >
                               <Avatar className="h-8 w-8 flex-shrink-0">
                                 <AvatarImage src={reply.author.user.image || ''} />
                                 <AvatarFallback>
@@ -1512,6 +1537,9 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
                                     <p className="text-xs text-muted-foreground">
                                       {formatDateTime(reply.createdAt)}
                                     </p>
+                                    {isPendingReply && (
+                                      <span className="text-[10px] text-primary/80">Sending...</span>
+                                    )}
                                   </div>
                                   {canDeleteReply(reply) && (
                                     <Button
@@ -1536,8 +1564,9 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
                                   />
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
 
@@ -1583,8 +1612,9 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
                   )}
                 </div>
               </CardContent>
-            </Card>
-          ))
+                </Card>
+              )
+            })
           )
         })()}
       </div>
