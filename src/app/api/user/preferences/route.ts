@@ -4,6 +4,10 @@ import { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'private, no-store, max-age=0',
+}
+
 function getPreferencesObject(preferences: unknown): Record<string, unknown> {
   if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) {
     return {}
@@ -15,7 +19,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE_HEADERS })
     }
 
     const user = await prisma.user.findUnique({
@@ -23,10 +27,10 @@ export async function GET() {
       select: { preferences: true },
     })
 
-    return NextResponse.json({ preferences: user?.preferences || null })
+    return NextResponse.json({ preferences: user?.preferences || null }, { headers: NO_STORE_HEADERS })
   } catch (error) {
     console.error('Error fetching user preferences:', error)
-    return NextResponse.json({ error: 'Failed to fetch preferences' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch preferences' }, { status: 500, headers: NO_STORE_HEADERS })
   }
 }
 
@@ -34,7 +38,7 @@ export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE_HEADERS })
     }
 
     const body = await request.json()
@@ -87,14 +91,14 @@ export async function PATCH(request: Request) {
           if (!membership) {
             return NextResponse.json(
               { error: 'You can only set a club you are currently in as primary.' },
-              { status: 403 }
+              { status: 403, headers: NO_STORE_HEADERS }
             )
           }
 
           updatedPreferences.primaryClubId = normalizedPrimaryClubId
         }
       } else {
-        return NextResponse.json({ error: 'Invalid primary club value' }, { status: 400 })
+        return NextResponse.json({ error: 'Invalid primary club value' }, { status: 400, headers: NO_STORE_HEADERS })
       }
     }
 
@@ -104,9 +108,9 @@ export async function PATCH(request: Request) {
       select: { preferences: true },
     })
 
-    return NextResponse.json({ preferences: updatedUser.preferences })
+    return NextResponse.json({ preferences: updatedUser.preferences }, { headers: NO_STORE_HEADERS })
   } catch (error) {
     console.error('Error updating user preferences:', error)
-    return NextResponse.json({ error: 'Failed to update preferences' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update preferences' }, { status: 500, headers: NO_STORE_HEADERS })
   }
 }

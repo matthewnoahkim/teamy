@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useTheme } from 'next-themes'
+import { useUserPreferences } from '@/hooks/use-user-preferences'
 
 const USER_BACKGROUND_CACHE_KEY = 'teamy.user-background.preferences.v1'
 const USER_BACKGROUND_AUTH_KEY = 'teamy.user-background.auth.v1'
@@ -10,6 +11,9 @@ const USER_BACKGROUND_AUTH_KEY = 'teamy.user-background.auth.v1'
 export function UserBackgroundApplier() {
   const { data: session, status } = useSession()
   const { setTheme } = useTheme()
+  const { data: userPreferencesData, refetch: refetchUserPreferences } = useUserPreferences({
+    enabled: status === 'authenticated' && Boolean(session?.user?.id),
+  })
 
   useEffect(() => {
     // Use the same style element that was created by the server-side script, or create a new one
@@ -65,7 +69,7 @@ export function UserBackgroundApplier() {
       }
     }
 
-    const applyBackground = async () => {
+    const applyBackground = () => {
       // Always enforce header static background - defined outside try block so it's accessible in catch
       const headerCss = `
         header,
@@ -139,15 +143,12 @@ export function UserBackgroundApplier() {
           return
         }
 
-        const response = await fetch('/api/user/preferences')
-        if (!response.ok) {
+        const preferences = userPreferencesData?.preferences as Record<string, unknown> | null | undefined
+        if (preferences === undefined) {
           // Keep whichever background is already applied (usually from bootstrap cache)
-          // to avoid flashing back to the default grid pattern.
+          // until shared user preferences are available.
           return
         }
-
-        const data = await response.json()
-        const preferences = data.preferences as Record<string, unknown> | null
 
         // Sync theme from account preferences so it follows the user across browser profiles/devices
         const savedTheme = preferences?.theme as string | undefined
@@ -409,13 +410,17 @@ export function UserBackgroundApplier() {
 
     // Listen for custom event to update background when changed
     const handleBackgroundUpdate = () => {
-      applyBackground()
+      void refetchUserPreferences()
     }
     window.addEventListener('userBackgroundUpdated', handleBackgroundUpdate)
 
     // Listen for focus to refresh background
     const handleFocus = () => {
-      applyBackground()
+      if (status === 'authenticated' && session?.user?.id) {
+        void refetchUserPreferences()
+      } else {
+        applyBackground()
+      }
     }
     window.addEventListener('focus', handleFocus)
 
@@ -423,7 +428,7 @@ export function UserBackgroundApplier() {
       window.removeEventListener('userBackgroundUpdated', handleBackgroundUpdate)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [session?.user?.id, status])
+  }, [refetchUserPreferences, session?.user?.id, status, setTheme, userPreferencesData?.preferences])
 
   return null
 }

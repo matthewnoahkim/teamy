@@ -359,13 +359,29 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     markTabNotificationSeen(tab)
   }, [markTabNotificationSeen])
 
-  const syncSeenFromServer = useCallback(async () => {
+  const refreshTabNotifications = useCallback(async () => {
+    const tabsToCheck = NOTIFICATION_TABS.filter(tab => tab !== activeTabRef.current)
+
+    const query = new URLSearchParams()
+    if (tabsToCheck.length > 0) {
+      query.set('tabs', tabsToCheck.join(','))
+    }
+    for (const tab of tabsToCheck) {
+      query.set(`${tab}Since`, getLastClearedTime(tab).toISOString())
+    }
+
     try {
-      const response = await fetch(`/api/clubs/${club.id}/notifications/seen`, { cache: 'no-store' })
+      const response = await fetch(`/api/clubs/${club.id}/notifications?${query.toString()}`, {
+        cache: 'no-store',
+      })
       if (handleMembershipLossStatus(response)) return
       if (!response.ok) return
 
-      const data = (await response.json()) as { seen?: Record<string, string> }
+      const data = (await response.json()) as {
+        notifications?: Record<string, boolean>
+        seen?: Record<string, string>
+      }
+      const notifications = data.notifications ?? {}
       const seenByTab = data.seen ?? {}
 
       for (const [tab, seenAtRaw] of Object.entries(seenByTab)) {
@@ -379,31 +395,6 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
         persistTabSeenTime(tab, seenAt)
         markTabNotificationSeen(tab)
       }
-    } catch (error) {
-      console.error('Failed to sync notification seen timestamps:', error)
-    }
-  }, [club.id, getLastClearedTime, handleMembershipLossStatus, isNotificationTab, markTabNotificationSeen, persistTabSeenTime])
-
-  const refreshTabNotifications = useCallback(async () => {
-    await syncSeenFromServer()
-    const tabsToCheck = NOTIFICATION_TABS.filter(tab => tab !== activeTabRef.current)
-    if (tabsToCheck.length === 0) return
-
-    const query = new URLSearchParams()
-    query.set('tabs', tabsToCheck.join(','))
-    for (const tab of tabsToCheck) {
-      query.set(`${tab}Since`, getLastClearedTime(tab).toISOString())
-    }
-
-    try {
-      const response = await fetch(`/api/clubs/${club.id}/notifications?${query.toString()}`, {
-        cache: 'no-store',
-      })
-      if (handleMembershipLossStatus(response)) return
-      if (!response.ok) return
-
-      const data = (await response.json()) as { notifications?: Record<string, boolean> }
-      const notifications = data.notifications ?? {}
 
       setTabNotifications(prev => {
         let changed = false
@@ -425,18 +416,21 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     } catch (error) {
       console.error('Failed to fetch tab notifications:', error)
     }
-  }, [club.id, getLastClearedTime, handleMembershipLossStatus, syncSeenFromServer])
+  }, [club.id, getLastClearedTime, handleMembershipLossStatus, isNotificationTab, markTabNotificationSeen, persistTabSeenTime])
 
-  const refreshClubSummary = useCallback(async () => {
+  const refreshClubSnapshot = useCallback(async () => {
     try {
-      const response = await fetch(`/api/clubs/${club.id}`, { cache: 'no-store' })
+      const response = await fetch(`/api/clubs/${club.id}/summary`, { cache: 'no-store' })
       if (handleMembershipLossStatus(response)) return
       if (!response.ok) return
 
       const data = (await response.json()) as {
         club?: {
           name?: string
-          memberships?: Array<unknown>
+          memberCount?: number
+        }
+        currentMembership?: {
+          role?: string
         }
       }
 
@@ -444,42 +438,18 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
         const nextName = data.club.name
         setCurrentClubName((prev) => (prev === nextName ? prev : nextName))
       }
-      if (Array.isArray(data.club?.memberships)) {
-        const nextCount = data.club.memberships.length
+      if (typeof data.club?.memberCount === 'number') {
+        const nextCount = data.club.memberCount
         setClubMemberCount((prev) => (prev === nextCount ? prev : nextCount))
       }
+      if (typeof data.currentMembership?.role === 'string') {
+        const nextRole = data.currentMembership.role.toUpperCase() === 'ADMIN' ? 'ADMIN' : 'MEMBER'
+        setCurrentMembershipRole((prev) => (prev === nextRole ? prev : nextRole))
+      }
     } catch (error) {
-      console.error('Failed to refresh club summary:', error)
+      console.error('Failed to refresh club snapshot:', error)
     }
   }, [club.id, handleMembershipLossStatus])
-
-  const refreshCurrentMembershipRole = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/memberships?clubId=${club.id}`, { cache: 'no-store' })
-      if (handleMembershipLossStatus(response)) return
-      if (!response.ok) return
-
-      const data = (await response.json()) as {
-        memberships?: Array<{ id: string; userId: string; role: string }>
-      }
-      const memberships = Array.isArray(data.memberships) ? data.memberships : []
-      setClubMemberCount((prev) => (prev === memberships.length ? prev : memberships.length))
-
-      const selfMembership =
-        memberships.find((membership) => membership.id === liveCurrentMembership.id) ||
-        memberships.find((membership) => membership.userId === user.id)
-
-      if (!selfMembership) {
-        redirectForMembershipLoss()
-        return
-      }
-
-      const nextRole = String(selfMembership.role).toUpperCase() === 'ADMIN' ? 'ADMIN' : 'MEMBER'
-      setCurrentMembershipRole((prev) => (prev === nextRole ? prev : nextRole))
-    } catch (error) {
-      console.error('Failed to refresh current membership role:', error)
-    }
-  }, [club.id, handleMembershipLossStatus, liveCurrentMembership.id, redirectForMembershipLoss, user.id])
 
   // Keep active tab in a ref so polling interval doesn't restart during navigation.
   useEffect(() => {
@@ -554,15 +524,6 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     }
   }, [club.id, isNotificationTab, markTabNotificationSeen, persistTabSeenTime, user.id])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const syncOnFocus = () => { void syncSeenFromServer() }
-    window.addEventListener('focus', syncOnFocus)
-    return () => {
-      window.removeEventListener('focus', syncOnFocus)
-    }
-  }, [syncSeenFromServer])
-
   // Persist "seen" timestamp for the currently open tab when page is backgrounded/unloaded.
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -614,20 +575,10 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
 
   // Keep permission-sensitive UI in sync when membership role changes (promote/demote).
   useBackgroundRefresh(
-    () => refreshCurrentMembershipRole(),
+    () => refreshClubSnapshot(),
     {
       intervalMs: 20_000,
       runOnMount: true,
-      refreshOnFocus: true,
-      refreshOnReconnect: true,
-    },
-  )
-
-  useBackgroundRefresh(
-    () => refreshClubSummary(),
-    {
-      intervalMs: 60_000,
-      runOnMount: false,
       refreshOnFocus: true,
       refreshOnReconnect: true,
     },

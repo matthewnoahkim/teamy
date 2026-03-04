@@ -20,6 +20,56 @@ import {
 
 const SUPPORTED_TABS = ['stream', 'calendar', 'attendance', 'finance', 'tests', 'people'] as const
 type NotificationTab = (typeof SUPPORTED_TABS)[number]
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'private, no-store, max-age=0',
+}
+
+function getObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  return value as Record<string, unknown>
+}
+
+function parseSeenAt(value: unknown): Date | null {
+  if (typeof value !== 'string') return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function getAllSeenByClub(preferences: Record<string, unknown>): Record<string, Record<string, string>> {
+  const rawByClub = getObject(preferences.clubNotificationSeen)
+  const normalized: Record<string, Record<string, string>> = {}
+
+  for (const [clubId, rawTabMap] of Object.entries(rawByClub)) {
+    const tabMap = getObject(rawTabMap)
+    const normalizedTabs: Record<string, string> = {}
+
+    for (const [tab, rawSeenAt] of Object.entries(tabMap)) {
+      const parsed = parseSeenAt(rawSeenAt)
+      if (parsed) {
+        normalizedTabs[tab] = parsed.toISOString()
+      }
+    }
+
+    if (Object.keys(normalizedTabs).length > 0) {
+      normalized[clubId] = normalizedTabs
+    }
+  }
+
+  return normalized
+}
+
+function filterSupportedTabs(tabMap: Record<string, string>): Partial<Record<NotificationTab, string>> {
+  const filtered: Partial<Record<NotificationTab, string>> = {}
+  for (const [tab, seenAt] of Object.entries(tabMap)) {
+    if (!(SUPPORTED_TABS as readonly string[]).includes(tab)) continue
+    const parsed = parseSeenAt(seenAt)
+    if (!parsed) continue
+    filtered[tab as NotificationTab] = parsed.toISOString()
+  }
+  return filtered
+}
 
 function parseSince(raw: string | null): Date {
   if (!raw) return new Date(0)
@@ -87,7 +137,7 @@ export async function GET(
   try {
     const session = await serverSession.get()
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE_HEADERS })
     }
 
     const membership = await prisma.membership.findUnique({
@@ -103,12 +153,21 @@ export async function GET(
         teamId: true,
         role: true,
         roles: true,
+        user: {
+          select: {
+            preferences: true,
+          },
+        },
       },
     })
 
     if (!membership) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403, headers: NO_STORE_HEADERS })
     }
+
+    const preferences = getObject(membership.user?.preferences)
+    const allSeenByClub = getAllSeenByClub(preferences)
+    const clubSeen = filterSupportedTabs(allSeenByClub[resolvedParams.clubId] ?? {})
 
     const isAdminUser = membership.role === Role.ADMIN
     const searchParams = req.nextUrl.searchParams
@@ -433,9 +492,9 @@ export async function GET(
       clubId: resolvedParams.clubId,
       tabCount: tabs.length,
     })
-    return NextResponse.json({ notifications })
+    return NextResponse.json({ notifications, seen: clubSeen }, { headers: NO_STORE_HEADERS })
   } catch (error) {
     console.error('Get club notifications error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: NO_STORE_HEADERS })
   }
 }

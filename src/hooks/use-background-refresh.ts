@@ -23,6 +23,10 @@ type BackgroundRefreshOptions = {
    * Toggle the entire refresh behavior on/off.
    */
   enabled?: boolean
+  /**
+   * Ignore duplicate triggers fired within this window (ms).
+   */
+  dedupeWindowMs?: number
 }
 
 const defaultOptions: Required<BackgroundRefreshOptions> = {
@@ -31,6 +35,7 @@ const defaultOptions: Required<BackgroundRefreshOptions> = {
   refreshOnFocus: true,
   refreshOnReconnect: true,
   enabled: true,
+  dedupeWindowMs: 750,
 }
 
 /**
@@ -44,6 +49,7 @@ export function useBackgroundRefresh(
   const opts = { ...defaultOptions, ...options }
   const callbackRef = useRef(refreshFn)
   const isRefreshingRef = useRef(false)
+  const lastRunStartedAtRef = useRef(0)
 
   useEffect(() => {
     callbackRef.current = refreshFn
@@ -63,7 +69,10 @@ export function useBackgroundRefresh(
     const run = async () => {
       if (isRefreshingRef.current || destroyed) return
       if (!canRun()) return
+      const now = Date.now()
+      if (now - lastRunStartedAtRef.current < opts.dedupeWindowMs) return
 
+      lastRunStartedAtRef.current = now
       isRefreshingRef.current = true
       try {
         await callbackRef.current()
@@ -115,11 +124,11 @@ export function useBackgroundRefresh(
     }
   }, [
     opts.enabled,
+    opts.dedupeWindowMs,
     opts.intervalMs,
     opts.refreshOnFocus,
     opts.refreshOnReconnect,
     opts.runOnMount,
   ])
 }
-
 

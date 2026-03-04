@@ -3,6 +3,10 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { serverSession } from '@/lib/server-session'
 
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'private, no-store, max-age=0',
+}
+
 const SUPPORTED_TABS = ['stream', 'calendar', 'attendance', 'finance', 'tests', 'people'] as const
 type NotificationTab = (typeof SUPPORTED_TABS)[number]
 const SUPPORTED_TAB_SET = new Set<string>(SUPPORTED_TABS)
@@ -61,7 +65,7 @@ export async function GET(
   try {
     const session = await serverSession.get()
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE_HEADERS })
     }
 
     const resolvedParams = await params
@@ -76,7 +80,7 @@ export async function GET(
     })
 
     if (!membership) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403, headers: NO_STORE_HEADERS })
     }
 
     const user = await prisma.user.findUnique({
@@ -88,10 +92,10 @@ export async function GET(
     const allSeenByClub = getAllSeenByClub(preferences)
     const clubSeen = filterSupportedTabs(allSeenByClub[resolvedParams.clubId] ?? {})
 
-    return NextResponse.json({ seen: clubSeen })
+    return NextResponse.json({ seen: clubSeen }, { headers: NO_STORE_HEADERS })
   } catch (error) {
     console.error('Get notification seen timestamps error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: NO_STORE_HEADERS })
   }
 }
 
@@ -102,7 +106,7 @@ export async function POST(
   try {
     const session = await serverSession.get()
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE_HEADERS })
     }
 
     const resolvedParams = await params
@@ -117,18 +121,18 @@ export async function POST(
     })
 
     if (!membership) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403, headers: NO_STORE_HEADERS })
     }
 
     const body = await req.json().catch(() => null) as { tab?: string; seenAt?: string } | null
     const tab = body?.tab?.trim()
     if (!tab || !SUPPORTED_TAB_SET.has(tab)) {
-      return NextResponse.json({ error: 'Invalid tab' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid tab' }, { status: 400, headers: NO_STORE_HEADERS })
     }
 
     const requestedSeenAt = body?.seenAt ? parseSeenAt(body.seenAt) : new Date()
     if (!requestedSeenAt) {
-      return NextResponse.json({ error: 'Invalid seenAt timestamp' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid seenAt timestamp' }, { status: 400, headers: NO_STORE_HEADERS })
     }
 
     const user = await prisma.user.findUnique({
@@ -174,9 +178,9 @@ export async function POST(
       tab: tab as NotificationTab,
       seenAt: effectiveSeenAt.toISOString(),
       seen: persistedClubSeen,
-    })
+    }, { headers: NO_STORE_HEADERS })
   } catch (error) {
     console.error('Update notification seen timestamp error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: NO_STORE_HEADERS })
   }
 }

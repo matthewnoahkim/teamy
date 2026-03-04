@@ -18,8 +18,10 @@ import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import { CreateClubDialog } from '@/components/create-club-dialog'
 import { JoinClubDialog } from '@/components/join-club-dialog'
 import { AccountSecurityMenuItem } from '@/components/account-security-menu-item'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useToast } from '@/components/ui/use-toast'
+import { useQueryClient } from '@tanstack/react-query'
+import { USER_PREFERENCES_QUERY_KEY, useUserPreferences } from '@/hooks/use-user-preferences'
 
 interface Club {
   id: string
@@ -48,6 +50,7 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
   const { toast } = useToast()
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
@@ -55,9 +58,11 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   const [joinClubOpen, setJoinClubOpen] = useState(false)
   const [joinInitialCode, setJoinInitialCode] = useState('')
   const [joinInitialInviteClubId, setJoinInitialInviteClubId] = useState('')
-  const [primaryClubId, setPrimaryClubId] = useState<string | null>(null)
-  const [primaryClubLoaded, setPrimaryClubLoaded] = useState(false)
   const [savingPrimaryClub, setSavingPrimaryClub] = useState(false)
+  const {
+    data: userPreferencesData,
+    isLoading: isLoadingUserPreferences,
+  } = useUserPreferences({ enabled: Boolean(user?.id) })
   
   // Show customization and billing on all app-header pages by default.
   const isOnClubPage = pathname?.startsWith('/club/')
@@ -78,6 +83,13 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   const inviteClubFromUrl = pathname?.startsWith('/club/')
     ? (searchParams.get('inviteClub') || '')
     : ''
+  const primaryClubId = useMemo(() => {
+    const rawPrimaryClubId = userPreferencesData?.preferences?.primaryClubId
+    if (typeof rawPrimaryClubId !== 'string') return null
+    const normalized = rawPrimaryClubId.trim()
+    return normalized.length > 0 ? normalized : null
+  }, [userPreferencesData?.preferences?.primaryClubId])
+  const primaryClubLoaded = !isLoadingUserPreferences
 
   useEffect(() => {
     // Warm route cache for quick club switching.
@@ -94,42 +106,6 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
     router.prefetch(customizationHref)
     router.prefetch(billingHref)
   }, [router, showCustomizationBilling, customizationHref, billingHref])
-
-  useEffect(() => {
-    let isMounted = true
-
-    const loadPrimaryClub = async () => {
-      try {
-        const response = await fetch('/api/user/preferences', {
-          cache: 'no-store',
-        })
-        if (response.ok) {
-          const data = await response.json()
-          const rawPrimaryClubId = data?.preferences?.primaryClubId
-          const resolvedPrimaryClubId =
-            typeof rawPrimaryClubId === 'string' && rawPrimaryClubId.trim().length > 0
-              ? rawPrimaryClubId.trim()
-              : null
-
-          if (isMounted) {
-            setPrimaryClubId(resolvedPrimaryClubId)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load primary club preference', error)
-      } finally {
-        if (isMounted) {
-          setPrimaryClubLoaded(true)
-        }
-      }
-    }
-
-    void loadPrimaryClub()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
 
   useEffect(() => {
     if (!inviteCodeFromUrl || !pathname) return
@@ -177,13 +153,21 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
           primaryClubId: targetClubId ?? null,
         }),
       })
+      const data = await response.json().catch(() => ({} as Record<string, unknown>))
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.error || 'Failed to set primary club')
+        const errorMessage = typeof data.error === 'string' ? data.error : 'Failed to set primary club'
+        throw new Error(errorMessage)
       }
 
-      setPrimaryClubId(targetClubId)
+      if (data.preferences) {
+        queryClient.setQueryData(USER_PREFERENCES_QUERY_KEY, {
+          preferences: data.preferences,
+        })
+      } else {
+        void queryClient.invalidateQueries({ queryKey: USER_PREFERENCES_QUERY_KEY })
+      }
+
       if (targetClubId) {
         document.cookie = `lastVisitedClub=${targetClubId}; path=/; max-age=${60 * 60 * 24 * 365}`
       }
