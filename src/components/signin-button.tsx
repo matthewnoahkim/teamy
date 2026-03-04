@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { buildAuthCallbackUrl } from '@/lib/auth-callback-url'
 
 type SignInButtonProps = {
   callbackUrl?: string
@@ -12,13 +13,14 @@ type SignInButtonProps = {
 
 export function SignInButton({ callbackUrl = '/', label = 'Sign in with Google' }: SignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const authCallbackUrl = buildAuthCallbackUrl(callbackUrl)
 
   const handleSignIn = async () => {
     if (isLoading) return
     setIsLoading(true)
     try {
       await signIn('google', {
-        callbackUrl,
+        callbackUrl: authCallbackUrl,
       })
     } finally {
       // Reset in case redirect is blocked or fails.

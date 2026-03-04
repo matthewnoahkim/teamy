@@ -10,6 +10,7 @@ import { ClipboardList, AlertCircle, Calendar, Users } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { formatDivision } from '@/lib/utils'
+import { buildAuthCallbackUrl } from '@/lib/auth-callback-url'
 
 interface InviteInfo {
   id: string
@@ -40,12 +41,15 @@ interface ESLoginClientProps {
 }
 
 export function ESLoginClient({ unauthorized, email, inviteInfo, token }: ESLoginClientProps) {
+  const destinationPath = token ? `/es?token=${token}` : '/es'
+  const authCallbackUrl = buildAuthCallbackUrl(destinationPath)
+
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: token ? `/es?token=${token}` : '/es' })
+    signIn('google', { callbackUrl: authCallbackUrl })
   }
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: token ? `/es?token=${token}` : '/es' })
+    signOut({ callbackUrl: destinationPath })
   }
 
   const roleLabel = inviteInfo?.role === 'EVENT_SUPERVISOR' ? 'Event Supervisor' : 'Tournament Director'
@@ -197,4 +201,3 @@ export function ESLoginClient({ unauthorized, email, inviteInfo, token }: ESLogi
     </div>
   )
 }
-

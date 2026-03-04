@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Logo } from '@/components/logo'
 import { FileText, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
+import { buildAuthCallbackUrl } from '@/lib/auth-callback-url'
 
 interface TestingLoginClientProps {
   unauthorized?: boolean
@@ -13,8 +14,10 @@ interface TestingLoginClientProps {
 }
 
 export function TestingLoginClient({ unauthorized, email: _email }: TestingLoginClientProps) {
+  const authCallbackUrl = buildAuthCallbackUrl('/testing')
+
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/testing' })
+    signIn('google', { callbackUrl: authCallbackUrl })
   }
 
   const handleSignOut = () => {
@@ -119,4 +122,3 @@ export function TestingLoginClient({ unauthorized, email: _email }: TestingLogin
     </div>
   )
 }
-

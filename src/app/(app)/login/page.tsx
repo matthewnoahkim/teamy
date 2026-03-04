@@ -2,7 +2,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { SignInButton } from '@/components/signin-button'
-import { SignUpButton } from '@/components/signup-button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
@@ -10,6 +9,9 @@ import { getPreferredClubPathForUser } from '@/lib/club-routing'
 import { cookies } from 'next/headers'
 import { cn } from '@/lib/utils'
 import { resolveSafeCallbackPath } from '@/lib/url-safety'
+import { prisma } from '@/lib/prisma'
+import { hasAgeVerification } from '@/lib/age-verification'
+import { buildAuthCallbackUrl } from '@/lib/auth-callback-url'
 
 type AuthMode = 'signin' | 'signup'
 
@@ -55,19 +57,34 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   // Accept both callbackUrl and legacy redirect query params.
   const rawCallbackUrl = resolvedSearchParams?.callbackUrl ?? resolvedSearchParams?.redirect
   const sanitizedCallbackUrl = resolveSafeCallbackPath(rawCallbackUrl, '/auth/callback')
+  const authCallbackUrl = buildAuthCallbackUrl(sanitizedCallbackUrl)
   const signInPageHref = buildAuthPageHref('signin', sanitizedCallbackUrl)
   const signUpPageHref = buildAuthPageHref('signup', sanitizedCallbackUrl)
+  const ageVerificationHref = `/age-verification?${new URLSearchParams({
+    callbackUrl: authCallbackUrl,
+  }).toString()}`
 
   // Calculate callback URL for both logged-in and logged-out states
-  let callbackUrl = '/auth/callback' // default redirect handler
+  let callbackUrl = authCallbackUrl
   
   if (session?.user) {
     const defaultRedirect = await getDefaultRedirect(session.user.id)
-    callbackUrl = resolveSafeCallbackPath(rawCallbackUrl, defaultRedirect)
-    redirect(callbackUrl)
+    const destination = resolveSafeCallbackPath(rawCallbackUrl, defaultRedirect)
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { preferences: true },
+    })
+
+    if (!hasAgeVerification(user?.preferences)) {
+      redirect(`/age-verification?${new URLSearchParams({ callbackUrl: destination }).toString()}`)
+    }
+
+    callbackUrl = destination
+    redirect(destination)
   } else {
-    // For non-logged-in users, use the callback from query params or default to auth callback
-    callbackUrl = resolveSafeCallbackPath(rawCallbackUrl, '/auth/callback')
+    // For non-logged-in users, always return to auth-callback so onboarding checks can run.
+    callbackUrl = authCallbackUrl
   }
 
   return (
@@ -126,7 +143,12 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
               </div>
 
               {isSignUpMode ? (
-                <SignUpButton callbackUrl={callbackUrl} label="Continue with Google" />
+                <Link
+                  href={ageVerificationHref}
+                  className="flex h-14 w-full items-center justify-center rounded-xl bg-teamy-primary px-4 text-base font-semibold text-white shadow-sm transition-all duration-300 hover:bg-teamy-primary-dark hover:shadow-md"
+                >
+                  Verify age and continue
+                </Link>
               ) : (
                 <SignInButton callbackUrl={callbackUrl} label="Continue with Google" />
               )}

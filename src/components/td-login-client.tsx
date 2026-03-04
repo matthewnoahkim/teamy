@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Logo } from '@/components/logo'
 import { Trophy, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
+import { buildAuthCallbackUrl } from '@/lib/auth-callback-url'
 
 interface TDLoginClientProps {
   unauthorized?: boolean
@@ -13,8 +14,10 @@ interface TDLoginClientProps {
 }
 
 export function TDLoginClient({ unauthorized, email }: TDLoginClientProps) {
+  const authCallbackUrl = buildAuthCallbackUrl('/td')
+
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/td' })
+    signIn('google', { callbackUrl: authCallbackUrl })
   }
 
   const handleSignOut = () => {
@@ -119,4 +122,3 @@ export function TDLoginClient({ unauthorized, email }: TDLoginClientProps) {
     </div>
   )
 }
-
