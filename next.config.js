@@ -1,4 +1,17 @@
 /** @type {import('next').NextConfig} */
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "script-src 'self' 'unsafe-inline' https://js.stripe.com https://va.vercel-scripts.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self' ws: wss: https://api.stripe.com https://vitals.vercel-insights.com https://vitals.vercel-analytics.com",
+  "frame-src 'self' https://js.stripe.com",
+].join('; ')
+
 const nextConfig = {
   images: {
     remotePatterns: [
@@ -53,6 +66,14 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin'
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()'
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: contentSecurityPolicy
           }
         ]
       }

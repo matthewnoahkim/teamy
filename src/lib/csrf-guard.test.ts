@@ -52,3 +52,26 @@ test('shouldRejectPotentialCsrf does not block webhook/auth exempt routes', () =
   assert.equal(blockedAuth, false)
 })
 
+test('shouldRejectPotentialCsrf blocks authenticated writes with missing origin/referer in strict mode', () => {
+  const blocked = shouldRejectPotentialCsrf({
+    method: 'POST',
+    pathname: '/api/clubs/join',
+    cookieHeader: '__Secure-next-auth.session-token=abc123',
+    allowedOrigins: ['https://teamy.site'],
+    requireOriginForAuthenticatedWrites: true,
+  })
+
+  assert.equal(blocked, true)
+})
+
+test('shouldRejectPotentialCsrf allows authenticated writes with missing origin/referer when strict mode disabled', () => {
+  const blocked = shouldRejectPotentialCsrf({
+    method: 'POST',
+    pathname: '/api/clubs/join',
+    cookieHeader: '__Secure-next-auth.session-token=abc123',
+    allowedOrigins: ['https://teamy.site'],
+    requireOriginForAuthenticatedWrites: false,
+  })
+
+  assert.equal(blocked, false)
+})

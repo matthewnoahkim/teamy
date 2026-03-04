@@ -36,6 +36,7 @@ export function shouldRejectPotentialCsrf(params: {
   refererHeader?: string | null
   exemptPathPrefixes?: string[]
   allowedOrigins?: string[]
+  requireOriginForAuthenticatedWrites?: boolean
 }): boolean {
   const {
     method,
@@ -45,6 +46,7 @@ export function shouldRejectPotentialCsrf(params: {
     refererHeader,
     exemptPathPrefixes = DEFAULT_EXEMPT_PATH_PREFIXES,
     allowedOrigins = getConfiguredAppOrigins(),
+    requireOriginForAuthenticatedWrites = process.env.NODE_ENV === 'production',
   } = params
 
   if (!pathname.startsWith('/api')) return false
@@ -62,6 +64,5 @@ export function shouldRejectPotentialCsrf(params: {
     return !isTrustedOrigin(refererOrigin, allowedOrigins)
   }
 
-  // Missing Origin/Referer can happen with some non-browser clients. Keep compatibility.
-  return false
+  return requireOriginForAuthenticatedWrites
 }

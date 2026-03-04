@@ -2,8 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { importQuestionsFromDocx } from '@/lib/docx-import';
+import {
+  createRateLimitResponse,
+  rateLimitRequest,
+} from '@/lib/rate-limit-api';
 
 export const dynamic = 'force-dynamic';
+
+const DOCX_IMPORT_RATE_LIMIT: {
+  limit: number;
+  window: number;
+  identifier: string;
+} = {
+  limit: 5,
+  window: 60 * 60,
+  identifier: 'DOCX import',
+};
 
 /**
  * POST /api/tests/import-docx
@@ -21,6 +35,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const rateLimitResult = await rateLimitRequest(
+      req,
+      session.user.id,
+      DOCX_IMPORT_RATE_LIMIT,
+      '/api/tests/import-docx'
+    );
+    const rateLimitResponse = createRateLimitResponse(
+      rateLimitResult,
+      DOCX_IMPORT_RATE_LIMIT
+    );
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     // Parse multipart form data
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -32,8 +60,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate file type
-    if (!file.name.endsWith('.docx') && !file.type.includes('wordprocessingml')) {
+    const hasDocxExtension = /\.docx$/i.test(file.name);
+    const allowedMimeTypes = new Set([
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '',
+    ]);
+    const hasAllowedMimeType = allowedMimeTypes.has(file.type);
+    if (!hasDocxExtension || !hasAllowedMimeType) {
       return NextResponse.json(
         { error: 'Invalid file type. Please upload a .docx file.' },
         { status: 400 }
@@ -52,6 +85,18 @@ export async function POST(req: NextRequest) {
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const hasZipSignature =
+      buffer.length >= 4 &&
+      buffer[0] === 0x50 &&
+      buffer[1] === 0x4b &&
+      (buffer[2] === 0x03 || buffer[2] === 0x05 || buffer[2] === 0x07) &&
+      (buffer[3] === 0x04 || buffer[3] === 0x06 || buffer[3] === 0x08);
+    if (!hasZipSignature) {
+      return NextResponse.json(
+        { error: 'Invalid .docx file format.' },
+        { status: 400 }
+      );
+    }
 
     // Import questions from docx
     const questions = await importQuestionsFromDocx(buffer);
@@ -60,9 +105,8 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     console.error('Error importing docx:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to import questions from docx' },
+      { error: 'Failed to import questions from docx' },
       { status: 500 }
     );
   }
 }
-

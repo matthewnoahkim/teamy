@@ -58,6 +58,7 @@ test('getAllowedOriginsForRequest accepts forwarded host/proto origin', () => {
       APP_URL: undefined,
       VERCEL_PROJECT_PRODUCTION_URL: undefined,
       VERCEL_URL: undefined,
+      TRUST_FORWARDED_HOST_ORIGIN: 'true',
     },
     () => {
       const request = new NextRequest('https://internal.vercel.local/api/memberships/abc', {
@@ -72,4 +73,30 @@ test('getAllowedOriginsForRequest accepts forwarded host/proto origin', () => {
   )
 
   assert.equal(origins.includes('https://teamy-staging.example.org'), true)
+})
+
+test('getAllowedOriginsForRequest ignores forwarded host/proto origin unless explicitly trusted', () => {
+  const origins = withEnv(
+    {
+      NODE_ENV: 'production',
+      NEXTAUTH_URL: 'https://teamy.site',
+      NEXT_PUBLIC_BASE_URL: undefined,
+      APP_URL: undefined,
+      VERCEL_PROJECT_PRODUCTION_URL: undefined,
+      VERCEL_URL: undefined,
+      TRUST_FORWARDED_HOST_ORIGIN: undefined,
+    },
+    () => {
+      const request = new NextRequest('https://internal.vercel.local/api/memberships/abc', {
+        method: 'DELETE',
+        headers: {
+          'x-forwarded-proto': 'https',
+          'x-forwarded-host': 'teamy-staging.example.org',
+        },
+      })
+      return getAllowedOriginsForRequest(request)
+    },
+  )
+
+  assert.equal(origins.includes('https://teamy-staging.example.org'), false)
 })

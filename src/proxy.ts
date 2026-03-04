@@ -4,12 +4,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   getRateLimitKey,
   getRateLimitConfig,
-  checkRateLimit,
+  checkRateLimitAsync,
   getRateLimitHeaders,
 } from '@/lib/rate-limit'
 import { getSecurityHeaders } from '@/lib/security-config'
 import { shouldRejectPotentialCsrf } from '@/lib/csrf-guard'
 import { getConfiguredAppOrigins } from '@/lib/url-safety'
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+function shouldTrustForwardedHostOrigin(): boolean {
+  return process.env.TRUST_FORWARDED_HOST_ORIGIN === 'true'
+}
 
 function normalizeOriginCandidate(value: string): string | null {
   const trimmed = value.trim()
@@ -45,13 +51,19 @@ export function getAllowedOriginsForRequest(request: NextRequest): string[] {
   // mutations work across production/custom/preview hosts.
   addOrigin(request.nextUrl.origin)
 
-  const forwardedProto = request.headers.get('x-forwarded-proto')
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  if (forwardedProto && forwardedHost) {
-    addOrigin(`${forwardedProto}://${forwardedHost}`)
+  if (shouldTrustForwardedHostOrigin()) {
+    const forwardedProto = request.headers.get('x-forwarded-proto')
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    if (forwardedProto && forwardedHost) {
+      addOrigin(`${forwardedProto}://${forwardedHost}`)
+    }
   }
 
   return [...origins]
+}
+
+function isStateChangingMethod(method: string): boolean {
+  return !SAFE_METHODS.has(method.toUpperCase())
 }
 
 /**
@@ -94,6 +106,7 @@ export default async function proxy(request: NextRequest) {
         originHeader: request.headers.get('origin'),
         refererHeader: request.headers.get('referer'),
         allowedOrigins: getAllowedOriginsForRequest(request),
+        requireOriginForAuthenticatedWrites: process.env.NODE_ENV === 'production',
       })
     ) {
       const forbidden = NextResponse.json(
@@ -111,13 +124,13 @@ export default async function proxy(request: NextRequest) {
     const rateLimitKey = getRateLimitKey(request, null, pathname)
 
     // Check rate limit
-    const result = checkRateLimit(rateLimitKey, config)
+    const result = await checkRateLimitAsync(rateLimitKey, config)
 
     // If rate limited, return 429 Too Many Requests
     if (!result.allowed) {
       const headers = getRateLimitHeaders(result)
 
-      return NextResponse.json(
+      const limited = NextResponse.json(
         {
           error: 'Too Many Requests',
           message: `Rate limit exceeded for ${config.identifier}. Please try again later.`,
@@ -128,6 +141,7 @@ export default async function proxy(request: NextRequest) {
           headers,
         }
       )
+      return applySecurityHeaders(limited)
     }
 
     // Add rate limit headers to successful responses
@@ -139,9 +153,16 @@ export default async function proxy(request: NextRequest) {
     })
     return applySecurityHeaders(response)
   } catch (error) {
-    // If rate limiting fails, allow the request through (fail open)
-    // Log the error but don't block legitimate traffic
-    console.error('Rate limiting error:', error)
+    // Fail closed for state-changing requests so security checks can't be bypassed.
+    console.error('API security middleware error:', error)
+    if (isStateChangingMethod(request.method)) {
+      const unavailable = NextResponse.json(
+        { error: 'Service Unavailable', message: 'Request blocked due to temporary security service failure.' },
+        { status: 503 }
+      )
+      return applySecurityHeaders(unavailable)
+    }
+
     return applySecurityHeaders(NextResponse.next())
   }
 }

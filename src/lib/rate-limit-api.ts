@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   getRateLimitKey,
   getRateLimitConfig,
-  checkRateLimit,
+  checkRateLimitAsync,
   getRateLimitHeaders,
   type RateLimitConfig,
 } from '@/lib/rate-limit'
@@ -41,7 +41,7 @@ export async function rateLimitRequest(
   const config = customConfig || getRateLimitConfig(request.method, request.nextUrl.pathname)
   const key = getRateLimitKey(request, userId, endpoint)
   
-  return checkRateLimit(key, config)
+  return checkRateLimitAsync(key, config)
 }
 
 /**

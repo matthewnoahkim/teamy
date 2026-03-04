@@ -1,5 +1,18 @@
 import { NextRequest } from 'next/server'
 
+const TRUST_X_FORWARDED_FOR = process.env.RATE_LIMIT_TRUST_X_FORWARDED_FOR === 'true'
+const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/+$/, '')
+const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
+const HAS_DISTRIBUTED_RATE_LIMIT =
+  typeof UPSTASH_REDIS_REST_URL === 'string' &&
+  UPSTASH_REDIS_REST_URL.length > 0 &&
+  typeof UPSTASH_REDIS_REST_TOKEN === 'string' &&
+  UPSTASH_REDIS_REST_TOKEN.length > 0
+
+const IPV4_SEGMENT = '(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)'
+const IPV4_REGEX = new RegExp(`^${IPV4_SEGMENT}\\.${IPV4_SEGMENT}\\.${IPV4_SEGMENT}\\.${IPV4_SEGMENT}$`)
+const IPV6_REGEX = /^[0-9a-fA-F:]+$/
+
 /**
  * Rate limiting configuration for different endpoint types
  */
@@ -57,6 +70,13 @@ interface RateLimitRecord {
   resetAt: number
 }
 
+export interface RateLimitCheckResult {
+  allowed: boolean
+  remaining: number
+  resetAt: number
+  limit: number
+}
+
 class RateLimitStore {
   private store = new Map<string, RateLimitRecord>()
   private cleanupInterval: NodeJS.Timeout | null = null
@@ -110,25 +130,162 @@ class RateLimitStore {
 // Global rate limit store instance
 const rateLimitStore = new RateLimitStore()
 
+function hashString(value: string): string {
+  let hash = 2166136261
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i)
+    hash +=
+      (hash << 1) +
+      (hash << 4) +
+      (hash << 7) +
+      (hash << 8) +
+      (hash << 24)
+  }
+  return (hash >>> 0).toString(16)
+}
+
+function normalizeIpCandidate(value: string): string | null {
+  let candidate = value.trim()
+  if (!candidate) return null
+
+  // Strip surrounding brackets for IPv6 literals.
+  if (candidate.startsWith('[') && candidate.endsWith(']')) {
+    candidate = candidate.slice(1, -1)
+  }
+
+  // Strip :port for IPv4 values.
+  if (candidate.includes('.') && candidate.includes(':') && candidate.indexOf(':') === candidate.lastIndexOf(':')) {
+    candidate = candidate.split(':')[0]
+  }
+
+  if (IPV4_REGEX.test(candidate)) return candidate
+  if (
+    candidate.includes(':') &&
+    candidate.length <= 45 &&
+    IPV6_REGEX.test(candidate)
+  ) {
+    return candidate.toLowerCase()
+  }
+
+  return null
+}
+
+function extractFirstIp(value: string | null): string | null {
+  if (!value) return null
+
+  const parts = value
+    .split(',')
+    .map((part) => normalizeIpCandidate(part))
+    .filter((part): part is string => !!part)
+
+  return parts[0] ?? null
+}
+
+type UpstashPipelineResult = {
+  result?: unknown
+  error?: unknown
+}
+
+function parseNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.floor(value)
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) {
+      return Math.floor(parsed)
+    }
+  }
+  return null
+}
+
+async function runUpstashPipeline(
+  commands: Array<Array<string | number>>
+): Promise<UpstashPipelineResult[]> {
+  if (!HAS_DISTRIBUTED_RATE_LIMIT || !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN) {
+    throw new Error('Distributed rate limiting is not configured')
+  }
+
+  const response = await fetch(`${UPSTASH_REDIS_REST_URL}/pipeline`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(commands),
+    cache: 'no-store',
+  })
+
+  if (!response.ok) {
+    throw new Error(`Upstash pipeline failed with status ${response.status}`)
+  }
+
+  const payload = (await response.json()) as unknown
+  if (!Array.isArray(payload)) {
+    throw new Error('Invalid Upstash pipeline response')
+  }
+
+  return payload as UpstashPipelineResult[]
+}
+
+async function checkDistributedRateLimit(
+  key: string,
+  config: RateLimitConfig
+): Promise<RateLimitCheckResult> {
+  const windowSeconds = Math.max(1, Math.floor(config.window))
+
+  const responses = await runUpstashPipeline([
+    ['INCR', key],
+    ['EXPIRE', key, windowSeconds, 'NX'],
+    ['TTL', key],
+  ])
+
+  const count = parseNumber(responses[0]?.result)
+  const ttl = parseNumber(responses[2]?.result)
+
+  if (!count || count < 1) {
+    throw new Error('Distributed rate limiter returned invalid count')
+  }
+
+  const effectiveTtl = ttl && ttl > 0 ? ttl : windowSeconds
+  const resetAt = Math.floor(Date.now() / 1000) + effectiveTtl
+
+  if (count > config.limit) {
+    return {
+      allowed: false,
+      remaining: 0,
+      resetAt,
+      limit: config.limit,
+    }
+  }
+
+  return {
+    allowed: true,
+    remaining: Math.max(0, config.limit - count),
+    resetAt,
+    limit: config.limit,
+  }
+}
+
 /**
  * Get IP address from request headers
  */
 export function getClientIp(request: NextRequest): string {
-  // Try to get IP address from various headers (for proxies/load balancers)
-  const forwarded = request.headers.get('x-forwarded-for')
-  const realIp = request.headers.get('x-real-ip')
-  const cfConnectingIp = request.headers.get('cf-connecting-ip') // Cloudflare
-  
-  if (cfConnectingIp) {
-    return cfConnectingIp.split(',')[0].trim()
+  // Prefer platform headers that are typically managed by the hosting edge.
+  const cfConnectingIp = extractFirstIp(request.headers.get('cf-connecting-ip'))
+  if (cfConnectingIp) return cfConnectingIp
+
+  const vercelForwardedFor = extractFirstIp(request.headers.get('x-vercel-forwarded-for'))
+  if (vercelForwardedFor) return vercelForwardedFor
+
+  const realIp = extractFirstIp(request.headers.get('x-real-ip'))
+  if (realIp) return realIp
+
+  if (TRUST_X_FORWARDED_FOR) {
+    const forwarded = extractFirstIp(request.headers.get('x-forwarded-for'))
+    if (forwarded) return forwarded
   }
-  if (realIp) {
-    return realIp.split(',')[0].trim()
-  }
-  if (forwarded) {
-    return forwarded.split(',')[0].trim()
-  }
-  
+
   return 'unknown'
 }
 
@@ -138,10 +295,15 @@ export function getClientIp(request: NextRequest): string {
  */
 export function getRateLimitKey(request: NextRequest, userId?: string | null, endpoint?: string): string {
   const ipAddress = getClientIp(request)
-  
-  // Use user ID if available (more accurate for authenticated users)
-  // Otherwise use IP address
-  const identifier = userId || ipAddress
+
+  // Prefer authenticated user IDs. For anonymous traffic, fall back to an IP
+  // and then a lightweight user-agent hash when IP metadata is unavailable.
+  const userAgent = request.headers.get('user-agent') || 'unknown'
+  const anonymousIdentifier =
+    ipAddress !== 'unknown'
+      ? `ip:${ipAddress}`
+      : `ua:${hashString(userAgent)}`
+  const identifier = userId || anonymousIdentifier
   
   // Include endpoint in key for per-endpoint rate limiting
   const key = endpoint 
@@ -199,12 +361,7 @@ export function getRateLimitConfig(
 export function checkRateLimit(
   key: string,
   config: RateLimitConfig
-): {
-  allowed: boolean
-  remaining: number
-  resetAt: number
-  limit: number
-} {
+): RateLimitCheckResult {
   const now = Date.now()
   const windowMs = config.window * 1000
   const record = rateLimitStore.get(key)
@@ -240,6 +397,46 @@ export function checkRateLimit(
     resetAt: Math.floor(record.resetAt / 1000),
     limit: config.limit,
   }
+}
+
+/**
+ * Check if a request should be rate limited
+ * Uses Upstash Redis when configured, with in-memory fallback.
+ */
+export async function checkRateLimitWithFallback(
+  key: string,
+  config: RateLimitConfig
+): Promise<RateLimitCheckResult> {
+  if (HAS_DISTRIBUTED_RATE_LIMIT) {
+    try {
+      return await checkDistributedRateLimit(key, config)
+    } catch (error) {
+      console.error('Distributed rate limiter failed, falling back to in-memory store:', error)
+    }
+  }
+
+  return checkRateLimit(key, config)
+}
+
+/**
+ * Check if a request should be rate limited
+ * @returns Object with allowed status, remaining requests, and reset time
+ */
+export async function checkRateLimitAsync(
+  key: string,
+  config: RateLimitConfig
+): Promise<RateLimitCheckResult> {
+  return checkRateLimitWithFallback(key, config)
+}
+
+/**
+ * @deprecated Use checkRateLimitAsync for new code paths.
+ */
+export function checkRateLimitSync(
+  key: string,
+  config: RateLimitConfig
+): RateLimitCheckResult {
+  return checkRateLimit(key, config)
 }
 
 /**

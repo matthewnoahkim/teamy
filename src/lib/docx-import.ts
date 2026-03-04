@@ -3,6 +3,9 @@ import OpenAI from 'openai';
 import { ImportedQuestion } from './import-types';
 import { nanoid } from 'nanoid';
 
+const MAX_MARKED_TEXT_LENGTH = 200_000;
+const MAX_CHUNKS = 25;
+
 // System prompt to be provided by user
 export const DOCX_IMPORT_SYSTEM_PROMPT = `
 You are the deterministic parser for the Teamy test builder’s “Import from .docx” feature.
@@ -449,6 +452,10 @@ export function splitIntoChunks(markedText: string, maxQuestionsPerChunk: number
  * Calls OpenAI GPT to parse marked text into structured questions.
  */
 export async function callGptForImport(markedChunk: string): Promise<ImportedQuestion[]> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('DOCX import AI parser is not configured');
+  }
+
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
@@ -510,9 +517,15 @@ export async function callGptForImport(markedChunk: string): Promise<ImportedQue
 export async function importQuestionsFromDocx(buffer: Buffer): Promise<ImportedQuestion[]> {
   // Convert docx to marked text
   const markedText = await docxToMarkedText(buffer);
+  if (markedText.length > MAX_MARKED_TEXT_LENGTH) {
+    throw new Error('Document is too large to import safely');
+  }
   
   // Split into chunks
   const chunks = splitIntoChunks(markedText, 10);
+  if (chunks.length > MAX_CHUNKS) {
+    throw new Error('Document contains too many question blocks to import safely');
+  }
   
   // Process each chunk with GPT
   const allQuestions: ImportedQuestion[] = [];
@@ -524,4 +537,3 @@ export async function importQuestionsFromDocx(buffer: Buffer): Promise<ImportedQ
   
   return allQuestions;
 }
-
