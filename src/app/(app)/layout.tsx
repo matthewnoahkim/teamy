@@ -1,4 +1,3 @@
-import { Providers } from '@/components/providers'
 import { Toaster } from '@/components/ui/toaster'
 import { FaviconLoader } from '@/components/favicon-loader'
 import { SpeedInsights } from '@vercel/speed-insights/next'
@@ -12,12 +11,10 @@ export default function AppLayout({
   return (
     <>
       <FaviconLoader />
-      <Providers>
-        {children}
-        <Toaster />
-        <SpeedInsights />
-        <Analytics />
-      </Providers>
+      {children}
+      <Toaster />
+      <SpeedInsights />
+      <Analytics />
     </>
   )
 }

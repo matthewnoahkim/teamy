@@ -4,6 +4,9 @@ import { useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useTheme } from 'next-themes'
 
+const USER_BACKGROUND_CACHE_KEY = 'teamy.user-background.preferences.v1'
+const USER_BACKGROUND_AUTH_KEY = 'teamy.user-background.auth.v1'
+
 export function UserBackgroundApplier() {
   const { data: session, status } = useSession()
   const { setTheme } = useTheme()
@@ -16,6 +19,50 @@ export function UserBackgroundApplier() {
       styleEl = document.createElement('style')
       styleEl.id = 'user-background-styles-inline'
       document.head.appendChild(styleEl)
+    }
+
+    const cacheBackgroundPreferences = (preferences: Record<string, unknown> | null) => {
+      try {
+        const cachePayload = {
+          backgroundType:
+            typeof preferences?.backgroundType === 'string'
+              ? preferences.backgroundType
+              : 'grid',
+          backgroundColor:
+            typeof preferences?.backgroundColor === 'string'
+              ? preferences.backgroundColor
+              : null,
+          gradientColors: Array.isArray(preferences?.gradientColors)
+            ? preferences.gradientColors
+            : [],
+          gradientDirection:
+            typeof preferences?.gradientDirection === 'string'
+              ? preferences.gradientDirection
+              : '135deg',
+          backgroundImageUrl:
+            typeof preferences?.backgroundImageUrl === 'string'
+              ? preferences.backgroundImageUrl
+              : null,
+          updatedAt: Date.now(),
+        }
+
+        localStorage.setItem(
+          USER_BACKGROUND_CACHE_KEY,
+          JSON.stringify(cachePayload)
+        )
+        localStorage.setItem(USER_BACKGROUND_AUTH_KEY, '1')
+      } catch {
+        // Ignore localStorage write failures (e.g., private mode restrictions).
+      }
+    }
+
+    const clearBackgroundCache = () => {
+      try {
+        localStorage.removeItem(USER_BACKGROUND_CACHE_KEY)
+        localStorage.setItem(USER_BACKGROUND_AUTH_KEY, '0')
+      } catch {
+        // Ignore localStorage write failures (e.g., private mode restrictions).
+      }
     }
 
     const applyBackground = async () => {
@@ -59,7 +106,12 @@ export function UserBackgroundApplier() {
           }
         `
 
+        if (status === 'loading') {
+          return
+        }
+
         if (status !== 'authenticated' || !session?.user?.id) {
+          clearBackgroundCache()
           styleEl!.textContent = headerCss + `
             html {
               background-color: hsl(var(--background)) !important;
@@ -89,30 +141,8 @@ export function UserBackgroundApplier() {
 
         const response = await fetch('/api/user/preferences')
         if (!response.ok) {
-          styleEl!.textContent = headerCss + `
-            html {
-              background-color: hsl(var(--background)) !important;
-              background-image: none !important;
-            }
-            body {
-              background-color: transparent !important;
-              background-attachment: fixed !important;
-              background-size: 24px 24px !important;
-              background-position: 0 0 !important;
-              background-repeat: repeat !important;
-            }
-            body.grid-pattern {
-              background-image: 
-                linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
-            }
-            .dark body.grid-pattern {
-              background-image: 
-                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
-            }
-          `
-          document.body.classList.add('grid-pattern')
+          // Keep whichever background is already applied (usually from bootstrap cache)
+          // to avoid flashing back to the default grid pattern.
           return
         }
 
@@ -124,6 +154,7 @@ export function UserBackgroundApplier() {
         if (savedTheme === 'light' || savedTheme === 'dark') {
           setTheme(savedTheme)
         }
+        cacheBackgroundPreferences(preferences)
 
         if (!preferences || !preferences.backgroundType) {
           styleEl!.textContent = headerCss + `
@@ -344,37 +375,37 @@ export function UserBackgroundApplier() {
         }
       } catch (error) {
         console.error('Error applying user background:', error)
-        styleEl!.textContent = headerCss + `
-          html {
-            background-color: hsl(var(--background)) !important;
-            background-image: none !important;
-          }
-          body {
-            background-color: transparent !important;
-            background-attachment: fixed !important;
-            background-size: 24px 24px !important;
-            background-position: 0 0 !important;
-            background-repeat: repeat !important;
-          }
-          body.grid-pattern {
-            background-image: 
-              linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
-          }
-          .dark body.grid-pattern {
-            background-image: 
-              linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
-          }
-        `
-        document.body.classList.add('grid-pattern')
+        if (status !== 'authenticated' || !session?.user?.id) {
+          clearBackgroundCache()
+          styleEl!.textContent = headerCss + `
+            html {
+              background-color: hsl(var(--background)) !important;
+              background-image: none !important;
+            }
+            body {
+              background-color: transparent !important;
+              background-attachment: fixed !important;
+              background-size: 24px 24px !important;
+              background-position: 0 0 !important;
+              background-repeat: repeat !important;
+            }
+            body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px) !important;
+            }
+            .dark body.grid-pattern {
+              background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) !important;
+            }
+          `
+          document.body.classList.add('grid-pattern')
+        }
       }
     }
 
-    // Use requestAnimationFrame to ensure DOM is ready and hydration is complete
-    const rafId = requestAnimationFrame(() => {
-      applyBackground()
-    })
+    applyBackground()
 
     // Listen for custom event to update background when changed
     const handleBackgroundUpdate = () => {
@@ -389,7 +420,6 @@ export function UserBackgroundApplier() {
     window.addEventListener('focus', handleFocus)
 
     return () => {
-      cancelAnimationFrame(rafId)
       window.removeEventListener('userBackgroundUpdated', handleBackgroundUpdate)
       window.removeEventListener('focus', handleFocus)
     }
