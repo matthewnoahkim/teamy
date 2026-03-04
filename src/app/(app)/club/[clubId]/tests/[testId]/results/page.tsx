@@ -20,7 +20,7 @@ export default async function TestResultsPage({
 
   const membership = await getUserMembership(session.user.id, resolvedParams.clubId)
   if (!membership) {
-    redirect('/no-clubs')
+    redirect('/')
   }
 
   // Check if user is admin
@@ -140,5 +140,4 @@ export default async function TestResultsPage({
     />
   )
 }
-
 

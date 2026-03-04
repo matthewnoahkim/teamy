@@ -160,7 +160,8 @@ export default async function ClubDetailPage({
   ])
 
   if (!membership) {
-    redirect('/no-clubs')
+    // Route through home so users removed from a club follow the same path as self-leave.
+    redirect('/')
   }
   if (!club) {
     redirect('/no-clubs')

@@ -234,7 +234,7 @@ export default async function TakeTestPage({
     // Regular club test - use existing logic
     membership = await getUserMembership(session.user.id, resolvedParams.clubId)
     if (!membership) {
-      redirect('/no-clubs')
+      redirect('/')
     }
 
     isAdminUser = await isAdmin(session.user.id, resolvedParams.clubId)
@@ -370,5 +370,4 @@ export default async function TakeTestPage({
     />
   )
 }
-
 

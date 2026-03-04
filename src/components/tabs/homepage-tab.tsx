@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { 
@@ -224,6 +225,7 @@ function SortableWidgetItem({
 }
 
 export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initialAnnouncements, initialTests }: HomePageTabProps) {
+  const router = useRouter()
   const { toast } = useToast()
   const [widgets, setWidgets] = useState<Widget[]>([])
   const [loading, setLoading] = useState(true)
@@ -233,6 +235,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
   const [selectedWidget, setSelectedWidget] = useState<Widget | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const gridContainerRef = useRef<HTMLDivElement>(null)
+  const membershipLossRedirectedRef = useRef(false)
   
   // Data for widgets - use initial data if provided
   const [announcements, setAnnouncements] = useState<Record<string, unknown>[]>(initialAnnouncements || [])
@@ -246,6 +249,24 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
   })
 
   const canConfigureWidgets = isAdmin
+
+  const redirectForMembershipLoss = useCallback(() => {
+    if (membershipLossRedirectedRef.current) return
+    membershipLossRedirectedRef.current = true
+    toast({
+      title: 'Removed from club',
+      description: 'You no longer have access to this club.',
+      variant: 'destructive',
+    })
+    router.replace('/')
+    router.refresh()
+  }, [router, toast])
+
+  const handleMembershipLossStatus = useCallback((response: Response) => {
+    if (response.status !== 401 && response.status !== 403) return false
+    redirectForMembershipLoss()
+    return true
+  }, [redirectForMembershipLoss])
 
   useEffect(() => {
     if (!user?.id) return
@@ -271,7 +292,17 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
   const fetchWidgets = async (options?: { silent?: boolean }) => {
     try {
       const response = await fetch(`/api/widgets?clubId=${clubId}`)
-      if (!response.ok) throw new Error('Failed to fetch widgets')
+      if (handleMembershipLossStatus(response)) return
+      if (!response.ok) {
+        if (!options?.silent) {
+          toast({
+            title: 'Error',
+            description: 'Failed to load widgets',
+            variant: 'destructive',
+          })
+        }
+        return
+      }
       const data = await response.json()
       setWidgets(data.widgets || [])
     } catch (error) {
@@ -299,7 +330,10 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       if (shouldFetchAnnouncements) {
         promises.push(
           fetch(`/api/announcements?clubId=${clubId}`)
-            .then(res => res.ok ? res.json() : null)
+            .then(res => {
+              if (handleMembershipLossStatus(res)) return null
+              return res.ok ? res.json() : null
+            })
             .then(data => data && setAnnouncements(data.announcements || []))
             .catch(err => console.error('Failed to fetch announcements:', err))
         )
@@ -308,7 +342,10 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       if (shouldFetchEvents) {
         promises.push(
           fetch(`/api/calendar?clubId=${clubId}`)
-            .then(res => res.ok ? res.json() : null)
+            .then(res => {
+              if (handleMembershipLossStatus(res)) return null
+              return res.ok ? res.json() : null
+            })
             .then(data => data && setEvents(data.events || []))
             .catch(err => console.error('Failed to fetch events:', err))
         )
@@ -317,7 +354,10 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       if (shouldFetchTests) {
         promises.push(
           fetch(`/api/tests?clubId=${clubId}`)
-            .then(res => res.ok ? res.json() : null)
+            .then(res => {
+              if (handleMembershipLossStatus(res)) return null
+              return res.ok ? res.json() : null
+            })
             .then(data => data && setTests(data.tests || []))
             .catch(err => console.error('Failed to fetch tests:', err))
         )

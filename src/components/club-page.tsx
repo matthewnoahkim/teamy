@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Home, MessageSquare, Users, Calendar, Settings, ClipboardCheck, DollarSign, FileText, Pencil, Image, File, Menu, CheckSquare, BarChart3, Wrench } from 'lucide-react'
@@ -196,6 +196,7 @@ function resolveTab(tab: string | null, isAdmin: boolean): ClubTab {
 }
 
 export function ClubPage({ club, currentMembership, user, clubs, initialData, initialInviteCodes }: ClubPageProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
   const isAdmin = currentMembership.role === 'ADMIN'
@@ -212,6 +213,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   const notificationSyncChannelRef = useRef<BroadcastChannel | null>(null)
   const activeTabRef = useRef(activeTab)
   const previousActiveTabRef = useRef<string | null>(null)
+  const membershipLossRedirectedRef = useRef(false)
   const DEFAULT_BACKGROUND = {
     backgroundType: 'grid',
     backgroundColor: '#f8fafc',
@@ -264,18 +266,37 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     return timestamp
   }, [getTabSeenStorageKey])
 
+  const redirectForMembershipLoss = useCallback(() => {
+    if (membershipLossRedirectedRef.current) return
+    membershipLossRedirectedRef.current = true
+    toast({
+      title: 'Removed from club',
+      description: 'You no longer have access to this club.',
+      variant: 'destructive',
+    })
+    router.replace('/')
+    router.refresh()
+  }, [router, toast])
+
+  const handleMembershipLossStatus = useCallback((response: Response) => {
+    if (response.status !== 401 && response.status !== 403) return false
+    redirectForMembershipLoss()
+    return true
+  }, [redirectForMembershipLoss])
+
   const syncSeenTimestampToServer = useCallback(async (tab: NotificationTab, seenAt: string) => {
     try {
-      await fetch(`/api/clubs/${club.id}/notifications/seen`, {
+      const response = await fetch(`/api/clubs/${club.id}/notifications/seen`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tab, seenAt }),
         keepalive: true,
       })
+      if (handleMembershipLossStatus(response)) return
     } catch (error) {
       console.error('Failed to sync notification seen timestamp:', error)
     }
-  }, [club.id])
+  }, [club.id, handleMembershipLossStatus])
 
   const broadcastTabSeen = useCallback((tab: NotificationTab, seenAt: string) => {
     notificationSyncChannelRef.current?.postMessage({
@@ -332,6 +353,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   const syncSeenFromServer = useCallback(async () => {
     try {
       const response = await fetch(`/api/clubs/${club.id}/notifications/seen`, { cache: 'no-store' })
+      if (handleMembershipLossStatus(response)) return
       if (!response.ok) return
 
       const data = (await response.json()) as { seen?: Record<string, string> }
@@ -351,7 +373,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     } catch (error) {
       console.error('Failed to sync notification seen timestamps:', error)
     }
-  }, [club.id, getLastClearedTime, isNotificationTab, markTabNotificationSeen, persistTabSeenTime])
+  }, [club.id, getLastClearedTime, handleMembershipLossStatus, isNotificationTab, markTabNotificationSeen, persistTabSeenTime])
 
   const refreshTabNotifications = useCallback(async () => {
     await syncSeenFromServer()
@@ -368,6 +390,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
       const response = await fetch(`/api/clubs/${club.id}/notifications?${query.toString()}`, {
         cache: 'no-store',
       })
+      if (handleMembershipLossStatus(response)) return
       if (!response.ok) return
 
       const data = (await response.json()) as { notifications?: Record<string, boolean> }
@@ -393,11 +416,12 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     } catch (error) {
       console.error('Failed to fetch tab notifications:', error)
     }
-  }, [club.id, getLastClearedTime, syncSeenFromServer])
+  }, [club.id, getLastClearedTime, handleMembershipLossStatus, syncSeenFromServer])
 
   const refreshClubSummary = useCallback(async () => {
     try {
       const response = await fetch(`/api/clubs/${club.id}`, { cache: 'no-store' })
+      if (handleMembershipLossStatus(response)) return
       if (!response.ok) return
 
       const data = (await response.json()) as {
@@ -418,7 +442,7 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     } catch (error) {
       console.error('Failed to refresh club summary:', error)
     }
-  }, [club.id])
+  }, [club.id, handleMembershipLossStatus])
 
   // Keep active tab in a ref so polling interval doesn't restart during navigation.
   useEffect(() => {
