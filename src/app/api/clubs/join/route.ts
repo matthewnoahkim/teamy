@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { verifyInviteCode } from '@/lib/invite-codes'
+import { decryptInviteCode, verifyInviteCode } from '@/lib/invite-codes'
 import { logActivity } from '@/lib/activity-log'
 import { createRateLimitResponse, rateLimitRequest } from '@/lib/rate-limit-api'
 import { z } from 'zod'
 import { Role } from '@prisma/client'
+import crypto from 'crypto'
 
 const joinSchema = z.object({
   code: z.string().min(1),
@@ -38,11 +40,42 @@ async function resolveInviteCodeForClub(code: string, clubId: string) {
       name: true,
       adminInviteCodeHash: true,
       memberInviteCodeHash: true,
+      adminInviteCodeEncrypted: true,
+      memberInviteCodeEncrypted: true,
     },
   })
 
   if (!club) {
     return null
+  }
+
+  const safeEquals = (a: string, b: string) => {
+    const left = Buffer.from(a)
+    const right = Buffer.from(b)
+    if (left.length !== right.length) return false
+    return crypto.timingSafeEqual(left, right)
+  }
+
+  const canTryEncrypted =
+    club.adminInviteCodeEncrypted !== 'NEEDS_REGENERATION' &&
+    club.memberInviteCodeEncrypted !== 'NEEDS_REGENERATION'
+
+  if (canTryEncrypted) {
+    try {
+      const adminCode = decryptInviteCode(club.adminInviteCodeEncrypted)
+      if (safeEquals(code, adminCode)) {
+        return { club, role: Role.ADMIN }
+      }
+
+      const memberCode = decryptInviteCode(club.memberInviteCodeEncrypted)
+      if (safeEquals(code, memberCode)) {
+        return { club, role: Role.MEMBER }
+      }
+
+      return null
+    } catch {
+      // Fall back to hash verification for legacy/invalid encrypted payloads.
+    }
   }
 
   const [isAdminCode, isMemberCode] = await Promise.all([
@@ -59,11 +92,18 @@ async function resolveInviteCodeForClub(code: string, clubId: string) {
   return null
 }
 
-async function resolveInviteCode(code: string, clubId?: string) {
+async function resolveInviteCode(
+  code: string,
+  clubId?: string,
+  { fallbackIfClubIdMisses = true }: { fallbackIfClubIdMisses?: boolean } = {},
+) {
   if (clubId) {
     const directMatch = await resolveInviteCodeForClub(code, clubId)
     if (directMatch) {
       return directMatch
+    }
+    if (!fallbackIfClubIdMisses) {
+      return null
     }
   }
 
@@ -94,6 +134,54 @@ async function resolveInviteCode(code: string, clubId?: string) {
 
 export async function GET(req: NextRequest) {
   try {
+    const searchParams = req.nextUrl.searchParams
+    const parsed = previewSchema.safeParse({
+      code: searchParams.get('code') ?? '',
+      clubId: searchParams.get('clubId') ?? undefined,
+    })
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invite code is required' }, { status: 400 })
+    }
+
+    if (parsed.data.clubId) {
+      const resolved = await resolveInviteCode(parsed.data.code, parsed.data.clubId, {
+        // Invite links include a specific club id; avoid expensive global scanning for preview UX.
+        fallbackIfClubIdMisses: false,
+      })
+      if (!resolved) {
+        return NextResponse.json(
+          { error: 'Invalid or expired invite code', code: 'INVALID_CODE' },
+          { status: 404 }
+        )
+      }
+
+      const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+      const userId = typeof token?.sub === 'string' ? token.sub : null
+
+      let existingMembership: { id: string } | null = null
+      if (userId) {
+        existingMembership = await prisma.membership.findUnique({
+          where: {
+            userId_clubId: {
+              userId,
+              clubId: resolved.club.id,
+            },
+          },
+          select: { id: true },
+        })
+      }
+
+      return NextResponse.json({
+        club: {
+          id: resolved.club.id,
+          name: resolved.club.name,
+        },
+        role: resolved.role,
+        alreadyMember: Boolean(existingMembership),
+      })
+    }
+
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -108,16 +196,6 @@ export async function GET(req: NextRequest) {
     const limited = createRateLimitResponse(rateLimitResult, JOIN_PREVIEW_RATE_LIMIT)
     if (limited) {
       return limited
-    }
-
-    const searchParams = req.nextUrl.searchParams
-    const parsed = previewSchema.safeParse({
-      code: searchParams.get('code') ?? '',
-      clubId: searchParams.get('clubId') ?? undefined,
-    })
-
-    if (!parsed.success) {
-      return NextResponse.json({ error: 'Invite code is required' }, { status: 400 })
     }
 
     const resolved = await resolveInviteCode(parsed.data.code, parsed.data.clubId)

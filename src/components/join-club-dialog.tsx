@@ -44,6 +44,7 @@ export function JoinClubDialog({
   const [code, setCode] = useState(initialCode)
   const [invitePreview, setInvitePreview] = useState<InvitePreview | null>(null)
   const [resolvingInvite, setResolvingInvite] = useState(false)
+  const [showResolvingState, setShowResolvingState] = useState(false)
   const isAlreadyMember = Boolean(invitePreview?.alreadyMember)
 
   // Update code when initialCode changes
@@ -58,11 +59,18 @@ export function JoinClubDialog({
       if (!open) {
         setInvitePreview(null)
         setResolvingInvite(false)
+        setShowResolvingState(false)
       }
       return
     }
 
     const controller = new AbortController()
+    const slowStateTimer = setTimeout(() => {
+      if (!controller.signal.aborted) {
+        setShowResolvingState(true)
+      }
+    }, 200)
+
     const resolveInvitePreview = async () => {
       setResolvingInvite(true)
       try {
@@ -82,8 +90,10 @@ export function JoinClubDialog({
       } catch {
         setInvitePreview(null)
       } finally {
+        clearTimeout(slowStateTimer)
         if (!controller.signal.aborted) {
           setResolvingInvite(false)
+          setShowResolvingState(false)
         }
       }
     }
@@ -91,6 +101,7 @@ export function JoinClubDialog({
     resolveInvitePreview()
 
     return () => {
+      clearTimeout(slowStateTimer)
       controller.abort()
     }
   }, [open, initialCode, initialInviteClubId])
@@ -149,7 +160,9 @@ export function JoinClubDialog({
             {initialCode && (
               <div className="rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-3 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-100">
                 {resolvingInvite
-                  ? 'Invite link detected. Verifying invite details...'
+                  ? showResolvingState
+                    ? 'Invite link detected. Verifying invite details...'
+                    : "Invite link detected. We've pre-filled the code below for you."
                   : invitePreview
                     ? isAlreadyMember
                       ? `You are already a member of ${invitePreview.club.name}.`

@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
-import { verifyInviteCode } from '@/lib/invite-codes'
 import { getPreferredClubIdForUser } from '@/lib/club-routing'
 
 type JoinPageProps = {
@@ -13,60 +12,10 @@ type JoinPageProps = {
   }>
 }
 
-type InviteClubRecord = {
-  id: string
-  adminInviteCodeHash: string
-  memberInviteCodeHash: string
-}
-
 async function getLoggedInUserClubRedirect(userId: string): Promise<string | null> {
   const cookieStore = await cookies()
   const lastClubId = cookieStore.get('lastVisitedClub')?.value
   return getPreferredClubIdForUser(userId, { lastVisitedClubId: lastClubId })
-}
-
-async function resolveInviteClubId(code: string, preferredClubId?: string): Promise<string | null> {
-  const verifyAgainstClub = async (club: InviteClubRecord | null): Promise<string | null> => {
-    if (!club) return null
-
-    const [adminMatch, memberMatch] = await Promise.all([
-      verifyInviteCode(code, club.adminInviteCodeHash),
-      verifyInviteCode(code, club.memberInviteCodeHash),
-    ])
-    if (adminMatch) return club.id
-
-    if (memberMatch) return club.id
-
-    return null
-  }
-
-  if (preferredClubId) {
-    const preferredClub = await prisma.club.findUnique({
-      where: { id: preferredClubId },
-      select: {
-        id: true,
-        adminInviteCodeHash: true,
-        memberInviteCodeHash: true,
-      },
-    })
-    const directMatch = await verifyAgainstClub(preferredClub)
-    if (directMatch) return directMatch
-  }
-
-  const clubs = await prisma.club.findMany({
-    select: {
-      id: true,
-      adminInviteCodeHash: true,
-      memberInviteCodeHash: true,
-    },
-  })
-
-  for (const club of clubs) {
-    const matchedClubId = await verifyAgainstClub(club)
-    if (matchedClubId) return matchedClubId
-  }
-
-  return null
 }
 
 export default async function JoinPage({ searchParams }: JoinPageProps) {
@@ -88,20 +37,19 @@ export default async function JoinPage({ searchParams }: JoinPageProps) {
 
   // If logged in with clubs, redirect directly to a club page and open join dialog there.
   if (code) {
-    const inviteClubId = await resolveInviteClubId(code, inviteClub || undefined)
-    if (inviteClubId) {
+    if (inviteClub) {
       const existingMembership = await prisma.membership.findUnique({
         where: {
           userId_clubId: {
             userId: session.user.id,
-            clubId: inviteClubId,
+            clubId: inviteClub,
           },
         },
         select: { id: true },
       })
 
       if (existingMembership) {
-        redirect(`/club/${inviteClubId}`)
+        redirect(`/club/${inviteClub}`)
       }
     }
 
