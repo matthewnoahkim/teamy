@@ -26,6 +26,16 @@ type AnnouncementReaction = AnnouncementFull['reactions'][number]
 type AnnouncementVisibility = AnnouncementFull['visibilities'][number]
 type AnnouncementCalendarEvent = NonNullable<AnnouncementFull['calendarEvent']>
 type CalendarEventRSVP = AnnouncementCalendarEvent['rsvps'][number]
+type ReactionSummary = {
+  emoji: string
+  count: number
+  hasUserReacted: boolean
+  reactors: Array<{
+    id: string
+    displayName: string
+    image?: string | null
+  }>
+}
 
 interface StreamTeam {
   id: string
@@ -664,19 +674,33 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
   const getReactionSummary = (reactions: AnnouncementReaction[]) => {
     if (!reactions || reactions.length === 0) return []
     
-    const summary: Array<{ emoji: string; count: number; hasUserReacted: boolean }> = []
+    const summary: ReactionSummary[] = []
     const grouped = reactions.reduce((acc, reaction) => {
       if (!acc[reaction.emoji]) {
-        acc[reaction.emoji] = { count: 0, hasUserReacted: false }
+        acc[reaction.emoji] = { count: 0, hasUserReacted: false, reactors: [] }
       }
       acc[reaction.emoji].count++
+
+      const reactionUserId = reaction.user?.id
+      const reactionUserName = reaction.user?.name || reaction.user?.email || 'Unknown user'
+      if (
+        reactionUserId &&
+        !acc[reaction.emoji].reactors.some((reactor) => reactor.id === reactionUserId)
+      ) {
+        acc[reaction.emoji].reactors.push({
+          id: reactionUserId,
+          displayName: reactionUserName,
+          image: reaction.user?.image || null,
+        })
+      }
+
       // Check if current user has reacted with this emoji
       // Use currentMembership.userId for comparison since that's the actual user ID
-      if (reaction.user.id === currentMembership.userId) {
+      if (reactionUserId === currentMembership.userId) {
         acc[reaction.emoji].hasUserReacted = true
       }
       return acc
-    }, {} as Record<string, { count: number; hasUserReacted: boolean }>)
+    }, {} as Record<string, Omit<ReactionSummary, 'emoji'>>)
 
     Object.keys(grouped).forEach((emoji) => {
       const info = grouped[emoji]
@@ -684,6 +708,7 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
         emoji,
         count: info.count,
         hasUserReacted: info.hasUserReacted,
+        reactors: info.reactors,
       })
     })
 

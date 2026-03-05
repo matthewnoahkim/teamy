@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Smile, Plus } from 'lucide-react'
 
 interface EmojiPickerProps {
@@ -10,6 +12,11 @@ interface EmojiPickerProps {
     emoji: string
     count: number
     hasUserReacted: boolean
+    reactors: Array<{
+      id: string
+      displayName: string
+      image?: string | null
+    }>
   }>
   onReactionToggle?: (emoji: string) => void
   disabled?: boolean
@@ -22,6 +29,7 @@ const ALL_EMOJIS = [
   '👏', '💯', '✨', '🚀', '💪', '🎯', '👀', '🤔',
   '🙌', '✅', '❌', '⭐', '💡', '🎊', '🏆', '👌'
 ]
+const REACTOR_PREVIEW_LIMIT = 4
 
 // Global state to ensure only one picker is open
 let globalOpenPicker: (() => void) | null = null
@@ -158,22 +166,54 @@ export function EmojiPicker({
     setShowQuickReact(false)
   }
 
+  const getInitial = (displayName: string) => {
+    const trimmed = displayName.trim()
+    return (trimmed.charAt(0) || '?').toUpperCase()
+  }
+
   return (
     <div ref={containerRef} className="relative inline-flex gap-1.5 flex-wrap items-center">
       {/* Show existing reactions */}
-      {currentReactions.map((reaction) => (
-        <Button
-          key={reaction.emoji}
-          variant={reaction.hasUserReacted ? "default" : "outline"}
-          size="sm"
-          onClick={() => onReactionToggle?.(reaction.emoji)}
-          disabled={disabled}
-          className="h-7 px-2 text-sm font-medium transition-all hover:scale-105"
-        >
-          <span className="mr-1">{reaction.emoji}</span>
-          <span className="text-xs">{reaction.count}</span>
-        </Button>
-      ))}
+      <TooltipProvider delayDuration={150}>
+        {currentReactions.map((reaction) => (
+          <Tooltip key={reaction.emoji}>
+            <TooltipTrigger asChild>
+              <Button
+                variant={reaction.hasUserReacted ? "default" : "outline"}
+                size="sm"
+                onClick={() => onReactionToggle?.(reaction.emoji)}
+                disabled={disabled}
+                className="h-7 px-2 text-sm font-medium transition-all hover:scale-105"
+              >
+                <span className="mr-1">{reaction.emoji}</span>
+                <span className="text-xs">{reaction.count}</span>
+              </Button>
+            </TooltipTrigger>
+            {reaction.reactors.length > 0 && (
+              <TooltipContent side="top" className="w-64 p-2">
+                <div className="space-y-1.5">
+                  {reaction.reactors.slice(0, REACTOR_PREVIEW_LIMIT).map((reactor) => (
+                    <div key={reactor.id} className="flex items-center gap-2">
+                      <Avatar className="h-5 w-5">
+                        <AvatarImage src={reactor.image || ''} />
+                        <AvatarFallback className="text-[10px]">
+                          {getInitial(reactor.displayName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs truncate">{reactor.displayName}</span>
+                    </div>
+                  ))}
+                  {reaction.reactors.length > REACTOR_PREVIEW_LIMIT && (
+                    <p className="text-[11px] text-muted-foreground">
+                      +{reaction.reactors.length - REACTOR_PREVIEW_LIMIT} more reacted
+                    </p>
+                  )}
+                </div>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        ))}
+      </TooltipProvider>
       
       {/* Add reaction button with hover popup */}
       <div 
@@ -270,6 +310,7 @@ export function EmojiPicker({
           </div>
         </div>
       )}
+
     </div>
   )
 }
