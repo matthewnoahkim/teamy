@@ -68,11 +68,25 @@ interface AttendanceTabProps {
 
 const attendanceCache = new Map<string, AttendanceFull[]>()
 
+export async function prefetchAttendanceTabData({ clubId }: { clubId: string }) {
+  try {
+    const response = await fetch(`/api/attendance?clubId=${clubId}`)
+    if (!response.ok) return
+
+    const data = await response.json() as { attendances?: AttendanceFull[] }
+    attendanceCache.set(clubId, data.attendances || [])
+  } catch (error) {
+    console.error('Failed to prefetch attendance tab data:', error)
+  }
+}
+
 export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: AttendanceTabProps) {
   const { toast } = useToast()
-  const seedAttendances = attendanceCache.get(clubId) ?? initialAttendances ?? []
+  const cachedAttendances = attendanceCache.get(clubId)
+  const hasSeedAttendances = cachedAttendances !== undefined || initialAttendances !== undefined
+  const seedAttendances = cachedAttendances ?? initialAttendances ?? []
   const [attendances, setAttendances] = useState<AttendanceFull[]>(seedAttendances)
-  const [loading, setLoading] = useState(seedAttendances.length === 0)
+  const [loading, setLoading] = useState(!hasSeedAttendances)
   const [selectedAttendance, setSelectedAttendance] = useState<AttendanceFull | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [checkInOpen, setCheckInOpen] = useState(false)
@@ -119,7 +133,7 @@ export function AttendanceTab({ clubId, isAdmin, user, initialAttendances }: Att
   }, [clubId, toast])
 
   useEffect(() => {
-    const hasSeedData = (attendanceCache.get(clubId)?.length ?? 0) > 0 || (initialAttendances?.length ?? 0) > 0
+    const hasSeedData = attendanceCache.has(clubId) || initialAttendances !== undefined
     void fetchAttendances({ silent: hasSeedData })
   }, [clubId, fetchAttendances, initialAttendances])
 

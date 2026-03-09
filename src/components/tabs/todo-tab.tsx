@@ -116,14 +116,43 @@ function getTodoCacheKey(clubId: string, showAll: boolean, selectedMemberId: str
   return `${clubId}:${showAll ? 'all' : 'my'}:${showAll ? selectedMemberId : 'all'}`
 }
 
+export async function prefetchTodoTabData({
+  clubId,
+  isAdmin,
+}: {
+  clubId: string
+  isAdmin: boolean
+}) {
+  try {
+    const defaultCacheKey = getTodoCacheKey(clubId, false, 'all')
+    const todoResponse = await fetch(`/api/todos?clubId=${clubId}`)
+    if (todoResponse.ok) {
+      const data = await todoResponse.json() as { todos?: Todo[] }
+      todoListCache.set(defaultCacheKey, data.todos || [])
+    }
+
+    if (!isAdmin) return
+
+    const membersResponse = await fetch(`/api/memberships?clubId=${clubId}`)
+    if (!membersResponse.ok) return
+
+    const data = await membersResponse.json() as { memberships?: TeamMember[] }
+    todoTeamMembersCache.set(clubId, data.memberships || [])
+  } catch (error) {
+    console.error('Failed to prefetch todo tab data:', error)
+  }
+}
+
 export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, initialTodos }: TodoTabProps) {
   const { toast } = useToast()
-  const seedTodos = todoListCache.get(getTodoCacheKey(clubId, false, 'all')) ?? initialTodos ?? []
+  const defaultCacheKey = getTodoCacheKey(clubId, false, 'all')
+  const hasSeedTodos = todoListCache.has(defaultCacheKey) || initialTodos !== undefined
+  const seedTodos = todoListCache.get(defaultCacheKey) ?? initialTodos ?? []
   const seedTeamMembers = todoTeamMembersCache.get(clubId) ?? []
   const [todos, setTodos] = useState<Todo[]>(seedTodos)
   const [allTodos, setAllTodos] = useState<Todo[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(seedTeamMembers)
-  const [loading, setLoading] = useState(seedTodos.length === 0)
+  const [loading, setLoading] = useState(!hasSeedTodos)
   const [submitting, setSubmitting] = useState(false)
   
   // Filter state
@@ -221,8 +250,8 @@ export function TodoTab({ clubId, currentMembershipId, user: _user, isAdmin, ini
     const showAll = viewMode === 'all' && isAdmin
     const cacheKey = getTodoCacheKey(clubId, showAll, selectedMemberId)
     const hasSeedData =
-      (todoListCache.get(cacheKey)?.length ?? 0) > 0 ||
-      (!showAll && (initialTodos?.length ?? 0) > 0)
+      todoListCache.has(cacheKey) ||
+      (!showAll && initialTodos !== undefined)
 
     void fetchTodos({ silent: hasSeedData })
   }, [clubId, fetchTodos, initialTodos, isAdmin, selectedMemberId, viewMode])

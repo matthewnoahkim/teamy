@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getUserMembership } from '@/lib/rbac'
+import { upsertTournamentTrialEvent } from '@/lib/tournament-trial-events'
 import { Prisma, Role, ScoreReleaseMode } from '@prisma/client'
 import { z } from 'zod'
 
@@ -29,6 +30,9 @@ const createTestSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().optional(),
   instructions: z.string().optional(),
+  eventId: z.string().optional(),
+  eventName: z.string().trim().min(1).max(200).optional(),
+  trialEventDivision: z.enum(['B', 'C']).optional().nullable(),
   durationMinutes: z.number().int().min(1).max(720),
   randomizeQuestionOrder: z.boolean().optional(),
   randomizeOptionOrder: z.boolean().optional(),
@@ -92,6 +96,7 @@ export async function POST(
         id: true,
         division: true,
         createdById: true,
+        trialEvents: true,
       },
     })
 
@@ -136,6 +141,9 @@ export async function POST(
       name,
       description,
       instructions,
+      eventId,
+      eventName,
+      trialEventDivision,
       durationMinutes,
       randomizeQuestionOrder,
       randomizeOptionOrder,
@@ -150,8 +158,51 @@ export async function POST(
       scoreReleaseMode,
     } = validatedData
 
+    let resolvedEventName: string | null = null
+    if (eventId) {
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: {
+          id: true,
+          name: true,
+          division: true,
+        },
+      })
+
+      if (!event) {
+        return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+      }
+
+      if (event.division !== tournament.division) {
+        return NextResponse.json(
+          { error: 'Event does not match tournament division' },
+          { status: 400 }
+        )
+      }
+
+      resolvedEventName = event.name
+    } else if (eventName) {
+      resolvedEventName = eventName.trim()
+    }
+
     // Create the test using the same transaction pattern as /api/tests
     const createdTest = await prisma.$transaction(async (tx) => {
+      if (!eventId && resolvedEventName) {
+        await tx.tournament.update({
+          where: { id: resolvedParams.tournamentId },
+          data: {
+            trialEvents: upsertTournamentTrialEvent(
+              tournament.trialEvents,
+              {
+                name: resolvedEventName,
+                division: trialEventDivision ?? tournament.division,
+              },
+              tournament.division,
+            ),
+          },
+        })
+      }
+
       const baseTest = await tx.test.create({
         data: {
           clubId,
@@ -214,7 +265,11 @@ export async function POST(
           testId: baseTest.id,
           actorMembershipId: membership.id,
           action: 'CREATE',
-          details: { testName: baseTest.name },
+          details: {
+            testName: baseTest.name,
+            eventId: eventId ?? null,
+            eventName: resolvedEventName,
+          },
         },
       })
 
@@ -223,6 +278,7 @@ export async function POST(
         data: {
           tournamentId: resolvedParams.tournamentId,
           testId: baseTest.id,
+          eventId: eventId ?? undefined,
         },
       })
 

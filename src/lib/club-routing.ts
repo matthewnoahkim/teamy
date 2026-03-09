@@ -25,34 +25,33 @@ export async function getPreferredClubIdForUser(
     return null
   }
 
-  const memberships = await prisma.membership.findMany({
-    where: { userId },
-    select: {
-      clubId: true,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  })
+  const [memberships, user] = await Promise.all([
+    prisma.membership.findMany({
+      where: { userId },
+      select: {
+        clubId: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        preferences: true,
+      },
+    }).catch((error) => {
+      console.error('Failed to load user preferences for preferred club routing:', error)
+      return null
+    }),
+  ])
 
   if (memberships.length === 0) {
     return null
   }
 
   const membershipClubIds = memberships.map((membership) => membership.clubId)
-  let primaryClubId: string | null = null
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        preferences: true,
-      },
-    })
-    primaryClubId = getPrimaryClubIdFromPreferences(user?.preferences)
-  } catch (error) {
-    console.error('Failed to load user preferences for preferred club routing:', error)
-  }
+  const primaryClubId = getPrimaryClubIdFromPreferences(user?.preferences)
 
   if (primaryClubId && membershipClubIds.includes(primaryClubId)) {
     return primaryClubId
@@ -78,4 +77,3 @@ export async function getPreferredClubPathForUser(
     return '/no-clubs'
   }
 }
-

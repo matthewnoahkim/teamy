@@ -21,6 +21,7 @@ interface TestsTabProps {
   clubId: string
   isAdmin: boolean
   initialTests?: Record<string, unknown>[]
+  isActive?: boolean
 }
 
 interface Test {
@@ -114,7 +115,7 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
   })
 }
 
-export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProps) {
+export default function TestsTab({ clubId, isAdmin, initialTests, isActive = true }: TestsTabProps) {
   const { toast } = useToast()
   const router = useRouter()
   // Ensure initialTests have proper _count structure - memoize to prevent infinite loops
@@ -234,7 +235,8 @@ export default function TestsTab({ clubId, isAdmin, initialTests }: TestsTabProp
     () => fetchTests({ silent: true }),
     {
       intervalMs: 30_000,
-      runOnMount: false,
+      runOnMount: true,
+      enabled: isActive,
     },
   )
 

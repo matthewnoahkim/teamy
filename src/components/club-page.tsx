@@ -7,55 +7,61 @@ import { Badge } from '@/components/ui/badge'
 import { Home, MessageSquare, Users, Calendar, Settings, ClipboardCheck, DollarSign, FileText, Pencil, Image, File, Menu, CheckSquare, BarChart3, Wrench } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
 import { PageLoading } from '@/components/ui/loading-spinner'
-import { DelayedRender } from '@/components/ui/delayed-render'
 import dynamic from 'next/dynamic'
 
 // Lazy load heavy tab components for better initial load performance
-const LOADING_INDICATOR_DELAY_MS = 180
 const delayedTabLoading = (title: string, description: string) => {
   function TabLoading() {
-    return (
-      <DelayedRender delayMs={LOADING_INDICATOR_DELAY_MS}>
-        <PageLoading title={title} description={description} variant="orbit" />
-      </DelayedRender>
-    )
+    return <PageLoading title={title} description={description} variant="orbit" />
   }
 
   TabLoading.displayName = `${title}TabLoading`
   return TabLoading
 }
 
-const HomePageTab = dynamic(() => import('@/components/tabs/homepage-tab').then(mod => ({ default: mod.HomePageTab })), {
+const loadHomePageTabModule = () => import('@/components/tabs/homepage-tab')
+const loadStreamTabModule = () => import('@/components/tabs/stream-tab')
+const loadPeopleTabModule = () => import('@/components/tabs/people-tab')
+const loadCalendarTabModule = () => import('@/components/tabs/calendar-tab')
+const loadAttendanceTabModule = () => import('@/components/tabs/attendance-tab')
+const loadSettingsTabModule = () => import('@/components/tabs/settings-tab')
+const loadFinanceTabModule = () => import('@/components/tabs/finance-tab')
+const loadTestsTabModule = () => import('@/components/tabs/tests-tab')
+const loadGalleryTabModule = () => import('@/components/tabs/gallery-tab')
+const loadPaperworkTabModule = () => import('@/components/tabs/paperwork-tab')
+const loadTodoTabModule = () => import('@/components/tabs/todo-tab')
+
+const HomePageTab = dynamic(() => loadHomePageTabModule().then(mod => ({ default: mod.HomePageTab })), {
   loading: delayedTabLoading('Loading dashboard', 'Preparing widgets and updates...'),
 })
-const StreamTab = dynamic(() => import('@/components/tabs/stream-tab').then(mod => ({ default: mod.StreamTab })), {
+const StreamTab = dynamic(() => loadStreamTabModule().then(mod => ({ default: mod.StreamTab })), {
   loading: delayedTabLoading('Loading stream', 'Fetching announcements and posts...'),
 })
-const PeopleTab = dynamic(() => import('@/components/tabs/people-tab').then(mod => ({ default: mod.PeopleTab })), {
+const PeopleTab = dynamic(() => loadPeopleTabModule().then(mod => ({ default: mod.PeopleTab })), {
   loading: delayedTabLoading('Loading people', 'Fetching club members and rosters...'),
 })
-const CalendarTab = dynamic(() => import('@/components/tabs/calendar-tab').then(mod => ({ default: mod.CalendarTab })), {
+const CalendarTab = dynamic(() => loadCalendarTabModule().then(mod => ({ default: mod.CalendarTab })), {
   loading: delayedTabLoading('Loading calendar', 'Fetching events and schedules...'),
 })
-const AttendanceTab = dynamic(() => import('@/components/tabs/attendance-tab').then(mod => ({ default: mod.AttendanceTab })), {
+const AttendanceTab = dynamic(() => loadAttendanceTabModule().then(mod => ({ default: mod.AttendanceTab })), {
   loading: delayedTabLoading('Loading attendance', 'Fetching attendance records...'),
 })
-const SettingsTab = dynamic(() => import('@/components/tabs/settings-tab').then(mod => ({ default: mod.SettingsTab })), {
+const SettingsTab = dynamic(() => loadSettingsTabModule().then(mod => ({ default: mod.SettingsTab })), {
   loading: delayedTabLoading('Loading settings', 'Fetching club configuration...'),
 })
-const FinanceTab = dynamic(() => import('@/components/tabs/finance-tab'), {
+const FinanceTab = dynamic(() => loadFinanceTabModule().then(mod => ({ default: mod.default })), {
   loading: delayedTabLoading('Loading finance', 'Fetching expenses and budgets...'),
 })
-const TestsTab = dynamic(() => import('@/components/tabs/tests-tab'), {
+const TestsTab = dynamic(() => loadTestsTabModule().then(mod => ({ default: mod.default })), {
   loading: delayedTabLoading('Loading tests', 'Fetching assessments and submissions...'),
 })
-const GalleryTab = dynamic(() => import('@/components/tabs/gallery-tab').then(mod => ({ default: mod.GalleryTab })), {
+const GalleryTab = dynamic(() => loadGalleryTabModule().then(mod => ({ default: mod.GalleryTab })), {
   loading: delayedTabLoading('Loading gallery', 'Fetching photos and videos...'),
 })
-const PaperworkTab = dynamic(() => import('@/components/tabs/paperwork-tab').then(mod => ({ default: mod.PaperworkTab })), {
+const PaperworkTab = dynamic(() => loadPaperworkTabModule().then(mod => ({ default: mod.PaperworkTab })), {
   loading: delayedTabLoading('Loading paperwork', 'Fetching forms and submissions...'),
 })
-const TodoTab = dynamic(() => import('@/components/tabs/todo-tab').then(mod => ({ default: mod.TodoTab })), {
+const TodoTab = dynamic(() => loadTodoTabModule().then(mod => ({ default: mod.TodoTab })), {
   loading: delayedTabLoading('Loading to-do list', 'Fetching tasks and reminders...'),
 })
 const StatsTab = dynamic(() => import('@/components/tabs/stats-tab').then(mod => ({ default: mod.StatsTab })).catch(() => ({ default: () => <div>Failed to load stats tab</div> })), {
@@ -113,9 +119,7 @@ interface ClubPageProps {
   club: ClubWithMembers | ClubWithMembersLite
   currentMembership: MembershipWithPreferences
   user: SessionUser
-  clubs?: Array<{ id: string; name: string }>
   initialData?: Partial<ClubPageInitialData>
-  initialInviteCodes?: { adminCode: string; memberCode: string } | null
 }
 
 const TAB_DETAILS = {
@@ -178,6 +182,7 @@ const NOTIFICATION_TABS = ['stream', 'calendar', 'attendance', 'finance', 'tests
 type NotificationTab = (typeof NOTIFICATION_TABS)[number]
 const NOTIFICATION_TAB_SET = new Set<string>(NOTIFICATION_TABS)
 const NOTIFICATION_SYNC_CHANNEL = 'club-notification-seen-sync'
+const PERSISTENT_TAB_SET = new Set<ClubTab>(['home', 'stream', 'people', 'calendar', 'finance', 'tests', 'settings'])
 
 function parseTimestamp(raw: string | null | undefined): Date | null {
   if (!raw) return null
@@ -195,7 +200,11 @@ function resolveTab(tab: string | null, isAdmin: boolean): ClubTab {
   return tab
 }
 
-export function ClubPage({ club, currentMembership, user, clubs, initialData, initialInviteCodes }: ClubPageProps) {
+function getClubMembershipCount(club: ClubWithMembers | ClubWithMembersLite): number {
+  return club._count?.memberships ?? club.memberships.length
+}
+
+export function ClubPage({ club, currentMembership, user, initialData }: ClubPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -206,10 +215,13 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     [currentMembership, currentMembershipRole],
   )
   const [activeTab, setActiveTab] = useState<ClubTab>(() => resolveTab(searchParams.get('tab'), isAdmin))
+  const [loadedTabs, setLoadedTabs] = useState<Set<ClubTab>>(() =>
+    PERSISTENT_TAB_SET.has(activeTab) ? new Set([activeTab]) : new Set<ClubTab>(),
+  )
   const [editClubNameOpen, setEditClubNameOpen] = useState(false)
   const [currentClubName, setCurrentClubName] = useState(club.name)
   const [newClubName, setNewClubName] = useState(club.name)
-  const [clubMemberCount, setClubMemberCount] = useState(club.memberships.length)
+  const [clubMemberCount, setClubMemberCount] = useState(() => getClubMembershipCount(club))
   const [updatingClubName, setUpdatingClubName] = useState(false)
   const [tabNotifications, setTabNotifications] = useState<Record<string, boolean>>({})
   const [totalUnreadCount, setTotalUnreadCount] = useState(0)
@@ -239,8 +251,8 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   }, [club.id, club.name])
 
   useEffect(() => {
-    setClubMemberCount(club.memberships.length)
-  }, [club.id, club.memberships.length])
+    setClubMemberCount(getClubMembershipCount(club))
+  }, [club])
 
   const getTabSeenStorageKey = useCallback((tab: string) => {
     return `lastCleared_${club.id}_${tab}_${user.id}`
@@ -327,6 +339,76 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
   useEffect(() => {
     setCurrentMembershipRole(currentMembership.role)
   }, [currentMembership.role])
+
+  useEffect(() => {
+    setLoadedTabs(PERSISTENT_TAB_SET.has(activeTab) ? new Set([activeTab]) : new Set<ClubTab>())
+  }, [club.id])
+
+  useEffect(() => {
+    if (!PERSISTENT_TAB_SET.has(activeTab)) return
+    setLoadedTabs(prev => {
+      if (prev.has(activeTab)) return prev
+      const next = new Set(prev)
+      next.add(activeTab)
+      return next
+    })
+  }, [activeTab])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const primaryTimerId = window.setTimeout(() => {
+      void Promise.allSettled([
+        loadHomePageTabModule().then(mod => mod.prefetchHomePageTabData?.({
+          clubId: club.id,
+        })),
+        loadStreamTabModule(),
+        loadCalendarTabModule(),
+        loadTestsTabModule(),
+        loadFinanceTabModule().then(mod => mod.prefetchFinanceTabData?.({
+          clubId: club.id,
+          division: club.division,
+        })),
+        loadPeopleTabModule().then(mod => mod.prefetchPeopleTabData?.({
+          clubId: club.id,
+          division: club.division,
+        })),
+      ])
+    }, 350)
+
+    const secondaryTimerId = window.setTimeout(() => {
+      void Promise.allSettled([
+        loadSettingsTabModule().then(mod => mod.prefetchSettingsTabData?.({
+          clubId: club.id,
+          isAdmin,
+        })),
+        loadAttendanceTabModule().then(mod => mod.prefetchAttendanceTabData?.({
+          clubId: club.id,
+        })),
+        loadTodoTabModule().then(mod => mod.prefetchTodoTabData?.({
+          clubId: club.id,
+          isAdmin,
+        })),
+        loadPaperworkTabModule().then(mod => mod.prefetchPaperworkTabData?.({
+          clubId: club.id,
+        })),
+      ])
+    }, 1_500)
+
+    const tertiaryTimerId = window.setTimeout(() => {
+      void Promise.allSettled([
+        loadGalleryTabModule().then(mod => mod.prefetchGalleryTabData?.({
+          clubId: club.id,
+        })),
+      ])
+    }, 3_000)
+
+    return () => {
+      window.clearTimeout(primaryTimerId)
+      window.clearTimeout(secondaryTimerId)
+      window.clearTimeout(tertiaryTimerId)
+    }
+  }, [club.id, club.division, isAdmin])
 
   // Update favicon badge with total unread count across all tabs
   useFaviconBadge(totalUnreadCount)
@@ -612,6 +694,10 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
     return Boolean(tabNotifications[tab] && activeTab !== tab)
   }, [tabNotifications, activeTab])
 
+  const shouldRenderPersistentTab = useCallback((tab: ClubTab) => {
+    return activeTab === tab || loadedTabs.has(tab)
+  }, [activeTab, loadedTabs])
+
   const handleUpdateClubName = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -833,7 +919,12 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
       className="min-h-screen bg-background grid-pattern"
       style={backgroundStyle}
     >
-      <AppHeader user={user} showBackButton={false} clubId={club.id} clubs={clubs} />
+      <AppHeader
+        user={user}
+        showBackButton={false}
+        clubId={club.id}
+        title={currentClubName}
+      />
 
       <main className="relative z-10 container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-full overflow-x-hidden">
         <div className="flex gap-4 sm:gap-6 lg:gap-8 items-start">
@@ -901,47 +992,60 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
               </div>
             )}
 
-            {activeTab === 'home' && (
-              <HomePageTab
-                clubId={club.id}
-                club={club}
-                isAdmin={isAdmin}
-                user={user}
-                initialEvents={initialData?.calendarEvents as Record<string, unknown>[] | undefined}
-                initialAnnouncements={initialData?.announcements as Record<string, unknown>[] | undefined}
-                initialTests={initialData?.tests as Record<string, unknown>[] | undefined}
-              />
+            {shouldRenderPersistentTab('home') && (
+              <div className={activeTab === 'home' ? undefined : 'hidden'} aria-hidden={activeTab !== 'home'}>
+                <HomePageTab
+                  clubId={club.id}
+                  clubName={currentClubName}
+                  memberCount={clubMemberCount}
+                  isAdmin={isAdmin}
+                  user={user}
+                  initialEvents={initialData?.calendarEvents as Record<string, unknown>[] | undefined}
+                  initialAnnouncements={initialData?.announcements as Record<string, unknown>[] | undefined}
+                  initialTests={initialData?.tests as Record<string, unknown>[] | undefined}
+                  isActive={activeTab === 'home'}
+                />
+              </div>
             )}
 
-            {activeTab === 'stream' && (
-              <StreamTab
-                clubId={club.id}
-                division={club.division}
-                currentMembership={liveCurrentMembership}
-                teams={club.teams}
-                isAdmin={isAdmin}
-                user={user}
-                initialAnnouncements={initialData?.announcements}
-              />
+            {shouldRenderPersistentTab('stream') && (
+              <div className={activeTab === 'stream' ? undefined : 'hidden'} aria-hidden={activeTab !== 'stream'}>
+                <StreamTab
+                  clubId={club.id}
+                  division={club.division}
+                  currentMembership={liveCurrentMembership}
+                  teams={club.teams}
+                  isAdmin={isAdmin}
+                  user={user}
+                  initialAnnouncements={initialData?.announcements}
+                  isActive={activeTab === 'stream'}
+                />
+              </div>
             )}
 
-            {activeTab === 'people' && (
-              <PeopleTab
-                club={club}
-                currentMembership={liveCurrentMembership}
-                isAdmin={isAdmin}
-              />
+            {shouldRenderPersistentTab('people') && (
+              <div className={activeTab === 'people' ? undefined : 'hidden'} aria-hidden={activeTab !== 'people'}>
+                <PeopleTab
+                  club={club}
+                  currentMembership={liveCurrentMembership}
+                  isAdmin={isAdmin}
+                  isActive={activeTab === 'people'}
+                />
+              </div>
             )}
 
-            {activeTab === 'calendar' && (
-              <CalendarTab
-                clubId={club.id}
-                division={club.division}
-                currentMembership={liveCurrentMembership}
-                isAdmin={isAdmin}
-                user={user}
-                initialEvents={initialData?.calendarEvents as CalendarEvent[] | undefined}
-              />
+            {shouldRenderPersistentTab('calendar') && (
+              <div className={activeTab === 'calendar' ? undefined : 'hidden'} aria-hidden={activeTab !== 'calendar'}>
+                <CalendarTab
+                  clubId={club.id}
+                  division={club.division}
+                  currentMembership={liveCurrentMembership}
+                  isAdmin={isAdmin}
+                  user={user}
+                  initialEvents={initialData?.calendarEvents as CalendarEvent[] | undefined}
+                  isActive={activeTab === 'calendar'}
+                />
+              </div>
             )}
 
             {activeTab === 'attendance' && (
@@ -953,26 +1057,32 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
               />
             )}
 
-            {activeTab === 'finance' && (
-              <FinanceTab
-                clubId={club.id}
-                isAdmin={isAdmin}
-                currentMembershipId={liveCurrentMembership.id}
-                currentMembershipTeamId={liveCurrentMembership.teamId}
-                division={club.division}
-                initialExpenses={initialData?.expenses as Expense[] | undefined}
-                initialPurchaseRequests={initialData?.purchaseRequests as PurchaseRequest[] | undefined}
-                initialBudgets={initialData?.eventBudgets as EventBudget[] | undefined}
-                initialTeams={club.teams as Team[]}
-              />
+            {shouldRenderPersistentTab('finance') && (
+              <div className={activeTab === 'finance' ? undefined : 'hidden'} aria-hidden={activeTab !== 'finance'}>
+                <FinanceTab
+                  clubId={club.id}
+                  isAdmin={isAdmin}
+                  currentMembershipId={liveCurrentMembership.id}
+                  currentMembershipTeamId={liveCurrentMembership.teamId}
+                  division={club.division}
+                  initialExpenses={initialData?.expenses as Expense[] | undefined}
+                  initialPurchaseRequests={initialData?.purchaseRequests as PurchaseRequest[] | undefined}
+                  initialBudgets={initialData?.eventBudgets as EventBudget[] | undefined}
+                  initialTeams={club.teams as Team[]}
+                  isActive={activeTab === 'finance'}
+                />
+              </div>
             )}
 
-            {activeTab === 'tests' && (
-              <TestsTab
-                clubId={club.id}
-                isAdmin={isAdmin}
-                initialTests={initialData?.tests as Record<string, unknown>[] | undefined}
-              />
+            {shouldRenderPersistentTab('tests') && (
+              <div className={activeTab === 'tests' ? undefined : 'hidden'} aria-hidden={activeTab !== 'tests'}>
+                <TestsTab
+                  clubId={club.id}
+                  isAdmin={isAdmin}
+                  initialTests={initialData?.tests as Record<string, unknown>[] | undefined}
+                  isActive={activeTab === 'tests'}
+                />
+              </div>
             )}
 
             {activeTab === 'gallery' && (
@@ -1021,16 +1131,18 @@ export function ClubPage({ club, currentMembership, user, clubs, initialData, in
               />
             )}
 
-            {activeTab === 'settings' && (
-              <SettingsTab
-                club={club}
-                currentMembership={liveCurrentMembership}
-                isAdmin={isAdmin}
-                initialInviteCodes={initialInviteCodes}
-                personalBackground={personalBackground as BackgroundPreferences | null | undefined}
-                onBackgroundUpdate={handleBackgroundUpdate as ((preferences: BackgroundPreferences | null) => void) | undefined}
-                onMembershipCountChange={setClubMemberCount}
-              />
+            {shouldRenderPersistentTab('settings') && (
+              <div className={activeTab === 'settings' ? undefined : 'hidden'} aria-hidden={activeTab !== 'settings'}>
+                <SettingsTab
+                  club={club}
+                  currentMembership={liveCurrentMembership}
+                  isAdmin={isAdmin}
+                  personalBackground={personalBackground as BackgroundPreferences | null | undefined}
+                  onBackgroundUpdate={handleBackgroundUpdate as ((preferences: BackgroundPreferences | null) => void) | undefined}
+                  onMembershipCountChange={setClubMemberCount}
+                  isActive={activeTab === 'settings'}
+                />
+              </div>
             )}
           </div>
         </div>

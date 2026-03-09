@@ -47,6 +47,7 @@ import {
 import Link from 'next/link'
 import { format, isBefore, isAfter } from 'date-fns'
 import { formatDivision, divisionsMatch as _divisionsMatch } from '@/lib/utils'
+import { parseTournamentTrialEvents } from '@/lib/tournament-trial-events'
 
 interface TournamentHostingRequest {
   id: string
@@ -651,18 +652,11 @@ export function TournamentPageClient({
                       <div className="mt-2">
                         {(() => {
                           try {
-                            if (!tournament.trialEvents || !tournament.trialEvents.trim()) {
-                              return <p className="text-sm text-muted-foreground">None</p>
-                            }
-                            
-                            const trialEvents = JSON.parse(tournament.trialEvents) as Array<{ name: string; division: string } | string>
-                            const normalizedTrialEvents = trialEvents.map(event => {
-                              if (typeof event === 'string') {
-                                return { name: event, division: 'B' }
-                              }
-                              return event
-                            })
-                            
+                            const normalizedTrialEvents = parseTournamentTrialEvents(
+                              tournament.trialEvents,
+                              tournament.division === 'B' ? 'B' : 'C'
+                            )
+
                             if (normalizedTrialEvents.length === 0) {
                               return <p className="text-sm text-muted-foreground">None</p>
                             }

@@ -60,6 +60,7 @@ interface StreamTabProps {
     image?: string | null
   }
   initialAnnouncements?: AnnouncementFull[]
+  isActive?: boolean
 }
 
 type AnnouncementsResponse = {
@@ -84,7 +85,7 @@ async function performRequest(url: string, options: RequestInit = {}, fallbackMe
   return response
 }
 
-export function StreamTab({ clubId, division, currentMembership, teams, isAdmin, user, initialAnnouncements }: StreamTabProps) {
+export function StreamTab({ clubId, division, currentMembership, teams, isAdmin, user, initialAnnouncements, isActive = true }: StreamTabProps) {
   const { toast } = useToast()
   const seedAnnouncements = streamAnnouncementsCache.get(clubId) ?? initialAnnouncements ?? []
   const seedDivisionEvents = streamEventsCache.get(division) ?? []
@@ -179,7 +180,8 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
     () => fetchAnnouncements({ silent: true }),
     {
       intervalMs: 30_000,
-      runOnMount: false,
+      runOnMount: true,
+      enabled: isActive,
     },
   )
 

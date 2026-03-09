@@ -279,6 +279,7 @@ interface SettingsTabProps {
   personalBackground?: BackgroundPreferences | null
   onBackgroundUpdate?: (preferences: BackgroundPreferences | null) => void
   onMembershipCountChange?: (count: number) => void
+  isActive?: boolean
 }
 
 type InviteCodes = { adminCode: string; memberCode: string }
@@ -286,6 +287,36 @@ type SettingsMembership = SettingsTabProps['club']['memberships'][number]
 
 const HIDDEN_CODE = '••••••••••••'
 const inviteCodesCache = new Map<string, InviteCodes>()
+
+export async function prefetchSettingsTabData({
+  clubId,
+  isAdmin,
+}: {
+  clubId: string
+  isAdmin: boolean
+}) {
+  if (!isAdmin) return
+
+  try {
+    const response = await fetch(`/api/clubs/${clubId}/invite/codes`)
+    if (!response.ok) return
+
+    const data = await response.json() as {
+      adminCode?: string
+      memberCode?: string
+      needsRegeneration?: boolean
+    }
+
+    if (data.needsRegeneration || !data.adminCode || !data.memberCode) return
+
+    inviteCodesCache.set(clubId, {
+      adminCode: data.adminCode,
+      memberCode: data.memberCode,
+    })
+  } catch (error) {
+    console.error('Failed to prefetch settings tab data:', error)
+  }
+}
 
 function hasRealInviteCodes(codes: InviteCodes | null | undefined): codes is InviteCodes {
   return Boolean(
@@ -338,6 +369,7 @@ export function SettingsTab({
   personalBackground,
   onBackgroundUpdate,
   onMembershipCountChange,
+  isActive = true,
 }: SettingsTabProps) {
   const { toast } = useToast()
   const router = useRouter()
@@ -422,7 +454,8 @@ export function SettingsTab({
     () => refreshMemberships({ silent: true }),
     {
       intervalMs: 60_000,
-      runOnMount: false,
+      runOnMount: true,
+      enabled: isActive,
     },
   )
 

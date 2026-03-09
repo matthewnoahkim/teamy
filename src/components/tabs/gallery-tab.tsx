@@ -76,11 +76,48 @@ interface GalleryTabProps {
   initialAlbums?: Album[]
 }
 
+type GalleryTabCacheEntry = {
+  mediaItems: MediaItem[]
+  albums: Album[]
+}
+
+const galleryTabDefaultCache = new Map<string, GalleryTabCacheEntry>()
+
+export async function prefetchGalleryTabData({ clubId }: { clubId: string }) {
+  try {
+    const [mediaResponse, albumsResponse] = await Promise.all([
+      fetch(`/api/media?clubId=${clubId}`),
+      fetch(`/api/albums?clubId=${clubId}`),
+    ])
+
+    const existing = galleryTabDefaultCache.get(clubId) ?? {
+      mediaItems: [],
+      albums: [],
+    }
+
+    if (mediaResponse.ok) {
+      const data = await mediaResponse.json() as { mediaItems?: MediaItem[] }
+      existing.mediaItems = data.mediaItems || []
+    }
+
+    if (albumsResponse.ok) {
+      const data = await albumsResponse.json() as { albums?: Album[] }
+      existing.albums = data.albums || []
+    }
+
+    galleryTabDefaultCache.set(clubId, existing)
+  } catch (error) {
+    console.error('Failed to prefetch gallery tab data:', error)
+  }
+}
+
 export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAlbums }: GalleryTabProps) {
   const { toast } = useToast()
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>(initialMediaItems || [])
-  const [albums, setAlbums] = useState<Album[]>(initialAlbums || [])
-  const [loading, setLoading] = useState(!(initialMediaItems && initialAlbums))
+  const cachedGalleryEntry = galleryTabDefaultCache.get(clubId)
+  const hasDefaultGallerySeed = galleryTabDefaultCache.has(clubId) || (initialMediaItems !== undefined && initialAlbums !== undefined)
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>(cachedGalleryEntry?.mediaItems ?? initialMediaItems ?? [])
+  const [albums, setAlbums] = useState<Album[]>(cachedGalleryEntry?.albums ?? initialAlbums ?? [])
+  const [loading, setLoading] = useState(!hasDefaultGallerySeed)
   const [uploading, setUploading] = useState(false)
   const [selectedAlbum, setSelectedAlbum] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -101,10 +138,20 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    // Only fetch if we don't have initial data, or if filters changed
-    if (!initialMediaItems || !initialAlbums || selectedAlbum || filterType !== 'all') {
+    const nextCachedGalleryEntry = galleryTabDefaultCache.get(clubId)
+
+    if (!selectedAlbum && filterType === 'all') {
+      setMediaItems(nextCachedGalleryEntry?.mediaItems ?? initialMediaItems ?? [])
+      setAlbums(nextCachedGalleryEntry?.albums ?? initialAlbums ?? [])
+    }
+
+    const hasDefaultSeed =
+      galleryTabDefaultCache.has(clubId) ||
+      (initialMediaItems !== undefined && initialAlbums !== undefined)
+
+    // Only fetch if default data is missing, or filters changed.
+    if (!hasDefaultSeed || selectedAlbum || filterType !== 'all') {
       setLoading(true)
-      // Batch fetch both in parallel
       Promise.all([fetchMedia(), fetchAlbums()]).finally(() => {
         setLoading(false)
       })
@@ -128,7 +175,12 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
       const response = await fetch(url)
       if (!response.ok) throw new Error('Failed to fetch media')
       const data = await response.json()
-      setMediaItems(data.mediaItems || [])
+      const nextMediaItems = data.mediaItems || []
+      setMediaItems(nextMediaItems)
+      if (!selectedAlbum && filterType === 'all') {
+        const existing = galleryTabDefaultCache.get(clubId) ?? { mediaItems: [], albums: [] }
+        galleryTabDefaultCache.set(clubId, { ...existing, mediaItems: nextMediaItems })
+      }
     } catch (error) {
       console.error('Failed to fetch media:', error)
       if (!options?.silent) {
@@ -146,7 +198,10 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
       const response = await fetch(`/api/albums?clubId=${clubId}`)
       if (!response.ok) throw new Error('Failed to fetch albums')
       const data = await response.json()
-      setAlbums(data.albums || [])
+      const nextAlbums = data.albums || []
+      setAlbums(nextAlbums)
+      const existing = galleryTabDefaultCache.get(clubId) ?? { mediaItems: [], albums: [] }
+      galleryTabDefaultCache.set(clubId, { ...existing, albums: nextAlbums })
     } catch (error) {
       if (!options?.silent) {
         console.error('Failed to fetch albums:', error)

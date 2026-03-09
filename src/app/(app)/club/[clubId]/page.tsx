@@ -5,11 +5,9 @@ import { prisma } from '@/lib/prisma'
 import { ClubPage } from '@/components/club-page'
 import { Suspense } from 'react'
 import { PageLoading } from '@/components/ui/loading-spinner'
-import { DelayedRender } from '@/components/ui/delayed-render'
 import { CalendarScope, AnnouncementScope, Role } from '@prisma/client'
 import { userSelectFields } from '@/types/models'
 import { hasAnnouncementTargetAccess, hasTestAssignmentAccess } from '@/lib/club-authz'
-import { decryptInviteCode } from '@/lib/invite-codes'
 
 // This page requires authentication (getServerSession), so ISR/static caching
 // cannot be used. Force dynamic rendering for correct per-user data.
@@ -42,11 +40,12 @@ export default async function ClubDetailPage({
   const requestedTab = resolvedSearchParams.tab || 'home'
   const activeTab = validTabs.has(requestedTab) ? requestedTab : 'home'
 
+  const needsSettingsData = activeTab === 'settings'
   const needsAttendanceData = activeTab === 'attendance'
   const needsFinanceData = activeTab === 'finance'
-  const needsCalendarData = activeTab === 'home' || activeTab === 'calendar'
-  const needsAnnouncementsData = activeTab === 'home' || activeTab === 'stream'
-  const needsTestsData = activeTab === 'home' || activeTab === 'tests'
+  const needsCalendarData = activeTab === 'calendar'
+  const needsAnnouncementsData = activeTab === 'stream'
+  const needsTestsData = activeTab === 'tests'
   const needsFullPeopleData = activeTab === 'people'
 
   const session = await getServerSession(authOptions)
@@ -55,12 +54,15 @@ export default async function ClubDetailPage({
     redirect('/login')
   }
 
-  // Wave 1: Fetch membership, user clubs, and club data in parallel.
+  // Wave 1: Fetch membership and club data in parallel.
   // People tab needs full roster/membership payload; other tabs use a lighter shape.
   const clubPromise = needsFullPeopleData
     ? prisma.club.findUnique({
         where: { id: resolvedParams.clubId },
         include: {
+          _count: {
+            select: { memberships: true },
+          },
           memberships: {
             include: {
               user: {
@@ -89,7 +91,8 @@ export default async function ClubDetailPage({
           },
         },
       })
-    : prisma.club.findUnique({
+    : needsSettingsData
+    ? prisma.club.findUnique({
         where: { id: resolvedParams.clubId },
         select: {
           id: true,
@@ -104,6 +107,9 @@ export default async function ClubDetailPage({
           backgroundImageUrl: true,
           createdAt: true,
           updatedAt: true,
+          _count: {
+            select: { memberships: true },
+          },
           memberships: {
             select: {
               id: true,
@@ -136,8 +142,59 @@ export default async function ClubDetailPage({
           },
         },
       })
+    : prisma.club.findUnique({
+        where: { id: resolvedParams.clubId },
+        select: {
+          id: true,
+          name: true,
+          division: true,
+          backgroundType: true,
+          backgroundColor: true,
+          gradientStartColor: true,
+          gradientEndColor: true,
+          gradientColors: true,
+          gradientDirection: true,
+          backgroundImageUrl: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: { memberships: true },
+          },
+          memberships: {
+            where: { userId: session.user.id },
+            select: {
+              id: true,
+              userId: true,
+              clubId: true,
+              role: true,
+              roles: true,
+              teamId: true,
+              createdAt: true,
+              updatedAt: true,
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              user: {
+                select: userSelectFields,
+              },
+            },
+          },
+          teams: {
+            select: {
+              id: true,
+              clubId: true,
+              name: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      })
 
-  const [membership, userClubs, club] = await Promise.all([
+  const [membership, club] = await Promise.all([
     prisma.membership.findUnique({
       where: {
         userId_clubId: {
@@ -146,15 +203,6 @@ export default async function ClubDetailPage({
         },
       },
       include: { preferences: true },
-    }),
-    prisma.membership.findMany({
-      where: { userId: session.user.id },
-      select: {
-        club: {
-          select: { id: true, name: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
     }),
     clubPromise,
   ])
@@ -167,7 +215,6 @@ export default async function ClubDetailPage({
     redirect('/no-clubs')
   }
 
-  const clubs = userClubs.map(m => m.club)
   const isAdminUser = membership.role === Role.ADMIN
 
   // Wave 2: Attendance, finance, and roster in one parallel batch.
@@ -178,7 +225,6 @@ export default async function ClubDetailPage({
     purchaseRequests,
     eventBudgets,
     userRosterAssignments,
-    inviteCodeRecord,
   ] = await Promise.all([
     needsAttendanceData
       ? prisma.attendance.findMany({
@@ -307,15 +353,6 @@ export default async function ClubDetailPage({
           },
         })
       : Promise.resolve([]),
-    isAdminUser
-      ? prisma.club.findUnique({
-          where: { id: resolvedParams.clubId },
-          select: {
-            adminInviteCodeEncrypted: true,
-            memberInviteCodeEncrypted: true,
-          },
-        })
-      : Promise.resolve(null),
   ])
 
   const rosterList = Array.isArray(userRosterAssignments) ? userRosterAssignments : []
@@ -626,43 +663,22 @@ export default async function ClubDetailPage({
         return hasAnnouncementTargetAccess(targets, membership, userEventIds)
       })
 
-  let initialInviteCodes: { adminCode: string; memberCode: string } | null = null
-  if (
-    isAdminUser &&
-    inviteCodeRecord &&
-    inviteCodeRecord.adminInviteCodeEncrypted !== 'NEEDS_REGENERATION' &&
-    inviteCodeRecord.memberInviteCodeEncrypted !== 'NEEDS_REGENERATION'
-  ) {
-    try {
-      initialInviteCodes = {
-        adminCode: decryptInviteCode(inviteCodeRecord.adminInviteCodeEncrypted),
-        memberCode: decryptInviteCode(inviteCodeRecord.memberInviteCodeEncrypted),
-      }
-    } catch {
-      console.warn('Failed to decrypt initial invite codes; regeneration required.')
-    }
-  }
-
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-background grid-pattern">
-        <DelayedRender delayMs={200}>
-          <div className="min-h-screen flex items-center justify-center px-4 py-12">
-            <PageLoading
-              title="Loading club"
-              description="Fetching club data and member information..."
-              variant="orbit"
-            />
-          </div>
-        </DelayedRender>
+        <div className="min-h-screen flex items-center justify-center px-4 py-12">
+          <PageLoading
+            title="Loading club"
+            description="Fetching club data and member information..."
+            variant="orbit"
+          />
+        </div>
       </div>
     }>
       <ClubPage
         club={club}
         currentMembership={membership}
         user={session.user}
-        clubs={clubs}
-        initialInviteCodes={initialInviteCodes}
         initialData={{
           attendances: attendances ?? [],
           expenses: expenses ?? [],

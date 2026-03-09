@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { serverSession } from '@/lib/server-session'
+import { isTournamentDirector } from '@/lib/rbac'
 
 // GET /api/tournaments/[tournamentId]/timeline - List all timeline items
 export async function GET(
@@ -10,7 +10,7 @@ export async function GET(
 ) {
   const _resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -66,7 +66,7 @@ export async function POST(
 ) {
   const _resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -97,11 +97,12 @@ export async function POST(
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
     }
 
-    const isCreator = tournament.createdById === session.user.id
-    const isAdmin = tournament.admins.some(a => a.userId === session.user.id)
-    const isDirector = tournament.hostingRequest?.directorEmail.toLowerCase() === session.user.email?.toLowerCase()
-
-    if (!isCreator && !isAdmin && !isDirector) {
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email || '',
+      tournamentId,
+    )
+    if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Not authorized to create timeline items' }, { status: 403 })
     }
 
@@ -129,7 +130,7 @@ export async function PUT(
 ) {
   const _resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -161,11 +162,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
     }
 
-    const isCreator = tournament.createdById === session.user.id
-    const isAdmin = tournament.admins.some(a => a.userId === session.user.id)
-    const isDirector = tournament.hostingRequest?.directorEmail.toLowerCase() === session.user.email?.toLowerCase()
-
-    if (!isCreator && !isAdmin && !isDirector) {
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email || '',
+      tournamentId,
+    )
+    if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Not authorized to update timeline items' }, { status: 403 })
     }
 
@@ -193,7 +195,7 @@ export async function DELETE(
 ) {
   const _resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -219,11 +221,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
     }
 
-    const isCreator = tournament.createdById === session.user.id
-    const isAdmin = tournament.admins.some(a => a.userId === session.user.id)
-    const isDirector = tournament.hostingRequest?.directorEmail.toLowerCase() === session.user.email?.toLowerCase()
-
-    if (!isCreator && !isAdmin && !isDirector) {
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email || '',
+      tournamentId,
+    )
+    if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Not authorized to delete timeline items' }, { status: 403 })
     }
 
@@ -237,4 +240,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete timeline item' }, { status: 500 })
   }
 }
-

@@ -119,6 +119,7 @@ interface CalendarTabProps {
     image?: string | null
   }
   initialEvents?: CalendarEvent[]
+  isActive?: boolean
 }
 
 type ViewMode = 'month' | 'week' | 'day'
@@ -148,7 +149,7 @@ function isAllDayEvent(start: Date, end: Date): boolean {
   )
 }
 
-export function CalendarTab({ clubId, division, currentMembership, isAdmin, user, initialEvents }: CalendarTabProps) {
+export function CalendarTab({ clubId, division, currentMembership, isAdmin, user, initialEvents, isActive = true }: CalendarTabProps) {
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -363,7 +364,8 @@ export function CalendarTab({ clubId, division, currentMembership, isAdmin, user
     () => fetchEvents({ silent: true }),
     {
       intervalMs: 35_000,
-      runOnMount: false,
+      runOnMount: true,
+      enabled: isActive,
     },
   )
 

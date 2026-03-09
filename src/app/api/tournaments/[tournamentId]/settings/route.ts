@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { serverSession } from '@/lib/server-session'
+import { isTournamentDirector } from '@/lib/rbac'
 import { z } from 'zod'
 
 const settingsSchema = z.object({
@@ -24,59 +24,26 @@ const settingsSchema = z.object({
   trialEvents: z.string().nullable().optional(),
 })
 
-async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
-  const admin = await prisma.tournamentAdmin.findUnique({
-    where: {
-      tournamentId_userId: {
-        tournamentId,
-        userId,
-      },
-    },
-  })
-  
-  if (admin) return true
-  
-  // Check if user is the creator
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    select: { createdById: true },
-  })
-  
-  return tournament?.createdById === userId
-}
-
-// Check if user is the TD via hosting request
-async function isTournamentDirector(userEmail: string, tournamentId: string): Promise<boolean> {
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    include: { hostingRequest: true },
-  })
-  
-  if (tournament?.hostingRequest?.directorEmail.toLowerCase() === userEmail.toLowerCase()) {
-    return true
-  }
-  
-  return false
-}
-
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const tournamentId = resolvedParams.tournamentId
 
-    // Check if user is TD or admin
-    const isAdmin = await isTournamentAdmin(session.user.id, tournamentId)
-    const isTD = await isTournamentDirector(session.user.email || '', tournamentId)
-    
-    if (!isAdmin && !isTD) {
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email || '',
+      tournamentId,
+    )
+
+    if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -154,4 +121,3 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 })
   }
 }
-

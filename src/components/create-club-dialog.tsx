@@ -49,8 +49,6 @@ export function CreateClubDialog({ open, onOpenChange }: CreateClubDialogProps) 
         title: 'Club created!',
         description: `${name} (Division ${division})`,
       })
-      // Refresh the router to update server-side data
-      router.refresh()
       // Navigate to the new club
       router.push(`/club/${data.club.id}`)
     } catch (_error) {
@@ -120,4 +118,3 @@ export function CreateClubDialog({ open, onOpenChange }: CreateClubDialogProps) 
 
 // Keep backward compatibility export
 export { CreateClubDialog as CreateTeamDialog }
-

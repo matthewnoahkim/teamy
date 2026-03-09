@@ -22,6 +22,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useToast } from '@/components/ui/use-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { USER_PREFERENCES_QUERY_KEY, useUserPreferences } from '@/hooks/use-user-preferences'
+import { useUserClubs } from '@/hooks/use-user-clubs'
 
 interface Club {
   id: string
@@ -66,11 +67,15 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
   
   // Show customization and billing on all app-header pages by default.
   const isOnClubPage = pathname?.startsWith('/club/')
+  const providedClubs = clubs ?? allClubs
+  const { data: fetchedClubs } = useUserClubs({
+    enabled: Boolean(user?.id) && isOnClubPage && !providedClubs,
+  })
   const showCustomizationBilling = showCustomizationBillingProp ?? true
-  const showClubDropdown = (isOnClubPage && clubs && clubs.length > 0) || (allClubs && allClubs.length > 1)
+  const effectiveClubs = providedClubs ?? fetchedClubs ?? []
+  const showClubDropdown = (isOnClubPage && effectiveClubs.length > 0) || Boolean(allClubs && allClubs.length > 1)
 
-  const currentClub = clubs?.find(c => c.id === clubId)
-  const effectiveClubs = clubs || allClubs || []
+  const currentClub = effectiveClubs.find(c => c.id === clubId)
   const effectivePath = currentPath || pathname
   const clubMenuTriggerId = clubId ? `club-switcher-trigger-${clubId}` : 'club-switcher-trigger'
   const userMenuTriggerId = `user-menu-trigger-${user.id}`
@@ -199,7 +204,7 @@ export function AppHeader({ user, showBackButton: _showBackButton = false, backH
               <DropdownMenu>
                 <DropdownMenuTrigger asChild id={clubMenuTriggerId}>
                   <button className="flex items-center gap-2 px-3 py-1.5 text-sm sm:text-base md:text-lg text-white font-semibold hover:bg-white/10 rounded-lg transition-colors truncate max-w-[150px] sm:max-w-[200px] md:max-w-[300px]">
-                    <span className="truncate">{currentClub?.name || 'Clubs'}</span>
+                    <span className="truncate">{currentClub?.name || title || 'Clubs'}</span>
                     <ChevronDown className="h-4 w-4 flex-shrink-0" />
                   </button>
                 </DropdownMenuTrigger>

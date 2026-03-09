@@ -97,6 +97,8 @@ interface PaperworkTabProps {
   initialForms?: PaperworkForm[]
 }
 
+const paperworkFormsCache = new Map<string, PaperworkForm[]>()
+
 function getFormDownloadUrl(formId: string): string {
   return `/api/forms/${formId}/download`
 }
@@ -105,10 +107,24 @@ function getSubmissionDownloadUrl(submissionId: string): string {
   return `/api/submissions/${submissionId}/download`
 }
 
+export async function prefetchPaperworkTabData({ clubId }: { clubId: string }) {
+  try {
+    const response = await fetch(`/api/forms?clubId=${clubId}`)
+    if (!response.ok) return
+
+    const data = await response.json() as { forms?: PaperworkForm[] }
+    paperworkFormsCache.set(clubId, data.forms || [])
+  } catch (error) {
+    console.error('Failed to prefetch paperwork tab data:', error)
+  }
+}
+
 export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: PaperworkTabProps) {
   const { toast } = useToast()
-  const [forms, setForms] = useState<PaperworkForm[]>(initialForms || [])
-  const [loading, setLoading] = useState(!initialForms)
+  const cachedForms = paperworkFormsCache.get(clubId)
+  const hasSeedForms = cachedForms !== undefined || initialForms !== undefined
+  const [forms, setForms] = useState<PaperworkForm[]>(cachedForms ?? initialForms ?? [])
+  const [loading, setLoading] = useState(!hasSeedForms)
   const [uploading, setUploading] = useState(false)
   
   // Dialogs
@@ -126,7 +142,7 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
   const _submissionFileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!initialForms) {
+    if (!paperworkFormsCache.has(clubId) && initialForms === undefined) {
       fetchForms()
     }
   }, [clubId, initialForms])
@@ -145,7 +161,9 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
       
       if (!response.ok) throw new Error('Failed to fetch forms')
       const data = await response.json()
-      setForms(data.forms || [])
+      const nextForms = data.forms || []
+      setForms(nextForms)
+      paperworkFormsCache.set(clubId, nextForms)
     } catch (error: unknown) {
       // Don't show error on abort (user navigated away)
       if (error instanceof Error && error.name === 'AbortError') {

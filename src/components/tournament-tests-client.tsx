@@ -72,6 +72,10 @@ interface TournamentTestsClientProps {
   tournamentId: string
   tournamentName: string
   tournamentDivision: 'B' | 'C'
+  trialEvents: Array<{
+    name: string
+    division: 'B' | 'C'
+  }>
   events: Array<{
     id: string
     name: string
@@ -121,7 +125,8 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
 export function TournamentTestsClient({
   tournamentId,
   tournamentName,
-  tournamentDivision: _tournamentDivision,
+  tournamentDivision,
+  trialEvents,
   events,
   userClubs: _userClubs,
   user,
@@ -139,6 +144,11 @@ export function TournamentTestsClient({
   const [selectedAssignTest, setSelectedAssignTest] = useState<TournamentTest | null>(null)
   const [assigning, setAssigning] = useState(false)
   const [selectedAssignEventId, setSelectedAssignEventId] = useState<string>('')
+  const [trialEventDialogOpen, setTrialEventDialogOpen] = useState(false)
+  const [trialEventName, setTrialEventName] = useState('')
+  const [trialEventDivision, setTrialEventDivision] = useState<'B' | 'C'>(
+    tournamentDivision === 'B' ? 'B' : 'C'
+  )
   const [warningDismissed, setWarningDismissed] = useState(false)
 
   useEffect(() => {
@@ -148,6 +158,10 @@ export function TournamentTestsClient({
       setWarningDismissed(true)
     }
   }, [])
+
+  useEffect(() => {
+    setTrialEventDivision(tournamentDivision === 'B' ? 'B' : 'C')
+  }, [tournamentDivision])
 
   const handleDismissWarning = (forever: boolean) => {
     setWarningDismissed(true)
@@ -281,6 +295,26 @@ export function TournamentTestsClient({
   const handleViewTest = (tournamentTest: TournamentTest) => {
     // Navigate to team's test detail page for editing
     router.push(`/club/${tournamentTest.test.clubId}/tests/${tournamentTest.test.id}`)
+  }
+
+  const openTrialEventBuilder = (name?: string, division?: 'B' | 'C') => {
+    const normalizedName = (name ?? trialEventName).trim()
+    if (!normalizedName) {
+      toast({
+        title: 'Error',
+        description: 'Enter a trial event name',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const normalizedDivision = division ?? trialEventDivision
+    sessionStorage.setItem('tournamentId', tournamentId)
+    const params = new URLSearchParams({
+      trialEventName: normalizedName,
+      trialEventDivision: normalizedDivision,
+    })
+    router.push(`/tournaments/${tournamentId}/tests/new?${params.toString()}`)
   }
 
   const getStatusBadge = (status: string) => {
@@ -510,16 +544,37 @@ export function TournamentTestsClient({
                 </div>
               </div>
               <div className="flex flex-col items-stretch sm:items-end gap-1.5">
-                <Button onClick={() => {
-                  sessionStorage.setItem('tournamentId', tournamentId)
-                  router.push(`/tournaments/${tournamentId}/tests/new`)
-                }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Open Test Builder
-                </Button>
-                <p className="text-xs text-muted-foreground">Build once, then assign tests to events.</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button onClick={() => {
+                    sessionStorage.setItem('tournamentId', tournamentId)
+                    router.push(`/tournaments/${tournamentId}/tests/new`)
+                  }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Open Test Builder
+                  </Button>
+                  <Button variant="outline" onClick={() => setTrialEventDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Trial Event Test
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Build a general test, or start directly from a trial event.</p>
               </div>
             </div>
+
+            {trialEvents.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {trialEvents.map((trialEvent) => (
+                  <Button
+                    key={`${trialEvent.name}-${trialEvent.division}`}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openTrialEventBuilder(trialEvent.name, trialEvent.division)}
+                  >
+                    {trialEvent.name} (Trial, Div {trialEvent.division})
+                  </Button>
+                ))}
+              </div>
+            )}
 
             {/* Search and Filter */}
             <div className="flex flex-col sm:flex-row gap-3">
@@ -766,6 +821,65 @@ export function TournamentTestsClient({
                 disabled={assigning || !selectedAssignEventId || !selectedAssignTest}
               >
                 {assigning ? 'Assigning...' : 'Assign Test'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={trialEventDialogOpen}
+          onOpenChange={(open) => {
+            setTrialEventDialogOpen(open)
+            if (!open) {
+              setTrialEventName('')
+              setTrialEventDivision(tournamentDivision === 'B' ? 'B' : 'C')
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Trial Event Test</DialogTitle>
+              <DialogDescription>
+                Choose the trial event this test belongs to. New trial events will also be added to the tournament page.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="trial-event-name">Trial event name</Label>
+                <Input
+                  id="trial-event-name"
+                  value={trialEventName}
+                  onChange={(e) => setTrialEventName(e.target.value)}
+                  placeholder="Robot Skills"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="trial-event-division">Division</Label>
+                <Select
+                  value={trialEventDivision}
+                  onValueChange={(value) => setTrialEventDivision(value as 'B' | 'C')}
+                  disabled
+                >
+                  <SelectTrigger id="trial-event-division">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="B">Division B</SelectItem>
+                    <SelectItem value="C">Division C</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTrialEventDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  openTrialEventBuilder()
+                }}
+              >
+                Continue
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -26,10 +26,17 @@ async function isTournamentAdmin(userId: string, tournamentId: string): Promise<
 
 export default async function NewTournamentTestPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ param: string }>
+  searchParams: Promise<{
+    eventId?: string
+    trialEventName?: string
+    trialEventDivision?: string
+  }>
 }) {
   const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
   const session = await getServerSession(authOptions)
 
   if (!session?.user?.id) {
@@ -59,13 +66,46 @@ export default async function NewTournamentTestPage({
     redirect('/tournament-listings')
   }
 
+  let eventId: string | undefined
+  let eventName: string | undefined
+
+  const requestedEventId = resolvedSearchParams.eventId?.trim()
+  if (requestedEventId) {
+    const event = await prisma.event.findUnique({
+      where: { id: requestedEventId },
+      select: {
+        id: true,
+        name: true,
+      },
+    })
+
+    if (event) {
+      eventId = event.id
+      eventName = event.name
+    }
+  }
+
+  if (!eventName) {
+    const requestedTrialEventName = resolvedSearchParams.trialEventName?.trim()
+    if (requestedTrialEventName) {
+      eventName = requestedTrialEventName
+    }
+  }
+
+  const trialEventDivision =
+    resolvedSearchParams.trialEventDivision === 'B' || resolvedSearchParams.trialEventDivision === 'C'
+      ? resolvedSearchParams.trialEventDivision
+      : undefined
+
   return (
     <TournamentTestCreator
       tournamentId={tournamentId}
       tournamentName={tournament.name}
       tournamentDivision={tournament.division}
+      eventId={eventId}
+      eventName={eventName}
+      trialEventDivision={trialEventDivision}
       user={session.user}
     />
   )
 }
-

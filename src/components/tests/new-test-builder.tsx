@@ -109,6 +109,7 @@ interface NewTestBuilderProps {
   staffMembershipId?: string
   eventId?: string
   eventName?: string
+  trialEventDivision?: 'B' | 'C'
   test?: {
     id: string
     name: string
@@ -357,6 +358,7 @@ export function NewTestBuilder({
   staffMembershipId,
   eventId: initialEventId,
   eventName,
+  trialEventDivision,
   test 
 }: NewTestBuilderProps) {
   const router = useRouter()
@@ -1489,6 +1491,9 @@ export function NewTestBuilder({
           createPayload = { 
             ...payload, 
             clubId: undefined,
+            eventId: initialEventId || undefined,
+            eventName: !initialEventId && eventName ? eventName : undefined,
+            trialEventDivision: !initialEventId ? trialEventDivision : undefined,
             ...(maxAttempts && !isNaN(maxAttempts) ? { maxAttempts } : {}),
           }
         } else {

@@ -28,6 +28,7 @@ interface FinanceTabProps {
   initialPurchaseRequests?: PurchaseRequest[]
   initialBudgets?: EventBudget[]
   initialTeams?: Team[]
+  isActive?: boolean
 }
 
 export interface Expense {
@@ -143,6 +144,78 @@ export interface EventBudget {
   remaining: number
 }
 
+type FinanceTabCacheEntry = {
+  expenses: Expense[]
+  purchaseRequests: PurchaseRequest[]
+  budgets: EventBudget[]
+  teams: Team[]
+  events: Event[]
+}
+
+const financeTabCache = new Map<string, FinanceTabCacheEntry>()
+
+export async function prefetchFinanceTabData({
+  clubId,
+  division,
+}: {
+  clubId: string
+  division?: 'B' | 'C'
+}) {
+  try {
+    const requests: Promise<Response | null>[] = [
+      fetch(`/api/expenses?clubId=${clubId}`),
+      fetch(`/api/purchase-requests?clubId=${clubId}`),
+      fetch(`/api/event-budgets?clubId=${clubId}`),
+      fetch(`/api/clubs/${clubId}/teams`),
+    ]
+
+    if (division) {
+      requests.push(fetch(`/api/events?division=${division}`))
+    } else {
+      requests.push(Promise.resolve(null))
+    }
+
+    const [expensesRes, requestsRes, budgetsRes, teamsRes, eventsRes] = await Promise.all(requests)
+    const existing = financeTabCache.get(clubId)
+    const nextCache: FinanceTabCacheEntry = {
+      expenses: existing?.expenses ?? [],
+      purchaseRequests: existing?.purchaseRequests ?? [],
+      budgets: existing?.budgets ?? [],
+      teams: existing?.teams ?? [],
+      events: existing?.events ?? [],
+    }
+
+    if (expensesRes?.ok) {
+      const data = await expensesRes.json() as { expenses?: Expense[] }
+      nextCache.expenses = data.expenses || []
+    }
+
+    if (requestsRes?.ok) {
+      const data = await requestsRes.json() as { purchaseRequests?: PurchaseRequest[] }
+      nextCache.purchaseRequests = data.purchaseRequests || []
+    }
+
+    if (budgetsRes?.ok) {
+      const data = await budgetsRes.json() as { budgets?: EventBudget[] }
+      nextCache.budgets = data.budgets || []
+    }
+
+    if (teamsRes?.ok) {
+      const data = await teamsRes.json() as { teams?: Team[] }
+      nextCache.teams = data.teams || []
+    }
+
+    if (eventsRes?.ok) {
+      const data = await eventsRes.json() as { events?: Event[] }
+      nextCache.events = data.events || []
+    }
+
+    financeTabCache.set(clubId, nextCache)
+  } catch (error) {
+    console.error('Failed to prefetch finance tab data:', error)
+  }
+}
+
 // Helper function to highlight search terms in text (exact copy from dev panel)
 const highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
   if (!text || !searchQuery) return text || ''
@@ -164,14 +237,21 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
   )
 }
 
-export default function FinanceTab({ clubId, isAdmin, currentMembershipId, currentMembershipTeamId, division, initialExpenses, initialPurchaseRequests, initialBudgets, initialTeams }: FinanceTabProps) {
+export default function FinanceTab({ clubId, isAdmin, currentMembershipId, currentMembershipTeamId, division, initialExpenses, initialPurchaseRequests, initialBudgets, initialTeams, isActive = true }: FinanceTabProps) {
   const { toast } = useToast()
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses || [])
-  const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>(initialPurchaseRequests || [])
-  const [events, setEvents] = useState<Event[]>([])
-  const [teams, setTeams] = useState<Team[]>(initialTeams || [])
-  const [budgets, setBudgets] = useState<EventBudget[]>(initialBudgets || [])
-  const [loading, setLoading] = useState(!initialExpenses && !initialPurchaseRequests && !initialBudgets)
+  const cachedFinanceEntry = financeTabCache.get(clubId)
+  const hasFinanceSeedData =
+    Boolean(cachedFinanceEntry) ||
+    initialExpenses !== undefined ||
+    initialPurchaseRequests !== undefined ||
+    initialBudgets !== undefined
+  const [expenses, setExpenses] = useState<Expense[]>(cachedFinanceEntry?.expenses ?? initialExpenses ?? [])
+  const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>(cachedFinanceEntry?.purchaseRequests ?? initialPurchaseRequests ?? [])
+  const [events, setEvents] = useState<Event[]>(cachedFinanceEntry?.events ?? [])
+  const [teams, setTeams] = useState<Team[]>(cachedFinanceEntry?.teams ?? initialTeams ?? [])
+  const [budgets, setBudgets] = useState<EventBudget[]>(cachedFinanceEntry?.budgets ?? initialBudgets ?? [])
+  const [loading, setLoading] = useState(!hasFinanceSeedData)
+  const [hasLoadedFinanceData, setHasLoadedFinanceData] = useState(hasFinanceSeedData)
 
   // Add Expense Dialog
   const [addExpenseOpen, setAddExpenseOpen] = useState(false)
@@ -294,6 +374,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
         const data = await eventsRes.json()
         setEvents(data.events || [])
       }
+      setHasLoadedFinanceData(true)
     } catch (error) {
       console.error('Failed to fetch finance data:', error)
       toast({
@@ -309,61 +390,41 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
   }, [clubId, division, toast])
 
   useEffect(() => {
-    // Skip initial fetch if we already have data from server
-    if (!initialExpenses && !initialPurchaseRequests && !initialBudgets && !initialTeams) {
-      fetchData()
-    } else {
-      // We have initial data, but may need to fetch missing pieces (events, teams if not provided)
-      const loadMissingData = async () => {
-        try {
-          const requests: Promise<Response | null>[] = []
-          
-          // Only fetch what's missing
-          if (!initialTeams) {
-            requests.push(fetch(`/api/clubs/${clubId}/teams`))
-          } else {
-            requests.push(Promise.resolve(null))
-          }
-          
-          if (division && events.length === 0) {
-            requests.push(fetch(`/api/events?division=${division}`))
-          } else {
-            requests.push(Promise.resolve(null))
-          }
-          
-          const [teamsRes, eventsRes] = await Promise.all(requests)
-          
-          if (teamsRes?.ok) {
-            const data = await teamsRes.json()
-            setTeams(data.teams || [])
-          }
-          
-          if (eventsRes?.ok) {
-            const data = await eventsRes.json()
-            setEvents(data.events || [])
-          }
-        } catch (error) {
-          console.error('Failed to fetch missing finance data:', error)
-        } finally {
-          setLoading(false)
-        }
-      }
-      
-      // Set initial data
-      if (initialExpenses) setExpenses(initialExpenses)
-      if (initialPurchaseRequests) setPurchaseRequests(initialPurchaseRequests)
-      if (initialBudgets) setBudgets(initialBudgets)
-      if (initialTeams) setTeams(initialTeams)
-      
-      loadMissingData()
-    }
-  }, [fetchData, initialExpenses, initialPurchaseRequests, initialBudgets, initialTeams, clubId, division, events.length])
+    const nextCachedFinanceEntry = financeTabCache.get(clubId)
+    const nextHasSeedData =
+      Boolean(nextCachedFinanceEntry) ||
+      initialExpenses !== undefined ||
+      initialPurchaseRequests !== undefined ||
+      initialBudgets !== undefined
+
+    setExpenses(nextCachedFinanceEntry?.expenses ?? initialExpenses ?? [])
+    setPurchaseRequests(nextCachedFinanceEntry?.purchaseRequests ?? initialPurchaseRequests ?? [])
+    setBudgets(nextCachedFinanceEntry?.budgets ?? initialBudgets ?? [])
+    setTeams(nextCachedFinanceEntry?.teams ?? initialTeams ?? [])
+    setEvents(nextCachedFinanceEntry?.events ?? [])
+    setLoading(!nextHasSeedData)
+    setHasLoadedFinanceData(nextHasSeedData)
+  }, [clubId, initialBudgets, initialExpenses, initialPurchaseRequests, initialTeams])
+
+  useEffect(() => {
+    if (!hasLoadedFinanceData) return
+    financeTabCache.set(clubId, {
+      expenses,
+      purchaseRequests,
+      budgets,
+      teams,
+      events,
+    })
+  }, [budgets, clubId, events, expenses, hasLoadedFinanceData, purchaseRequests, teams])
 
   useBackgroundRefresh(
-    () => fetchData({ silent: true }),
+    () => fetchData({
+      silent: hasLoadedFinanceData,
+    }),
     {
       intervalMs: 45_000,
-      runOnMount: false,
+      runOnMount: true,
+      enabled: isActive,
     },
   )
 
@@ -2482,4 +2543,3 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
     </div>
   )
 }
-

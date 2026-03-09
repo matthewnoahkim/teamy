@@ -51,6 +51,20 @@ interface PeopleTabProps {
   club: ClubInput
   currentMembership: MembershipWithPreferences
   isAdmin: boolean
+  isActive?: boolean
+}
+
+type PeopleTabCacheEntry = {
+  club?: ClubWithMembers
+  events?: SciOlyEvent[]
+  conflictGroups?: ConflictGroup[]
+}
+
+const peopleTabCache = new Map<string, PeopleTabCacheEntry>()
+
+function updatePeopleTabCache(clubId: string, partial: Partial<PeopleTabCacheEntry>) {
+  const existing = peopleTabCache.get(clubId) ?? {}
+  peopleTabCache.set(clubId, { ...existing, ...partial })
 }
 
 function hasFullPeopleData(club: ClubInput): club is ClubWithMembers {
@@ -82,13 +96,50 @@ function normalizePeopleClub(club: ClubInput): ClubWithMembers {
   } as ClubWithMembers
 }
 
-export function PeopleTab({ club: initialClubInput, currentMembership: _currentMembership, isAdmin }: PeopleTabProps) {
+export async function prefetchPeopleTabData({
+  clubId,
+  division,
+}: {
+  clubId: string
+  division: string
+}) {
+  try {
+    const [clubResponse, eventsResponse, conflictsResponse] = await Promise.all([
+      fetch(`/api/clubs/${clubId}`),
+      fetch(`/api/events?division=${division}`),
+      fetch(`/api/conflicts?division=${division}`),
+    ])
+
+    if (clubResponse.ok) {
+      const data = (await clubResponse.json()) as { club?: ClubWithMembers }
+      if (data.club) {
+        updatePeopleTabCache(clubId, { club: normalizePeopleClub(data.club) })
+      }
+    }
+
+    if (eventsResponse.ok) {
+      const data = await eventsResponse.json() as { events?: SciOlyEvent[] }
+      updatePeopleTabCache(clubId, { events: data.events || [] })
+    }
+
+    if (conflictsResponse.ok) {
+      const data = await conflictsResponse.json() as { conflictGroups?: ConflictGroup[] }
+      updatePeopleTabCache(clubId, { conflictGroups: data.conflictGroups || [] })
+    }
+  } catch (error) {
+    console.error('Failed to prefetch people tab data:', error)
+  }
+}
+
+export function PeopleTab({ club: initialClubInput, currentMembership: _currentMembership, isAdmin, isActive = true }: PeopleTabProps) {
   const { toast } = useToast()
   const clubId = initialClubInput.id
+  const cachedPeopleEntry = peopleTabCache.get(clubId)
+  const seedClubInput = cachedPeopleEntry?.club ?? initialClubInput
   
   // Local club state for immediate updates
-  const [club, setClub] = useState<ClubWithMembers>(() => normalizePeopleClub(initialClubInput))
-  const [loadingClubData, setLoadingClubData] = useState(!hasFullPeopleData(initialClubInput))
+  const [club, setClub] = useState<ClubWithMembers>(() => normalizePeopleClub(seedClubInput))
+  const [loadingClubData, setLoadingClubData] = useState(!hasFullPeopleData(seedClubInput))
   
   // Team management state
   const [selectedTeam, setSelectedTeam] = useState<ClubTeam | null>(null)
@@ -100,8 +151,8 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
   const [editTeamName, setEditTeamName] = useState('')
   
   // Roster state
-  const [events, setEvents] = useState<SciOlyEvent[]>([])
-  const [conflictGroups, setConflictGroups] = useState<ConflictGroup[]>([])
+  const [events, setEvents] = useState<SciOlyEvent[]>(cachedPeopleEntry?.events ?? [])
+  const [conflictGroups, setConflictGroups] = useState<ConflictGroup[]>(cachedPeopleEntry?.conflictGroups ?? [])
   const [assignments, setAssignments] = useState<RosterAssignmentWithMembership[]>([])
   const [rosterViewMode, setRosterViewMode] = useState<'category' | 'conflict'>('category')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -143,7 +194,9 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
 
       const data = (await response.json()) as { club?: ClubWithMembers }
       if (!data.club) return
-      setClub(normalizePeopleClub(data.club))
+      const normalizedClub = normalizePeopleClub(data.club)
+      setClub(normalizedClub)
+      updatePeopleTabCache(clubId, { club: normalizedClub })
     } catch (error) {
       if (!options?.silent) {
         console.error('Failed to fetch full people tab club data:', error)
@@ -161,19 +214,13 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
   }, [clubId, toast])
 
   useEffect(() => {
-    if (hasFullPeopleData(initialClubInput)) {
-      setClub(normalizePeopleClub(initialClubInput))
-      setLoadingClubData(false)
-      return
-    }
-
-    void fetchFullClubData()
-  }, [initialClubInput, fetchFullClubData])
-
-  useEffect(() => {
-    fetchEvents()
-    fetchConflictGroups()
-  }, [club.id])
+    const nextCachedPeopleEntry = peopleTabCache.get(clubId)
+    const nextClubInput = nextCachedPeopleEntry?.club ?? initialClubInput
+    setClub(normalizePeopleClub(nextClubInput))
+    setLoadingClubData(!hasFullPeopleData(nextClubInput))
+    setEvents(nextCachedPeopleEntry?.events ?? [])
+    setConflictGroups(nextCachedPeopleEntry?.conflictGroups ?? [])
+  }, [clubId, initialClubInput])
 
   // Update assignments whenever team memberships change
   useEffect(() => {
@@ -218,7 +265,9 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
       const response = await fetch(`/api/events?division=${club.division}`)
       if (response.ok) {
         const data = await response.json() as { events: SciOlyEvent[] }
-        setEvents(data.events)
+        const nextEvents = data.events || []
+        setEvents(nextEvents)
+        updatePeopleTabCache(clubId, { events: nextEvents })
       }
     } catch (error: unknown) {
       console.error('Failed to fetch events:', error)
@@ -230,7 +279,9 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
       const response = await fetch(`/api/conflicts?division=${club.division}`)
       if (response.ok) {
         const data = await response.json() as { conflictGroups?: ConflictGroup[] }
-        setConflictGroups(data.conflictGroups || [])
+        const nextConflictGroups = data.conflictGroups || []
+        setConflictGroups(nextConflictGroups)
+        updatePeopleTabCache(clubId, { conflictGroups: nextConflictGroups })
       }
     } catch (error: unknown) {
       console.error('Failed to fetch conflict groups:', error)
@@ -240,7 +291,7 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
   useBackgroundRefresh(
     async () => {
       await Promise.all([
-        fetchFullClubData({ silent: true }),
+        fetchFullClubData({ silent: hasFullPeopleData(club) }),
         fetchEvents(),
         fetchConflictGroups(),
       ])
@@ -248,8 +299,13 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
     {
       intervalMs: 30_000,
       runOnMount: true,
+      enabled: isActive,
     },
   )
+
+  useEffect(() => {
+    updatePeopleTabCache(clubId, { club, events, conflictGroups })
+  }, [club, clubId, conflictGroups, events])
 
   function fetchAssignments() {
     const allAssignments: RosterAssignmentWithMembership[] = []

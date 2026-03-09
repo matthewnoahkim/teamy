@@ -32,6 +32,7 @@ export type MembershipWithPreferences = Prisma.MembershipGetPayload<{
 // ---------------------------------------------------------------------------
 export type ClubWithMembers = Prisma.ClubGetPayload<{
   include: {
+    _count: { select: { memberships: true } }
     memberships: {
       include: {
         user: { select: typeof userSelectFields }
@@ -70,6 +71,7 @@ export type ClubWithMembersLite = Prisma.ClubGetPayload<{
     backgroundImageUrl: true
     createdAt: true
     updatedAt: true
+    _count: { select: { memberships: true } }
     memberships: {
       select: {
         id: true

@@ -131,8 +131,6 @@ export function JoinClubDialog({
         description: data.message,
       })
       onOpenChange(false)
-      // Refresh the router to update server-side data
-      router.refresh()
       // Navigate to the club
       router.push(`/club/${data.membership.club.id}`)
     } catch (error: unknown) {

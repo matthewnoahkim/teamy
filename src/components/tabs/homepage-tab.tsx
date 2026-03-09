@@ -86,19 +86,78 @@ interface WidgetData {
   config: Record<string, unknown>
 }
 
-interface ClubData {
-  name: string
-  memberships?: unknown[]
-}
-
 interface HomePageTabProps {
   clubId: string
-  club: ClubData
+  clubName: string
+  memberCount: number
   isAdmin: boolean
   user: SessionUser
   initialEvents?: Record<string, unknown>[]
   initialAnnouncements?: Record<string, unknown>[]
   initialTests?: Record<string, unknown>[]
+  isActive?: boolean
+}
+
+type HomePageTabCacheEntry = {
+  widgets: Widget[]
+  announcements: Record<string, unknown>[]
+  events: Record<string, unknown>[]
+  tests: Record<string, unknown>[]
+}
+
+const homePageTabCache = new Map<string, HomePageTabCacheEntry>()
+
+function updateHomePageTabCache(clubId: string, partial: Partial<HomePageTabCacheEntry>) {
+  const existing = homePageTabCache.get(clubId) ?? {
+    widgets: [],
+    announcements: [],
+    events: [],
+    tests: [],
+  }
+
+  homePageTabCache.set(clubId, { ...existing, ...partial })
+}
+
+export async function prefetchHomePageTabData({ clubId }: { clubId: string }) {
+  try {
+    const [widgetsRes, announcementsRes, eventsRes, testsRes] = await Promise.all([
+      fetch(`/api/widgets?clubId=${clubId}`),
+      fetch(`/api/announcements?clubId=${clubId}`),
+      fetch(`/api/calendar?clubId=${clubId}`),
+      fetch(`/api/tests?clubId=${clubId}`),
+    ])
+
+    const existing = homePageTabCache.get(clubId) ?? {
+      widgets: [],
+      announcements: [],
+      events: [],
+      tests: [],
+    }
+
+    if (widgetsRes.ok) {
+      const data = await widgetsRes.json() as { widgets?: Widget[] }
+      existing.widgets = data.widgets || []
+    }
+
+    if (announcementsRes.ok) {
+      const data = await announcementsRes.json() as { announcements?: Record<string, unknown>[] }
+      existing.announcements = data.announcements || []
+    }
+
+    if (eventsRes.ok) {
+      const data = await eventsRes.json() as { events?: Record<string, unknown>[] }
+      existing.events = data.events || []
+    }
+
+    if (testsRes.ok) {
+      const data = await testsRes.json() as { tests?: Record<string, unknown>[] }
+      existing.tests = data.tests || []
+    }
+
+    homePageTabCache.set(clubId, existing)
+  } catch (error) {
+    console.error('Failed to prefetch homepage tab data:', error)
+  }
 }
 
 // Sortable Widget Item Component
@@ -224,11 +283,13 @@ function SortableWidgetItem({
   )
 }
 
-export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initialAnnouncements, initialTests }: HomePageTabProps) {
+export function HomePageTab({ clubId, clubName, memberCount, isAdmin, user, initialEvents, initialAnnouncements, initialTests, isActive = true }: HomePageTabProps) {
   const router = useRouter()
   const { toast } = useToast()
-  const [widgets, setWidgets] = useState<Widget[]>([])
-  const [loading, setLoading] = useState(true)
+  const cachedHomePageEntry = homePageTabCache.get(clubId)
+  const hasWidgetSeed = homePageTabCache.has(clubId)
+  const [widgets, setWidgets] = useState<Widget[]>(cachedHomePageEntry?.widgets ?? [])
+  const [loading, setLoading] = useState(!hasWidgetSeed)
   const [isConfigMode, setIsConfigMode] = useState(false)
   const [addWidgetOpen, setAddWidgetOpen] = useState(false)
   const [editWidgetOpen, setEditWidgetOpen] = useState(false)
@@ -238,11 +299,11 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
   const membershipLossRedirectedRef = useRef(false)
   
   // Data for widgets - use initial data if provided
-  const [announcements, setAnnouncements] = useState<Record<string, unknown>[]>(initialAnnouncements || [])
-  const [events, setEvents] = useState<Record<string, unknown>[]>(initialEvents || [])
-  const [tests, setTests] = useState<Record<string, unknown>[]>(initialTests || [])
+  const [announcements, setAnnouncements] = useState<Record<string, unknown>[]>(cachedHomePageEntry?.announcements ?? initialAnnouncements ?? [])
+  const [events, setEvents] = useState<Record<string, unknown>[]>(cachedHomePageEntry?.events ?? initialEvents ?? [])
+  const [tests, setTests] = useState<Record<string, unknown>[]>(cachedHomePageEntry?.tests ?? initialTests ?? [])
   const [stats, setStats] = useState({
-    memberCount: club.memberships?.length || 0,
+    memberCount,
     announcementCount: initialAnnouncements?.length || 0,
     eventCount: initialEvents?.length || 0,
     testCount: initialTests?.length || 0,
@@ -269,28 +330,30 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
   }, [redirectForMembershipLoss])
 
   useEffect(() => {
-    if (!user?.id) return
-    // Fetch widgets and data in parallel if needed
-    const promises: Promise<void>[] = [fetchWidgets()]
-    // Only fetch data if we don't have all initial data
-    if (!initialAnnouncements || !initialEvents || !initialTests) {
-      promises.push(fetchData())
-    }
-    Promise.all(promises)
-  }, [clubId, user?.id, initialAnnouncements, initialEvents, initialTests])
+    const nextCachedHomePageEntry = homePageTabCache.get(clubId)
+    const nextHasWidgetSeed = homePageTabCache.has(clubId)
+    setWidgets(nextCachedHomePageEntry?.widgets ?? [])
+    setAnnouncements(nextCachedHomePageEntry?.announcements ?? initialAnnouncements ?? [])
+    setEvents(nextCachedHomePageEntry?.events ?? initialEvents ?? [])
+    setTests(nextCachedHomePageEntry?.tests ?? initialTests ?? [])
+    setLoading(!nextHasWidgetSeed)
+  }, [clubId, initialAnnouncements, initialEvents, initialTests])
 
   // Calculate stats when data changes
   useEffect(() => {
     setStats({
-      memberCount: club.memberships?.length || 0,
+      memberCount,
       announcementCount: announcements.length,
       eventCount: events.length,
       testCount: tests.length,
     })
-  }, [announcements.length, events.length, tests.length, club.memberships?.length])
+  }, [announcements.length, events.length, tests.length, memberCount])
 
   const fetchWidgets = async (options?: { silent?: boolean }) => {
     try {
+      if (!options?.silent) {
+        setLoading(true)
+      }
       const response = await fetch(`/api/widgets?clubId=${clubId}`)
       if (handleMembershipLossStatus(response)) return
       if (!response.ok) {
@@ -304,7 +367,9 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
         return
       }
       const data = await response.json()
-      setWidgets(data.widgets || [])
+      const nextWidgets = data.widgets || []
+      setWidgets(nextWidgets)
+      updateHomePageTabCache(clubId, { widgets: nextWidgets })
     } catch (error) {
       console.error('Failed to fetch widgets:', error)
       if (!options?.silent) {
@@ -315,7 +380,9 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
         })
       }
     } finally {
-      setLoading(false)
+      if (!options?.silent) {
+        setLoading(false)
+      }
     }
   }
 
@@ -334,7 +401,11 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
               if (handleMembershipLossStatus(res)) return null
               return res.ok ? res.json() : null
             })
-            .then(data => data && setAnnouncements(data.announcements || []))
+            .then(data => {
+              const nextAnnouncements = data?.announcements || []
+              setAnnouncements(nextAnnouncements)
+              updateHomePageTabCache(clubId, { announcements: nextAnnouncements })
+            })
             .catch(err => console.error('Failed to fetch announcements:', err))
         )
       }
@@ -346,7 +417,11 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
               if (handleMembershipLossStatus(res)) return null
               return res.ok ? res.json() : null
             })
-            .then(data => data && setEvents(data.events || []))
+            .then(data => {
+              const nextEvents = data?.events || []
+              setEvents(nextEvents)
+              updateHomePageTabCache(clubId, { events: nextEvents })
+            })
             .catch(err => console.error('Failed to fetch events:', err))
         )
       }
@@ -358,7 +433,11 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
               if (handleMembershipLossStatus(res)) return null
               return res.ok ? res.json() : null
             })
-            .then(data => data && setTests(data.tests || []))
+            .then(data => {
+              const nextTests = data?.tests || []
+              setTests(nextTests)
+              updateHomePageTabCache(clubId, { tests: nextTests })
+            })
             .catch(err => console.error('Failed to fetch tests:', err))
         )
       }
@@ -367,7 +446,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
 
       // Calculate stats - use current state values
       setStats(_prev => ({
-        memberCount: club.memberships?.length || 0,
+        memberCount,
         announcementCount: announcements.length,
         eventCount: events.length,
         testCount: tests.length,
@@ -379,14 +458,16 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
 
   useBackgroundRefresh(
     async () => {
+      if (!user?.id) return
       await Promise.all([
-        fetchWidgets({ silent: true }),
+        fetchWidgets({ silent: homePageTabCache.has(clubId) }),
         fetchData({ force: true }),
       ])
     },
     {
       intervalMs: 35_000,
-      runOnMount: false,
+      runOnMount: true,
+      enabled: isActive,
     },
   )
 
@@ -574,8 +655,8 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
       case 'WELCOME_MESSAGE':
         return (
           <WelcomeWidget
-            clubName={club.name}
-            memberCount={club.memberships?.length || 0}
+            clubName={clubName}
+            memberCount={memberCount}
             {...widgetProps}
           />
         )
@@ -662,7 +743,7 @@ export function HomePageTab({ clubId, club, isAdmin, user, initialEvents, initia
         <div className="min-w-0 flex-1">
           <h2 className="text-xl sm:text-2xl font-bold truncate">Home</h2>
           <p className="text-sm sm:text-base text-muted-foreground truncate">
-            Welcome back to {club.name}
+            Welcome back to {clubName}
           </p>
         </div>
         {canConfigureWidgets && (

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { Role } from '@prisma/client'
 import { TournamentTestsClient } from '@/components/tournament-tests-client'
+import { parseTournamentTrialEvents } from '@/lib/tournament-trial-events'
 
 async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
   const admin = await prisma.tournamentAdmin.findUnique({
@@ -55,6 +56,7 @@ export default async function TournamentTestsPage({
       id: true,
       name: true,
       division: true,
+      trialEvents: true,
     },
   })
 
@@ -98,16 +100,17 @@ export default async function TournamentTestsPage({
   })
 
   const userClubs = memberships.map(m => m.club)
+  const trialEvents = parseTournamentTrialEvents(tournament.trialEvents, tournament.division)
 
   return (
     <TournamentTestsClient
       tournamentId={tournamentId}
       tournamentName={tournament.name}
       tournamentDivision={tournament.division}
+      trialEvents={trialEvents}
       events={events}
       userClubs={userClubs}
       user={session.user}
     />
   )
 }
-

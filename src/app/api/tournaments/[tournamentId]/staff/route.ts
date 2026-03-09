@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { nanoid } from 'nanoid'
 import { sendStaffInviteEmail } from '@/lib/email'
+import { serverSession } from '@/lib/server-session'
+import { isTournamentDirector } from '@/lib/rbac'
 
 // GET /api/tournaments/[tournamentId]/staff - List all staff
 export async function GET(
@@ -12,31 +12,28 @@ export async function GET(
 ) {
   const _resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { tournamentId } = await params
 
-    // Check if user is a TD or creator of the tournament
     const tournament = await prisma.tournament.findUnique({
       where: { id: tournamentId },
-      include: {
-        admins: true,
-        hostingRequest: true,
-      },
+      select: { id: true },
     })
 
     if (!tournament) {
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
     }
 
-    const isCreator = tournament.createdById === session.user.id
-    const isAdmin = tournament.admins.some(a => a.userId === session.user.id)
-    const isDirector = tournament.hostingRequest?.directorEmail.toLowerCase() === session.user.email?.toLowerCase()
-
-    if (!isCreator && !isAdmin && !isDirector) {
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email || '',
+      tournamentId,
+    )
+    if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Not authorized to view staff' }, { status: 403 })
     }
 
@@ -91,7 +88,7 @@ export async function POST(
 ) {
   const _resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -110,12 +107,11 @@ export async function POST(
       return NextResponse.json({ error: 'Email and role are required' }, { status: 400 })
     }
 
-    // Check if user is authorized
     const tournament = await prisma.tournament.findUnique({
       where: { id: tournamentId },
-      include: {
-        admins: true,
-        hostingRequest: true,
+      select: {
+        id: true,
+        name: true,
       },
     })
 
@@ -123,11 +119,12 @@ export async function POST(
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
     }
 
-    const isCreator = tournament.createdById === session.user.id
-    const isAdmin = tournament.admins.some(a => a.userId === session.user.id)
-    const isDirector = tournament.hostingRequest?.directorEmail.toLowerCase() === session.user.email?.toLowerCase()
-
-    if (!isCreator && !isAdmin && !isDirector) {
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email || '',
+      tournamentId,
+    )
+    if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Not authorized to invite staff' }, { status: 403 })
     }
 
@@ -211,7 +208,7 @@ export async function DELETE(
 ) {
   const _resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -224,24 +221,21 @@ export async function DELETE(
       return NextResponse.json({ error: 'Staff ID is required' }, { status: 400 })
     }
 
-    // Check if user is authorized
     const tournament = await prisma.tournament.findUnique({
       where: { id: tournamentId },
-      include: {
-        admins: true,
-        hostingRequest: true,
-      },
+      select: { id: true },
     })
 
     if (!tournament) {
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
     }
 
-    const isCreator = tournament.createdById === session.user.id
-    const isAdmin = tournament.admins.some(a => a.userId === session.user.id)
-    const isDirector = tournament.hostingRequest?.directorEmail.toLowerCase() === session.user.email?.toLowerCase()
-
-    if (!isCreator && !isAdmin && !isDirector) {
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email || '',
+      tournamentId,
+    )
+    if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Not authorized to remove staff' }, { status: 403 })
     }
 
@@ -263,7 +257,7 @@ export async function PATCH(
 ) {
   const _resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -281,24 +275,21 @@ export async function PATCH(
       return NextResponse.json({ error: 'Staff ID is required' }, { status: 400 })
     }
 
-    // Check if user is authorized
     const tournament = await prisma.tournament.findUnique({
       where: { id: tournamentId },
-      include: {
-        admins: true,
-        hostingRequest: true,
-      },
+      select: { id: true },
     })
 
     if (!tournament) {
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
     }
 
-    const isCreator = tournament.createdById === session.user.id
-    const isAdmin = tournament.admins.some(a => a.userId === session.user.id)
-    const isDirector = tournament.hostingRequest?.directorEmail.toLowerCase() === session.user.email?.toLowerCase()
-
-    if (!isCreator && !isAdmin && !isDirector) {
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email || '',
+      tournamentId,
+    )
+    if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Not authorized to update staff' }, { status: 403 })
     }
 
@@ -391,4 +382,3 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to update staff' }, { status: 500 })
   }
 }
-
