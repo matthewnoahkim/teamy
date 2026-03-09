@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { serverSession } from '@/lib/server-session'
 import {
   getBirthYearBounds,
   isUnder13ForBirthDate,
@@ -19,9 +18,18 @@ const ageVerificationSchema = z.object({
   parentConsent: z.boolean().optional().default(false),
 })
 
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'P2002'
+  )
+}
+
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -64,11 +72,43 @@ export async function POST(request: Request) {
       parentConsent,
     })
 
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: { preferences: updatedPreferences as Prisma.InputJsonValue },
-      select: { id: true },
-    })
+    const sessionEmail = session.user.email?.trim()
+    if (!existingUser && !sessionEmail) {
+      return NextResponse.json(
+        { error: 'Your session is out of date. Please sign in again.' },
+        { status: 409 }
+      )
+    }
+
+    try {
+      if (!existingUser) {
+        console.warn('Recovering missing authenticated user during age verification', {
+          sessionUserId: session.user.id,
+        })
+      }
+
+      await prisma.user.upsert({
+        where: { id: session.user.id },
+        update: { preferences: updatedPreferences as Prisma.InputJsonValue },
+        create: {
+          id: session.user.id,
+          email: sessionEmail!,
+          name: session.user.name ?? null,
+          image: session.user.image ?? null,
+          preferences: updatedPreferences as Prisma.InputJsonValue,
+        },
+        select: { id: true },
+      })
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        return NextResponse.json(
+          { error: 'Your session is out of date. Please sign in again.' },
+          { status: 409 }
+        )
+      }
+
+      throw error
+    }
 
     return NextResponse.json({
       success: true,
