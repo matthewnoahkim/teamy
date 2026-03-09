@@ -6,6 +6,7 @@ import { tournamentRequestSchema, validateRequestBody } from '@/lib/validation-s
 import { getValidatedWebhook, EMAIL_CONFIG } from '@/lib/security-config'
 import { requireDevAccess } from '@/lib/dev/guard'
 import { escapeHtml, renderTeamyEmailLayout } from '@/lib/email'
+import { getPublicApprovedTournamentRequests } from '@/lib/public-tournament-listings'
 
 /**
  * Tournament Hosting Request API Endpoint
@@ -276,27 +277,7 @@ export async function GET(request: NextRequest) {
     // All other request views are dev-panel-only and should not leak route/data.
     const isPublicApprovedListing = normalizedStatus === 'APPROVED' && !search
     if (isPublicApprovedListing) {
-      const publicRequests = await prisma.tournamentHostingRequest.findMany({
-        where: { status: 'APPROVED' },
-        select: {
-          id: true,
-          tournamentName: true,
-          tournamentLevel: true,
-          division: true,
-          tournamentFormat: true,
-          location: true,
-          preferredSlug: true,
-          status: true,
-          createdAt: true,
-          tournament: {
-            select: {
-              id: true,
-              published: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      })
+      const publicRequests = await getPublicApprovedTournamentRequests()
 
       return NextResponse.json({ requests: publicRequests })
     }

@@ -14,6 +14,10 @@ interface Props {
 }
 
 export async function generateStaticParams() {
+  if (!process.env.DATABASE_URL) {
+    return []
+  }
+
   try {
     const posts = await prisma.blogPost.findMany({
       where: { published: true },

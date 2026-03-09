@@ -6,6 +6,7 @@ import { PublicPageTransition } from '@/components/public-page-transition'
 import { PublicPageTools } from '@/components/public-page-tools'
 import { prisma } from '@/lib/prisma'
 import { unstable_cache } from 'next/cache'
+import { cookies } from 'next/headers'
 import { PublicUserActions } from '@/components/public-user-actions'
 import { serverSession } from '@/lib/server-session'
 
@@ -16,6 +17,15 @@ interface PublicPageLayoutProps {
 }
 
 const getBannerSettings = unstable_cache(async () => {
+  if (!process.env.DATABASE_URL) {
+    return {
+      enabled: false,
+      text: 'Welcome to Teamy. Questions or feedback? teamysite@gmail.com',
+      link: '',
+      backgroundColor: '#0056C7',
+    }
+  }
+
   try {
     const [enabledSetting, textSetting, linkSetting, bgSetting] = await Promise.all([
       prisma.siteSetting.findUnique({ where: { key: 'banner_enabled' } }),
@@ -41,14 +51,25 @@ const getBannerSettings = unstable_cache(async () => {
   }
 }, ['public-banner-settings'], { revalidate: 300 })
 
+async function hasAuthSessionCookie() {
+  const cookieStore = await cookies()
+  return [
+    '__Secure-next-auth.session-token',
+    'next-auth.session-token',
+    '__Secure-authjs.session-token',
+    'authjs.session-token',
+  ].some((cookieName) => cookieStore.has(cookieName))
+}
+
 export async function PublicPageLayout({
   children,
   hideFooter = false,
   disableUserAwareNav = false,
 }: PublicPageLayoutProps) {
+  const shouldLoadSession = !disableUserAwareNav && await hasAuthSessionCookie()
   const [bannerSettings, session] = await Promise.all([
     getBannerSettings(),
-    disableUserAwareNav ? Promise.resolve(null) : serverSession.get(),
+    shouldLoadSession ? serverSession.get() : Promise.resolve(null),
   ])
   const isAuthenticated = Boolean(session?.user)
 
