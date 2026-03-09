@@ -140,8 +140,9 @@ test('POST /api/tournaments/[tournamentId]/staff lets an accepted secondary TD i
 
     assert.equal(response.status, 200)
     assert.ok(createdData)
-    assert.equal(createdData.role, 'TOURNAMENT_DIRECTOR')
-    assert.equal(createdData.email, 'director-three@example.com')
+    const createdStaff = createdData as { role?: string; email?: string }
+    assert.equal(createdStaff.role, 'TOURNAMENT_DIRECTOR')
+    assert.equal(createdStaff.email, 'director-three@example.com')
   } finally {
     restoreAll(mocks)
   }
@@ -260,7 +261,8 @@ test('PATCH /api/tournaments/[tournamentId]/settings lets an accepted secondary 
 
     assert.equal(response.status, 200)
     assert.ok(updatedData)
-    assert.equal(updatedData.eligibilityRequirements, 'None')
+    const updatedTournament = updatedData as { eligibilityRequirements?: string }
+    assert.equal(updatedTournament.eligibilityRequirements, 'None')
   } finally {
     restoreAll(mocks)
   }

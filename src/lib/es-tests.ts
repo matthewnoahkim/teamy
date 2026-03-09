@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { Division } from '@prisma/client'
+import { ensureTournamentDirectorStaff } from '@/lib/tournament-director-staff'
 
 interface GetESTestsOptions {
   includeQuestions?: boolean
@@ -164,20 +165,24 @@ export async function getESTestsForUser(
   
   for (const admin of tournamentAdmins) {
     if (admin.tournament && !tournamentIdsSet.has(admin.tournament.id)) {
+      const staffRecord = await ensureTournamentDirectorStaff({
+        tournamentId: admin.tournament.id,
+        userId,
+        userEmail: email,
+      })
+      if (!staffRecord) {
+        continue
+      }
+
       tournamentIdsSet.add(admin.tournament.id)
       staffMemberships.push({
-        id: `admin-${admin.id}`,
+        ...staffRecord,
         userId,
         email,
         name: null,
         role: 'TOURNAMENT_DIRECTOR' as const,
         status: 'ACCEPTED' as const,
         tournamentId: admin.tournament.id,
-        inviteToken: `admin-${admin.id}-${admin.tournament.id}`,
-        invitedAt: new Date(),
-        acceptedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
         trialEvents: null,
         tournament: admin.tournament,
         events: [],
@@ -187,20 +192,24 @@ export async function getESTestsForUser(
 
   for (const tournament of createdTournaments) {
     if (!tournamentIdsSet.has(tournament.id)) {
+      const staffRecord = await ensureTournamentDirectorStaff({
+        tournamentId: tournament.id,
+        userId,
+        userEmail: email,
+      })
+      if (!staffRecord) {
+        continue
+      }
+
       tournamentIdsSet.add(tournament.id)
       staffMemberships.push({
-        id: `creator-${tournament.id}`,
+        ...staffRecord,
         userId,
         email,
         name: null,
         role: 'TOURNAMENT_DIRECTOR' as const,
         status: 'ACCEPTED' as const,
         tournamentId: tournament.id,
-        inviteToken: `creator-${tournament.id}`,
-        invitedAt: new Date(),
-        acceptedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
         trialEvents: null,
         tournament: tournament,
         events: [],
@@ -210,20 +219,24 @@ export async function getESTestsForUser(
 
   for (const request of directorHostingRequests) {
     if (request.tournament && !tournamentIdsSet.has(request.tournament.id)) {
+      const staffRecord = await ensureTournamentDirectorStaff({
+        tournamentId: request.tournament.id,
+        userId,
+        userEmail: email,
+      })
+      if (!staffRecord) {
+        continue
+      }
+
       tournamentIdsSet.add(request.tournament.id)
       staffMemberships.push({
-        id: `hosting-${request.id}`,
+        ...staffRecord,
         userId,
         email,
         name: null,
         role: 'TOURNAMENT_DIRECTOR' as const,
         status: 'ACCEPTED' as const,
         tournamentId: request.tournament.id,
-        inviteToken: `hosting-${request.id}`,
-        invitedAt: new Date(),
-        acceptedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
         trialEvents: null,
         tournament: request.tournament,
         events: [],

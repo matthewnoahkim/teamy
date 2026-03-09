@@ -1,33 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { isTournamentDirector } from '@/lib/rbac'
+import { serverSession } from '@/lib/server-session'
 
 const addTestSchema = z.object({
   testId: z.string(),
   eventId: z.string().optional(),
 })
-
-// Helper to check if user is tournament admin
-async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
-  const admin = await prisma.tournamentAdmin.findUnique({
-    where: {
-      tournamentId_userId: {
-        tournamentId,
-        userId,
-      },
-    },
-  })
-  if (admin) return true
-
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    select: { createdById: true },
-  })
-
-  return tournament?.createdById === userId
-}
 
 // GET /api/tournaments/[tournamentId]/tests
 export async function GET(
@@ -36,15 +16,18 @@ export async function GET(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const session = await serverSession.get()
+    if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Only tournament admins can view tests' }, { status: 403 })
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email,
+      resolvedParams.tournamentId,
+    )
+    if (!hasDirectorAccess) {
+      return NextResponse.json({ error: 'Only tournament directors can view tests' }, { status: 403 })
     }
 
     const tournamentTests = await prisma.tournamentTest.findMany({
@@ -103,15 +86,18 @@ export async function POST(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const session = await serverSession.get()
+    if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Only tournament admins can add tests' }, { status: 403 })
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email,
+      resolvedParams.tournamentId,
+    )
+    if (!hasDirectorAccess) {
+      return NextResponse.json({ error: 'Only tournament directors can add tests' }, { status: 403 })
     }
 
     const body = await req.json()
@@ -200,15 +186,18 @@ export async function DELETE(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const session = await serverSession.get()
+    if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Only tournament admins can remove tests' }, { status: 403 })
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email,
+      resolvedParams.tournamentId,
+    )
+    if (!hasDirectorAccess) {
+      return NextResponse.json({ error: 'Only tournament directors can remove tests' }, { status: 403 })
     }
 
     const { searchParams } = new URL(req.url)
@@ -233,4 +222,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

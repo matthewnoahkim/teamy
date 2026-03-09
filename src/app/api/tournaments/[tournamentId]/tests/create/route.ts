@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { getUserMembership } from '@/lib/rbac'
+import { isTournamentDirector } from '@/lib/rbac'
 import { upsertTournamentTrialEvent } from '@/lib/tournament-trial-events'
 import { Prisma, Role, ScoreReleaseMode } from '@prisma/client'
 import { z } from 'zod'
+import { serverSession } from '@/lib/server-session'
 
 // Reuse the exact same schemas from /api/tests/route.ts
 const questionOptionSchema = z.object({
@@ -50,27 +49,6 @@ const createTestSchema = z.object({
 
 type _QuestionInput = z.infer<typeof questionSchema>
 
-// Helper to check if user is tournament admin
-async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
-  const admin = await prisma.tournamentAdmin.findUnique({
-    where: {
-      tournamentId_userId: {
-        tournamentId,
-        userId,
-      },
-    },
-  })
-  
-  if (admin) return true
-  
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    select: { createdById: true },
-  })
-  
-  return tournament?.createdById === userId
-}
-
 // POST /api/tournaments/[tournamentId]/tests/create
 export async function POST(
   req: NextRequest,
@@ -78,15 +56,18 @@ export async function POST(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const session = await serverSession.get()
+    if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user is tournament admin
-    const isAdmin = await isTournamentAdmin(session.user.id, resolvedParams.tournamentId)
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Only tournament admins can create tests' }, { status: 403 })
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email,
+      resolvedParams.tournamentId,
+    )
+    if (!hasDirectorAccess) {
+      return NextResponse.json({ error: 'Only tournament directors can create tests' }, { status: 403 })
     }
 
     // Get tournament info
@@ -104,34 +85,40 @@ export async function POST(
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 })
     }
 
-    // Find a club to use (tests require a clubId, but we'll handle it internally)
-    // Use the current user's first admin club matching the tournament division
-    const userMembership = await prisma.membership.findFirst({
-      where: {
-        userId: session.user.id,
-        role: Role.ADMIN,
-        club: {
-          division: tournament.division,
+    // Tournament tests still require a backing club membership.
+    // Prefer a same-division admin club, but fall back to any admin club so invited TDs can create tests too.
+    const userMembership =
+      await prisma.membership.findFirst({
+        where: {
+          userId: session.user.id,
+          role: Role.ADMIN,
+          club: {
+            division: tournament.division,
+          },
         },
-      },
-      select: {
-        clubId: true,
-      },
-    })
+        select: {
+          id: true,
+          clubId: true,
+        },
+      }) ??
+      await prisma.membership.findFirst({
+        where: {
+          userId: session.user.id,
+          role: Role.ADMIN,
+        },
+        select: {
+          id: true,
+          clubId: true,
+        },
+      })
 
     if (!userMembership) {
       return NextResponse.json({ 
-        error: 'You need at least one club in the tournament division to create tests' 
+        error: 'You need at least one admin club to create tests' 
       }, { status: 400 })
     }
 
     const clubId = userMembership.clubId
-
-    // Get membership for the test creation
-    const membership = await getUserMembership(session.user.id, clubId)
-    if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
-    }
 
     const body = await req.json()
     const validatedData = createTestSchema.parse(body)
@@ -222,7 +209,7 @@ export async function POST(
           releaseScoresAt: releaseScoresAt ? new Date(releaseScoresAt) : null,
           maxAttempts: maxAttempts ?? null,
           scoreReleaseMode: (scoreReleaseMode ?? 'FULL_TEST') as ScoreReleaseMode,
-          createdByMembershipId: membership.id,
+          createdByMembershipId: userMembership.id,
         },
       })
 
@@ -263,7 +250,7 @@ export async function POST(
       await tx.testAudit.create({
         data: {
           testId: baseTest.id,
-          actorMembershipId: membership.id,
+          actorMembershipId: userMembership.id,
           action: 'CREATE',
           details: {
             testName: baseTest.name,

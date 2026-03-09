@@ -122,6 +122,15 @@ export default async function ESPortalPage({ searchParams }: ESPortalPageProps) 
     }
   }
 
+  if (
+    token &&
+    inviteInfo &&
+    inviteInfo.email.toLowerCase() !== session.user.email.toLowerCase()
+  ) {
+    const serializedInviteInfo = await serializeInviteInfo()
+    return <ESLoginClient unauthorized email={session.user.email} inviteInfo={serializedInviteInfo} token={token} />
+  }
+
   // Build all ES/TD test access using the shared loader (single source of truth).
   const serializedStaffMemberships = await getESTestsForUser(
     session.user.id,

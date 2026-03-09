@@ -3,25 +3,52 @@
 import { signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Logo } from '@/components/logo'
-import { Trophy, AlertCircle } from 'lucide-react'
+import { Trophy, AlertCircle, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { buildAuthCallbackUrl } from '@/lib/auth-callback-url'
+import { format } from 'date-fns'
+import { formatDivision } from '@/lib/utils'
+
+interface InviteInfo {
+  id: string
+  email: string
+  name: string | null
+  role: 'TOURNAMENT_DIRECTOR'
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED'
+  tournament: {
+    id: string
+    name: string
+    division: string
+    startDate: string
+    endDate: string
+  }
+}
 
 interface TDLoginClientProps {
   unauthorized?: boolean
   email?: string
+  inviteInfo?: InviteInfo | null
+  token?: string
 }
 
-export function TDLoginClient({ unauthorized, email }: TDLoginClientProps) {
-  const authCallbackUrl = buildAuthCallbackUrl('/td')
+export function TDLoginClient({ unauthorized, email, inviteInfo, token }: TDLoginClientProps) {
+  const destinationPath = token ? `/td?${new URLSearchParams({ token }).toString()}` : '/td'
+  const authCallbackUrl = buildAuthCallbackUrl(destinationPath)
+  const invitedDifferentEmail = !!(
+    unauthorized &&
+    inviteInfo &&
+    email &&
+    inviteInfo.email.toLowerCase() !== email.toLowerCase()
+  )
 
   const handleSignIn = () => {
     signIn('google', { callbackUrl: authCallbackUrl })
   }
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/td' })
+    signOut({ callbackUrl: destinationPath })
   }
 
   return (
@@ -45,15 +72,53 @@ export function TDLoginClient({ unauthorized, email }: TDLoginClientProps) {
               <Trophy className="h-10 w-10 text-teamy-primary" />
             </div>
             <CardTitle className="text-2xl">
-              {unauthorized ? 'Access Denied' : 'Tournament Director Portal'}
+              {unauthorized ? 'Access Denied' : inviteInfo ? "You're Invited!" : 'Tournament Director Portal'}
             </CardTitle>
             <CardDescription className="text-base">
               {unauthorized 
-                ? 'Your email is not associated with a tournament hosting request.'
-                : 'Sign in with the email you used to submit your tournament hosting request.'}
+                ? inviteInfo
+                  ? invitedDifferentEmail
+                    ? 'This invitation is tied to a different account.'
+                    : 'This invitation is not currently active for this account.'
+                  : 'Your email is not associated with any tournament hosting request or TD invitation.'
+                : inviteInfo
+                  ? `You've been invited to join ${inviteInfo.tournament.name}`
+                  : 'Sign in with the email you used to submit your tournament hosting request.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {inviteInfo && (
+              <div className="space-y-4">
+                <div className="p-4 bg-teamy-primary/5 dark:bg-white/5 rounded-xl border border-teamy-primary/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge className="bg-teamy-primary/10 text-teamy-primary border-teamy-primary/20">
+                      Tournament Director
+                    </Badge>
+                    <Badge variant="outline" className="border-teamy-primary/30">
+                      Division {formatDivision(inviteInfo.tournament.division)}
+                    </Badge>
+                  </div>
+
+                  <h3 className="font-semibold text-lg mb-2">{inviteInfo.tournament.name}</h3>
+
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-teamy-primary" />
+                      <span>
+                        {format(new Date(inviteInfo.tournament.startDate), 'MMM d')} - {format(new Date(inviteInfo.tournament.endDate), 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {!unauthorized && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Sign in with <strong>{inviteInfo.email}</strong> to accept your invitation
+                  </p>
+                )}
+              </div>
+            )}
+
             {unauthorized ? (
               <>
                 <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -61,11 +126,20 @@ export function TDLoginClient({ unauthorized, email }: TDLoginClientProps) {
                     <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-destructive">
-                        No tournament request found
+                        {inviteInfo ? 'Invitation email mismatch' : 'No tournament access found'}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        The email <strong>{email}</strong> is not associated with any tournament hosting request. 
-                        Please sign in with the email you used when submitting your request.
+                        {invitedDifferentEmail ? (
+                          <>
+                            This invitation was sent to <strong>{inviteInfo.email}</strong>, but you are signed in as <strong>{email}</strong>.
+                            Sign out and continue with the invited email.
+                          </>
+                        ) : (
+                          <>
+                            The email <strong>{email}</strong> is not associated with any tournament hosting request or accepted TD invitation.
+                            Please sign in with the email you used when submitting your request or the email that received the TD invite.
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -106,14 +180,16 @@ export function TDLoginClient({ unauthorized, email }: TDLoginClientProps) {
                       d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                     />
                   </svg>
-                  Sign in with Google
+                  {inviteInfo ? 'Accept Invitation & Sign In' : 'Sign in with Google'}
                 </Button>
-                <p className="text-xs text-center text-muted-foreground">
-                  Don&apos;t have a tournament request?{' '}
-                  <Link href="/tournaments" className="text-teamy-primary hover:underline">
-                    Submit one here
-                  </Link>
-                </p>
+                {!inviteInfo && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    Don&apos;t have a tournament request?{' '}
+                    <Link href="/tournaments" className="text-teamy-primary hover:underline">
+                      Submit one here
+                    </Link>
+                  </p>
+                )}
               </>
             )}
           </CardContent>

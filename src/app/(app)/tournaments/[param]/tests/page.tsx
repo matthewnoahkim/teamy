@@ -5,27 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { Role } from '@prisma/client'
 import { TournamentTestsClient } from '@/components/tournament-tests-client'
 import { parseTournamentTrialEvents } from '@/lib/tournament-trial-events'
-
-async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
-  const admin = await prisma.tournamentAdmin.findUnique({
-    where: {
-      tournamentId_userId: {
-        tournamentId,
-        userId,
-      },
-    },
-  })
-  
-  if (admin) return true
-  
-  // Check if user is the creator
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    select: { createdById: true },
-  })
-  
-  return tournament?.createdById === userId
-}
+import { isTournamentDirector } from '@/lib/rbac'
 
 export default async function TournamentTestsPage({ 
   params 
@@ -43,7 +23,7 @@ export default async function TournamentTestsPage({
   const tournamentId = resolvedParams.param
 
   // Check if user is tournament admin
-  const isAdmin = await isTournamentAdmin(session.user.id, tournamentId)
+  const isAdmin = await isTournamentDirector(session.user.id, session.user.email || '', tournamentId)
   
   if (!isAdmin) {
     redirect(`/tournaments/${tournamentId}`)

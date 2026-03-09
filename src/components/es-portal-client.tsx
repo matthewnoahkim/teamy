@@ -851,8 +851,8 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
                                           <Link 
                                             href={
                                               isTrialEvent
-                                                ? `/es/tests/new?staffId=${membership.id}&eventName=${encodeURIComponent(eventAssignment.event.name)}&trialEventDivision=${eventAssignment.event.division}`
-                                                : `/es/tests/new?staffId=${membership.id}&eventId=${eventAssignment.event.id}`
+                                                ? `/es/tests/new?staffId=${membership.id}&tournamentId=${membership.tournament.id}&eventName=${encodeURIComponent(eventAssignment.event.name)}&trialEventDivision=${eventAssignment.event.division}`
+                                                : `/es/tests/new?staffId=${membership.id}&tournamentId=${membership.tournament.id}&eventId=${eventAssignment.event.id}`
                                             }
                                           >
                                             <Button size="sm" className="bg-teamy-primary text-white hover:bg-teamy-primary-dark">

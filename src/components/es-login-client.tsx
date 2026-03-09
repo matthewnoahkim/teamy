@@ -42,6 +42,12 @@ interface ESLoginClientProps {
 export function ESLoginClient({ unauthorized, email, inviteInfo, token }: ESLoginClientProps) {
   const destinationPath = token ? `/es?token=${token}` : '/es'
   const authCallbackUrl = buildAuthCallbackUrl(destinationPath)
+  const invitedDifferentEmail = !!(
+    unauthorized &&
+    inviteInfo &&
+    email &&
+    inviteInfo.email.toLowerCase() !== email.toLowerCase()
+  )
 
   const handleSignIn = () => {
     signIn('google', { callbackUrl: authCallbackUrl })
@@ -78,7 +84,11 @@ export function ESLoginClient({ unauthorized, email, inviteInfo, token }: ESLogi
             </CardTitle>
             <CardDescription className="text-base">
               {unauthorized 
-                ? 'Your email is not associated with any tournament staff invitation.'
+                ? inviteInfo
+                  ? invitedDifferentEmail
+                    ? 'This invitation is tied to a different account.'
+                    : 'This invitation is not currently active for this account.'
+                  : 'Your email is not associated with any tournament staff invitation.'
                 : inviteInfo
                   ? `You've been invited to join ${inviteInfo.tournament.name}`
                   : 'Sign in with your invited email to access your tournament assignments.'}
@@ -86,7 +96,7 @@ export function ESLoginClient({ unauthorized, email, inviteInfo, token }: ESLogi
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Invitation Details */}
-            {inviteInfo && !unauthorized && (
+            {inviteInfo && (
               <div className="space-y-4">
                 <div className="p-4 bg-teamy-primary/5 dark:bg-white/5 rounded-xl border border-teamy-primary/20">
                   <div className="flex items-center gap-2 mb-3">
@@ -126,9 +136,11 @@ export function ESLoginClient({ unauthorized, email, inviteInfo, token }: ESLogi
                   </div>
                 </div>
 
-                <p className="text-sm text-muted-foreground text-center">
-                  Sign in with <strong>{inviteInfo.email}</strong> to accept your invitation
-                </p>
+                {!unauthorized && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Sign in with <strong>{inviteInfo.email}</strong> to accept your invitation
+                  </p>
+                )}
               </div>
             )}
 
@@ -139,11 +151,20 @@ export function ESLoginClient({ unauthorized, email, inviteInfo, token }: ESLogi
                     <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-red-700 dark:text-red-300">
-                        No invitation found
+                        {inviteInfo ? 'Invitation email mismatch' : 'No invitation found'}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        The email <strong>{email}</strong> is not associated with any tournament staff invitation. 
-                        Please sign in with the email that received the invitation.
+                        {invitedDifferentEmail ? (
+                          <>
+                            This invitation was sent to <strong>{inviteInfo.email}</strong>, but you are signed in as <strong>{email}</strong>.
+                            Sign out and continue with the invited email.
+                          </>
+                        ) : (
+                          <>
+                            The email <strong>{email}</strong> is not associated with any tournament staff invitation. 
+                            Please sign in with the email that received the invitation.
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>

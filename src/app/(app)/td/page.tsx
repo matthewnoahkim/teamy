@@ -1,15 +1,115 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { TDPortalClient, type TournamentRequest } from '@/components/td-portal-client'
 import { TDLoginClient } from '@/components/td-login-client'
+import { serverSession } from '@/lib/server-session'
 
-export default async function TDPortalPage() {
-  const session = await getServerSession(authOptions)
+interface TDPortalPageProps {
+  searchParams: Promise<{ token?: string }>
+}
+
+interface InviteInfo {
+  id: string
+  email: string
+  name: string | null
+  role: 'TOURNAMENT_DIRECTOR'
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED'
+  tournament: {
+    id: string
+    name: string
+    division: string
+    startDate: Date
+    endDate: Date
+    hostingRequestId: string | null
+  }
+}
+
+export default async function TDPortalPage({ searchParams }: TDPortalPageProps) {
+  const { token } = await searchParams
+  const session = await serverSession.get()
+
+  let inviteInfo: InviteInfo | null = null
+  if (token) {
+    const foundInvite = await prisma.tournamentStaff.findUnique({
+      where: { inviteToken: token },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        tournament: {
+          select: {
+            id: true,
+            name: true,
+            division: true,
+            startDate: true,
+            endDate: true,
+            hostingRequestId: true,
+          },
+        },
+      },
+    })
+
+    if (foundInvite?.role === 'TOURNAMENT_DIRECTOR') {
+      inviteInfo = foundInvite as InviteInfo
+    }
+  }
+
+  const serializeInviteInfo = async () => {
+    if (!inviteInfo) return null
+
+    let displayDivision = inviteInfo.tournament.division
+    if (inviteInfo.tournament.hostingRequestId) {
+      const hostingRequest = await prisma.tournamentHostingRequest.findUnique({
+        where: { id: inviteInfo.tournament.hostingRequestId },
+        select: { division: true },
+      })
+      if (hostingRequest?.division) {
+        displayDivision = hostingRequest.division
+      }
+    }
+
+    return {
+      ...inviteInfo,
+      tournament: {
+        ...inviteInfo.tournament,
+        division: displayDivision,
+        startDate: inviteInfo.tournament.startDate.toISOString(),
+        endDate: inviteInfo.tournament.endDate.toISOString(),
+      },
+    }
+  }
 
   // If not signed in, show login page
   if (!session?.user?.email) {
-    return <TDLoginClient />
+    const serializedInviteInfo = await serializeInviteInfo()
+    return <TDLoginClient inviteInfo={serializedInviteInfo} token={token} />
+  }
+
+  if (
+    token &&
+    inviteInfo &&
+    inviteInfo.status === 'PENDING' &&
+    inviteInfo.email.toLowerCase() === session.user.email.toLowerCase()
+  ) {
+    await prisma.tournamentStaff.update({
+      where: { id: inviteInfo.id },
+      data: {
+        status: 'ACCEPTED',
+        acceptedAt: new Date(),
+        userId: session.user.id,
+        name: inviteInfo.name || session.user.name,
+      },
+    })
+  }
+
+  if (
+    token &&
+    inviteInfo &&
+    inviteInfo.email.toLowerCase() !== session.user.email.toLowerCase()
+  ) {
+    const serializedInviteInfo = await serializeInviteInfo()
+    return <TDLoginClient unauthorized email={session.user.email} inviteInfo={serializedInviteInfo} token={token} />
   }
 
   // Check if the user's email has a tournament hosting request
@@ -64,9 +164,14 @@ export default async function TDPortalPage() {
     },
   })
 
-  // Combine requests and staff records, deduplicating by tournament ID
+  if (requests.length === 0 && staffRecords.length === 0) {
+    const serializedInviteInfo = await serializeInviteInfo()
+    return <TDLoginClient unauthorized email={session.user.email} inviteInfo={serializedInviteInfo} token={token} />
+  }
+
+  // Combine accessible tournaments from the user's requests and accepted TD invites.
   const tournamentIds = new Set<string>()
-  const allAccess: Array<{
+  const accessibleTournaments: Array<{
     createdAt: Date
     updatedAt: Date
     tournament: { id: string; name: string; division: string; startDate: Date; endDate: Date } | null
@@ -76,7 +181,7 @@ export default async function TDPortalPage() {
   // Add all hosting requests so users can access TD portal immediately
   // after submitting (even before a tournament record exists).
   for (const request of requests) {
-    allAccess.push(request)
+    accessibleTournaments.push(request)
 
     if (request.tournament) {
       tournamentIds.add(request.tournament.id)
@@ -87,9 +192,7 @@ export default async function TDPortalPage() {
   for (const staff of staffRecords) {
     if (staff.tournament && !tournamentIds.has(staff.tournament.id)) {
       tournamentIds.add(staff.tournament.id)
-      // Create a request-like object for staff records
-      // Use staff.id as a marker, but we'll need to handle routing differently
-      allAccess.push({
+      accessibleTournaments.push({
         id: `staff-${staff.id}`, // Prefix to identify staff records
         tournamentId: staff.tournament.id,
         tournamentName: staff.tournament.name,
@@ -110,13 +213,12 @@ export default async function TDPortalPage() {
     }
   }
 
-  // If no access found, show unauthorized message
-  if (allAccess.length === 0) {
-    return <TDLoginClient unauthorized email={session.user.email} />
-  }
-
-  // Serialize dates for client component
-  const serializedRequests = allAccess.map(request => ({
+  const serializeRecords = (records: Array<{
+    createdAt: Date
+    updatedAt: Date
+    tournament: { id: string; name: string; division: string; startDate: Date; endDate: Date } | null
+    [key: string]: unknown
+  }>) => records.map(request => ({
     ...request,
     createdAt: request.createdAt.toISOString(),
     updatedAt: request.updatedAt.toISOString(),
@@ -127,5 +229,16 @@ export default async function TDPortalPage() {
     } : null,
   }))
 
-  return <TDPortalClient user={session.user} requests={serializedRequests as unknown as TournamentRequest[]} />
+  const serializedRequests = serializeRecords(requests)
+  const serializedAccessibleTournaments = serializeRecords(accessibleTournaments)
+
+  return (
+    <TDPortalClient
+      user={session.user}
+      requests={serializedRequests as unknown as TournamentRequest[]}
+      accessibleTournaments={
+        serializedAccessibleTournaments as unknown as TournamentRequest[]
+      }
+    />
+  )
 }
