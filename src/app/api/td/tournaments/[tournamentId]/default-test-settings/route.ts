@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { hasESAccess } from '@/lib/rbac'
+import { hasESAccess, isTournamentDirector } from '@/lib/rbac'
+import { serverSession } from '@/lib/server-session'
 import { z } from 'zod'
 import { CalculatorType, ScoreReleaseMode } from '@prisma/client'
 
@@ -29,7 +28,7 @@ export async function GET(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -100,7 +99,7 @@ export async function PATCH(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -112,9 +111,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Tournament ID is required' }, { status: 400 })
     }
 
-    // Check if user has access to this tournament
-    const hasAccess = await hasESAccess(session.user.id, session.user.email, tournamentId)
-    if (!hasAccess) {
+    // Only tournament directors/admins can change tournament-wide defaults.
+    const hasDirectorAccess = await isTournamentDirector(
+      session.user.id,
+      session.user.email,
+      tournamentId,
+    )
+    if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
     }
 
@@ -221,4 +224,3 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to update default test settings' }, { status: 500 })
   }
 }
-

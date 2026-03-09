@@ -3,6 +3,19 @@ import { prisma } from '@/lib/prisma'
 import { serverSession } from '@/lib/server-session'
 import { isTournamentDirector } from '@/lib/rbac'
 
+async function findScopedTimelineItem(id: string, tournamentId: string) {
+  const timelineItem = await prisma.tournamentTimeline.findUnique({
+    where: { id },
+    select: { id: true, tournamentId: true },
+  })
+
+  if (!timelineItem || timelineItem.tournamentId !== tournamentId) {
+    return null
+  }
+
+  return timelineItem
+}
+
 // GET /api/tournaments/[tournamentId]/timeline - List all timeline items
 export async function GET(
   request: NextRequest,
@@ -171,6 +184,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Not authorized to update timeline items' }, { status: 403 })
     }
 
+    const existingTimelineItem = await findScopedTimelineItem(id, tournamentId)
+    if (!existingTimelineItem) {
+      return NextResponse.json({ error: 'Timeline item not found' }, { status: 404 })
+    }
+
     const timelineItem = await prisma.tournamentTimeline.update({
       where: { id },
       data: {
@@ -228,6 +246,11 @@ export async function DELETE(
     )
     if (!hasDirectorAccess) {
       return NextResponse.json({ error: 'Not authorized to delete timeline items' }, { status: 403 })
+    }
+
+    const existingTimelineItem = await findScopedTimelineItem(timelineId, tournamentId)
+    if (!existingTimelineItem) {
+      return NextResponse.json({ error: 'Timeline item not found' }, { status: 404 })
     }
 
     await prisma.tournamentTimeline.delete({

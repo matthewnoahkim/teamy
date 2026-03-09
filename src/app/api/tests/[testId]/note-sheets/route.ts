@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
+import { requireMember, getUserMembership, hasESTestAccess, isAdmin } from '@/lib/rbac'
+import { serverSession } from '@/lib/server-session'
 import { writeFile, unlink } from 'fs/promises'
 import { join } from 'path'
 import { z } from 'zod'
@@ -45,7 +44,7 @@ export async function POST(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -716,7 +715,7 @@ export async function GET(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -748,6 +747,76 @@ export async function GET(
 
       if (esTest) {
         // Handle ESTest note sheets
+        if (adminView) {
+          const hasAdminAccess = await hasESTestAccess(
+            session.user.id,
+            session.user.email || '',
+            resolvedParams.testId,
+          )
+          if (!hasAdminAccess) {
+            return NextResponse.json(
+              { error: 'Only assigned tournament staff can view all note sheets' },
+              { status: 403 }
+            )
+          }
+
+          const noteSheets = await prisma.noteSheet.findMany({
+            where: {
+              esTestId: resolvedParams.testId,
+            },
+            select: {
+              id: true,
+              type: true,
+              content: true,
+              filePath: true,
+              filename: true,
+              status: true,
+              rejectionReason: true,
+              reviewedAt: true,
+              createdAt: true,
+              membership: {
+                select: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                    },
+                  },
+                  team: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                  club: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+              reviewer: {
+                select: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          })
+
+          return NextResponse.json({ noteSheets })
+        }
+
         // Get user memberships to find their registered teams/clubs
         const userMemberships = await prisma.membership.findMany({
           where: {
@@ -800,83 +869,30 @@ export async function GET(
           return NextResponse.json({ noteSheet: null })
         }
 
-        if (adminView) {
-          // Admin view - get all note sheets for this ESTest
-          // Check if user is tournament staff
-          const tournamentStaff = await prisma.tournamentStaff.findFirst({
-            where: {
-              tournamentId: esTest.tournamentId,
-              userId: session.user.id,
-            },
-          })
-          
-          if (!tournamentStaff) {
-            return NextResponse.json(
-              { error: 'Only tournament staff can view all note sheets' },
-              { status: 403 }
-            )
-          }
-
-          const noteSheets = await prisma.noteSheet.findMany({
-            where: {
+        // User view - get their own note sheet
+        const noteSheet = await prisma.noteSheet.findUnique({
+          where: {
+            esTestId_membershipId: {
               esTestId: resolvedParams.testId,
+              membershipId: membership.id,
             },
-            include: {
-              membership: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      name: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-              reviewer: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      name: true,
-                      email: true,
-                    },
+          },
+          include: {
+            reviewer: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
                   },
                 },
               },
             },
-            orderBy: {
-              createdAt: 'desc',
-            },
-          })
+          },
+        })
 
-          return NextResponse.json({ noteSheets })
-        } else {
-          // User view - get their own note sheet
-          const noteSheet = await prisma.noteSheet.findUnique({
-            where: {
-              esTestId_membershipId: {
-                esTestId: resolvedParams.testId,
-                membershipId: membership.id,
-              },
-            },
-            include: {
-              reviewer: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      name: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-            },
-          })
-
-          return NextResponse.json({ noteSheet })
-        }
+        return NextResponse.json({ noteSheet })
       }
     }
 

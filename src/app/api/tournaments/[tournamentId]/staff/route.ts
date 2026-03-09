@@ -239,6 +239,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Not authorized to remove staff' }, { status: 403 })
     }
 
+    const existingStaff = await prisma.tournamentStaff.findUnique({
+      where: { id: staffId },
+      select: { id: true, tournamentId: true },
+    })
+
+    if (!existingStaff || existingStaff.tournamentId !== tournamentId) {
+      return NextResponse.json({ error: 'Staff member not found' }, { status: 404 })
+    }
+
     await prisma.tournamentStaff.delete({
       where: { id: staffId },
     })

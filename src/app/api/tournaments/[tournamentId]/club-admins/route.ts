@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { serverSession } from '@/lib/server-session'
 
 // Helper to check if user is tournament admin
 async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
@@ -28,7 +27,7 @@ export async function GET(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -47,19 +46,35 @@ export async function GET(
       return NextResponse.json({ error: 'clubIds parameter is required' }, { status: 400 })
     }
 
-    const clubIds = clubIdsParam.split(',').filter(id => id.trim().length > 0)
+    const clubIds = [...new Set(clubIdsParam.split(',').map(id => id.trim()).filter(id => id.length > 0))]
     
     if (clubIds.length === 0) {
       return NextResponse.json({ adminEmails: [] })
     }
 
-    // Fetch all admins for the specified clubs
+    const registrations = await prisma.tournamentRegistration.findMany({
+      where: {
+        tournamentId: resolvedParams.tournamentId,
+        clubId: { in: clubIds },
+      },
+      select: {
+        clubId: true,
+      },
+    })
+
+    const registeredClubIds = [...new Set(registrations.map((registration) => registration.clubId))]
+
+    if (registeredClubIds.length === 0) {
+      return NextResponse.json({ adminEmails: [] })
+    }
+
+    // Fetch admins only for clubs actually registered to this tournament.
     const admins = await prisma.membership.findMany({
       where: {
-        clubId: { in: clubIds },
+        clubId: { in: registeredClubIds },
         role: 'ADMIN',
       },
-      include: {
+      select: {
         user: {
           select: {
             email: true,
@@ -80,4 +95,3 @@ export async function GET(
     )
   }
 }
-
