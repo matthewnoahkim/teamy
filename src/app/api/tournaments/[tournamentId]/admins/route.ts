@@ -101,7 +101,7 @@ export async function POST(
     }
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: 'No account found with that email or ID' }, { status: 400 })
     }
 
     // Check if already an admin
