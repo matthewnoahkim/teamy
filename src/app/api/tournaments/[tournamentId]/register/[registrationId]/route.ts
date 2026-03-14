@@ -75,41 +75,16 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid input', details: error.issues }, { status: 400 })
     }
-    
-    // Enhanced error logging
+
     console.error('Update registration error:', error)
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
-    console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
     const errorCode = (error as Record<string, unknown>)?.code
-    const errorMeta = (error as Record<string, unknown>)?.meta
-    
-    // Check for Prisma errors
-    if (errorCode === 'P2009' || errorMessage.includes('Unknown column') || (errorMessage.includes('column') && errorMessage.includes('does not exist'))) {
-      return NextResponse.json({
-        error: 'Database schema error. Please contact support.',
-        details: process.env.NODE_ENV === 'development' ? { errorMessage, errorCode, meta: errorMeta } : undefined
-      }, { status: 500 })
-    }
-    
-    // Prisma validation errors
+
     if (errorCode === 'P2002') {
-      return NextResponse.json({ 
-        error: 'Validation error',
-        details: process.env.NODE_ENV === 'development' ? errorMeta : undefined 
-      }, { status: 400 })
+      return NextResponse.json({ error: 'Validation error' }, { status: 400 })
     }
-    
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? {
-        message: errorMessage,
-        code: errorCode,
-        meta: errorMeta,
-        stack: error instanceof Error ? error.stack : undefined
-      } : undefined 
-    }, { status: 500 })
+
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -173,10 +148,6 @@ export async function DELETE(
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Deregister from tournament error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ 
-      error: 'Internal server error', 
-      details: process.env.NODE_ENV === 'development' ? errorMessage : undefined 
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -7,7 +7,7 @@ import crypto from 'crypto'
 export async function hashTestPassword(password: string): Promise<string> {
   return argon2.hash(password, {
     type: argon2.argon2id,
-    memoryCost: 65536, // 64 MB
+    memoryCost: 19456, // 19 MB — OWASP minimum; existing hashes remain verifiable
     timeCost: 3,
     parallelism: 4,
   })

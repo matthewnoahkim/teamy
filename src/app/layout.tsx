@@ -160,6 +160,30 @@ const bootstrapThemeAndBackgroundScript = `
         transparentSurfaceCss;
     }
 
+    function isValidCssColor(color) {
+      if (typeof color !== 'string') return false;
+      if (/^#[0-9a-f]{3,8}$/i.test(color)) return true;
+      if (/^(rgb|rgba|hsl|hsla)\\(\\s*[\\d\\s%.,/]+\\)$/i.test(color)) return true;
+      return false;
+    }
+
+    function isValidHttpsUrl(url) {
+      if (typeof url !== 'string') return false;
+      try {
+        var parsed = new URL(url);
+        return parsed.protocol === 'https:';
+      } catch (_e) {
+        return false;
+      }
+    }
+
+    function isValidGradientDirection(dir) {
+      if (typeof dir !== 'string') return false;
+      if (/^\\d+(\\.\\d+)?deg$/i.test(dir)) return true;
+      if (/^to\\s+(top|bottom|left|right)(\\s+(top|bottom|left|right))?$/i.test(dir)) return true;
+      return false;
+    }
+
     function applyImage(styleEl, imageUrl) {
       var normalizedImageUrl = String(imageUrl).replace(/["\\\\]/g, '\\\\$&');
       var imageCss = 'url("' + normalizedImageUrl + '")';
@@ -223,7 +247,8 @@ const bootstrapThemeAndBackgroundScript = `
         backgroundType === 'solid' &&
         preferences &&
         typeof preferences.backgroundColor === 'string' &&
-        preferences.backgroundColor
+        preferences.backgroundColor &&
+        isValidCssColor(preferences.backgroundColor)
       ) {
         applySolid(styleEl, preferences.backgroundColor);
         return;
@@ -236,7 +261,7 @@ const bootstrapThemeAndBackgroundScript = `
         preferences.gradientColors.length >= 2
       ) {
         var gradientColors = preferences.gradientColors.filter(function(color) {
-          return typeof color === 'string' && color.length > 0;
+          return typeof color === 'string' && color.length > 0 && isValidCssColor(color);
         });
 
         if (gradientColors.length >= 2) {
@@ -247,7 +272,7 @@ const bootstrapThemeAndBackgroundScript = `
             })
             .join(', ');
           var gradientDirection =
-            typeof preferences.gradientDirection === 'string'
+            typeof preferences.gradientDirection === 'string' && isValidGradientDirection(preferences.gradientDirection)
               ? preferences.gradientDirection
               : '135deg';
           applyGradient(
@@ -262,7 +287,8 @@ const bootstrapThemeAndBackgroundScript = `
         backgroundType === 'image' &&
         preferences &&
         typeof preferences.backgroundImageUrl === 'string' &&
-        preferences.backgroundImageUrl
+        preferences.backgroundImageUrl &&
+        isValidHttpsUrl(preferences.backgroundImageUrl)
       ) {
         applyImage(styleEl, preferences.backgroundImageUrl);
         return;
@@ -274,7 +300,9 @@ const bootstrapThemeAndBackgroundScript = `
     try {
       applyTheme();
       applyCachedBackground();
-    } catch (_error) {}
+    } catch (_error) {
+      console.error('Theme initialization error:', _error);
+    }
   })();
 `
 

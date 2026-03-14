@@ -61,12 +61,13 @@ export async function GET(
 
     // Return CSV with appropriate headers
     const cleanTitle = attendance.calendarEvent.title.replace(/[^a-z0-9\s]/gi, '').trim().replace(/\s+/g, ' ')
-    const filename = `${cleanTitle} attendance.csv`
+    const asciiFilename = (cleanTitle || 'attendance') + ' attendance.csv'
+    const encodedFilename = encodeURIComponent(asciiFilename)
 
     return new NextResponse(csv, {
       headers: {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `attachment; filename="attendance.csv"; filename*=UTF-8''${encodedFilename}`,
       },
     })
   } catch (error) {

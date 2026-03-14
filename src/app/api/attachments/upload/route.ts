@@ -168,29 +168,35 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(bytes)
     await writeFile(filePath, buffer)
 
-    // Create attachment in database
-    const attachment = await prisma.attachment.create({
-      data: {
-        filename,
-        originalFilename: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        filePath: buildPrivateUploadPath('attachments', filename),
-        announcementId: announcementId || null,
-        calendarEventId: calendarEventId || null,
-        uploadedById: session.user.id,
-      },
-      include: {
-        uploadedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
+    // Create attachment in database — clean up the file if this fails
+    let attachment
+    try {
+      attachment = await prisma.attachment.create({
+        data: {
+          filename,
+          originalFilename: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+          filePath: buildPrivateUploadPath('attachments', filename),
+          announcementId: announcementId || null,
+          calendarEventId: calendarEventId || null,
+          uploadedById: session.user.id,
+        },
+        include: {
+          uploadedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
           },
         },
-      },
-    })
+      })
+    } catch (dbError) {
+      await unlink(filePath).catch(() => {})
+      throw dbError
+    }
 
     return NextResponse.json({ attachment })
   } catch (error) {
