@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, BookOpen, Megaphone, Tag, History, Pencil } from 'lucide-react'
+import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, Megaphone, Tag, History, Pencil } from 'lucide-react'
 import { SignInButton } from '@/components/signin-button'
 import {
   DropdownMenu,
@@ -34,7 +34,6 @@ import { BlogManager } from '@/components/dev/blog-manager'
 import { TournamentRequests } from '@/components/dev/tournament-requests'
 import { EmailManager } from '@/components/dev/email-manager'
 import { AnalyticsDashboard } from '@/components/dev/analytics-dashboard'
-import { ResourceRequests } from '@/components/dev/resource-requests'
 import { BannerManager } from '@/components/dev/banner-manager'
 import { PromoCodeManager } from '@/components/dev/promo-code-manager'
 import { AuditLogViewer } from '@/components/dev/audit-log-viewer'
@@ -44,7 +43,7 @@ import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AccountSecurityMenuItem } from '@/components/account-security-menu-item'
 
-type Section = 'blog' | 'security' | 'tournaments' | 'email' | 'analytics' | 'payments' | 'resources' | 'banner' | 'promo' | 'audit'
+type Section = 'blog' | 'security' | 'tournaments' | 'email' | 'analytics' | 'payments' | 'banner' | 'promo' | 'audit'
 
 const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -52,8 +51,7 @@ const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: 'email', label: 'Email', icon: Mail },
   { id: 'blog', label: 'Blog', icon: FileText },
   { id: 'tournaments', label: 'Tournaments', icon: Trophy },
-  { id: 'resources', label: 'Resources', icon: BookOpen },
-  { id: 'promo', label: 'Promo Codes', icon: Tag },
+{ id: 'promo', label: 'Promo Codes', icon: Tag },
   { id: 'audit', label: 'Audit Logs', icon: History },
   { id: 'security', label: 'Security', icon: Shield },
   { id: 'payments', label: 'Payments', icon: CreditCard },
@@ -63,7 +61,7 @@ export default function DevPage() {
   const [activeSection, setActiveSection] = useState<Section>(() => {
     if (typeof window !== 'undefined') {
       const savedSection = localStorage.getItem('dev-panel-active-section') as Section
-      if (savedSection && ['blog', 'security', 'tournaments', 'email', 'analytics', 'payments', 'resources', 'banner', 'promo', 'audit'].includes(savedSection)) {
+      if (savedSection && ['blog', 'security', 'tournaments', 'email', 'analytics', 'payments', 'banner', 'promo', 'audit'].includes(savedSection)) {
         return savedSection
       }
     }
@@ -353,9 +351,7 @@ export default function DevPage() {
           
           {activeSection === 'tournaments' && <TournamentRequests />}
           
-          {activeSection === 'resources' && <ResourceRequests />}
-          
-          {activeSection === 'promo' && <PromoCodeManager />}
+{activeSection === 'promo' && <PromoCodeManager />}
           
           {activeSection === 'audit' && <AuditLogViewer />}
           
