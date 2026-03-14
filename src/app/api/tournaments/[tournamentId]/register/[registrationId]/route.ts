@@ -87,9 +87,9 @@ export async function PATCH(
     
     // Check for Prisma errors
     if (errorCode === 'P2009' || errorMessage.includes('Unknown column') || (errorMessage.includes('column') && errorMessage.includes('does not exist'))) {
-      return NextResponse.json({ 
-        error: 'Database schema error. The paid column may not exist. Please run: npx prisma generate',
-        details: process.env.NODE_ENV === 'development' ? { errorMessage, errorCode, meta: errorMeta } : undefined 
+      return NextResponse.json({
+        error: 'Database schema error. Please contact support.',
+        details: process.env.NODE_ENV === 'development' ? { errorMessage, errorCode, meta: errorMeta } : undefined
       }, { status: 500 })
     }
     

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getOpenAIClient } from '@/lib/ai'
+import { createRateLimitResponse, rateLimitRequest } from '@/lib/rate-limit-api'
+
+const AI_CHAT_RATE_LIMIT = {
+  limit: 20,
+  window: 60,
+  identifier: 'ai chat',
+}
 
 const SYSTEM_PROMPT = `You are an AI assistant specialized in Science Olympiad, a national STEM competition for middle school and high school students in the United States. You can ONLY provide information and assistance related to Science Olympiad topics.
 
@@ -27,6 +34,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const rateLimitResult = await rateLimitRequest(
+      request,
+      session.user.id,
+      AI_CHAT_RATE_LIMIT,
+      '/api/ai/chat'
+    )
+    const limited = createRateLimitResponse(rateLimitResult, AI_CHAT_RATE_LIMIT)
+    if (limited) {
+      return limited
+    }
+
     const openai = getOpenAIClient()
     if (!openai) {
       return NextResponse.json({ error: 'AI service not configured' }, { status: 503 })
@@ -39,6 +57,14 @@ export async function POST(request: NextRequest) {
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'Messages are required' }, { status: 400 })
+    }
+
+    // Validate message content lengths to prevent excessive token usage
+    const MAX_MESSAGE_LENGTH = 4000
+    for (const msg of messages) {
+      if (typeof msg.content !== 'string' || msg.content.length > MAX_MESSAGE_LENGTH) {
+        return NextResponse.json({ error: 'Message content too long' }, { status: 400 })
+      }
     }
 
     // Limit conversation history to prevent token overflow
