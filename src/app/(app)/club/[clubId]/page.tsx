@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { ClubPage } from '@/components/club-page'
 import { Suspense } from 'react'
-import { PageLoading } from '@/components/ui/loading-spinner'
 import { CalendarScope, AnnouncementScope, Role } from '@prisma/client'
 import { userSelectFields } from '@/types/models'
 import { hasAnnouncementTargetAccess, hasTestAssignmentAccess } from '@/lib/club-authz'
@@ -13,7 +12,60 @@ import { hasAnnouncementTargetAccess, hasTestAssignmentAccess } from '@/lib/club
 // cannot be used. Force dynamic rendering for correct per-user data.
 export const dynamic = 'force-dynamic'
 
-export default async function ClubDetailPage({
+// ---------------------------------------------------------------------------
+// Skeleton shown immediately while ClubDataLoader fetches data server-side.
+// ---------------------------------------------------------------------------
+function ClubPageSkeleton() {
+  return (
+    <div className="min-h-screen bg-background grid-pattern animate-pulse">
+      {/* Header skeleton */}
+      <div className="h-16 bg-card/80 border-b border-border/50" />
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-full">
+        <div className="flex gap-4 sm:gap-6 lg:gap-8 items-start">
+          {/* Sidebar skeleton */}
+          <aside className="w-48 lg:w-52 flex-shrink-0 hidden md:block">
+            <div className="bg-card/80 border border-border/50 p-3 rounded-2xl space-y-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-10 sm:h-11 bg-muted rounded-2xl" />
+              ))}
+            </div>
+          </aside>
+          {/* Content skeleton */}
+          <div className="flex-1 min-w-0 pl-9 sm:pl-10 md:pl-0 space-y-3">
+            <div className="h-8 bg-muted rounded-xl w-1/3" />
+            <div className="h-24 bg-muted rounded-xl" />
+            <div className="h-24 bg-muted rounded-xl" />
+            <div className="h-24 bg-muted rounded-xl w-2/3" />
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page shell — synchronous so Next.js can stream the skeleton to the browser
+// immediately, while ClubDataLoader does all the async work behind the scenes.
+// ---------------------------------------------------------------------------
+export default function ClubDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ clubId: string }>
+  searchParams: Promise<{ tab?: string }>
+}) {
+  return (
+    <Suspense fallback={<ClubPageSkeleton />}>
+      <ClubDataLoader params={params} searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Async component: all data-fetching happens here. Suspense streams the
+// skeleton until this resolves, then swaps in the real content.
+// ---------------------------------------------------------------------------
+async function ClubDataLoader({
   params,
   searchParams,
 }: {
@@ -43,10 +95,12 @@ export default async function ClubDetailPage({
   const needsSettingsData = activeTab === 'settings'
   const needsAttendanceData = activeTab === 'attendance'
   const needsFinanceData = activeTab === 'finance'
-  const needsCalendarData = activeTab === 'calendar'
-  const needsAnnouncementsData = activeTab === 'stream'
-  const needsTestsData = activeTab === 'tests'
   const needsFullPeopleData = activeTab === 'people'
+  // Always fetch these — they power both their own tabs AND the home tab widgets,
+  // so they must be ready regardless of which tab the user lands on.
+  const needsCalendarData = true
+  const needsAnnouncementsData = true
+  const needsTestsData = true
 
   const session = await getServerSession(authOptions)
 
@@ -202,7 +256,12 @@ export default async function ClubDetailPage({
           clubId: resolvedParams.clubId,
         },
       },
-      include: { preferences: true },
+      include: {
+        preferences: true,
+        // Fetch roster IDs here so Wave 2 can start immediately after Wave 1
+        // without a dedicated Wave 2 round-trip just for these IDs.
+        rosterAssignments: { select: { eventId: true, teamId: true } },
+      },
     }),
     clubPromise,
   ])
@@ -217,14 +276,22 @@ export default async function ClubDetailPage({
 
   const isAdminUser = membership.role === Role.ADMIN
 
-  // Wave 2: Attendance, finance, and roster in one parallel batch.
-  // Roster is also needed for announcement event-target visibility checks.
+  // Roster IDs are already on the membership (fetched in Wave 1).
+  const rosterList = membership.rosterAssignments ?? []
+  const userEventIds = rosterList.map(ra => ra.eventId)
+  const userTeamIds = [...new Set(rosterList.map(ra => ra.teamId))]
+
+  // Wave 2: All remaining data in one parallel batch.
+  // Calendar/announcements/tests can now start immediately (no longer blocked
+  // by a dedicated roster round-trip) because roster IDs came from Wave 1.
   const [
     attendances,
     expenses,
     purchaseRequests,
     eventBudgets,
-    userRosterAssignments,
+    calendarEvents,
+    allAnnouncements,
+    allTests,
   ] = await Promise.all([
     needsAttendanceData
       ? prisma.attendance.findMany({
@@ -341,26 +408,6 @@ export default async function ClubDetailPage({
           },
         })
       : Promise.resolve([]),
-    (needsCalendarData || needsTestsData || needsAnnouncementsData)
-      ? prisma.rosterAssignment.findMany({
-          where: {
-            membershipId: membership.id,
-            team: { clubId: resolvedParams.clubId },
-          },
-          select: {
-            eventId: true,
-            teamId: true,
-          },
-        })
-      : Promise.resolve([]),
-  ])
-
-  const rosterList = Array.isArray(userRosterAssignments) ? userRosterAssignments : []
-  const userEventIds = rosterList.map(ra => ra.eventId)
-  const userTeamIds = [...new Set(rosterList.map(ra => ra.teamId))]
-
-  // Wave 3: Calendar, announcements, tests in parallel (depend on userTeamIds / userEventIds only for in-memory filter).
-  const [calendarEvents, allAnnouncements, allTests] = await Promise.all([
     needsCalendarData
       ? prisma.calendarEvent.findMany({
           where: {
@@ -393,7 +440,7 @@ export default async function ClubDetailPage({
                 },
               },
             },
-            team: true,
+            team: { select: { id: true, name: true, clubId: true } },
             attendee: {
               include: {
                 user: {
@@ -483,7 +530,7 @@ export default async function ClubDetailPage({
             },
             visibilities: {
               include: {
-                team: true,
+                team: { select: { id: true, name: true } },
               },
             },
             replies: {
@@ -549,7 +596,7 @@ export default async function ClubDetailPage({
                     },
                   },
                 },
-                team: true,
+                team: { select: { id: true, name: true } },
               },
             },
             attachments: {
@@ -664,33 +711,21 @@ export default async function ClubDetailPage({
       })
 
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background grid-pattern">
-        <div className="min-h-screen flex items-center justify-center px-4 py-12">
-          <PageLoading
-            title="Loading club"
-            description="Fetching club data and member information..."
-            variant="orbit"
-          />
-        </div>
-      </div>
-    }>
-      <ClubPage
-        club={club}
-        currentMembership={membership}
-        user={session.user}
-        initialData={{
-          attendances: attendances ?? [],
-          expenses: expenses ?? [],
-          purchaseRequests: purchaseRequests ?? [],
-          eventBudgets: budgetsWithTotals,
-          calendarEvents: calendarEvents ?? [],
-          announcements: announcements ?? [],
-          tests,
-          // Gallery, paperwork, todos, and stats are fetched on-demand when tabs are clicked
-          // This significantly improves initial page load time
-        }}
-      />
-    </Suspense>
+    <ClubPage
+      club={club}
+      currentMembership={membership}
+      user={session.user}
+      initialData={{
+        attendances: attendances ?? [],
+        expenses: expenses ?? [],
+        purchaseRequests: purchaseRequests ?? [],
+        eventBudgets: budgetsWithTotals,
+        calendarEvents: calendarEvents ?? [],
+        announcements: announcements ?? [],
+        tests,
+        // Gallery, paperwork, todos, and stats are fetched on-demand when tabs are clicked
+        // This significantly improves initial page load time
+      }}
+    />
   )
 }

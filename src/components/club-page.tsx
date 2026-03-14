@@ -6,17 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Home, MessageSquare, Users, Calendar, Settings, ClipboardCheck, DollarSign, FileText, Pencil, Image, File, Menu, CheckSquare, BarChart3, Wrench } from 'lucide-react'
 import { AppHeader } from '@/components/app-header'
-import { PageLoading } from '@/components/ui/loading-spinner'
 import dynamic from 'next/dynamic'
 
-// Lazy load heavy tab components for better initial load performance
-const delayedTabLoading = (title: string, description: string) => {
-  function TabLoading() {
-    return <PageLoading title={title} description={description} variant="orbit" />
-  }
-
-  TabLoading.displayName = `${title}TabLoading`
-  return TabLoading
+// Tab modules are prefetched in a useEffect shortly after mount, so bundles are
+// already in cache by the time the user clicks. Use a generic skeleton instead
+// of a full-page spinner — it holds the layout space without signalling a wait.
+function TabShell() {
+  return (
+    <div className="space-y-3 p-1 animate-pulse">
+      <div className="h-8 bg-muted rounded-xl w-1/3" />
+      <div className="h-24 bg-muted rounded-xl" />
+      <div className="h-24 bg-muted rounded-xl" />
+      <div className="h-24 bg-muted rounded-xl w-2/3" />
+    </div>
+  )
 }
 
 const loadHomePageTabModule = () => import('@/components/tabs/homepage-tab')
@@ -31,45 +34,19 @@ const loadGalleryTabModule = () => import('@/components/tabs/gallery-tab')
 const loadPaperworkTabModule = () => import('@/components/tabs/paperwork-tab')
 const loadTodoTabModule = () => import('@/components/tabs/todo-tab')
 
-const HomePageTab = dynamic(() => loadHomePageTabModule().then(mod => ({ default: mod.HomePageTab })), {
-  loading: delayedTabLoading('Loading dashboard', 'Preparing widgets and updates...'),
-})
-const StreamTab = dynamic(() => loadStreamTabModule().then(mod => ({ default: mod.StreamTab })), {
-  loading: delayedTabLoading('Loading stream', 'Fetching announcements and posts...'),
-})
-const PeopleTab = dynamic(() => loadPeopleTabModule().then(mod => ({ default: mod.PeopleTab })), {
-  loading: delayedTabLoading('Loading people', 'Fetching club members and rosters...'),
-})
-const CalendarTab = dynamic(() => loadCalendarTabModule().then(mod => ({ default: mod.CalendarTab })), {
-  loading: delayedTabLoading('Loading calendar', 'Fetching events and schedules...'),
-})
-const AttendanceTab = dynamic(() => loadAttendanceTabModule().then(mod => ({ default: mod.AttendanceTab })), {
-  loading: delayedTabLoading('Loading attendance', 'Fetching attendance records...'),
-})
-const SettingsTab = dynamic(() => loadSettingsTabModule().then(mod => ({ default: mod.SettingsTab })), {
-  loading: delayedTabLoading('Loading settings', 'Fetching club configuration...'),
-})
-const FinanceTab = dynamic(() => loadFinanceTabModule().then(mod => ({ default: mod.default })), {
-  loading: delayedTabLoading('Loading finance', 'Fetching expenses and budgets...'),
-})
-const TestsTab = dynamic(() => loadTestsTabModule().then(mod => ({ default: mod.default })), {
-  loading: delayedTabLoading('Loading tests', 'Fetching assessments and submissions...'),
-})
-const GalleryTab = dynamic(() => loadGalleryTabModule().then(mod => ({ default: mod.GalleryTab })), {
-  loading: delayedTabLoading('Loading gallery', 'Fetching photos and videos...'),
-})
-const PaperworkTab = dynamic(() => loadPaperworkTabModule().then(mod => ({ default: mod.PaperworkTab })), {
-  loading: delayedTabLoading('Loading paperwork', 'Fetching forms and submissions...'),
-})
-const TodoTab = dynamic(() => loadTodoTabModule().then(mod => ({ default: mod.TodoTab })), {
-  loading: delayedTabLoading('Loading to-do list', 'Fetching tasks and reminders...'),
-})
-const StatsTab = dynamic(() => import('@/components/tabs/stats-tab').then(mod => ({ default: mod.StatsTab })).catch(() => ({ default: () => <div>Failed to load stats tab</div> })), {
-  loading: delayedTabLoading('Loading stats', 'Fetching analytics and insights...'),
-})
-const ToolsTab = dynamic(() => import('@/components/tabs/tools-tab').then(mod => ({ default: mod.ToolsTab })), {
-  loading: delayedTabLoading('Loading tools', 'Preparing study tools...'),
-})
+const HomePageTab = dynamic(() => loadHomePageTabModule().then(mod => ({ default: mod.HomePageTab })), { loading: TabShell })
+const StreamTab = dynamic(() => loadStreamTabModule().then(mod => ({ default: mod.StreamTab })), { loading: TabShell })
+const PeopleTab = dynamic(() => loadPeopleTabModule().then(mod => ({ default: mod.PeopleTab })), { loading: TabShell })
+const CalendarTab = dynamic(() => loadCalendarTabModule().then(mod => ({ default: mod.CalendarTab })), { loading: TabShell })
+const AttendanceTab = dynamic(() => loadAttendanceTabModule().then(mod => ({ default: mod.AttendanceTab })), { loading: TabShell })
+const SettingsTab = dynamic(() => loadSettingsTabModule().then(mod => ({ default: mod.SettingsTab })), { loading: TabShell })
+const FinanceTab = dynamic(() => loadFinanceTabModule().then(mod => ({ default: mod.default })), { loading: TabShell })
+const TestsTab = dynamic(() => loadTestsTabModule().then(mod => ({ default: mod.default })), { loading: TabShell })
+const GalleryTab = dynamic(() => loadGalleryTabModule().then(mod => ({ default: mod.GalleryTab })), { loading: TabShell })
+const PaperworkTab = dynamic(() => loadPaperworkTabModule().then(mod => ({ default: mod.PaperworkTab })), { loading: TabShell })
+const TodoTab = dynamic(() => loadTodoTabModule().then(mod => ({ default: mod.TodoTab })), { loading: TabShell })
+const StatsTab = dynamic(() => import('@/components/tabs/stats-tab').then(mod => ({ default: mod.StatsTab })).catch(() => ({ default: () => <div>Failed to load stats tab</div> })), { loading: TabShell })
+const ToolsTab = dynamic(() => import('@/components/tabs/tools-tab').then(mod => ({ default: mod.ToolsTab })), { loading: TabShell })
 import {
   Dialog,
   DialogContent,
@@ -357,6 +334,8 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    // Stream, calendar, and tests data arrives from the server via initialData.
+    // Prefetch the remaining tabs immediately after paint so they're ready before the user clicks.
     const primaryTimerId = window.setTimeout(() => {
       void Promise.allSettled([
         loadHomePageTabModule().then(mod => mod.prefetchHomePageTabData?.({
@@ -373,11 +352,6 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
           clubId: club.id,
           division: club.division,
         })),
-      ])
-    }, 350)
-
-    const secondaryTimerId = window.setTimeout(() => {
-      void Promise.allSettled([
         loadSettingsTabModule().then(mod => mod.prefetchSettingsTabData?.({
           clubId: club.id,
           isAdmin,
@@ -385,6 +359,11 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
         loadAttendanceTabModule().then(mod => mod.prefetchAttendanceTabData?.({
           clubId: club.id,
         })),
+      ])
+    }, 100)
+
+    const secondaryTimerId = window.setTimeout(() => {
+      void Promise.allSettled([
         loadTodoTabModule().then(mod => mod.prefetchTodoTabData?.({
           clubId: club.id,
           isAdmin,
@@ -392,21 +371,15 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
         loadPaperworkTabModule().then(mod => mod.prefetchPaperworkTabData?.({
           clubId: club.id,
         })),
-      ])
-    }, 1_500)
-
-    const tertiaryTimerId = window.setTimeout(() => {
-      void Promise.allSettled([
         loadGalleryTabModule().then(mod => mod.prefetchGalleryTabData?.({
           clubId: club.id,
         })),
       ])
-    }, 3_000)
+    }, 800)
 
     return () => {
       window.clearTimeout(primaryTimerId)
       window.clearTimeout(secondaryTimerId)
-      window.clearTimeout(tertiaryTimerId)
     }
   }, [club.id, club.division, isAdmin])
 

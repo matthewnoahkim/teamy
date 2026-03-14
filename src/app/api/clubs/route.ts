@@ -110,8 +110,25 @@ export async function GET(_req: NextRequest) {
     const memberships = await prisma.membership.findMany({
       where: { userId: session.user.id },
       include: {
-        club: true,
-        team: true,
+        club: {
+          select: {
+            id: true,
+            name: true,
+            division: true,
+            backgroundType: true,
+            backgroundColor: true,
+            gradientStartColor: true,
+            gradientEndColor: true,
+            gradientColors: true,
+            gradientDirection: true,
+            backgroundImageUrl: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        team: {
+          select: { id: true, name: true, clubId: true },
+        },
       },
       orderBy: {
         createdAt: 'desc',

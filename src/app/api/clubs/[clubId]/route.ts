@@ -43,10 +43,14 @@ export async function GET(
                 image: true,
               },
             },
-            team: true,
+            team: {
+              select: { id: true, name: true, clubId: true },
+            },
             rosterAssignments: {
               include: {
-                event: true,
+                event: {
+                  select: { id: true, name: true, division: true },
+                },
               },
             },
           },

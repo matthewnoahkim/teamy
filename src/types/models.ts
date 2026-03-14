@@ -111,7 +111,7 @@ export type CalendarEventFull = Prisma.CalendarEventGetPayload<{
     creator: {
       include: { user: { select: typeof userSelectFields } }
     }
-    team: true
+    team: { select: { id: true; name: true; clubId: true } }
     attendee: {
       include: { user: { select: typeof userSelectFields } }
     }
@@ -134,7 +134,7 @@ export type AnnouncementFull = Prisma.AnnouncementGetPayload<{
     author: {
       include: { user: { select: typeof userSelectFields } }
     }
-    visibilities: { include: { team: true } }
+    visibilities: { include: { team: { select: { id: true; name: true } } } }
     replies: {
       include: {
         author: {
@@ -154,7 +154,7 @@ export type AnnouncementFull = Prisma.AnnouncementGetPayload<{
         rsvps: {
           include: { user: { select: typeof userSelectFields } }
         }
-        team: true
+        team: { select: { id: true; name: true } }
       }
     }
     attachments: {

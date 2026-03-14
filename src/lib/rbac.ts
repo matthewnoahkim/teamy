@@ -114,50 +114,44 @@ export async function isTournamentDirector(userId: string, userEmail: string, to
   })
   
   if (admin) return true
-  
-  // Check if user created the tournament
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    select: { createdById: true },
-  })
-  
-  if (tournament?.createdById === userId) return true
-  
-  // Check if user is the director on the hosting request
-  const hostingRequest = await prisma.tournamentHostingRequest.findFirst({
-    where: {
-      tournament: {
-        id: tournamentId,
-      },
-      directorEmail: {
-        equals: userEmail,
-        mode: 'insensitive',
-      },
-      status: 'APPROVED',
-    },
-  })
-  
-  if (hostingRequest) return true
-  
-  // Also check if user is a TD via TournamentStaff
-  const staffRecord = await prisma.tournamentStaff.findFirst({
-    where: {
-      tournamentId,
-      role: 'TOURNAMENT_DIRECTOR',
-      status: 'ACCEPTED',
-      OR: [
-        { userId },
-        {
-          email: {
-            equals: userEmail,
-            mode: 'insensitive',
-          },
+
+  // Run remaining checks in parallel
+  const [tournament, hostingRequest, staffRecord] = await Promise.all([
+    prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      select: { createdById: true },
+    }),
+    prisma.tournamentHostingRequest.findFirst({
+      where: {
+        tournament: {
+          id: tournamentId,
         },
-      ],
-    },
-  })
-  
-  return !!staffRecord
+        directorEmail: {
+          equals: userEmail,
+          mode: 'insensitive',
+        },
+        status: 'APPROVED',
+      },
+    }),
+    prisma.tournamentStaff.findFirst({
+      where: {
+        tournamentId,
+        role: 'TOURNAMENT_DIRECTOR',
+        status: 'ACCEPTED',
+        OR: [
+          { userId },
+          {
+            email: {
+              equals: userEmail,
+              mode: 'insensitive',
+            },
+          },
+        ],
+      },
+    }),
+  ])
+
+  return tournament?.createdById === userId || !!hostingRequest || !!staffRecord
 }
 
 /**
