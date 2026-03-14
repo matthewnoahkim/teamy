@@ -522,7 +522,7 @@ export function GalleryTab({ clubId, user, isAdmin, initialMediaItems, initialAl
       {mediaItems.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <ImageIcon className="h-16 w-16 text-muted-foreground mb-4" />
+            <ImageIcon className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">
               No media yet. Start by uploading some photos or videos!
             </p>

@@ -379,7 +379,7 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold">Paperwork</h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-muted-foreground">
             Forms and documents for tournaments and events
           </p>
         </div>
@@ -395,8 +395,8 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
       {forms.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-16 w-16 text-gray-400 mb-4" />
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mb-4">
               No forms yet.
             </p>
             {isAdmin && (
@@ -433,11 +433,11 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
                         )}
                       </CardTitle>
                       {form.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           {form.description}
                         </p>
                       )}
-                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                         {form.dueDate && (
                           <span className="flex items-center gap-1">
                             <CalendarIcon className="h-4 w-4" />
@@ -486,12 +486,12 @@ export function PaperworkTab({ clubId, user: _user, isAdmin, initialForms }: Pap
                               Pending Review
                             </Badge>
                           )}
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                          <span className="text-sm text-muted-foreground">
                             Submitted {formatDateTime(status.submittedAt!)}
                           </span>
                         </div>
                       ) : (
-                        <Badge variant="outline" className="text-gray-600">
+                        <Badge variant="outline" className="text-muted-foreground">
                           Not Submitted
                         </Badge>
                       )}
@@ -681,7 +681,7 @@ function UploadFormDialog({ open, onOpenChange, onUpload, clubId, uploading }: U
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 PDF, Word, or image files (max 50MB)
               </p>
             </div>
@@ -753,7 +753,7 @@ function SubmitFormDialog({ open, onOpenChange, onSubmit, form, uploading }: Sub
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 PDF, Word, or image files (max 50MB)
               </p>
             </div>
@@ -828,7 +828,7 @@ function ViewSubmissionsDialog({
                           <p className="font-medium">
                             {submission.user.name || submission.user.email}
                           </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <p className="text-sm text-muted-foreground">
                             Submitted {formatDateTime(submission.submittedAt)}
                           </p>
                         </div>

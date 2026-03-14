@@ -30,12 +30,12 @@ export function ImportantLinksWidget({ config }: ImportantLinksWidgetProps) {
         {links.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full mb-3">
-              <Link2 className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+              <Link2 className="h-6 w-6 text-muted-foreground" />
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <p className="text-sm text-muted-foreground font-medium">
               No links configured
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Add links in widget settings
             </p>
           </div>
@@ -55,12 +55,12 @@ export function ImportantLinksWidget({ config }: ImportantLinksWidgetProps) {
                       {link.title}
                     </h4>
                     {link.description && (
-                      <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                         {link.description}
                       </p>
                     )}
                   </div>
-                  <ExternalLink className="h-4 w-4 text-gray-400 dark:text-gray-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 flex-shrink-0 transition-colors group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-indigo-600 dark:group-hover:text-indigo-400 flex-shrink-0 transition-colors group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </div>
               </a>
             ))}

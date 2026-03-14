@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { format } from 'date-fns'
+import { highlightText } from '@/lib/highlight-text'
 
 interface TestsTabProps {
   clubId: string
@@ -77,43 +77,6 @@ type TestsTabCacheEntry = {
 
 const testsTabCache = new Map<string, TestsTabCacheEntry>()
 
-// Memoized regex cache for highlightText
-const regexCache = new Map<string, RegExp>()
-
-// Helper function to highlight search terms in text (optimized with regex caching)
-const highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
-  if (!text || !searchQuery) return text || ''
-  
-  const query = searchQuery.trim()
-  if (!query) return text
-  
-  // Use cached regex if available
-  let regex = regexCache.get(query)
-  if (!regex) {
-    // Escape special regex characters
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    regex = new RegExp(`(${escapedQuery})`, 'gi')
-    // Cache regex (limit cache size to prevent memory leaks)
-    if (regexCache.size < 50) {
-      regexCache.set(query, regex)
-    }
-  }
-  
-  // Split text using regex - alternate parts will be matches
-  const parts = text.split(regex)
-  
-  // Check if part matches by comparing with original query (case-insensitive)
-  // This avoids regex.test() which modifies lastIndex
-  return parts.map((part, index) => {
-    // Even indices are non-matches, odd indices are matches (due to capture group)
-    const isMatch = index % 2 === 1
-    return isMatch ? (
-      <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-foreground px-0.5 rounded">
-        {part}
-      </mark>
-    ) : part
-  })
-}
 
 export default function TestsTab({ clubId, isAdmin, initialTests, isActive = true }: TestsTabProps) {
   const { toast } = useToast()

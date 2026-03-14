@@ -81,7 +81,7 @@ export function TeamStatsWidget({ stats, config }: TeamStatsWidgetProps) {
                   <p className="text-2xl font-bold bg-gradient-to-r bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300">
                     {stat.value}
                   </p>
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mt-0.5">
+                  <p className="text-xs font-medium text-muted-foreground mt-0.5">
                     {stat.label}
                   </p>
                 </div>

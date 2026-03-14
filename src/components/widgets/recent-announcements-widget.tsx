@@ -55,12 +55,12 @@ export function RecentAnnouncementsWidget({
         {displayAnnouncements.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full mb-3">
-              <Inbox className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+              <Inbox className="h-6 w-6 text-muted-foreground" />
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <p className="text-sm text-muted-foreground font-medium">
               No announcements yet
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Check back later for updates
             </p>
           </div>
@@ -88,11 +88,11 @@ export function RecentAnnouncementsWidget({
                         <span className="line-clamp-1">{announcement.title}</span>
                       </h4>
                     </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-2 leading-relaxed">
+                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
                       {announcement.content}
                     </p>
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-500 dark:text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {formatDateTime(announcement.createdAt)}
                       </p>
                       {announcement.important && (

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { JSX } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,6 +16,7 @@ import { SaveIndicator } from '@/components/ui/save-indicator'
 import { ButtonLoading, PageLoading } from '@/components/ui/loading-spinner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
+import { highlightText } from '@/lib/highlight-text'
 
 interface FinanceTabProps {
   clubId: string
@@ -216,26 +216,6 @@ export async function prefetchFinanceTabData({
   }
 }
 
-// Helper function to highlight search terms in text (exact copy from dev panel)
-const highlightText = (text: string | null | undefined, searchQuery: string): string | (string | JSX.Element)[] => {
-  if (!text || !searchQuery) return text || ''
-  
-  const query = searchQuery.trim()
-  if (!query) return text
-  
-  // Escape special regex characters
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const regex = new RegExp(`(${escapedQuery})`, 'gi')
-  const parts = text.split(regex)
-  
-  return parts.map((part, index) => 
-    regex.test(part) ? (
-      <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-foreground px-0.5 rounded">
-        {part}
-      </mark>
-    ) : part
-  )
-}
 
 export default function FinanceTab({ clubId, isAdmin, currentMembershipId, currentMembershipTeamId, division, initialExpenses, initialPurchaseRequests, initialBudgets, initialTeams, isActive = true }: FinanceTabProps) {
   const { toast } = useToast()
@@ -1388,7 +1368,7 @@ export default function FinanceTab({ clubId, isAdmin, currentMembershipId, curre
           <div className="mb-4">
             <div className="relative">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
-                <Search className="h-4 w-4 text-muted-foreground" style={{ imageRendering: 'crisp-edges', WebkitFontSmoothing: 'antialiased' }} />
+                <Search className="h-4 w-4 text-muted-foreground" />
               </div>
               <Input
                 type="text"

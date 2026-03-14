@@ -338,7 +338,7 @@ export function StatsTab({ clubId, division: _division, initialStats }: StatsTab
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => { void fetchStats() }} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 transition-transform duration-300 ${loading ? 'animate-spin' : 'hover:rotate-180'}`} />
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <Button onClick={() => setAiDialogOpen(true)}>

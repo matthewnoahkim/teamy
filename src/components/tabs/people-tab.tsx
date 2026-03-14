@@ -21,6 +21,7 @@ import { Plus, Pencil, Trash2, ArrowLeft, X, FileSpreadsheet, Mail, Grid3x3, Lay
 import { groupEventsByCategory, categoryOrder, type EventCategory } from '@/lib/event-categories'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useBackgroundRefresh } from '@/hooks/use-background-refresh'
+import { highlightText } from '@/lib/highlight-text'
 import type { ClubWithMembers, ClubWithMembersLite, MembershipWithPreferences } from '@/types/models'
 
 // ---------------------------------------------------------------------------
@@ -1268,7 +1269,7 @@ export function PeopleTab({ club: initialClubInput, currentMembership: _currentM
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="font-semibold">{event.name}</h4>
+                <h4 className="font-semibold">{highlightText(event.name, eventSearch)}</h4>
                 <Badge variant="outline" className="text-xs">
                   {eventAssignments.length}/{event.maxCompetitors}
                 </Badge>

@@ -55,12 +55,12 @@ export function UpcomingEventsWidget({
         {upcomingEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full mb-3">
-              <CalendarDays className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+              <CalendarDays className="h-6 w-6 text-muted-foreground" />
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+            <p className="text-sm text-muted-foreground font-medium">
               No upcoming events
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Events will appear here when scheduled
             </p>
           </div>
@@ -104,7 +104,7 @@ export function UpcomingEventsWidget({
                           </Badge>
                         )}
                       </div>
-                      <div className="flex flex-col gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                      <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1.5">
                           <Clock className="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
                           <span className="font-medium">
