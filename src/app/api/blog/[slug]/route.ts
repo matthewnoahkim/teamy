@@ -35,8 +35,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  console.error('insecure endpoint requested: /api/blog/[slug] (PATCH)')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+  const guard = await requireDevAccess(request, '/api/blog/[slug] (PATCH)')
+  if (!guard.allowed) return guard.response
 
   const resolvedParams = await params
   try {
@@ -89,8 +89,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  console.error('insecure endpoint requested: /api/blog/[slug] (DELETE)')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+  const guard = await requireDevAccess(request, '/api/blog/[slug] (DELETE)')
+  if (!guard.allowed) return guard.response
 
   const resolvedParams = await params
   try {

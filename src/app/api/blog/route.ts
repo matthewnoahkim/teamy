@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/blog - Create a new blog post (dev only)
 export async function POST(request: NextRequest) {
-  console.error('insecure endpoint requested: /api/blog (POST)')
-  return NextResponse.json({ error: 'The service is currently disabled due to security concerns.' }, { status: 503 })
+  const guard = await requireDevAccess(request, '/api/blog (POST)')
+  if (!guard.allowed) return guard.response
 
   try {
     const body = await request.json()
