@@ -10,14 +10,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
-  const _resolvedParams = await params
+  const { tournamentId } = await params
   try {
     const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { tournamentId } = await params
 
     const tournament = await prisma.tournament.findUnique({
       where: { id: tournamentId },
@@ -86,14 +84,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
-  const _resolvedParams = await params
+  const { tournamentId } = await params
   try {
     const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { tournamentId } = await params
     const body = await request.json()
     const { email, name, role, eventIds = [], trialEventNames = [] } = body as {
       email: string
@@ -206,14 +202,12 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
-  const _resolvedParams = await params
+  const { tournamentId } = await params
   try {
     const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { tournamentId } = await params
     const { searchParams } = new URL(request.url)
     const staffId = searchParams.get('staffId')
 
@@ -264,14 +258,12 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ tournamentId: string }> }
 ) {
-  const _resolvedParams = await params
+  const { tournamentId } = await params
   try {
     const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { tournamentId } = await params
     const body = await request.json()
     const { staffId, role, eventIds, trialEventNames } = body as {
       staffId: string

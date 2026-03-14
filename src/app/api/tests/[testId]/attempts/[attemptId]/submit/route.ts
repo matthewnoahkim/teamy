@@ -186,13 +186,9 @@ export async function POST(
     // Update attempt and answers in transaction
     await prisma.$transaction(async (tx) => {
       if (isESTest) {
-        // Get current tab tracking values from the attempt
-        const esAttemptData = await tx.eSTestAttempt.findUnique({
-          where: { id: resolvedParams.attemptId },
-          select: { tabSwitchCount: true, timeOffPageSeconds: true },
-        })
-        
-        // Update ESTestAttempt
+        // Update ESTestAttempt — tabSwitchCount and timeOffPageSeconds are
+        // updated concurrently by the tab-tracking route and must NOT be
+        // touched here; omitting them preserves whatever the latest value is.
         await tx.eSTestAttempt.update({
           where: { id: resolvedParams.attemptId },
           data: {
@@ -201,9 +197,6 @@ export async function POST(
             gradeEarned: totalAutoGraded,
             proctoringScore,
             ipAtSubmit,
-            // Preserve tab tracking values if they exist
-            tabSwitchCount: esAttemptData?.tabSwitchCount ?? 0,
-            timeOffPageSeconds: esAttemptData?.timeOffPageSeconds ?? 0,
           },
         })
 
