@@ -44,6 +44,8 @@ import {
   Loader2,
   Trash2,
   Sparkles,
+  Pin,
+  PinOff,
 } from 'lucide-react'
 import {
   Collapsible,
@@ -1241,9 +1243,20 @@ function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, i
   const [clubResources, setClubResources] = useState<Record<string, unknown>[]>([])
   const [_loadingResources, setLoadingResources] = useState(true)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleteDefaultConfirmKey, setDeleteDefaultConfirmKey] = useState<string | null>(null)
   const [deletingResource, setDeletingResource] = useState(false)
   const [syncConfirmOpen, setSyncConfirmOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [pinnedKeys, setPinnedKeys] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    const saved = localStorage.getItem(`pinned-resources-${clubId}`)
+    return saved ? new Set(JSON.parse(saved) as string[]) : new Set()
+  })
+  const [hiddenDefaultKeys, setHiddenDefaultKeys] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    const saved = localStorage.getItem(`hidden-default-resources-${clubId}`)
+    return saved ? new Set(JSON.parse(saved) as string[]) : new Set()
+  })
   const { toast } = useToast()
 
   // Predefined resource tags
@@ -1254,6 +1267,14 @@ function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, i
     { value: 'practice', label: 'Practice' },
     { value: 'misc', label: 'Miscellaneous' },
   ]
+
+  useEffect(() => {
+    localStorage.setItem(`pinned-resources-${clubId}`, JSON.stringify([...pinnedKeys]))
+  }, [pinnedKeys, clubId])
+
+  useEffect(() => {
+    localStorage.setItem(`hidden-default-resources-${clubId}`, JSON.stringify([...hiddenDefaultKeys]))
+  }, [hiddenDefaultKeys, clubId])
 
   // Fetch club resources
   useEffect(() => {
@@ -1290,23 +1311,42 @@ function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, i
   // Merge hardcoded resources with club resources
   const getResourcesForCategory = useCallback((categorySlug: string) => {
     const hardcodedEvent = SCIENCE_OLYMPIAD_RESOURCES.find(e => e.slug === categorySlug)
-    const hardcoded = hardcodedEvent?.resources || []
-    
+    const hardcoded = (hardcodedEvent?.resources || [])
+      .filter(r => !hiddenDefaultKeys.has(`default:${categorySlug}:${r.title}`))
+      .map(r => {
+        const key = `default:${categorySlug}:${r.title}`
+        return {
+          ...r,
+          resourceKey: key,
+          isPinned: pinnedKeys.has(key),
+          isDefault: true as const,
+          canDelete: false,
+        }
+      })
+
     // Get club resources for this category
     const club = clubResources
       .filter(r => r.category === categorySlug)
-      .map(r => ({
-        id: r.id as string,
-        title: r.name as string,
-        url: (r.url as string) || null,
-        type: r.tag as Resource['type'],
-        isClubResource: r.scope === 'CLUB',
-        isApproved: r.scope === 'PUBLIC',
-        canDelete: r.clubId === clubId, // Can delete any resource added by this club
-      }))
-    
-    return [...hardcoded, ...club]
-  }, [clubResources, clubId])
+      .map(r => {
+        const key = `club:${r.id as string}`
+        return {
+          id: r.id as string,
+          title: r.name as string,
+          url: (r.url as string) || null,
+          type: r.tag as Resource['type'],
+          isClubResource: r.scope === 'CLUB',
+          isApproved: r.scope === 'PUBLIC',
+          canDelete: r.clubId === clubId,
+          resourceKey: key,
+          isPinned: pinnedKeys.has(key),
+          isDefault: false as const,
+        }
+      })
+
+    const combined = [...hardcoded, ...club]
+    combined.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0))
+    return combined
+  }, [clubResources, clubId, pinnedKeys, hiddenDefaultKeys])
 
   const filteredResources = SCIENCE_OLYMPIAD_RESOURCES.map(event => ({
     ...event,
@@ -1388,6 +1428,19 @@ function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, i
     if (!resourceForm[category]) {
       setResourceForm(prev => ({ ...prev, [category]: { name: '', tag: '', url: '' } }))
     }
+  }
+
+  const togglePin = (key: string) => {
+    setPinnedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const hideDefaultResource = (key: string) => {
+    setHiddenDefaultKeys(prev => new Set([...prev, key]))
   }
 
   const handleDeleteResource = async (resourceId: string) => {
@@ -1510,40 +1563,58 @@ function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, i
                 <div className="space-y-1">
                   {event.resources.map((resource, idx) => {
                     const hasUrl = resource.url && resource.url !== '#'
-                    const canDeleteThis = isAdmin && 'canDelete' in resource && resource.canDelete
-                    // Approved = PUBLIC scope OR hardcoded default resources (no id = hardcoded)
-                    const isApprovedOrDefault = ('isApproved' in resource && resource.isApproved) || !('id' in resource)
-                    const resourceId = 'id' in resource ? resource.id : null
+                    const isApprovedOrDefault = ('isApproved' in resource && resource.isApproved) || resource.isDefault
+                    const resourceId = !resource.isDefault && 'id' in resource ? resource.id : null
+                    const { resourceKey, isPinned } = resource
 
                     return (
                       <div
                         key={idx}
                         className="flex items-center justify-between p-2 rounded hover:bg-muted transition-colors group"
                       >
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          {hasUrl ? (
-                            <a
-                              href={resource.url!}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`text-sm hover:underline truncate ${isApprovedOrDefault ? 'font-medium' : ''}`}
-                            >
+                        {/* Left: clickable link or plain text */}
+                        {hasUrl ? (
+                          <a
+                            href={resource.url!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 flex-1 min-w-0"
+                          >
+                            <span className={`text-sm truncate hover:underline ${isApprovedOrDefault ? 'font-medium' : ''}`}>
                               {resource.title}
-                            </a>
-                          ) : (
+                            </span>
+                            <Badge className={`text-xs flex-shrink-0 ${getTypeColor(resource.type)}`}>
+                              {resource.type}
+                            </Badge>
+                            <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          </a>
+                        ) : (
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className={`text-sm truncate ${isApprovedOrDefault ? 'font-medium' : ''}`}>
                               {resource.title}
                             </span>
-                          )}
-                          <Badge className={`text-xs flex-shrink-0 ${getTypeColor(resource.type)}`}>
-                            {resource.type}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {hasUrl && (
-                            <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          )}
-                          {canDeleteThis && resourceId && (
+                            <Badge className={`text-xs flex-shrink-0 ${getTypeColor(resource.type)}`}>
+                              {resource.type}
+                            </Badge>
+                          </div>
+                        )}
+
+                        {/* Right: admin actions */}
+                        {isAdmin && (
+                          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-6 w-6 p-0 transition-opacity ${isPinned ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-100 text-muted-foreground'} hover:text-primary`}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                togglePin(resourceKey)
+                              }}
+                              title={isPinned ? 'Unpin resource' : 'Pin resource'}
+                            >
+                              {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1551,13 +1622,18 @@ function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, i
                               onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                setDeleteConfirmId(resourceId)
+                                if (resource.isDefault) {
+                                  setDeleteDefaultConfirmKey(resourceKey)
+                                } else if (resourceId) {
+                                  setDeleteConfirmId(resourceId)
+                                }
                               }}
+                              title="Remove resource"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -1674,6 +1750,37 @@ function ResourcesSection({ clubId, currentMembershipId: _currentMembershipId, i
               disabled={deletingResource}
             >
               {deletingResource ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Default Resource Confirmation Dialog */}
+      <Dialog open={!!deleteDefaultConfirmKey} onOpenChange={(open) => !open && setDeleteDefaultConfirmKey(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hide Resource</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to hide this default resource? It will no longer be visible to your club. You can restore it by syncing resources.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDefaultConfirmKey(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteDefaultConfirmKey) {
+                  hideDefaultResource(deleteDefaultConfirmKey)
+                  setDeleteDefaultConfirmKey(null)
+                }
+              }}
+            >
+              Hide
             </Button>
           </DialogFooter>
         </DialogContent>
