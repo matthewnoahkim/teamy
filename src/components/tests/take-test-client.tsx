@@ -87,7 +87,8 @@ interface AnswerData {
   numericAnswer?: number | null
   blankAnswers?: string[]
   markedForReview?: boolean
-  timedSubmittedAt?: string
+  timedSubmit?: boolean
+  timedElapsedMs?: number
 }
 
 interface TakeTestClientProps {
@@ -221,16 +222,20 @@ export function TakeTestClient({
   const [started, setStarted] = useState(!!existingAttempt)
   const [answers, setAnswers] = useState<Record<string, AnswerData>>({})
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set())
-  // Timed question state: maps questionId → { revealedAt: ISO string | null, submittedAt: ISO string | null }
-  const [timedState, setTimedState] = useState<Record<string, { revealedAt: string | null; submittedAt: string | null }>>(() => {
-    const state: Record<string, { revealedAt: string | null; submittedAt: string | null }> = {}
+  // Timed question state: maps questionId → { revealedAt: ISO string | null, submittedAt: ISO string | null, clientRevealedAt: number | null }
+  // clientRevealedAt is Date.now() on the client for accurate countdown (avoids server clock skew)
+  const [timedState, setTimedState] = useState<Record<string, { revealedAt: string | null; submittedAt: string | null; clientRevealedAt: number | null }>>(() => {
+    const state: Record<string, { revealedAt: string | null; submittedAt: string | null; clientRevealedAt: number | null }> = {}
     if (existingAttempt?.answers) {
       existingAttempt.answers.forEach((a) => {
         if (a.timedRevealedAt || a.timedSubmittedAt) {
-          state[a.questionId] = {
-            revealedAt: a.timedRevealedAt ? new Date(a.timedRevealedAt).toISOString() : null,
-            submittedAt: a.timedSubmittedAt ? new Date(a.timedSubmittedAt).toISOString() : null,
-          }
+          // For resumed attempts, use the server timestamp as the client reference
+          // adjusted by the elapsed time since reveal
+          const revealedAt = a.timedRevealedAt ? new Date(a.timedRevealedAt).toISOString() : null
+          const submittedAt = a.timedSubmittedAt ? new Date(a.timedSubmittedAt).toISOString() : null
+          // Reconstruct clientRevealedAt so countdown continues accurately
+          const clientRevealedAt = revealedAt ? Date.now() - (Date.now() - new Date(revealedAt).getTime()) : null
+          state[a.questionId] = { revealedAt, submittedAt, clientRevealedAt }
         }
       })
     }
@@ -706,7 +711,7 @@ export function TakeTestClient({
       return
     }
     if (!tickRef.current) {
-      tickRef.current = setInterval(() => setTick((t) => t + 1), 1000)
+      tickRef.current = setInterval(() => setTick((t) => t + 1), 250)
     }
     return () => {
       if (tickRef.current) clearInterval(tickRef.current)
@@ -726,9 +731,10 @@ export function TakeTestClient({
       })
       if (!res.ok) throw new Error('Failed to reveal question')
       const data = await res.json()
+      const now = Date.now()
       setTimedState((prev) => ({
         ...prev,
-        [questionId]: { revealedAt: data.revealedAt, submittedAt: null },
+        [questionId]: { revealedAt: data.revealedAt, submittedAt: null, clientRevealedAt: now },
       }))
     } catch {
       toast({ title: 'Error', description: 'Could not reveal question. Please try again.', variant: 'destructive' })
@@ -740,16 +746,25 @@ export function TakeTestClient({
   const submitTimedQuestion = useCallback(async (questionId: string, expired = false) => {
     if (!attempt) return
     setTimedSubmitLoading((prev) => new Set(prev).add(questionId))
-    const now = new Date().toISOString()
     try {
       const answerData = answers[questionId] || {}
+      const ts = timedState[questionId]
+      let elapsedMs = ts?.clientRevealedAt ? Date.now() - ts.clientRevealedAt : undefined
+      // Cap at the time limit for expired questions so auto-submit delay doesn't inflate the time
+      if (expired && elapsedMs !== undefined) {
+        const question = test.questions.find((q: TestQuestion) => q.id === questionId)
+        if (question?.timedLimitSeconds) {
+          elapsedMs = Math.min(elapsedMs, question.timedLimitSeconds * 1000)
+        }
+      }
       await saveAnswer(questionId, {
         ...answerData,
-        timedSubmittedAt: now,
-      } as AnswerData & { timedSubmittedAt: string })
+        timedSubmit: true,
+        timedElapsedMs: elapsedMs,
+      } as AnswerData)
       setTimedState((prev) => ({
         ...prev,
-        [questionId]: { ...prev[questionId], submittedAt: now },
+        [questionId]: { ...prev[questionId], submittedAt: new Date().toISOString() },
       }))
       if (expired) {
         toast({ title: 'Time\'s up', description: 'Your answer has been automatically submitted.' })
@@ -759,15 +774,15 @@ export function TakeTestClient({
     } finally {
       setTimedSubmitLoading((prev) => { const s = new Set(prev); s.delete(questionId); return s })
     }
-  }, [attempt, answers, saveAnswer, toast])
+  }, [attempt, answers, saveAnswer, toast, timedState, test.questions])
 
   // Auto-submit expired timed questions
   useEffect(() => {
     test.questions.forEach((q: TestQuestion) => {
       if (!q.timedLimitSeconds) return
       const ts = timedState[q.id]
-      if (!ts?.revealedAt || ts.submittedAt) return
-      const elapsed = (Date.now() - new Date(ts.revealedAt).getTime()) / 1000
+      if (!ts?.clientRevealedAt || ts.submittedAt) return
+      const elapsed = (Date.now() - ts.clientRevealedAt) / 1000
       if (elapsed >= q.timedLimitSeconds) {
         submitTimedQuestion(q.id, true)
       }
@@ -807,8 +822,23 @@ export function TakeTestClient({
         clearTimeout(saveTimeoutRef.current)
       }
 
+      // For any timed questions that were revealed but not yet submitted, stamp timedSubmittedAt now
+      const timedStampPromises = test.questions
+        .filter((q: TestQuestion) => q.timedLimitSeconds && timedState[q.id]?.revealedAt && !timedState[q.id]?.submittedAt)
+        .map((q: TestQuestion) => {
+          const ts = timedState[q.id]
+          const elapsedMs = ts?.clientRevealedAt ? Date.now() - ts.clientRevealedAt : undefined
+          return saveAnswer(q.id, {
+            ...(answers[q.id] || {}),
+            markedForReview: markedForReview.has(q.id),
+            timedSubmit: true,
+            timedElapsedMs: elapsedMs,
+          } as AnswerData)
+        })
+      await Promise.all(timedStampPromises)
+
       // Save all answers that might be pending (wait for them to complete)
-      const savePromises = Object.entries(answers).map(([questionId, answerData]) => 
+      const savePromises = Object.entries(answers).map(([questionId, answerData]) =>
         saveAnswer(questionId, {
           ...answerData,
           markedForReview: markedForReview.has(questionId),
@@ -927,8 +957,9 @@ export function TakeTestClient({
 
   if (!started) {
     const clubId = membership?.clubId
-    
+
     return (
+      <div className="min-h-screen">
       <div className="container mx-auto max-w-2xl py-8 px-4">
         <Card>
           <CardHeader>
@@ -1016,6 +1047,7 @@ export function TakeTestClient({
           </CardContent>
         </Card>
       </div>
+      </div>
     )
   }
 
@@ -1091,10 +1123,10 @@ export function TakeTestClient({
                 const isTimedSubmitted = isTimed && !!ts?.submittedAt
                 const isTimedLocked = isTimedSubmitted
 
-                // Compute remaining seconds for countdown
+                // Compute remaining seconds for countdown using client clock
                 let timedSecondsLeft: number | null = null
-                if (isTimedRevealed && !isTimedSubmitted && question.timedLimitSeconds) {
-                  const elapsed = (Date.now() - new Date(ts!.revealedAt!).getTime()) / 1000
+                if (isTimedRevealed && !isTimedSubmitted && question.timedLimitSeconds && ts?.clientRevealedAt) {
+                  const elapsed = (Date.now() - ts.clientRevealedAt) / 1000
                   timedSecondsLeft = Math.max(0, question.timedLimitSeconds - elapsed)
                 }
 
@@ -1364,8 +1396,8 @@ export function TakeTestClient({
                     )
                   })()}
                   
-                  {question.type !== 'SHORT_TEXT' && question.type !== 'LONG_TEXT' && !isTextBlock && <QuestionPrompt promptMd={question.promptMd} />}
-                  {question.type === 'LONG_TEXT' && !isTextBlock && (() => {
+                  {question.type !== 'SHORT_TEXT' && question.type !== 'LONG_TEXT' && !isTextBlock && (!isTimed || isTimedRevealed) && !isTimedLocked && <QuestionPrompt promptMd={question.promptMd} />}
+                  {question.type === 'LONG_TEXT' && !isTextBlock && (!isTimed || isTimedRevealed) && !isTimedLocked && (() => {
                     // For LONG_TEXT, we'll render the prompt inside the answer section if it has FRQ parts
                     // Otherwise render it here
                     const promptMd = question.promptMd || ''
@@ -1378,9 +1410,9 @@ export function TakeTestClient({
                     return null
                   })()}
                   
-                  {!isTextBlock && question.type === 'MCQ_SINGLE' && (
-                    <RadioGroup 
-                      value={answers[question.id]?.selectedOptionIds?.[0] || ''} 
+                  {!isTextBlock && question.type === 'MCQ_SINGLE' && (!isTimed || isTimedRevealed) && !isTimedLocked && (
+                    <RadioGroup
+                      value={answers[question.id]?.selectedOptionIds?.[0] || ''}
                       onValueChange={(value) => handleAnswerChange(question.id, {
                         selectedOptionIds: [value],
                       })}
@@ -1388,49 +1420,50 @@ export function TakeTestClient({
                       className="space-y-2"
                     >
                       {question.options.map((option: TestOption) => (
-                        <div
+                        <Label
                           key={option.id}
-                          className={`flex items-center gap-2 p-3 rounded border ${submitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted'}`}
+                          htmlFor={`${question.id}-${option.id}`}
+                          className={`flex items-center gap-3 p-3 rounded border transition-colors ${submitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted'} ${answers[question.id]?.selectedOptionIds?.[0] === option.id ? 'border-primary bg-primary/5' : ''}`}
                         >
                           <RadioGroupItem value={option.id} id={`${question.id}-${option.id}`} disabled={submitting} />
-                          <Label htmlFor={`${question.id}-${option.id}`} className={`${submitting ? 'cursor-not-allowed' : 'cursor-pointer'} font-normal flex-1`}>
-                            {option.label}
-                          </Label>
-                        </div>
+                          <span className="font-normal flex-1">{option.label}</span>
+                        </Label>
                       ))}
                     </RadioGroup>
                   )}
 
-                  {!isTextBlock && question.type === 'MCQ_MULTI' && (
+                  {!isTextBlock && question.type === 'MCQ_MULTI' && (!isTimed || isTimedRevealed) && !isTimedLocked && (
                     <div className="space-y-2">
-                      {question.options.map((option: TestOption) => (
-                        <div
-                          key={option.id}
-                          className={`flex items-center gap-2 p-3 rounded border ${submitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted'}`}
-                        >
-                          <Checkbox
-                            id={`${question.id}-${option.id}`}
-                            checked={answers[question.id]?.selectedOptionIds?.includes(option.id) || false}
-                            onCheckedChange={(checked) => {
-                              const current = answers[question.id]?.selectedOptionIds || []
-                              const newSelected = checked
-                                ? [...current, option.id]
-                                : current.filter((id: string) => id !== option.id)
-                              handleAnswerChange(question.id, {
-                                selectedOptionIds: newSelected,
-                              })
-                            }}
-                            disabled={submitting}
-                          />
-                          <Label htmlFor={`${question.id}-${option.id}`} className={`${submitting ? 'cursor-not-allowed' : 'cursor-pointer'} font-normal flex-1`}>
-                            {option.label}
+                      {question.options.map((option: TestOption) => {
+                        const isChecked = answers[question.id]?.selectedOptionIds?.includes(option.id) || false
+                        return (
+                          <Label
+                            key={option.id}
+                            htmlFor={`${question.id}-${option.id}`}
+                            className={`flex items-center gap-3 p-3 rounded border transition-colors ${submitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-muted'} ${isChecked ? 'border-primary bg-primary/5' : ''}`}
+                          >
+                            <Checkbox
+                              id={`${question.id}-${option.id}`}
+                              checked={isChecked}
+                              onCheckedChange={(checked) => {
+                                const current = answers[question.id]?.selectedOptionIds || []
+                                const newSelected = checked
+                                  ? [...current, option.id]
+                                  : current.filter((id: string) => id !== option.id)
+                                handleAnswerChange(question.id, {
+                                  selectedOptionIds: newSelected,
+                                })
+                              }}
+                              disabled={submitting}
+                            />
+                            <span className="font-normal flex-1">{option.label}</span>
                           </Label>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
 
-                  {!isTextBlock && question.type === 'NUMERIC' && (
+                  {!isTextBlock && question.type === 'NUMERIC' && (!isTimed || isTimedRevealed) && !isTimedLocked && (
                     <Input
                       type="number"
                       step="any"
@@ -1443,7 +1476,7 @@ export function TakeTestClient({
                     />
                   )}
 
-                  {!isTextBlock && question.type === 'LONG_TEXT' && (() => {
+                  {!isTextBlock && question.type === 'LONG_TEXT' && (!isTimed || isTimedRevealed) && !isTimedLocked && (() => {
                     // Parse FRQ parts from promptMd if they exist
                     const promptMd = question.promptMd || ''
                     const frqPartsMatch = promptMd.match(/---FRQ_PARTS---\n\n([\s\S]+)$/)

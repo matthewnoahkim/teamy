@@ -49,6 +49,8 @@ interface Attempt {
     pointsAwarded: number | null
     gradedAt: string | null
     graderNote: string | null
+    timedRevealedAt: string | Date | null
+    timedSubmittedAt: string | Date | null
     question: {
       id: string
       promptMd: string
@@ -56,6 +58,7 @@ interface Attempt {
       points: number
       sectionId: string | null
       explanation: string | null
+      timedLimitSeconds: number | null
       options: Array<{
         id: string
         label: string
@@ -1197,6 +1200,15 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                             <Badge variant="outline">
                               {answer.question.type.replace('MCQ_', '').replace('_', ' ')}
                             </Badge>
+                            {answer.question.timedLimitSeconds && (
+                              <Badge variant="outline" className="text-xs border-orange-500 text-orange-600 dark:text-orange-400">
+                                Timed {answer.timedRevealedAt && answer.timedSubmittedAt
+                                  ? `— ${Math.round((new Date(answer.timedSubmittedAt).getTime() - new Date(answer.timedRevealedAt).getTime()) / 1000)}s`
+                                  : answer.timedRevealedAt && !answer.timedSubmittedAt
+                                  ? '— expired'
+                                  : ''}
+                              </Badge>
+                            )}
                             {answer.gradedAt !== null && answer.pointsAwarded !== null && (
                               <Badge variant={answer.pointsAwarded > 0 ? 'default' : 'destructive'}>
                                 {answer.pointsAwarded} / {answer.question.points} pts
@@ -1206,6 +1218,21 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
+                        {/* Timed question info */}
+                        {answer.question.timedLimitSeconds && (
+                          <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium ${
+                            answer.timedRevealedAt && answer.timedSubmittedAt
+                              ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
+                              : 'bg-muted text-muted-foreground border border-border'
+                          }`}>
+                            <Clock className="h-4 w-4 shrink-0" />
+                            {answer.timedRevealedAt && answer.timedSubmittedAt
+                              ? <>Time taken: <strong className="ml-1">{Math.round((new Date(answer.timedSubmittedAt).getTime() - new Date(answer.timedRevealedAt).getTime()) / 1000)}s</strong>&nbsp;/ {answer.question.timedLimitSeconds}s limit</>
+                              : answer.timedRevealedAt && !answer.timedSubmittedAt
+                              ? `Time expired — ${answer.question.timedLimitSeconds}s limit`
+                              : `Timed question (${answer.question.timedLimitSeconds}s) — question not revealed`}
+                          </div>
+                        )}
                         {/* Student's Answer */}
                         {answer.question.type.startsWith('MCQ') && answer.question.options && (
                           <div>

@@ -1354,6 +1354,22 @@ export function ESTestAttemptsView({ testId, testName, scoresReleased: initialSc
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
+                        {/* Timed question info */}
+                        {answer.question.timedLimitSeconds && (
+                          <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium ${
+                            answer.timedRevealedAt && answer.timedSubmittedAt
+                              ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
+                              : 'bg-muted text-muted-foreground border border-border'
+                          }`}>
+                            <Clock className="h-4 w-4 shrink-0" />
+                            {answer.timedRevealedAt && answer.timedSubmittedAt
+                              ? <>Time taken: <strong className="ml-1">{Math.round((new Date(answer.timedSubmittedAt).getTime() - new Date(answer.timedRevealedAt).getTime()) / 1000)}s</strong>&nbsp;/ {answer.question.timedLimitSeconds}s limit</>
+                              : answer.timedRevealedAt && !answer.timedSubmittedAt
+                              ? `Time expired — ${answer.question.timedLimitSeconds}s limit`
+                              : `Timed question (${answer.question.timedLimitSeconds}s) — question not revealed`}
+                          </div>
+                        )}
+
                         {/* Student's Answer */}
                         {answer.question.type.startsWith('MCQ') && answer.question.options && (
                           <div>

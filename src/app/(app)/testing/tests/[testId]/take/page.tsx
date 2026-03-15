@@ -164,6 +164,7 @@ export default async function TournamentTakeTestPage({
       shuffleOptions: boolean
       order: number
       numericTolerance: number | null
+      timedLimitSeconds: number | null
       options: Array<{
         id: string
         label: string
@@ -295,6 +296,7 @@ export default async function TournamentTakeTestPage({
           shuffleOptions: q.shuffleOptions,
           order: q.order,
           numericTolerance: q.numericTolerance ? Number(q.numericTolerance) : null,
+          timedLimitSeconds: q.timedLimitSeconds ?? null,
           isTiebreak: q.isTiebreak,
           options: q.options.map((o) => ({
             id: o.id,

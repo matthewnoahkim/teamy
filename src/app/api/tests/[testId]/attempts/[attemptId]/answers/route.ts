@@ -11,7 +11,8 @@ const saveAnswerSchema = z.object({
   selectedOptionIds: z.array(z.string()).optional().nullable(),
   numericAnswer: z.number().optional().nullable(),
   markedForReview: z.boolean().optional(),
-  timedSubmittedAt: z.string().datetime().optional(),
+  timedSubmit: z.boolean().optional(),
+  timedElapsedMs: z.number().optional(),
 })
 
 // POST /api/tests/[testId]/attempts/[attemptId]/answers
@@ -79,8 +80,18 @@ export async function POST(
       if (validatedData.markedForReview !== undefined) {
         updateData.markedForReview = validatedData.markedForReview
       }
-      if (validatedData.timedSubmittedAt !== undefined) {
-        updateData.timedSubmittedAt = new Date(validatedData.timedSubmittedAt)
+      if (validatedData.timedSubmit) {
+        // Look up the existing answer to get timedRevealedAt, then compute timedSubmittedAt from client elapsed time
+        const existingAnswer = await prisma.attemptAnswer.findUnique({
+          where: { attemptId_questionId: { attemptId: resolvedParams.attemptId, questionId: validatedData.questionId } },
+          select: { timedRevealedAt: true },
+        })
+        if (existingAnswer?.timedRevealedAt && validatedData.timedElapsedMs !== undefined) {
+          // Use client-measured elapsed time added to server's revealedAt for consistent timestamps
+          updateData.timedSubmittedAt = new Date(existingAnswer.timedRevealedAt.getTime() + validatedData.timedElapsedMs)
+        } else {
+          updateData.timedSubmittedAt = new Date()
+        }
       }
 
       const answer = await prisma.attemptAnswer.upsert({
@@ -98,7 +109,7 @@ export async function POST(
           selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
           numericAnswer: validatedData.numericAnswer,
           markedForReview: validatedData.markedForReview ?? false,
-          timedSubmittedAt: validatedData.timedSubmittedAt ? new Date(validatedData.timedSubmittedAt) : undefined,
+          timedSubmittedAt: validatedData.timedSubmit ? new Date() : undefined,
         },
       })
 
@@ -187,8 +198,16 @@ export async function POST(
       if (validatedData.markedForReview !== undefined) {
         updateData.markedForReview = validatedData.markedForReview
       }
-      if (validatedData.timedSubmittedAt !== undefined) {
-        updateData.timedSubmittedAt = new Date(validatedData.timedSubmittedAt)
+      if (validatedData.timedSubmit) {
+        const existingAnswer = await prisma.eSTestAttemptAnswer.findUnique({
+          where: { attemptId_questionId: { attemptId: resolvedParams.attemptId, questionId: validatedData.questionId } },
+          select: { timedRevealedAt: true },
+        })
+        if (existingAnswer?.timedRevealedAt && validatedData.timedElapsedMs !== undefined) {
+          updateData.timedSubmittedAt = new Date(existingAnswer.timedRevealedAt.getTime() + validatedData.timedElapsedMs)
+        } else {
+          updateData.timedSubmittedAt = new Date()
+        }
       }
 
       const answer = await prisma.eSTestAttemptAnswer.upsert({
@@ -206,7 +225,7 @@ export async function POST(
           selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
           numericAnswer: validatedData.numericAnswer,
           markedForReview: validatedData.markedForReview ?? false,
-          timedSubmittedAt: validatedData.timedSubmittedAt ? new Date(validatedData.timedSubmittedAt) : undefined,
+          timedSubmittedAt: validatedData.timedSubmit ? new Date() : undefined,
         },
       })
 
