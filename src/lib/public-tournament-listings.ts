@@ -9,7 +9,6 @@ export const publicApprovedTournamentSelect = {
   tournamentFormat: true,
   location: true,
   preferredSlug: true,
-  otherNotes: true,
   status: true,
   createdAt: true,
   tournament: {

@@ -303,6 +303,16 @@ test('DELETE /api/tournaments/[tournamentId]/staff rejects deleting staff from a
     ),
     overrideMethod(prisma.tournamentAdmin as Record<string, unknown>, 'findUnique', async () => null as never),
     overrideMethod(
+      prisma.tournamentHostingRequest as Record<string, unknown>,
+      'findFirst',
+      async () => null as never,
+    ),
+    overrideMethod(
+      prisma.tournamentStaff as Record<string, unknown>,
+      'findFirst',
+      async () => null as never,
+    ),
+    overrideMethod(
       prisma.tournamentStaff as Record<string, unknown>,
       'findUnique',
       async () =>
@@ -362,6 +372,16 @@ test('PUT /api/tournaments/[tournamentId]/timeline rejects updating items from a
         }) as never,
     ),
     overrideMethod(prisma.tournamentAdmin as Record<string, unknown>, 'findUnique', async () => null as never),
+    overrideMethod(
+      prisma.tournamentHostingRequest as Record<string, unknown>,
+      'findFirst',
+      async () => null as never,
+    ),
+    overrideMethod(
+      prisma.tournamentStaff as Record<string, unknown>,
+      'findFirst',
+      async () => null as never,
+    ),
     overrideMethod(
       prisma.tournamentTimeline as Record<string, unknown>,
       'findUnique',
@@ -426,6 +446,16 @@ test('DELETE /api/tournaments/[tournamentId]/timeline rejects deleting items fro
         }) as never,
     ),
     overrideMethod(prisma.tournamentAdmin as Record<string, unknown>, 'findUnique', async () => null as never),
+    overrideMethod(
+      prisma.tournamentHostingRequest as Record<string, unknown>,
+      'findFirst',
+      async () => null as never,
+    ),
+    overrideMethod(
+      prisma.tournamentStaff as Record<string, unknown>,
+      'findFirst',
+      async () => null as never,
+    ),
     overrideMethod(
       prisma.tournamentTimeline as Record<string, unknown>,
       'findUnique',
