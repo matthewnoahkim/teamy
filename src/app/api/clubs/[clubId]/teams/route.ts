@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin } from '@/lib/rbac'
+import { requireAdmin, requireMember } from '@/lib/rbac'
 import { z } from 'zod'
 
 const createTeamSchema = z.object({
@@ -56,6 +56,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    await requireMember(session.user.id, resolvedParams.clubId)
+
     const teams = await prisma.team.findMany({
       where: { clubId: resolvedParams.clubId },
       include: {
@@ -84,6 +86,9 @@ export async function GET(
 
     return NextResponse.json({ teams })
   } catch (error) {
+    if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
     console.error('Get teams error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

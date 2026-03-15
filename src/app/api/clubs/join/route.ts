@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
     if (!matchedClub || !role) {
       return NextResponse.json(
         { error: 'Invalid or expired invite code', code: 'INVALID_CODE' },
-        { status: 401 }
+        { status: 400 }
       )
     }
 
