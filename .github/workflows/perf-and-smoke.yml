@@ -40,6 +40,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Create .env.test
+        run: echo "DATABASE_URL=postgresql://test:test@localhost:5432/sciolyteams_test" > .env.test
+
       - name: API Tests
         run: npm run test:api
 
