@@ -68,14 +68,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if max redemptions reached
-    if (promoCode.maxRedemptions && promoCode.currentRedemptions >= promoCode.maxRedemptions) {
-      return NextResponse.json(
-        { error: 'This promo code has reached its maximum number of redemptions' },
-        { status: 400 }
-      )
-    }
-
     // Calculate expiration date for the redemption
     let redemptionExpiresAt: Date
     if (promoCode.effectType === 'PRO_SUBSCRIPTION') {
