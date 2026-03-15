@@ -179,17 +179,51 @@ export async function POST(req: NextRequest) {
 
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice
-        // Handle successful payment
         console.log(`Payment succeeded for invoice: ${invoice.id}`)
-        // TODO: Update subscription status if needed
+
+        const customerId = invoice.customer as string | null
+        if (customerId) {
+          const user = await prisma.user.findUnique({
+            where: { stripeCustomerId: customerId },
+          })
+          if (user) {
+            const subscriptionId = (invoice as unknown as Record<string, unknown>).subscription as string | null
+            const updateData: Record<string, unknown> = { subscriptionStatus: 'active' }
+            if (subscriptionId && stripe) {
+              try {
+                const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+                const currentPeriodEnd = (subscription as unknown as Record<string, unknown>).current_period_end
+                if (currentPeriodEnd && typeof currentPeriodEnd === 'number') {
+                  updateData.subscriptionEndsAt = new Date(currentPeriodEnd * 1000)
+                }
+              } catch (err) {
+                console.error('Failed to retrieve subscription for invoice:', err)
+              }
+            }
+            await prisma.user.update({ where: { id: user.id }, data: updateData })
+            console.log(`Confirmed active subscription for user ${user.id}`)
+          }
+        }
         break
       }
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
-        // Handle failed payment
         console.log(`Payment failed for invoice: ${invoice.id}`)
-        // TODO: Notify user or update subscription status
+
+        const customerId = invoice.customer as string | null
+        if (customerId) {
+          const user = await prisma.user.findUnique({
+            where: { stripeCustomerId: customerId },
+          })
+          if (user) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { subscriptionStatus: 'past_due' },
+            })
+            console.log(`Marked subscription past_due for user ${user.id}`)
+          }
+        }
         break
       }
 

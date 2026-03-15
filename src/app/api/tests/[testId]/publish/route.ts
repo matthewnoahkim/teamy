@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { ScoreReleaseMode } from '@prisma/client'
 import { isAdmin, getUserMembership } from '@/lib/rbac'
 import { hashTestPassword } from '@/lib/test-security'
+import { sendTestPublishedEmail } from '@/lib/email'
 import { z } from 'zod'
 
 const publishSchema = z.object({
@@ -314,8 +315,65 @@ export async function POST(
       }
     }
 
-    // TODO: Send emails if sendEmails is true
-    // Get assignments and send notifications to assigned users
+    if (validatedData.sendEmails) {
+      try {
+        const club = await prisma.club.findUnique({
+          where: { id: test.clubId },
+          select: { name: true },
+        })
+
+        const finalAssignments = validatedData.assignmentMode
+          ? await prisma.testAssignment.findMany({ where: { testId } })
+          : test.assignments
+
+        const hasClubAssignment = finalAssignments.some(a => a.assignedScope === 'CLUB')
+        let emails: string[] = []
+
+        if (hasClubAssignment) {
+          const memberships = await prisma.membership.findMany({
+            where: { clubId: test.clubId },
+            select: { user: { select: { email: true } } },
+          })
+          emails = memberships.map(m => m.user.email)
+        } else {
+          const teamIds = finalAssignments
+            .filter(a => a.assignedScope === 'TEAM' && a.teamId)
+            .map(a => a.teamId as string)
+          const membershipIds = finalAssignments
+            .filter(a => a.assignedScope === 'PERSONAL' && a.targetMembershipId)
+            .map(a => a.targetMembershipId as string)
+
+          const conditions = []
+          if (teamIds.length > 0) conditions.push({ teamId: { in: teamIds } })
+          if (membershipIds.length > 0) conditions.push({ id: { in: membershipIds } })
+
+          if (conditions.length > 0) {
+            const memberships = await prisma.membership.findMany({
+              where: { clubId: test.clubId, OR: conditions },
+              select: { user: { select: { email: true } } },
+            })
+            emails = memberships.map(m => m.user.email)
+          }
+        }
+
+        const baseUrl = process.env.NEXTAUTH_URL ?? process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : 'https://teamy.site'
+
+        if (emails.length > 0) {
+          await sendTestPublishedEmail({
+            to: [...new Set(emails)],
+            testName: test.name,
+            clubName: club?.name ?? 'your club',
+            startAt: updatedTest.startAt,
+            endAt: updatedTest.endAt,
+            testUrl: `${baseUrl}/club/${test.clubId}?tab=tests`,
+          })
+        }
+      } catch (emailError) {
+        console.error('Failed to send test published emails:', emailError)
+      }
+    }
 
     return NextResponse.json({ test: updatedTest, calendarEventIds })
   } catch (error) {

@@ -206,11 +206,6 @@ export default async function TournamentListingsPage({ searchParams }: Tournamen
                         <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
                       </div>
 
-                      {tournament.otherNotes && (
-                        <p className="line-clamp-2 text-sm text-muted-foreground">
-                          {tournament.otherNotes}
-                        </p>
-                      )}
                     </div>
 
                     {tournament.tournamentFormat === 'in-person' && tournament.location ? (

@@ -275,6 +275,77 @@ export async function sendStaffInviteEmail({
   }
 }
 
+export interface TestPublishedEmailParams {
+  to: string[]
+  testName: string
+  clubName: string
+  startAt: Date | null
+  endAt: Date | null
+  testUrl: string
+}
+
+/**
+ * Send test published notification emails to assigned users.
+ */
+export async function sendTestPublishedEmail({
+  to,
+  testName,
+  clubName,
+  startAt,
+  endAt,
+  testUrl,
+}: TestPublishedEmailParams): Promise<void> {
+  if (!resend) {
+    console.error('RESEND_API_KEY is not configured')
+    return
+  }
+  if (to.length === 0) return
+
+  const windowHtml =
+    startAt && endAt
+      ? `<p style="margin:0 0 14px 0; color:${EMAIL_THEME.body}; font-size:14px; line-height:1.65;">
+          <strong style="color:${EMAIL_THEME.title};">Window:</strong> ${escapeHtml(formatEventTimeForEmail(startAt, endAt))}
+        </p>`
+      : ''
+
+  const bodyHtml = `
+    <p style="margin:0 0 14px 0; color:${EMAIL_THEME.body}; font-size:15px; line-height:1.65;">
+      A new test has been published for your club.
+    </p>
+    ${windowHtml}
+    <p style="margin:0; color:${EMAIL_THEME.muted}; font-size:13px; line-height:1.6;">
+      Open the link below to start when ready.
+    </p>
+  `
+
+  const html = renderTeamyEmailLayout({
+    preheader: `New test published: ${testName}`,
+    label: 'Test Published',
+    title: testName,
+    subtitle: clubName,
+    bodyHtml,
+    actionLabel: 'Open Test',
+    actionUrl: testUrl,
+    footerText: 'Teamy • Science Olympiad Management Platform',
+  })
+
+  // Send in batches of 50 (Resend limit per call)
+  for (let i = 0; i < to.length; i += 50) {
+    const batch = to.slice(i, i + 50)
+    try {
+      const { error } = await resend.emails.send({
+        from: 'Teamy <no-reply@teamy.site>',
+        to: batch,
+        subject: `Test Published: ${testName} [${clubName}]`,
+        html,
+      })
+      if (error) console.error('Resend error sending test published email:', error)
+    } catch (err) {
+      console.error('Failed to send test published email batch:', err)
+    }
+  }
+}
+
 export interface CalendarEventDetails {
   startUTC: Date
   endUTC: Date
