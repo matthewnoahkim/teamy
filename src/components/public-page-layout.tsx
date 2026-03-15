@@ -69,7 +69,7 @@ export async function PublicPageLayout({
   const shouldLoadSession = !disableUserAwareNav && await hasAuthSessionCookie()
   const [bannerSettings, session] = await Promise.all([
     getBannerSettings(),
-    shouldLoadSession ? serverSession.get() : Promise.resolve(null),
+    shouldLoadSession ? serverSession.get().catch(() => null) : Promise.resolve(null),
   ])
   const isAuthenticated = Boolean(session?.user)
 

@@ -2,7 +2,6 @@ import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, User } from 'lucide-react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { format } from 'date-fns'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { PublicPageLayout } from '@/components/public-page-layout'
@@ -35,27 +34,42 @@ export async function generateStaticParams() {
 }
 
 export default async function BlogPostPage({ params }: Props) {
-  const resolvedParams = await params
+  let resolvedParams: { slug: string }
+  try {
+    resolvedParams = await params
+  } catch {
+    notFound()
+  }
 
-  const post = await prisma.blogPost.findUnique({
-    where: { slug: resolvedParams.slug },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      coverImage: true,
-      content: true,
-      authorName: true,
-      createdAt: true,
-      published: true,
-    },
-  }).catch((error) => {
+  let post
+  try {
+    post = await prisma.blogPost.findUnique({
+      where: { slug: resolvedParams.slug },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        coverImage: true,
+        content: true,
+        authorName: true,
+        createdAt: true,
+        published: true,
+      },
+    })
+  } catch (error) {
     console.error(`Failed to load blog post for slug "${resolvedParams.slug}":`, error)
-    return null
-  })
+    post = null
+  }
 
   if (!post || !post.published) {
     notFound()
+  }
+
+  let formattedDate: string
+  try {
+    formattedDate = format(new Date(post.createdAt), 'MMMM d, yyyy')
+  } catch {
+    formattedDate = ''
   }
 
   return (
@@ -69,14 +83,11 @@ export default async function BlogPostPage({ params }: Props) {
 
           {post.coverImage && (
             <div className="mb-8 rounded-2xl overflow-hidden shadow-card border border-border">
-              <Image
+              {/* Use img instead of next/image for user-provided URLs that may not be in remotePatterns */}
+              <img
                 src={post.coverImage}
                 alt={post.title}
-                width={1200}
-                height={640}
-                sizes="(max-width: 768px) 100vw, 768px"
                 className="w-full h-64 md:h-80 object-cover"
-                priority
               />
             </div>
           )}
@@ -90,10 +101,12 @@ export default async function BlogPostPage({ params }: Props) {
                 <User className="h-4 w-4" />
                 {post.authorName}
               </span>
-              <span className="flex items-center gap-1.5">
-                <Calendar className="h-4 w-4" />
-                {format(new Date(post.createdAt), 'MMMM d, yyyy')}
-              </span>
+              {formattedDate && (
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" />
+                  {formattedDate}
+                </span>
+              )}
             </div>
           </header>
 
