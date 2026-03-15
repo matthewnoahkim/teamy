@@ -135,6 +135,7 @@ export async function POST(request: NextRequest) {
         order: number
         shuffleOptions?: boolean
         numericTolerance?: number
+        isTiebreak?: boolean
         options?: Array<{
           label: string
           isCorrect: boolean
@@ -203,6 +204,7 @@ export async function POST(request: NextRequest) {
                   order: q.order ?? index,
                   shuffleOptions: q.shuffleOptions || false,
                   numericTolerance: q.numericTolerance,
+                  isTiebreak: q.isTiebreak || false,
                   options: q.options && q.options.length > 0
                     ? {
                         create: q.options.map((opt, optIndex) => ({
@@ -356,6 +358,7 @@ export async function PUT(request: NextRequest) {
         order: number
         shuffleOptions?: boolean
         numericTolerance?: number
+        isTiebreak?: boolean
         options?: Array<{
           id?: string
           label: string
@@ -646,6 +649,7 @@ export async function PUT(request: NextRequest) {
                 order: q.order,
                 shuffleOptions: q.shuffleOptions || false,
                 numericTolerance: q.numericTolerance,
+                isTiebreak: q.isTiebreak || false,
               },
             })
 
@@ -693,6 +697,7 @@ export async function PUT(request: NextRequest) {
                 order: q.order,
                 shuffleOptions: q.shuffleOptions || false,
                 numericTolerance: q.numericTolerance,
+                isTiebreak: q.isTiebreak || false,
                 options: q.options && q.options.length > 0
                   ? {
                       create: q.options.map((opt, optIndex) => ({

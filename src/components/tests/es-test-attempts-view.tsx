@@ -62,6 +62,7 @@ interface Attempt {
       points: number
       sectionId: string | null
       explanation: string | null
+      isTiebreak: boolean
       options: Array<{
         id: string
         label: string
@@ -131,6 +132,8 @@ export function ESTestAttemptsView({ testId, testName, scoresReleased: initialSc
   const [aiSuggestions, setAiSuggestions] = useState<Record<string, AiSuggestion>>({})
   const [_loadingAiSuggestions, setLoadingAiSuggestions] = useState(false)
   const [requestingAiGrading, setRequestingAiGrading] = useState<string | null>(null) // Track which part is loading: `${answerId}-${partIndex}` or `answerId` for whole question
+  const [reassigningAttemptId, setReassigningAttemptId] = useState<string | null>(null)
+  const [confirmReassignId, setConfirmReassignId] = useState<string | null>(null)
   const [scoresReleased, setScoresReleased] = useState(initialScoresReleased)
   const [releasingScores, setReleasingScores] = useState(false)
 
@@ -158,6 +161,24 @@ export function ESTestAttemptsView({ testId, testName, scoresReleased: initialSc
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleReassign = async (attemptId: string) => {
+    setReassigningAttemptId(attemptId)
+    try {
+      const res = await fetch(`/api/es/tests/${testId}/attempts/${attemptId}/reassign`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to reassign attempt')
+      }
+      setAttempts((prev) => prev.filter((a) => a.id !== attemptId))
+      toast({ title: 'Attempt removed', description: 'The student can now retake the test.' })
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to reassign', variant: 'destructive' })
+    } finally {
+      setReassigningAttemptId(null)
+      setConfirmReassignId(null)
     }
   }
 
@@ -854,6 +875,19 @@ export function ESTestAttemptsView({ testId, testName, scoresReleased: initialSc
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => setConfirmReassignId(attempt.id)}
+                        disabled={reassigningAttemptId === attempt.id}
+                      >
+                        {reassigningAttemptId === attempt.id ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4 mr-1" />
+                        )}
+                        Reassign
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => handleViewDetails(attempt)}
                       >
                         <Eye className="h-4 w-4 mr-1" />
@@ -867,6 +901,29 @@ export function ESTestAttemptsView({ testId, testName, scoresReleased: initialSc
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm Reassign Dialog */}
+      <Dialog open={confirmReassignId !== null} onOpenChange={(open) => { if (!open) setConfirmReassignId(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reassign Attempt</DialogTitle>
+            <DialogDescription>
+              This will permanently delete this attempt so the student can retake the test. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setConfirmReassignId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={reassigningAttemptId !== null}
+              onClick={() => confirmReassignId && handleReassign(confirmReassignId)}
+            >
+              {reassigningAttemptId !== null ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Delete & Reassign
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={(open) => {
@@ -1110,8 +1167,13 @@ export function ESTestAttemptsView({ testId, testName, scoresReleased: initialSc
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
-                            <CardTitle className="text-base">
+                            <CardTitle className="text-base flex items-center gap-2">
                               Question {index + 1}
+                              {answer.question.isTiebreak && (
+                                <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
+                                  Tiebreak
+                                </Badge>
+                              )}
                             </CardTitle>
                             <div className="text-sm text-muted-foreground mt-1">
                               {(() => {

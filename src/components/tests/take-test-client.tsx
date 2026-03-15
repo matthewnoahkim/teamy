@@ -37,6 +37,7 @@ interface TestQuestion {
   type: string
   points: number
   promptMd: string
+  isTiebreak?: boolean
   options: TestOption[]
 }
 
@@ -1020,6 +1021,11 @@ export function TakeTestClient({
                         <span className="text-sm text-muted-foreground">
                           ({question.points} points)
                         </span>
+                      )}
+                      {question.isTiebreak && !isTextBlock && (
+                        <Badge variant="outline" className="text-xs border-blue-500 text-blue-600 dark:text-blue-400">
+                          Tiebreak
+                        </Badge>
                       )}
                       {markedForReview.has(question.id) && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 font-medium">

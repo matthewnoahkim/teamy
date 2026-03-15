@@ -145,6 +145,7 @@ export default async function ESEditTestPage({ params }: Props) {
       explanation: q.explanation,
       points: Number(q.points),
       shuffleOptions: q.shuffleOptions,
+      isTiebreak: q.isTiebreak,
       options: q.options.map((o) => ({
         id: o.id,
         label: o.label,

@@ -61,6 +61,8 @@ import {
   Copy,
   Save,
   Pencil,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -115,7 +117,10 @@ interface EventRankingRow {
   participantName: string
   clubName: string
   score: number
+  tiebreakScore: number
   submittedAt: string | null
+  membershipId: string
+  overrideRank: number | null
 }
 
 interface EventInfo {
@@ -569,6 +574,9 @@ export function TDTournamentManageClient({
   const [eventRankingRows, setEventRankingRows] = useState<EventRankingRow[]>([])
   const [fullyGradedTestCount, setFullyGradedTestCount] = useState(0)
   const [loadingRankings, setLoadingRankings] = useState(false)
+  const [editingRank, setEditingRank] = useState<{ testId: string; membershipId: string } | null>(null)
+  const [editingRankValue, setEditingRankValue] = useState<string>('')
+  const [savingRankOverride, setSavingRankOverride] = useState(false)
   const [auditLogs, setAuditLogs] = useState<Array<{
     id: string
     testId: string
@@ -1563,6 +1571,31 @@ export function TDTournamentManageClient({
       })
     } finally {
       setLoadingRankings(false)
+    }
+  }
+
+  const handleRankOverride = async (row: EventRankingRow, newRank: number | null) => {
+    setSavingRankOverride(true)
+    try {
+      if (newRank === null) {
+        await fetch(
+          `/api/tournaments/${tournament.id}/event-rankings/override?testId=${row.testId}&membershipId=${row.membershipId}`,
+          { method: 'DELETE' },
+        )
+      } else {
+        await fetch(`/api/tournaments/${tournament.id}/event-rankings/override`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ testId: row.testId, membershipId: row.membershipId, overrideRank: newRank }),
+        })
+      }
+      await fetchEventRankings()
+      toast({ title: newRank === null ? 'Override removed' : 'Rank updated' })
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update rank', variant: 'destructive' })
+    } finally {
+      setSavingRankOverride(false)
+      setEditingRank(null)
     }
   }
 
@@ -2769,7 +2802,71 @@ export function TDTournamentManageClient({
                                       )}
                                     </TableCell>
                                     <TableCell>{row.testName}</TableCell>
-                                    <TableCell>{row.rank}</TableCell>
+                                    <TableCell>
+                                      {editingRank?.testId === row.testId && editingRank?.membershipId === row.membershipId ? (
+                                        <div className="flex items-center gap-1">
+                                          <Input
+                                            type="number"
+                                            min="1"
+                                            value={editingRankValue}
+                                            onChange={(e) => setEditingRankValue(e.target.value)}
+                                            className="w-16 h-7 text-sm"
+                                            autoFocus
+                                          />
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-7 w-7"
+                                            disabled={savingRankOverride}
+                                            onClick={() => {
+                                              const val = parseInt(editingRankValue)
+                                              if (!isNaN(val) && val > 0) {
+                                                handleRankOverride(row, val)
+                                              }
+                                            }}
+                                          >
+                                            <CheckCircle className="h-4 w-4 text-green-600" />
+                                          </Button>
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-7 w-7"
+                                            onClick={() => setEditingRank(null)}
+                                          >
+                                            <XCircle className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-1 group">
+                                          <span>{row.overrideRank ?? row.rank}</span>
+                                          {row.overrideRank !== null && row.overrideRank !== row.rank && (
+                                            <span className="text-xs text-muted-foreground line-through">{row.rank}</span>
+                                          )}
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => {
+                                              setEditingRank({ testId: row.testId, membershipId: row.membershipId })
+                                              setEditingRankValue(String(row.overrideRank ?? row.rank))
+                                            }}
+                                          >
+                                            <Pencil className="h-3 w-3" />
+                                          </Button>
+                                          {row.overrideRank !== null && (
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                              title="Remove override"
+                                              onClick={() => handleRankOverride(row, null)}
+                                            >
+                                              <XCircle className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </TableCell>
                                     <TableCell>{row.participantName}</TableCell>
                                     <TableCell>{row.clubName}</TableCell>
                                     <TableCell className="text-right">{row.score.toFixed(2)}</TableCell>

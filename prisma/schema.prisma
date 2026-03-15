@@ -654,6 +654,7 @@ model Question {
   order            Int                   @default(0)
   shuffleOptions   Boolean               @default(false)
   numericTolerance Decimal?              @db.Decimal(8, 3)
+  isTiebreak       Boolean               @default(false)
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
   aiSuggestions    AiGradingSuggestion[]
@@ -1426,6 +1427,7 @@ model ESTestQuestion {
   order            Int                    @default(0)
   shuffleOptions   Boolean                @default(false)
   numericTolerance Decimal?               @db.Decimal(8, 3)
+  isTiebreak       Boolean                @default(false)
   createdAt        DateTime               @default(now())
   updatedAt        DateTime               @updatedAt
   answers          ESTestAttemptAnswer[]
@@ -1509,6 +1511,21 @@ model ESTestAttemptAnswer {
   @@unique([attemptId, questionId])
   @@index([attemptId])
   @@index([questionId])
+}
+
+model TournamentRankingOverride {
+  id           String   @id @default(cuid())
+  tournamentId String
+  testId       String
+  membershipId String
+  overrideRank Int
+  reason       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([testId, membershipId])
+  @@index([tournamentId])
+  @@index([testId])
 }
 
 model Resource {

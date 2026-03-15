@@ -89,6 +89,7 @@ interface QuestionDraft {
   points: number
   options: OptionDraft[]
   shuffleOptions: boolean
+  isTiebreak?: boolean
   frqParts?: FRQPart[] // For multi-part FRQ questions
   contextTables?: TableData[] // Tables for context field
   promptTables?: TableData[] // Tables for prompt field
@@ -143,6 +144,7 @@ interface NewTestBuilderProps {
       explanation: string | null
       points: number
       shuffleOptions: boolean
+      isTiebreak?: boolean
       options: Array<{
         id: string
         label: string
@@ -518,6 +520,7 @@ export function NewTestBuilder({
             isCorrect: opt.isCorrect,
           })),
           shuffleOptions: q.shuffleOptions,
+          isTiebreak: q.isTiebreak || false,
           frqParts,
           contextTables,
           promptTables,
@@ -565,6 +568,7 @@ export function NewTestBuilder({
       points: defaultPoints,
       options: baseOptions,
       shuffleOptions: type !== 'TRUE_FALSE' && type !== 'TEXT_BLOCK' && type !== 'LONG_TEXT' && type !== 'FILL_BLANK',
+      isTiebreak: false,
       blankAnswers: type === 'FILL_BLANK' ? [] : undefined,
     }
 
@@ -1252,14 +1256,15 @@ export function NewTestBuilder({
               
               const questionPayload: Record<string, unknown> = {
                 ...(existingQuestionIds.has(question.id) ? { id: question.id } : {}),
-                type: question.type === 'TRUE_FALSE' ? 'MCQ_SINGLE' : 
-                      question.type === 'FILL_BLANK' || question.type === 'TEXT_BLOCK' ? 'SHORT_TEXT' : 
+                type: question.type === 'TRUE_FALSE' ? 'MCQ_SINGLE' :
+                      question.type === 'FILL_BLANK' || question.type === 'TEXT_BLOCK' ? 'SHORT_TEXT' :
                       question.type,
                 promptMd: composePrompt(question),
                 explanation: explanationValue,
                 points: question.points,
                 order: index,
                 shuffleOptions: question.type === 'LONG_TEXT' ? false : question.shuffleOptions,
+                isTiebreak: question.isTiebreak || false,
               }
               
               // Only include options for MCQ question types
@@ -2306,6 +2311,7 @@ export function NewTestBuilder({
               onMoveToPosition={(position) => moveQuestionToPosition(question.id, position)}
               onImageUpload={(field, file, cursorPosition) => handleImageEmbed(question.id, field, file, cursorPosition)}
               onAddRecommendedOptions={() => addRecommendedOptions(question.id)}
+              esMode={esMode}
             />
           ))}
             </CardContent>
@@ -2817,6 +2823,7 @@ interface QuestionCardProps {
   onMoveToPosition: (position: number) => void
   onImageUpload: (field: 'context' | 'prompt', file: File, cursorPosition?: number | null) => void
   onAddRecommendedOptions: () => void
+  esMode?: boolean
 }
 
 function QuestionCard({
@@ -2830,6 +2837,7 @@ function QuestionCard({
   onMoveToPosition,
   onImageUpload,
   onAddRecommendedOptions,
+  esMode,
 }: QuestionCardProps) {
   const { toast } = useToast()
   const contextInputRef = useRef<HTMLInputElement>(null)
@@ -3923,6 +3931,24 @@ function QuestionCard({
                 </Label>
               </div>
             )}
+          </div>
+        )}
+
+        {esMode && question.type !== 'TEXT_BLOCK' && (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={`tiebreak-${question.id}`}
+              checked={question.isTiebreak || false}
+              onCheckedChange={(checked) =>
+                onChange((prev) => ({
+                  ...prev,
+                  isTiebreak: checked as boolean,
+                }))
+              }
+            />
+            <Label htmlFor={`tiebreak-${question.id}`} className="cursor-pointer font-normal text-sm">
+              Tiebreak question
+            </Label>
           </div>
         )}
 

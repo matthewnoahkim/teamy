@@ -134,7 +134,10 @@ interface EventRankingRow {
   participantName: string
   clubName: string
   score: number
+  tiebreakScore: number
   submittedAt: string | null
+  membershipId: string
+  overrideRank: number | null
 }
 
 interface ESPortalClientProps {
@@ -744,7 +747,12 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
                                                   )}
                                                 </TableCell>
                                                 <TableCell>{row.testName}</TableCell>
-                                                <TableCell>{row.rank}</TableCell>
+                                                <TableCell>
+                                                  {row.overrideRank !== null ? row.overrideRank : row.rank}
+                                                  {row.overrideRank !== null && row.overrideRank !== row.rank && (
+                                                    <span className="text-xs text-muted-foreground ml-1 line-through">{row.rank}</span>
+                                                  )}
+                                                </TableCell>
                                                 <TableCell>{row.participantName}</TableCell>
                                                 <TableCell>{row.clubName}</TableCell>
                                                 <TableCell className="text-right">{row.score.toFixed(2)}</TableCell>

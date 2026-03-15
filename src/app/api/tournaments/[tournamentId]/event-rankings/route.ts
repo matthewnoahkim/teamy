@@ -15,7 +15,10 @@ interface RankingRow {
   participantName: string
   clubName: string
   score: number
+  tiebreakScore: number
   submittedAt: string | null
+  membershipId: string
+  overrideRank: number | null
 }
 
 // GET /api/tournaments/[tournamentId]/event-rankings
@@ -107,6 +110,11 @@ export async function GET(
           select: {
             gradedAt: true,
             pointsAwarded: true,
+            question: {
+              select: {
+                isTiebreak: true,
+              },
+            },
           },
         },
       },
@@ -154,9 +162,14 @@ export async function GET(
             return sum + Number(answer.pointsAwarded ?? 0)
           }, 0)
 
+          const tiebreakScore = attempt.answers.reduce((sum, answer) => {
+            return answer.question.isTiebreak ? sum + Number(answer.pointsAwarded ?? 0) : sum
+          }, 0)
+
           return {
             attempt,
             score: attempt.gradeEarned !== null ? Number(attempt.gradeEarned) : fallbackScore,
+            tiebreakScore,
             participantName:
               attempt.membership.user?.name?.trim() ||
               attempt.membership.user?.email ||
@@ -165,9 +178,8 @@ export async function GET(
           }
         })
         .sort((a, b) => {
-          if (b.score !== a.score) {
-            return b.score - a.score
-          }
+          if (b.score !== a.score) return b.score - a.score
+          if (b.tiebreakScore !== a.tiebreakScore) return b.tiebreakScore - a.tiebreakScore
           return a.participantName.localeCompare(b.participantName)
         })
 
@@ -190,9 +202,25 @@ export async function GET(
           participantName: entry.participantName,
           clubName: entry.clubName,
           score: entry.score,
+          tiebreakScore: entry.tiebreakScore,
           submittedAt: entry.attempt.submittedAt?.toISOString() || null,
+          membershipId: entry.attempt.membershipId,
+          overrideRank: null,
         })
       })
+    })
+
+    // Fetch ranking overrides and apply them
+    const overrides = await prisma.tournamentRankingOverride.findMany({
+      where: { tournamentId },
+      select: { testId: true, membershipId: true, overrideRank: true },
+    })
+    const overrideMap = new Map(overrides.map((o) => [`${o.testId}:${o.membershipId}`, o.overrideRank]))
+    rows.forEach((row) => {
+      const key = `${row.testId}:${row.membershipId}`
+      if (overrideMap.has(key)) {
+        row.overrideRank = overrideMap.get(key)!
+      }
     })
 
     rows.sort((a, b) => {
