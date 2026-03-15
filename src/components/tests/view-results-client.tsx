@@ -35,6 +35,7 @@ interface ResultQuestion {
   type: string
   points: number
   explanation: string | null
+  timedLimitSeconds?: number | null
   options: ResultOption[]
   order: number
 }
@@ -48,6 +49,8 @@ interface ResultAnswer {
   pointsAwarded: number | null
   gradedAt: string | null
   graderNote: string | null
+  timedRevealedAt?: string | Date | null
+  timedSubmittedAt?: string | Date | null
   question: ResultQuestion
 }
 
@@ -358,7 +361,14 @@ export function ViewResultsClient({
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <CardTitle className="text-base">Question {index + 1}</CardTitle>
+                        <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                          Question {index + 1}
+                          {answer.question.timedLimitSeconds && answer.timedRevealedAt && answer.timedSubmittedAt && (
+                            <span className="text-xs font-normal text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-950 px-2 py-0.5 rounded-full">
+                              ⏱ {Math.round((new Date(answer.timedSubmittedAt).getTime() - new Date(answer.timedRevealedAt).getTime()) / 1000)}s
+                            </span>
+                          )}
+                        </CardTitle>
                         {answer.question && (
                           <div className="text-muted-foreground mt-1">
                             {(() => {

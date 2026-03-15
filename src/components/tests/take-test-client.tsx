@@ -38,6 +38,7 @@ interface TestQuestion {
   points: number
   promptMd: string
   isTiebreak?: boolean
+  timedLimitSeconds?: number | null
   options: TestOption[]
 }
 
@@ -67,6 +68,8 @@ interface AttemptAnswer {
   selectedOptionIds: string[] | null
   numericAnswer: number | null
   markedForReview: boolean
+  timedRevealedAt?: string | Date | null
+  timedSubmittedAt?: string | Date | null
 }
 
 export interface AttemptData {
@@ -84,6 +87,7 @@ interface AnswerData {
   numericAnswer?: number | null
   blankAnswers?: string[]
   markedForReview?: boolean
+  timedSubmittedAt?: string
 }
 
 interface TakeTestClientProps {
@@ -217,6 +221,26 @@ export function TakeTestClient({
   const [started, setStarted] = useState(!!existingAttempt)
   const [answers, setAnswers] = useState<Record<string, AnswerData>>({})
   const [markedForReview, setMarkedForReview] = useState<Set<string>>(new Set())
+  // Timed question state: maps questionId → { revealedAt: ISO string | null, submittedAt: ISO string | null }
+  const [timedState, setTimedState] = useState<Record<string, { revealedAt: string | null; submittedAt: string | null }>>(() => {
+    const state: Record<string, { revealedAt: string | null; submittedAt: string | null }> = {}
+    if (existingAttempt?.answers) {
+      existingAttempt.answers.forEach((a) => {
+        if (a.timedRevealedAt || a.timedSubmittedAt) {
+          state[a.questionId] = {
+            revealedAt: a.timedRevealedAt ? new Date(a.timedRevealedAt).toISOString() : null,
+            submittedAt: a.timedSubmittedAt ? new Date(a.timedSubmittedAt).toISOString() : null,
+          }
+        }
+      })
+    }
+    return state
+  })
+  const [timedRevealLoading, setTimedRevealLoading] = useState<Set<string>>(new Set())
+  const [timedSubmitLoading, setTimedSubmitLoading] = useState<Set<string>>(new Set())
+  // Tick every second for countdown timers
+  const [tick, setTick] = useState(0)
+  const tickRef = useRef<NodeJS.Timeout | null>(null)
   const [tabSwitchCount, setTabSwitchCount] = useState(existingAttempt?.tabSwitchCount || 0)
   const [timeOffPageSeconds, setTimeOffPageSeconds] = useState(existingAttempt?.timeOffPageSeconds || 0)
   const [_isPageVisible, setIsPageVisible] = useState(true)
@@ -668,6 +692,89 @@ export function TakeTestClient({
     })
   }
 
+  // Tick every second for live countdown timers
+  useEffect(() => {
+    const hasActiveTimers = test.questions.some((q: TestQuestion) => {
+      if (!q.timedLimitSeconds) return false
+      const ts = timedState[q.id]
+      if (!ts?.revealedAt || ts.submittedAt) return false
+      return true
+    })
+    if (!hasActiveTimers) {
+      if (tickRef.current) clearInterval(tickRef.current)
+      tickRef.current = null
+      return
+    }
+    if (!tickRef.current) {
+      tickRef.current = setInterval(() => setTick((t) => t + 1), 1000)
+    }
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current)
+      tickRef.current = null
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timedState, test.questions])
+
+  const revealTimedQuestion = useCallback(async (questionId: string) => {
+    if (!attempt) return
+    setTimedRevealLoading((prev) => new Set(prev).add(questionId))
+    try {
+      const res = await fetch(`/api/tests/${test.id}/attempts/${attempt.id}/timed-reveal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId }),
+      })
+      if (!res.ok) throw new Error('Failed to reveal question')
+      const data = await res.json()
+      setTimedState((prev) => ({
+        ...prev,
+        [questionId]: { revealedAt: data.revealedAt, submittedAt: null },
+      }))
+    } catch {
+      toast({ title: 'Error', description: 'Could not reveal question. Please try again.', variant: 'destructive' })
+    } finally {
+      setTimedRevealLoading((prev) => { const s = new Set(prev); s.delete(questionId); return s })
+    }
+  }, [attempt, test.id, toast])
+
+  const submitTimedQuestion = useCallback(async (questionId: string, expired = false) => {
+    if (!attempt) return
+    setTimedSubmitLoading((prev) => new Set(prev).add(questionId))
+    const now = new Date().toISOString()
+    try {
+      const answerData = answers[questionId] || {}
+      await saveAnswer(questionId, {
+        ...answerData,
+        timedSubmittedAt: now,
+      } as AnswerData & { timedSubmittedAt: string })
+      setTimedState((prev) => ({
+        ...prev,
+        [questionId]: { ...prev[questionId], submittedAt: now },
+      }))
+      if (expired) {
+        toast({ title: 'Time\'s up', description: 'Your answer has been automatically submitted.' })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to submit timed answer.', variant: 'destructive' })
+    } finally {
+      setTimedSubmitLoading((prev) => { const s = new Set(prev); s.delete(questionId); return s })
+    }
+  }, [attempt, answers, saveAnswer, toast])
+
+  // Auto-submit expired timed questions
+  useEffect(() => {
+    test.questions.forEach((q: TestQuestion) => {
+      if (!q.timedLimitSeconds) return
+      const ts = timedState[q.id]
+      if (!ts?.revealedAt || ts.submittedAt) return
+      const elapsed = (Date.now() - new Date(ts.revealedAt).getTime()) / 1000
+      if (elapsed >= q.timedLimitSeconds) {
+        submitTimedQuestion(q.id, true)
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick])
+
   // Check if there are unanswered questions - memoized to avoid recalculating on every render
   const unansweredQuestions = useMemo(() => {
     return test.questions.filter((question: TestQuestion) => {
@@ -976,9 +1083,23 @@ export function TakeTestClient({
               test.questions.map((question: TestQuestion, index: number) => {
                 // TEXT_BLOCK questions are stored as SHORT_TEXT with 0 points
                 const isTextBlock = question.type === 'SHORT_TEXT' && Number(question.points) === 0
-                
+
+                // Timed question state
+                const isTimed = !isTextBlock && !!question.timedLimitSeconds
+                const ts = timedState[question.id]
+                const isTimedRevealed = isTimed && !!ts?.revealedAt
+                const isTimedSubmitted = isTimed && !!ts?.submittedAt
+                const isTimedLocked = isTimedSubmitted
+
+                // Compute remaining seconds for countdown
+                let timedSecondsLeft: number | null = null
+                if (isTimedRevealed && !isTimedSubmitted && question.timedLimitSeconds) {
+                  const elapsed = (Date.now() - new Date(ts!.revealedAt!).getTime()) / 1000
+                  timedSecondsLeft = Math.max(0, question.timedLimitSeconds - elapsed)
+                }
+
                 return (
-                <div key={question.id} className={`space-y-3 p-4 border rounded-lg ${markedForReview.has(question.id) ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/10' : ''}`}>
+                <div key={question.id} className={`space-y-3 p-4 border rounded-lg ${isTimedLocked ? 'border-muted bg-muted/20 opacity-75' : markedForReview.has(question.id) ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/10' : ''}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">Question {index + 1}</span>
@@ -1027,13 +1148,25 @@ export function TakeTestClient({
                           Tiebreak
                         </Badge>
                       )}
-                      {markedForReview.has(question.id) && (
+                      {isTimed && (
+                        <Badge variant="outline" className="text-xs border-orange-500 text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Timed
+                        </Badge>
+                      )}
+                      {!isTimedLocked && markedForReview.has(question.id) && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 font-medium">
                           Marked for Review
                         </span>
                       )}
+                      {isTimedLocked && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium flex items-center gap-1">
+                          <Lock className="h-3 w-3" />
+                          Submitted
+                        </span>
+                      )}
                     </div>
-                    {!isTextBlock && (
+                    {!isTextBlock && !isTimedLocked && (
                       <Button
                         type="button"
                         variant="ghost"
@@ -1057,8 +1190,51 @@ export function TakeTestClient({
                       </Button>
                     )}
                   </div>
+
+                  {/* Timed question: countdown bar when revealed */}
+                  {isTimedRevealed && !isTimedSubmitted && timedSecondsLeft !== null && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-none ${timedSecondsLeft <= 10 ? 'bg-red-500' : timedSecondsLeft <= 30 ? 'bg-orange-500' : 'bg-green-500'}`}
+                          style={{ width: `${(timedSecondsLeft / question.timedLimitSeconds!) * 100}%` }}
+                        />
+                      </div>
+                      <span className={`text-sm font-mono font-semibold tabular-nums shrink-0 ${timedSecondsLeft <= 10 ? 'text-red-600 dark:text-red-400' : timedSecondsLeft <= 30 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
+                        {Math.floor(timedSecondsLeft / 60).toString().padStart(2, '0')}:{Math.floor(timedSecondsLeft % 60).toString().padStart(2, '0')}
+                      </span>
+                    </div>
+                  )}
+
                   {isTextBlock ? (
                     <QuestionPrompt promptMd={question.promptMd} />
+                  ) : isTimed && !isTimedRevealed ? (
+                    /* Timed question not yet revealed */
+                    <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
+                      <div className="p-4 rounded-full bg-orange-100 dark:bg-orange-950">
+                        <Clock className="h-8 w-8 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="font-semibold">Timed Question</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          You have <span className="font-semibold">{question.timedLimitSeconds}s</span> once you reveal this question.
+                          Once started, you cannot pause the timer.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => revealTimedQuestion(question.id)}
+                        disabled={timedRevealLoading.has(question.id)}
+                        className="min-w-32"
+                      >
+                        {timedRevealLoading.has(question.id) ? 'Loading…' : 'Reveal Question'}
+                      </Button>
+                    </div>
+                  ) : isTimed && isTimedLocked ? (
+                    /* Timed question locked after submission */
+                    <div className="flex flex-col items-center justify-center py-8 gap-3 text-center text-muted-foreground">
+                      <Lock className="h-6 w-6" />
+                      <p className="text-sm">This question has been submitted and is no longer accessible.</p>
+                    </div>
                   ) : question.type === 'SHORT_TEXT' && (() => {
                     // Check if this is a fill-in-the-blank question (contains blank markers: [blank] or [blank1], [blank2], etc.)
                     const promptText = question.promptMd || ''
@@ -1364,6 +1540,21 @@ export function TakeTestClient({
                       />
                     )
                   })()}
+
+                  {/* Submit button for active timed questions */}
+                  {isTimedRevealed && !isTimedSubmitted && (
+                    <div className="flex justify-end pt-2 border-t border-border mt-2">
+                      <Button
+                        size="sm"
+                        onClick={() => submitTimedQuestion(question.id)}
+                        disabled={timedSubmitLoading.has(question.id) || submitting}
+                        className="gap-2"
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        {timedSubmitLoading.has(question.id) ? 'Submitting…' : 'Submit this question'}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )})
             )}

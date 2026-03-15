@@ -55,6 +55,8 @@ interface Attempt {
     pointsAwarded: number | null
     gradedAt: string | null
     graderNote: string | null
+    timedRevealedAt: string | Date | null
+    timedSubmittedAt: string | Date | null
     question: {
       id: string
       promptMd: string
@@ -63,6 +65,7 @@ interface Attempt {
       sectionId: string | null
       explanation: string | null
       isTiebreak: boolean
+      timedLimitSeconds: number | null
       options: Array<{
         id: string
         label: string
@@ -1167,11 +1170,20 @@ export function ESTestAttemptsView({ testId, testName, scoresReleased: initialSc
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
-                            <CardTitle className="text-base flex items-center gap-2">
+                            <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                               Question {index + 1}
                               {answer.question.isTiebreak && (
                                 <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
                                   Tiebreak
+                                </Badge>
+                              )}
+                              {answer.question.timedLimitSeconds && (
+                                <Badge variant="outline" className="text-xs border-orange-500 text-orange-600 dark:text-orange-400">
+                                  Timed {answer.timedRevealedAt && answer.timedSubmittedAt
+                                    ? `— ${Math.round((new Date(answer.timedSubmittedAt).getTime() - new Date(answer.timedRevealedAt).getTime()) / 1000)}s`
+                                    : answer.timedRevealedAt && !answer.timedSubmittedAt
+                                    ? '— expired'
+                                    : ''}
                                 </Badge>
                               )}
                             </CardTitle>

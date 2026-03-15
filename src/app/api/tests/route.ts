@@ -22,6 +22,7 @@ const questionSchema = z.object({
   sectionId: z.string().optional(),
   shuffleOptions: z.boolean().optional(),
   numericTolerance: z.number().min(0).optional(),
+  timedLimitSeconds: z.number().int().min(1).optional(),
   options: z.array(questionOptionSchema).optional(),
 })
 
@@ -379,6 +380,7 @@ export async function POST(req: NextRequest) {
                 question.numericTolerance !== undefined
                   ? new Prisma.Decimal(question.numericTolerance)
                   : undefined,
+              timedLimitSeconds: question.timedLimitSeconds ?? null,
             },
           })
 

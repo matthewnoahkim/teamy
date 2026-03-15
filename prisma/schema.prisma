@@ -654,11 +654,12 @@ model Question {
   order            Int                   @default(0)
   shuffleOptions   Boolean               @default(false)
   numericTolerance Decimal?              @db.Decimal(8, 3)
-  isTiebreak       Boolean               @default(false)
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  aiSuggestions    AiGradingSuggestion[]
-  answers          AttemptAnswer[]
+  isTiebreak        Boolean               @default(false)
+  timedLimitSeconds Int?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  aiSuggestions     AiGradingSuggestion[]
+  answers           AttemptAnswer[]
   section          TestSection?          @relation(fields: [sectionId], references: [id])
   test             Test                  @relation(fields: [testId], references: [id], onDelete: Cascade)
   options          QuestionOption[]
@@ -739,6 +740,8 @@ model AttemptAnswer {
   gradedAt          DateTime?
   graderNote        String?
   markedForReview   Boolean               @default(false)
+  timedRevealedAt   DateTime?
+  timedSubmittedAt  DateTime?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
   aiSuggestions     AiGradingSuggestion[]
@@ -1427,10 +1430,11 @@ model ESTestQuestion {
   order            Int                    @default(0)
   shuffleOptions   Boolean                @default(false)
   numericTolerance Decimal?               @db.Decimal(8, 3)
-  isTiebreak       Boolean                @default(false)
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  answers          ESTestAttemptAnswer[]
+  isTiebreak        Boolean                @default(false)
+  timedLimitSeconds Int?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  answers           ESTestAttemptAnswer[]
   test             ESTest                 @relation(fields: [testId], references: [id], onDelete: Cascade)
   options          ESTestQuestionOption[]
 
@@ -1503,6 +1507,8 @@ model ESTestAttemptAnswer {
   gradedAt          DateTime?
   graderNote        String?
   markedForReview   Boolean        @default(false)
+  timedRevealedAt   DateTime?
+  timedSubmittedAt  DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   attempt           ESTestAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)

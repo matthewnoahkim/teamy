@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Providers } from '@/components/providers'
 import './globals.css'
+import 'katex/dist/katex.min.css'
 
 const bootstrapThemeAndBackgroundScript = `
   (function() {

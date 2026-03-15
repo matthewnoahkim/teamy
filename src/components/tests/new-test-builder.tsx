@@ -48,6 +48,7 @@ import {
   LayoutList,
   Sparkles,
   Table as TableIcon,
+  Info,
 } from 'lucide-react'
 import { DuplicateTestButton } from '@/components/tests/duplicate-test-button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -95,6 +96,7 @@ interface QuestionDraft {
   promptTables?: TableData[] // Tables for prompt field
   blankAnswers?: string[] // Correct answers for each blank in fill-in-the-blank questions
   blankPoints?: (number | null)[] // Optional points allocation for each blank
+  timedLimitSeconds?: number
 }
 
 interface NewTestBuilderProps {
@@ -145,6 +147,7 @@ interface NewTestBuilderProps {
       points: number
       shuffleOptions: boolean
       isTiebreak?: boolean
+      timedLimitSeconds?: number | null
       options: Array<{
         id: string
         label: string
@@ -521,6 +524,7 @@ export function NewTestBuilder({
           })),
           shuffleOptions: q.shuffleOptions,
           isTiebreak: q.isTiebreak || false,
+          timedLimitSeconds: q.timedLimitSeconds ?? undefined,
           frqParts,
           contextTables,
           promptTables,
@@ -1175,6 +1179,7 @@ export function NewTestBuilder({
           points: question.points,
           order: index,
           shuffleOptions: (question.type === 'LONG_TEXT' || question.type === 'FILL_BLANK' || question.type === 'TEXT_BLOCK') ? false : question.shuffleOptions,
+          timedLimitSeconds: question.type !== 'TEXT_BLOCK' ? (question.timedLimitSeconds ?? undefined) : undefined,
           options:
             (question.type === 'LONG_TEXT' || question.type === 'FILL_BLANK' || question.type === 'TEXT_BLOCK')
               ? undefined
@@ -1265,8 +1270,9 @@ export function NewTestBuilder({
                 order: index,
                 shuffleOptions: question.type === 'LONG_TEXT' ? false : question.shuffleOptions,
                 isTiebreak: question.isTiebreak || false,
+                timedLimitSeconds: question.type !== 'TEXT_BLOCK' ? (question.timedLimitSeconds ?? undefined) : undefined,
               }
-              
+
               // Only include options for MCQ question types
               if ((question.type === 'MCQ_SINGLE' || question.type === 'MCQ_MULTI' || question.type === 'TRUE_FALSE') && question.options && Array.isArray(question.options)) {
                 questionPayload.options = question.options
@@ -2277,16 +2283,16 @@ export function NewTestBuilder({
                   <Plus className="mr-2 h-4 w-4" />
                   Text Block
                 </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={handleImportFromDocx}
                   disabled={importing}
                   className="border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors"
                 >
                   <Sparkles className="mr-2 h-4 w-4 text-primary" />
-                  {importing 
-                    ? `Importing with AI... ${elapsedSeconds}s / ~${estimatedTimeSeconds}s` 
+                  {importing
+                    ? `Importing with AI... ${elapsedSeconds}s / ~${estimatedTimeSeconds}s`
                     : 'Import .docx with AI'}
                 </Button>
               </div>
@@ -2826,6 +2832,37 @@ interface QuestionCardProps {
   esMode?: boolean
 }
 
+const MATH_HELP_ROWS: Array<[string, string]> = [
+  ['2^2, x^n', 'superscript (auto)'],
+  ['H_2, CO_2', 'subscript (auto)'],
+  ['$\\frac{1}{2}$', 'fraction'],
+  ['$\\sqrt{x}$', '√x'],
+  ['$$...$$', 'display block'],
+]
+
+function MathHelpTooltip() {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0" />
+        </TooltipTrigger>
+        <TooltipContent side="right" className="max-w-xs p-3 space-y-2">
+          <p className="font-semibold text-xs">Math formatting</p>
+          <div className="text-xs space-y-1">
+            {MATH_HELP_ROWS.map(([input, output]) => (
+              <div key={input} className="flex items-center gap-2">
+                <code className="bg-muted px-1 py-0.5 rounded text-primary font-mono">{input}</code>
+                <span className="text-muted-foreground">→ {output}</span>
+              </div>
+            ))}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
 function QuestionCard({
   question,
   index,
@@ -3357,7 +3394,10 @@ function QuestionCard({
         {question.type !== 'TEXT_BLOCK' && (
         <div>
           <div className="flex items-center justify-between text-sm font-medium mb-2">
-            <Label htmlFor={`context-label-${index}`}>Context / stimulus (optional)</Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor={`context-label-${index}`}>Context / stimulus (optional)</Label>
+              <MathHelpTooltip />
+            </div>
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -3505,9 +3545,12 @@ function QuestionCard({
 
         <div>
           <div className="flex items-center justify-between text-sm font-medium mb-2">
-            <Label htmlFor={`prompt-label-${index}`}>
-              {question.type === 'TEXT_BLOCK' ? 'Content *' : 'Prompt *'}
-            </Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor={`prompt-label-${index}`}>
+                {question.type === 'TEXT_BLOCK' ? 'Content *' : 'Prompt *'}
+              </Label>
+              <MathHelpTooltip />
+            </div>
             <div className="flex gap-2">
               {question.type === 'FILL_BLANK' && (
                 <Button
@@ -3949,6 +3992,45 @@ function QuestionCard({
             <Label htmlFor={`tiebreak-${question.id}`} className="cursor-pointer font-normal text-sm">
               Tiebreak question
             </Label>
+          </div>
+        )}
+
+        {question.type !== 'TEXT_BLOCK' && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={`timed-${question.id}`}
+                checked={question.timedLimitSeconds !== undefined}
+                onCheckedChange={(checked) =>
+                  onChange((prev) => ({
+                    ...prev,
+                    timedLimitSeconds: checked ? 60 : undefined,
+                  }))
+                }
+              />
+              <Label htmlFor={`timed-${question.id}`} className="cursor-pointer font-normal text-sm flex items-center gap-1.5">
+                <Clock3 className="h-3.5 w-3.5" />
+                Timed question
+              </Label>
+            </div>
+            {question.timedLimitSeconds !== undefined && (
+              <div className="flex items-center gap-2 ml-6">
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={question.timedLimitSeconds}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10)
+                    if (!isNaN(val) && val >= 1) {
+                      onChange((prev) => ({ ...prev, timedLimitSeconds: val }))
+                    }
+                  }}
+                  className="w-24 h-8 text-sm"
+                />
+                <span className="text-sm text-muted-foreground">seconds time limit</span>
+              </div>
+            )}
           </div>
         )}
 

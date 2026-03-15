@@ -11,6 +11,7 @@ const saveAnswerSchema = z.object({
   selectedOptionIds: z.array(z.string()).optional().nullable(),
   numericAnswer: z.number().optional().nullable(),
   markedForReview: z.boolean().optional(),
+  timedSubmittedAt: z.string().datetime().optional(),
 })
 
 // POST /api/tests/[testId]/attempts/[attemptId]/answers
@@ -74,9 +75,12 @@ export async function POST(
         selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
         numericAnswer: validatedData.numericAnswer,
       }
-      
+
       if (validatedData.markedForReview !== undefined) {
         updateData.markedForReview = validatedData.markedForReview
+      }
+      if (validatedData.timedSubmittedAt !== undefined) {
+        updateData.timedSubmittedAt = new Date(validatedData.timedSubmittedAt)
       }
 
       const answer = await prisma.attemptAnswer.upsert({
@@ -94,6 +98,7 @@ export async function POST(
           selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
           numericAnswer: validatedData.numericAnswer,
           markedForReview: validatedData.markedForReview ?? false,
+          timedSubmittedAt: validatedData.timedSubmittedAt ? new Date(validatedData.timedSubmittedAt) : undefined,
         },
       })
 
@@ -178,9 +183,12 @@ export async function POST(
         selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
         numericAnswer: validatedData.numericAnswer,
       }
-      
+
       if (validatedData.markedForReview !== undefined) {
         updateData.markedForReview = validatedData.markedForReview
+      }
+      if (validatedData.timedSubmittedAt !== undefined) {
+        updateData.timedSubmittedAt = new Date(validatedData.timedSubmittedAt)
       }
 
       const answer = await prisma.eSTestAttemptAnswer.upsert({
@@ -198,6 +206,7 @@ export async function POST(
           selectedOptionIds: validatedData.selectedOptionIds ?? undefined,
           numericAnswer: validatedData.numericAnswer,
           markedForReview: validatedData.markedForReview ?? false,
+          timedSubmittedAt: validatedData.timedSubmittedAt ? new Date(validatedData.timedSubmittedAt) : undefined,
         },
       })
 
