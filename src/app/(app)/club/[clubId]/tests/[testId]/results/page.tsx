@@ -108,6 +108,7 @@ export default async function TestResultsPage({
         promptMd: answer.question.promptMd,
         type: answer.question.type,
         points: Number(answer.question.points),
+        explanation: answer.question.explanation,
         sectionId: answer.question.sectionId,
         order: answer.question.order,
         timedLimitSeconds: answer.question.timedLimitSeconds ?? null,

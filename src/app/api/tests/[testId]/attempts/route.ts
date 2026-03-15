@@ -131,6 +131,7 @@ export async function GET(
             points: Number(answer.question.points),
             sectionId: answer.question.sectionId,
             explanation: answer.question.explanation,
+            isTiebreak: answer.question.isTiebreak || false,
             timedLimitSeconds: answer.question.timedLimitSeconds ?? null,
             options: answer.question.options.map((opt) => ({
               id: opt.id,

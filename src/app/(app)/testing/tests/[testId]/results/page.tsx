@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { ViewResultsClient, type ResultAttempt } from '@/components/tests/view-results-client'
+import { filterAttemptByReleaseMode } from '@/lib/test-security'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
@@ -238,6 +239,8 @@ export default async function TournamentTestResultsPage({
     )
   }
 
+  const testStatus = isESTest ? esTest!.status : tournamentTest!.test.status
+
   const sortedAnswers = [...attempt.answers].sort((a, b) => a.question.order - b.question.order)
 
   const attemptRecord = {
@@ -270,51 +273,37 @@ export default async function TournamentTestResultsPage({
         promptMd: answer.question.promptMd,
         type: answer.question.type,
         points: Number(answer.question.points),
-        explanation: scoresReleased ? answer.question.explanation : null,
+        explanation: answer.question.explanation,
         order: answer.question.order,
         timedLimitSeconds: answer.question.timedLimitSeconds ?? null,
         options: answer.question.options.map((option) => ({
           id: option.id,
           label: option.label,
-          isCorrect: scoresReleased ? option.isCorrect : undefined,
+          isCorrect: option.isCorrect,
           order: option.order,
         })),
       },
     })),
   }
 
-  let filteredAttempt: unknown = attemptRecord
-  if (scoreReleaseMode === 'NONE') {
-    filteredAttempt = {
-      ...attemptRecord,
-      gradeEarned: null,
-      proctoringScore: null,
-      answers: null,
-    }
-  } else if (scoreReleaseMode === 'SCORE_ONLY') {
-    filteredAttempt = {
-      ...attemptRecord,
-      answers: null,
-    }
-  } else if (scoreReleaseMode === 'SCORE_WITH_WRONG') {
-    filteredAttempt = {
-      ...attemptRecord,
-      answers: attemptRecord.answers.filter((answer) => {
-        const questionPoints = answer.question.points
-        const earnedPoints = answer.pointsAwarded || 0
-        return earnedPoints < questionPoints
-      }),
-    }
-  }
+  const filteredAttempt = filterAttemptByReleaseMode(
+    attemptRecord,
+    {
+      scoreReleaseMode: (scoreReleaseMode || 'FULL_TEST') as 'NONE' | 'SCORE_ONLY' | 'SCORE_WITH_WRONG' | 'FULL_TEST',
+      releaseScoresAt: releaseScoresAt ?? null,
+      status: testStatus,
+    },
+    false
+  )
 
   return (
     <ViewResultsClient
       testId={testId}
       testName={testName}
-      attempt={filteredAttempt as ResultAttempt}
+      attempt={filteredAttempt as unknown as ResultAttempt}
       testSettings={{
         releaseScoresAt: releaseScoresAt ?? null,
-        scoreReleaseMode: scoreReleaseMode as ScoreReleaseMode,
+        scoreReleaseMode: (scoreReleaseMode || 'FULL_TEST') as ScoreReleaseMode,
       }}
     />
   )

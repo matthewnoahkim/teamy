@@ -58,6 +58,7 @@ interface Attempt {
       points: number
       sectionId: string | null
       explanation: string | null
+      isTiebreak: boolean
       timedLimitSeconds: number | null
       options: Array<{
         id: string
@@ -1200,6 +1201,11 @@ export function TestAttemptsView({ testId, testName }: TestAttemptsViewProps) {
                             <Badge variant="outline">
                               {answer.question.type.replace('MCQ_', '').replace('_', ' ')}
                             </Badge>
+                            {answer.question.isTiebreak && (
+                              <Badge variant="outline" className="text-xs border-purple-500 text-purple-600 dark:text-purple-400">
+                                Tiebreak
+                              </Badge>
+                            )}
                             {answer.question.timedLimitSeconds && (
                               <Badge variant="outline" className="text-xs border-orange-500 text-orange-600 dark:text-orange-400">
                                 Timed {answer.timedRevealedAt && answer.timedSubmittedAt
