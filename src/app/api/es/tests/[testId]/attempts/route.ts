@@ -138,6 +138,8 @@ export async function GET(
           pointsAwarded: answer.pointsAwarded ? Number(answer.pointsAwarded) : null,
           gradedAt: answer.gradedAt?.toISOString() || null,
           graderNote: answer.graderNote,
+          timedRevealedAt: answer.timedRevealedAt?.toISOString() || null,
+          timedSubmittedAt: answer.timedSubmittedAt?.toISOString() || null,
           question: {
             id: answer.question.id,
             promptMd: answer.question.promptMd,
@@ -145,6 +147,7 @@ export async function GET(
             points: Number(answer.question.points),
             explanation: answer.question.explanation,
             isTiebreak: answer.question.isTiebreak,
+            timedLimitSeconds: answer.question.timedLimitSeconds ?? null,
             sectionId: null,
             options: answer.question.options.map((opt) => ({
               id: opt.id,

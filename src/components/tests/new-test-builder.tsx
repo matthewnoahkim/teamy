@@ -1856,9 +1856,8 @@ export function NewTestBuilder({
       if (question.type === 'FILL_BLANK') {
         return (question.blankAnswers || []).some((answer) => answer.trim().length > 0)
       }
-      return question.options.length >= 2 &&
-        question.options.every((option) => option.label.trim().length > 0) &&
-        question.options.some((option) => option.isCorrect)
+      const filledOptions = question.options.filter((o) => o.label.trim().length > 0)
+      return filledOptions.length >= 2 && filledOptions.some((o) => o.isCorrect)
     }))
     const publishReady = publishValidation.errors.length === 0
 

@@ -263,6 +263,8 @@ export default async function TournamentTestResultsPage({
       pointsAwarded: answer.pointsAwarded ? Number(answer.pointsAwarded) : null,
       gradedAt: answer.gradedAt?.toISOString() || null,
       graderNote: answer.graderNote,
+      timedRevealedAt: answer.timedRevealedAt?.toISOString() || null,
+      timedSubmittedAt: answer.timedSubmittedAt?.toISOString() || null,
       question: {
         id: answer.question.id,
         promptMd: answer.question.promptMd,
@@ -270,6 +272,7 @@ export default async function TournamentTestResultsPage({
         points: Number(answer.question.points),
         explanation: scoresReleased ? answer.question.explanation : null,
         order: answer.question.order,
+        timedLimitSeconds: answer.question.timedLimitSeconds ?? null,
         options: answer.question.options.map((option) => ({
           id: option.id,
           label: option.label,

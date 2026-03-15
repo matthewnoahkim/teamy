@@ -101,6 +101,8 @@ export default async function TestResultsPage({
       pointsAwarded: answer.pointsAwarded ? Number(answer.pointsAwarded) : null,
       gradedAt: answer.gradedAt?.toISOString() || null,
       graderNote: answer.graderNote,
+      timedRevealedAt: answer.timedRevealedAt?.toISOString() || null,
+      timedSubmittedAt: answer.timedSubmittedAt?.toISOString() || null,
       question: {
         id: answer.question.id,
         promptMd: answer.question.promptMd,
@@ -108,6 +110,7 @@ export default async function TestResultsPage({
         points: Number(answer.question.points),
         sectionId: answer.question.sectionId,
         order: answer.question.order,
+        timedLimitSeconds: answer.question.timedLimitSeconds ?? null,
         options: answer.question.options.map((opt) => ({
           id: opt.id,
           label: opt.label,

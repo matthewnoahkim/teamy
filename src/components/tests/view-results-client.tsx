@@ -721,9 +721,21 @@ export function ViewResultsClient({
                           </div>
                         )}
 
+                      {/* Time taken for timed questions */}
+                      {answer.question.timedLimitSeconds && (
+                        <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-950/20 rounded border border-orange-200 dark:border-orange-800 flex items-center gap-2 text-sm text-orange-800 dark:text-orange-300">
+                          <span>⏱</span>
+                          {answer.timedRevealedAt && answer.timedSubmittedAt
+                            ? <span>Time taken: <strong>{Math.round((new Date(answer.timedSubmittedAt).getTime() - new Date(answer.timedRevealedAt).getTime()) / 1000)}s</strong> of {answer.question.timedLimitSeconds}s</span>
+                            : answer.timedRevealedAt && !answer.timedSubmittedAt
+                            ? <span>Time expired ({answer.question.timedLimitSeconds}s limit)</span>
+                            : <span>Timed question ({answer.question.timedLimitSeconds}s) — not revealed</span>}
+                        </div>
+                      )}
+
                       {/* Grader Feedback for non-FRQ questions */}
-                      {answer.question.type !== 'SHORT_TEXT' && 
-                       answer.question.type !== 'LONG_TEXT' && 
+                      {answer.question.type !== 'SHORT_TEXT' &&
+                       answer.question.type !== 'LONG_TEXT' &&
                        answer.graderNote && (
                         <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded">
                           <p className="text-xs font-semibold uppercase text-blue-900 dark:text-blue-100 mb-1">
