@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { serverSession } from '@/lib/server-session'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { Division } from '@prisma/client'
@@ -47,7 +46,7 @@ export async function PUT(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -96,7 +95,7 @@ export async function DELETE(
 ) {
   const resolvedParams = await params
   try {
-    const session = await getServerSession(authOptions)
+    const session = await serverSession.get()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
