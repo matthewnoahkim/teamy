@@ -39,7 +39,7 @@ export async function createStoredFileDownloadResponse(params: {
       status: 200,
       headers: {
         'Content-Type': params.mimeType || 'application/octet-stream',
-        'Content-Disposition': `${disposition}; filename="${filename}"`,
+        'Content-Disposition': `${disposition}; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
         'Content-Length': String(fileStat.size),
         'Cache-Control': 'private, no-store, max-age=0',
         'X-Content-Type-Options': 'nosniff',

@@ -334,9 +334,17 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // Stream, calendar, and tests data arrives from the server via initialData.
-    // Prefetch the remaining tabs immediately after paint so they're ready before the user clicks.
-    const primaryTimerId = window.setTimeout(() => {
+    // Prefetch tab modules and data after the initial paint settles.
+    // Use requestIdleCallback (with setTimeout fallback) so prefetches don't
+    // compete with the critical render path and initial data hydration.
+    const scheduleIdle = (fn: () => void): number => {
+      if (typeof window.requestIdleCallback === 'function') {
+        return window.requestIdleCallback(fn, { timeout: 3000 }) as number
+      }
+      return window.setTimeout(fn, 1500)
+    }
+
+    const primaryTimerId = scheduleIdle(() => {
       void Promise.allSettled([
         loadHomePageTabModule().then(mod => mod.prefetchHomePageTabData?.({
           clubId: club.id,
@@ -344,6 +352,11 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
         loadStreamTabModule(),
         loadCalendarTabModule(),
         loadTestsTabModule(),
+      ])
+    })
+
+    const secondaryTimerId = window.setTimeout(() => {
+      void Promise.allSettled([
         loadFinanceTabModule().then(mod => mod.prefetchFinanceTabData?.({
           clubId: club.id,
           division: club.division,
@@ -352,18 +365,18 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
           clubId: club.id,
           division: club.division,
         })),
-        loadSettingsTabModule().then(mod => mod.prefetchSettingsTabData?.({
-          clubId: club.id,
-          isAdmin,
-        })),
         loadAttendanceTabModule().then(mod => mod.prefetchAttendanceTabData?.({
           clubId: club.id,
         })),
       ])
-    }, 100)
+    }, 3000)
 
-    const secondaryTimerId = window.setTimeout(() => {
+    const tertiaryTimerId = window.setTimeout(() => {
       void Promise.allSettled([
+        loadSettingsTabModule().then(mod => mod.prefetchSettingsTabData?.({
+          clubId: club.id,
+          isAdmin,
+        })),
         loadTodoTabModule().then(mod => mod.prefetchTodoTabData?.({
           clubId: club.id,
           isAdmin,
@@ -375,11 +388,16 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
           clubId: club.id,
         })),
       ])
-    }, 800)
+    }, 5000)
 
     return () => {
-      window.clearTimeout(primaryTimerId)
+      if (typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(primaryTimerId)
+      } else {
+        window.clearTimeout(primaryTimerId)
+      }
       window.clearTimeout(secondaryTimerId)
+      window.clearTimeout(tertiaryTimerId)
     }
   }, [club.id, club.division, isAdmin])
 

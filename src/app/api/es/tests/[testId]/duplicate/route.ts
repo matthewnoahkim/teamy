@@ -149,9 +149,8 @@ export async function POST(
     return NextResponse.json({ test: duplicatedTest })
   } catch (error) {
     console.error('Duplicate ES test error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Internal server error', message: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

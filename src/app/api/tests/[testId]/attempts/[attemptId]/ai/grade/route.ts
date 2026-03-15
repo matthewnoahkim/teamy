@@ -375,10 +375,10 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid request', details: error.issues }, { status: 400 })
     }
     if (error instanceof Error && error.message?.includes('OpenAI')) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return NextResponse.json({ error: 'AI service error. Please try again later.' }, { status: 400 })
     }
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to request AI suggestion' },
+      { error: 'Failed to request AI suggestion' },
       { status: 500 }
     )
   }

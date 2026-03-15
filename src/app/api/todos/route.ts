@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
+import { getUserMembership } from '@/lib/rbac'
 import { z } from 'zod'
 
 const createTodoSchema = z.object({
@@ -31,14 +31,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID is required' }, { status: 400 })
     }
 
-    await requireMember(session.user.id, clubId)
-
     const membership = await getUserMembership(session.user.id, clubId)
     if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const isAdminUser = await isAdmin(session.user.id, clubId)
+    const isAdminUser = membership.role === 'ADMIN'
 
     // Build where clause
     const where: Record<string, unknown> = { clubId }
@@ -104,14 +102,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const validated = createTodoSchema.parse(body)
 
-    await requireMember(session.user.id, validated.clubId)
-
     const membership = await getUserMembership(session.user.id, validated.clubId)
     if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const isAdminUser = await isAdmin(session.user.id, validated.clubId)
+    const isAdminUser = membership.role === 'ADMIN'
 
     // Determine whose todo this is
     let targetMembershipId = membership.id

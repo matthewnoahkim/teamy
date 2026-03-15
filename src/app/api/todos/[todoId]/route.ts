@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
+import { getUserMembership } from '@/lib/rbac'
 import { z } from 'zod'
 
 const updateTodoSchema = z.object({
@@ -56,14 +56,12 @@ export async function GET(
       return NextResponse.json({ error: 'Todo not found' }, { status: 404 })
     }
 
-    await requireMember(session.user.id, todo.clubId)
-
     const membership = await getUserMembership(session.user.id, todo.clubId)
     if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const isAdminUser = await isAdmin(session.user.id, todo.clubId)
+    const isAdminUser = membership.role === 'ADMIN'
 
     // Only owner or admin can view
     if (todo.membershipId !== membership.id && !isAdminUser) {
@@ -103,14 +101,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Todo not found' }, { status: 404 })
     }
 
-    await requireMember(session.user.id, todo.clubId)
-
     const membership = await getUserMembership(session.user.id, todo.clubId)
     if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const isAdminUser = await isAdmin(session.user.id, todo.clubId)
+    const isAdminUser = membership.role === 'ADMIN'
 
     // Only owner or admin can update
     if (todo.membershipId !== membership.id && !isAdminUser) {
@@ -204,14 +200,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Todo not found' }, { status: 404 })
     }
 
-    await requireMember(session.user.id, todo.clubId)
-
     const membership = await getUserMembership(session.user.id, todo.clubId)
     if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const isAdminUser = await isAdmin(session.user.id, todo.clubId)
+    const isAdminUser = membership.role === 'ADMIN'
 
     // Only owner or admin can delete
     if (todo.membershipId !== membership.id && !isAdminUser) {

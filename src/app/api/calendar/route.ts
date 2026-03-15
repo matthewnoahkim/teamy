@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, getUserMembership, isAdmin } from '@/lib/rbac'
+import { getUserMembership } from '@/lib/rbac'
 import { generateAttendanceCode, hashAttendanceCode } from '@/lib/attendance'
 import { logApiTiming } from '@/lib/api-timing'
 import { hasAnnouncementTargetAccess, hasTestAssignmentAccess } from '@/lib/club-authz'
@@ -125,17 +125,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    await requireMember(session.user.id, validated.clubId)
-
     const membership = await getUserMembership(session.user.id, validated.clubId)
     if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     // Validate scope permissions
     if (validated.scope === 'CLUB' || validated.scope === 'TEAM') {
-      const isAdminUser = await isAdmin(session.user.id, validated.clubId)
-      if (!isAdminUser) {
+      if (membership.role !== 'ADMIN') {
         return NextResponse.json(
           { error: 'Only admins can create club/team events' },
           { status: 403 }
@@ -410,15 +407,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID required' }, { status: 400 })
     }
 
-    await requireMember(session.user.id, clubId)
-
     const membership = await getUserMembership(session.user.id, clubId)
     if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Check if user is an admin
-    const isAdminUser = await isAdmin(session.user.id, clubId)
+    const isAdminUser = membership.role === 'ADMIN'
 
     // Get user's event assignments from roster (for filtering targeted events)
     const userRosterAssignments = await prisma.rosterAssignment.findMany({
@@ -546,6 +540,7 @@ export async function GET(req: NextRequest) {
       orderBy: {
         startUTC: 'asc',
       },
+      take: 200,
     })
 
     // Filter events for non-admins based on targets and test assignments

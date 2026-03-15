@@ -96,11 +96,14 @@ async function ClubDataLoader({
   const needsAttendanceData = activeTab === 'attendance'
   const needsFinanceData = activeTab === 'finance'
   const needsFullPeopleData = activeTab === 'people'
-  // Always fetch these — they power both their own tabs AND the home tab widgets,
-  // so they must be ready regardless of which tab the user lands on.
-  const needsCalendarData = true
-  const needsAnnouncementsData = true
-  const needsTestsData = true
+  // Only fetch tab-specific data when needed. The home tab needs a limited set for widgets;
+  // individual tabs fetch full data client-side if not pre-loaded.
+  const needsCalendarData = activeTab === 'home' || activeTab === 'calendar'
+  const needsAnnouncementsData = activeTab === 'home' || activeTab === 'stream'
+  const needsTestsData = activeTab === 'home' || activeTab === 'tests'
+  // When on the home tab, limit the number of records for widget previews.
+  // The actual tabs will fetch their own data client-side.
+  const isHomeTab = activeTab === 'home'
 
   const session = await getServerSession(authOptions)
 
@@ -487,6 +490,7 @@ async function ClubDataLoader({
           orderBy: {
             startUTC: 'asc',
           },
+          ...(isHomeTab ? { take: 50 } : {}),
         })
       : Promise.resolve([]),
     needsAnnouncementsData
@@ -615,6 +619,7 @@ async function ClubDataLoader({
           orderBy: {
             createdAt: 'desc',
           },
+          ...(isHomeTab ? { take: 20 } : {}),
         })
       : Promise.resolve([]),
     needsTestsData
@@ -658,6 +663,7 @@ async function ClubDataLoader({
             },
           },
           orderBy: { createdAt: 'desc' },
+          ...(isHomeTab ? { take: 20 } : {}),
         })
       : Promise.resolve([]),
   ])

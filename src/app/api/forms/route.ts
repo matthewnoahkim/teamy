@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, isAdmin, getUserMembership } from '@/lib/rbac'
+import { getUserMembership } from '@/lib/rbac'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { buildPrivateUploadPath, ensurePrivateUploadDir, extensionForMime } from '@/lib/upload-security'
@@ -31,9 +31,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID required' }, { status: 400 })
     }
 
-    await requireMember(session.user.id, clubId)
-
     const _membership = await getUserMembership(session.user.id, clubId)
+    if (!_membership) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     const forms = await prisma.form.findMany({
       where: { clubId },
@@ -93,15 +94,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Only admins can upload forms
-    const isAdminUser = await isAdmin(session.user.id, clubId)
-    if (!isAdminUser) {
+    const postMembership = await getUserMembership(session.user.id, clubId)
+    if (!postMembership || postMembership.role !== 'ADMIN') {
       return NextResponse.json(
         { error: 'Only admins can upload forms' },
         { status: 403 }
       )
     }
-
-    await requireMember(session.user.id, clubId)
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {

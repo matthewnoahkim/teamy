@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, isAdmin } from '@/lib/rbac'
+import { getUserMembership } from '@/lib/rbac'
 import { logApiTiming } from '@/lib/api-timing'
 
 // GET /api/stats?clubId=xxx - Get comprehensive stats for all club members
@@ -21,11 +21,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID is required' }, { status: 400 })
     }
 
-    await requireMember(session.user.id, clubId)
+    const membership = await getUserMembership(session.user.id, clubId)
+    if (!membership) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     // Only admins can view stats
-    const isAdminUser = await isAdmin(session.user.id, clubId)
-    if (!isAdminUser) {
+    if (membership.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Only admins can view stats' }, { status: 403 })
     }
 

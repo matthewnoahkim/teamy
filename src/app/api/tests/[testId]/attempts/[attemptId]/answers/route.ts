@@ -211,9 +211,8 @@ export async function POST(
       )
     }
     console.error('Save answer error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error'
     return NextResponse.json(
-      { error: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

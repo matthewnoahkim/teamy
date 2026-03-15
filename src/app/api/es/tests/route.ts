@@ -282,17 +282,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ test })
   } catch (error) {
     console.error('Error creating ES test:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create test'
+    const errorMessage = error instanceof Error ? error.message : ''
     // Check for database schema errors
     if (errorMessage.includes('createdByStaffId') || errorMessage.includes('column') || errorMessage.includes('field')) {
-      return NextResponse.json({ 
-        error: 'Database schema error. Please run migrations: npx prisma migrate deploy',
-        details: errorMessage 
+      return NextResponse.json({
+        error: 'Database schema error. Please run migrations.',
       }, { status: 500 })
     }
-    return NextResponse.json({ 
-      error: errorMessage || 'Failed to create test',
-      details: error instanceof Error ? error.stack : undefined
+    return NextResponse.json({
+      error: 'Failed to create test',
     }, { status: 500 })
   }
 }

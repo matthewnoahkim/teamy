@@ -31,20 +31,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const validated = createAnnouncementSchema.parse(body)
 
+    const membership = await rbac.getUserMembership(session.user.id, validated.clubId)
+    if (!membership) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     // Only admins can create announcements
-    const isAdminUser = await rbac.isAdmin(session.user.id, validated.clubId)
-    if (!isAdminUser) {
+    if (membership.role !== 'ADMIN') {
       return NextResponse.json(
         { error: 'Only admins can create announcements' },
         { status: 403 }
       )
-    }
-
-    await rbac.requireMember(session.user.id, validated.clubId)
-
-    const membership = await rbac.getUserMembership(session.user.id, validated.clubId)
-    if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
     }
 
     // Validate team IDs if provided
@@ -349,15 +346,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID required' }, { status: 400 })
     }
 
-    await rbac.requireMember(session.user.id, clubId)
-
     const membership = await rbac.getUserMembership(session.user.id, clubId)
     if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Check if user is an admin
-    const isAdminUser = await rbac.isAdmin(session.user.id, clubId)
+    const isAdminUser = membership.role === 'ADMIN'
     const userEventIds = !isAdminUser
       ? (await prisma.rosterAssignment.findMany({
           where: {
@@ -500,6 +494,7 @@ export async function GET(req: NextRequest) {
       orderBy: {
         createdAt: 'desc',
       },
+      take: 100,
     })
 
     const announcements = isAdminUser

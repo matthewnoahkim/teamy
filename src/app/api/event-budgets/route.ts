@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, isAdmin, getUserMembership } from '@/lib/rbac'
+import { getUserMembership } from '@/lib/rbac'
 import { z } from 'zod'
 
 const createEventBudgetSchema = z.object({
@@ -28,16 +28,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID is required' }, { status: 400 })
     }
 
-    await requireMember(session.user.id, clubId)
-
-    // Get user's membership to check role and team
     const membership = await getUserMembership(session.user.id, clubId)
     if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Check if user is admin
-    const isAdminUser = await isAdmin(session.user.id, clubId)
+    const isAdminUser = membership.role === 'ADMIN'
 
     // Build where clause to filter budgets
     // Admins see all budgets, regular members only see their team's budgets or club-wide budgets
@@ -155,8 +151,8 @@ export async function POST(req: NextRequest) {
     const validatedData = createEventBudgetSchema.parse(body)
 
     // Only admins can create/update budgets
-    const isAdminUser = await isAdmin(session.user.id, validatedData.clubId)
-    if (!isAdminUser) {
+    const postMembership = await getUserMembership(session.user.id, validatedData.clubId)
+    if (!postMembership || postMembership.role !== 'ADMIN') {
       return NextResponse.json(
         { error: 'Only admins can manage event budgets' },
         { status: 403 }
@@ -392,7 +388,7 @@ export async function POST(req: NextRequest) {
         )
       }
       return NextResponse.json(
-        { error: error.message || 'Internal server error' },
+        { error: 'Internal server error' },
         { status: 500 }
       )
     }

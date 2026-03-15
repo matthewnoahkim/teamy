@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, isAdmin } from '@/lib/rbac'
+import { getUserMembership } from '@/lib/rbac'
 import { logApiTiming } from '@/lib/api-timing'
 import { z } from 'zod'
 
@@ -32,7 +32,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID is required' }, { status: 400 })
     }
 
-    await requireMember(session.user.id, clubId)
+    const membership = await getUserMembership(session.user.id, clubId)
+    if (!membership) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     const expenses = await prisma.expense.findMany({
       where: { clubId },
@@ -153,28 +156,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const validatedData = createExpenseSchema.parse(body)
 
-    // Check if user is an admin
-    const isAdminUser = await isAdmin(session.user.id, validatedData.clubId)
-    if (!isAdminUser) {
+    // Get the user's membership ID and check admin role
+    const membership = await getUserMembership(session.user.id, validatedData.clubId)
+    if (!membership || membership.role !== 'ADMIN') {
       return NextResponse.json(
         { error: 'Only admins can add expenses' },
         { status: 403 }
       )
     }
 
-    // Get the user's membership ID
-    const membership = await prisma.membership.findUnique({
-      where: {
-        userId_clubId: {
-          userId: session.user.id,
-          clubId: validatedData.clubId,
-        },
-      },
-    })
-
-    if (!membership) {
-      return NextResponse.json({ error: 'Membership not found' }, { status: 404 })
-    }
+    // membership already fetched above via getUserMembership
 
     const expense = await prisma.expense.create({
       data: {

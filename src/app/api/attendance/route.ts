@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { requireMember, isAdmin } from '@/lib/rbac'
+import { getUserMembership } from '@/lib/rbac'
 import { updateAttendanceStatuses } from '@/lib/attendance'
 import { logApiTiming } from '@/lib/api-timing'
 import { z } from 'zod'
@@ -28,12 +28,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Club ID required' }, { status: 400 })
     }
 
-    await requireMember(session.user.id, clubId)
+    const membership = await getUserMembership(session.user.id, clubId)
+    if (!membership) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     // Update statuses before fetching
     await updateAttendanceStatuses(clubId)
 
-    const isAdminUser = await isAdmin(session.user.id, clubId)
+    const isAdminUser = membership.role === 'ADMIN'
 
     // Get all attendance records for club events
     const attendances = await prisma.attendance.findMany({
