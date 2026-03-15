@@ -96,6 +96,7 @@ interface ClubPageProps {
   club: ClubWithMembers | ClubWithMembersLite
   currentMembership: MembershipWithPreferences
   user: SessionUser
+  userClubs?: Array<{ id: string; name: string }>
   initialData?: Partial<ClubPageInitialData>
 }
 
@@ -181,7 +182,7 @@ function getClubMembershipCount(club: ClubWithMembers | ClubWithMembersLite): nu
   return club._count?.memberships ?? club.memberships.length
 }
 
-export function ClubPage({ club, currentMembership, user, initialData }: ClubPageProps) {
+export function ClubPage({ club, currentMembership, user, userClubs, initialData }: ClubPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -915,6 +916,7 @@ export function ClubPage({ club, currentMembership, user, initialData }: ClubPag
         showBackButton={false}
         clubId={club.id}
         title={currentClubName}
+        clubs={userClubs}
       />
 
       <main className="relative z-10 container mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 max-w-full overflow-x-hidden">

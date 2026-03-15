@@ -251,7 +251,7 @@ async function ClubDataLoader({
         },
       })
 
-  const [membership, club] = await Promise.all([
+  const [membership, club, userClubs] = await Promise.all([
     prisma.membership.findUnique({
       where: {
         userId_clubId: {
@@ -267,6 +267,11 @@ async function ClubDataLoader({
       },
     }),
     clubPromise,
+    // Pre-fetch all user clubs so the header dropdown renders instantly
+    prisma.membership.findMany({
+      where: { userId: session.user.id },
+      select: { club: { select: { id: true, name: true } } },
+    }),
   ])
 
   if (!membership) {
@@ -721,6 +726,7 @@ async function ClubDataLoader({
       club={club}
       currentMembership={membership}
       user={session.user}
+      userClubs={userClubs.map((m) => m.club).filter((c): c is { id: string; name: string } => Boolean(c))}
       initialData={{
         attendances: attendances ?? [],
         expenses: expenses ?? [],
