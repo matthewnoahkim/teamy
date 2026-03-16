@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import * as rbac from '@/lib/rbac'
 import { sendAnnouncementEmail } from '@/lib/email'
@@ -20,6 +20,135 @@ const createAnnouncementSchema = z.object({
   calendarEventId: z.string().optional(),
   important: z.boolean().optional(),
 })
+
+type AnnouncementEmailJob = {
+  announcementId: string
+  clubId: string
+  membershipId: string
+  scope: z.infer<typeof createAnnouncementSchema>['scope']
+  teamIds?: string[]
+  calendarEventId?: string
+  title: string
+  content: string
+}
+
+async function sendAnnouncementEmailsInBackground(job: AnnouncementEmailJob) {
+  try {
+    const club = await prisma.club.findUnique({
+      where: { id: job.clubId },
+      select: { name: true },
+    })
+
+    const allMemberships = await prisma.membership.findMany({
+      where: { clubId: job.clubId },
+      include: {
+        user: {
+          select: { id: true, email: true },
+        },
+      },
+    })
+
+    const author = allMemberships.find(m => m.id === job.membershipId)
+    const authorEmail = author?.user.email
+
+    if (!authorEmail) {
+      console.error('Author email not found for announcement', job.announcementId)
+      return
+    }
+
+    const admins = allMemberships.filter(m => String(m.role) === 'ADMIN' && m.id !== job.membershipId)
+    const adminEmails = admins.map(a => a.user.email).filter(Boolean)
+
+    let targetMembers: { email: string; id: string }[] = []
+
+    if (job.scope === 'CLUB') {
+      targetMembers = allMemberships
+        .filter(m => m.role === 'MEMBER')
+        .map(m => ({ email: m.user.email, id: m.user.id }))
+        .filter(m => m.email)
+    } else if (job.teamIds) {
+      const teamMemberships = allMemberships.filter(m =>
+        m.role === 'MEMBER' && m.teamId && job.teamIds?.includes(m.teamId),
+      )
+      targetMembers = teamMemberships
+        .map(m => ({ email: m.user.email, id: m.user.id }))
+        .filter(m => m.email)
+    }
+
+    let calendarEventDetails: {
+      startUTC: Date
+      endUTC: Date
+      location?: string
+      description?: string
+      rsvpEnabled?: boolean
+    } | null = null
+
+    if (job.calendarEventId) {
+      const calEvent = await prisma.calendarEvent.findUnique({
+        where: { id: job.calendarEventId },
+        select: {
+          startUTC: true,
+          endUTC: true,
+          location: true,
+          description: true,
+          rsvpEnabled: true,
+        },
+      })
+
+      if (calEvent) {
+        calendarEventDetails = {
+          startUTC: calEvent.startUTC,
+          endUTC: calEvent.endUTC,
+          location: calEvent.location ?? undefined,
+          description: calEvent.description ?? undefined,
+          rsvpEnabled: calEvent.rsvpEnabled,
+        }
+      }
+    }
+
+    if (adminEmails.length === 0 && targetMembers.length === 0) {
+      console.warn('No valid email recipients found, skipping email send')
+      return
+    }
+
+    const result = await sendAnnouncementEmail({
+      to: [authorEmail],
+      cc: adminEmails.length > 0 ? adminEmails : undefined,
+      bcc: targetMembers.length > 0 ? targetMembers.map(u => u.email) : undefined,
+      replyTo: authorEmail,
+      clubId: job.clubId,
+      clubName: club?.name || 'Club',
+      title: job.title,
+      content: job.content,
+      announcementId: job.announcementId,
+      calendarEvent: calendarEventDetails || undefined,
+    })
+
+    const allRecipients = [
+      ...admins.map(a => ({ id: a.userId, email: a.user.email })),
+      ...targetMembers,
+    ].filter(r => r.email && r.id)
+
+    if (allRecipients.length === 0) {
+      return
+    }
+
+    await Promise.all(
+      allRecipients.map(recipient =>
+        prisma.emailLog.create({
+          data: {
+            announcementId: job.announcementId,
+            toUserId: recipient.id,
+            subject: `[${club?.name}] ${job.title}`,
+            providerMessageId: result.messageId,
+          },
+        }).catch(err => console.error('Failed to log email for', recipient.email, err)),
+      ),
+    )
+  } catch (emailError) {
+    console.error('Email sending failed:', emailError)
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -117,129 +246,19 @@ export async function POST(req: NextRequest) {
       return ann
     })
 
-    // Send emails if requested
     if (validated.sendEmail) {
-      const club = await prisma.club.findUnique({
-        where: { id: validated.clubId },
-        select: { name: true },
-      })
-
-      // Get all club memberships with role info
-      const allMemberships = await prisma.membership.findMany({
-        where: { clubId: validated.clubId },
-        include: {
-          user: {
-            select: { id: true, email: true },
-          },
-        },
-      })
-
-      // Get the author (admin who posted)
-      const author = allMemberships.find(m => m.id === membership.id)
-      const authorEmail = author?.user.email
-
-      if (!authorEmail) {
-        console.error('Author email not found for announcement', announcement.id)
-      }
-
-      // Get all admins (will be CC'd) - exclude the author
-      const admins = allMemberships.filter(m => String(m.role) === 'ADMIN' && m.id !== membership.id)
-      const adminEmails = admins.map(a => a.user.email).filter(Boolean)
-
-      // Get target members based on scope (will be BCC'd)
-      let targetMembers: { email: string; id: string }[] = []
-
-      if (validated.scope === 'CLUB') {
-        // All members (exclude admins and author)
-        targetMembers = allMemberships
-          .filter(m => m.role === 'MEMBER')
-          .map(m => ({ email: m.user.email, id: m.user.id }))
-          .filter(m => m.email)
-      } else if (validated.teamIds) {
-        // Members in selected teams
-        const teamMemberships = allMemberships.filter(m => 
-          m.role === 'MEMBER' && m.teamId && validated.teamIds?.includes(m.teamId)
-        )
-        targetMembers = teamMemberships
-          .map(m => ({ email: m.user.email, id: m.user.id }))
-          .filter(m => m.email)
-      }
-
-      // Get calendar event details if this announcement is linked to an event
-      let calendarEventDetails: {
-        startUTC: Date
-        endUTC: Date
-        location?: string
-        description?: string
-        rsvpEnabled?: boolean
-      } | null = null
-      if (validated.calendarEventId) {
-        const calEvent = await prisma.calendarEvent.findUnique({
-          where: { id: validated.calendarEventId },
-          select: {
-            startUTC: true,
-            endUTC: true,
-            location: true,
-            description: true,
-            rsvpEnabled: true,
-          },
+      after(async () => {
+        await sendAnnouncementEmailsInBackground({
+          announcementId: announcement.id,
+          clubId: validated.clubId,
+          membershipId: membership.id,
+          scope: validated.scope,
+          teamIds: validated.teamIds,
+          calendarEventId: validated.calendarEventId,
+          title: validated.title,
+          content: validated.content,
         })
-        if (calEvent) {
-          calendarEventDetails = {
-            startUTC: calEvent.startUTC,
-            endUTC: calEvent.endUTC,
-            location: calEvent.location ?? undefined,
-            description: calEvent.description ?? undefined,
-            rsvpEnabled: calEvent.rsvpEnabled,
-          }
-        }
-      }
-
-      // Only send email if we have valid recipients
-      if (authorEmail && (adminEmails.length > 0 || targetMembers.length > 0)) {
-        // Send one email with CC and BCC (don't await to not block response)
-        Promise.resolve().then(async () => {
-          try {
-            const result = await sendAnnouncementEmail({
-              to: [authorEmail], // Send to author as primary recipient
-              cc: adminEmails.length > 0 ? adminEmails : undefined, // CC all other admins
-              bcc: targetMembers.length > 0 ? targetMembers.map(u => u.email) : undefined, // BCC all members
-              replyTo: authorEmail,
-              clubId: validated.clubId,
-              clubName: club?.name || 'Club',
-              title: validated.title,
-              content: validated.content,
-              announcementId: announcement.id,
-              calendarEvent: calendarEventDetails || undefined,
-            })
-
-            // Log email for all recipients (admins + members, not the author)
-            const allRecipients = [
-              ...admins.map(a => ({ id: a.userId, email: a.user.email })),
-              ...targetMembers,
-            ].filter(r => r.email && r.id)
-
-            if (allRecipients.length > 0) {
-              await Promise.all(
-                allRecipients.map(recipient =>
-                  prisma.emailLog.create({
-                    data: {
-                      announcementId: announcement.id,
-                      toUserId: recipient.id,
-                      subject: `[${club?.name}] ${validated.title}`,
-                      providerMessageId: result.messageId,
-                    },
-                  }).catch(err => console.error('Failed to log email for', recipient.email, err))
-                )
-              )
-            }
-          } catch (emailError) {
-            console.error('Email sending failed:', emailError)
-          }
-        }).catch(error => console.error('Email sending promise error:', error))
-      } else {
-        console.warn('No valid email recipients found, skipping email send')
-      }
+      })
     }
 
     const fullAnnouncement = await prisma.announcement.findUnique({

@@ -120,7 +120,6 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
   const [rsvping, setRsvping] = useState<Record<string, boolean>>({})
   const [showImportantOnly, setShowImportantOnly] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const [uploadingFiles, setUploadingFiles] = useState(false)
 
   const _memberUserId = currentMembership?.userId as string | undefined
   const _announcementMap = useMemo(() => {
@@ -215,6 +214,36 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
     
     return () => clearTimeout(timer)
   }, [division])
+
+  const uploadAnnouncementAttachments = useCallback(async (announcementId: string, files: File[]) => {
+    try {
+      await Promise.all(
+        files.map(async (file) => {
+          const formData = new FormData()
+          formData.append('file', file)
+          formData.append('announcementId', announcementId)
+
+          const uploadResponse = await fetch('/api/attachments/upload', {
+            method: 'POST',
+            body: formData,
+          })
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Failed to upload ${file.name}`)
+          }
+        }),
+      )
+
+      await fetchAnnouncements({ silent: true })
+    } catch (error) {
+      console.error('File upload error:', error)
+      toast({
+        title: 'Warning',
+        description: 'Announcement posted but some files failed to upload',
+        variant: 'destructive',
+      })
+    }
+  }, [fetchAnnouncements, toast])
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -318,38 +347,6 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
         announcementId = (rawData.announcement as { id?: string }).id
       }
 
-      // Upload files if any
-      if (formDataToPost.selectedFiles.length > 0 && announcementId) {
-        setUploadingFiles(true)
-        try {
-          await Promise.all(
-            formDataToPost.selectedFiles.map(async (file) => {
-              const formData = new FormData()
-              formData.append('file', file)
-              formData.append('announcementId', announcementId!)
-
-              const uploadResponse = await fetch('/api/attachments/upload', {
-                method: 'POST',
-                body: formData,
-              })
-
-              if (!uploadResponse.ok) {
-                throw new Error(`Failed to upload ${file.name}`)
-              }
-            })
-          )
-        } catch (error) {
-          console.error('File upload error:', error)
-          toast({
-            title: 'Warning',
-            description: 'Announcement posted but some files failed to upload',
-            variant: 'destructive',
-          })
-        } finally {
-          setUploadingFiles(false)
-        }
-      }
-
       // Replace temp announcement with server response
       if (serverAnnouncement) {
         setAnnouncements((prev) =>
@@ -363,9 +360,17 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
         fetchAnnouncements()
       }
 
+      if (formDataToPost.selectedFiles.length > 0 && announcementId) {
+        void uploadAnnouncementAttachments(announcementId, formDataToPost.selectedFiles)
+      }
+
       toast({
         title: 'Announcement posted',
-        description: formDataToPost.sendEmail ? 'Emails are being sent.' : undefined,
+        description: formDataToPost.selectedFiles.length > 0
+          ? 'Attachments are uploading in the background.'
+          : formDataToPost.sendEmail
+            ? 'Emails are being sent.'
+            : undefined,
       })
     } catch (error: unknown) {
       console.error('Post announcement error:', error)
@@ -1240,9 +1245,9 @@ export function StreamTab({ clubId, division, currentMembership, teams, isAdmin,
 
             {/* Submit Button */}
             <div className="pt-2">
-              <Button type="submit" disabled={posting || uploadingFiles} className="w-full sm:w-auto">
+              <Button type="submit" disabled={posting} className="w-full sm:w-auto">
                 <Send className="mr-2 h-4 w-4" />
-                {uploadingFiles ? 'Uploading Files...' : posting ? 'Posting...' : 'Post Announcement'}
+                {posting ? 'Posting...' : 'Post Announcement'}
               </Button>
             </div>
           </form>
