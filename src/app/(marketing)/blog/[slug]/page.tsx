@@ -74,47 +74,50 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <PublicPageLayout>
-      <main className="py-12 px-4 sm:px-6 overflow-x-hidden">
+      <div className="py-10 sm:py-16 px-4 sm:px-6">
         <div className="max-w-3xl mx-auto">
-          <Link href="/blog" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8">
+          <Link href="/blog" className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-8">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm font-medium">Back to blog</span>
+            Back to blog
           </Link>
 
-          {post.coverImage && (
-            <div className="mb-8 rounded-2xl overflow-hidden shadow-card border border-border">
-              {/* Use img instead of next/image for user-provided URLs that may not be in remotePatterns */}
-              <img
-                src={post.coverImage}
-                alt={post.title}
-                className="w-full h-64 md:h-80 object-cover"
-              />
-            </div>
-          )}
+          <div className="rounded-2xl border border-border bg-card p-6 sm:p-10 shadow-card">
+            {post.coverImage && (
+              <div className="mb-8 -mx-6 -mt-6 sm:-mx-10 sm:-mt-10 rounded-t-2xl overflow-hidden">
+                <img
+                  src={post.coverImage}
+                  alt={post.title}
+                  className="w-full h-56 sm:h-72 object-cover"
+                />
+              </div>
+            )}
 
-          <header className="mb-10">
-            <h1 className="font-heading text-3xl md:text-4xl font-bold text-foreground mb-5">
-              {post.title}
-            </h1>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <User className="h-4 w-4" />
-                {post.authorName}
-              </span>
-              {formattedDate && (
+            <div className="mb-8">
+              <h1 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-4">
+                {post.title}
+              </h1>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4" />
-                  {formattedDate}
+                  <User className="h-4 w-4" />
+                  {post.authorName}
                 </span>
-              )}
+                {formattedDate && (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4" />
+                    {formattedDate}
+                  </span>
+                )}
+              </div>
             </div>
-          </header>
 
-          <article className="prose prose-slate dark:prose-invert prose-lg max-w-none prose-headings:font-heading prose-a:text-teamy-primary">
-            <MarkdownRenderer content={post.content} />
-          </article>
+            <hr className="border-border mb-8" />
+
+            <article className="prose prose-slate dark:prose-invert prose-lg max-w-none prose-headings:font-heading prose-a:text-teamy-primary">
+              <MarkdownRenderer content={post.content} />
+            </article>
+          </div>
         </div>
-      </main>
+      </div>
     </PublicPageLayout>
   )
 }

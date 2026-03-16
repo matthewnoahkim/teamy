@@ -8,19 +8,18 @@ export default async function BlogPage() {
   if (!process.env.DATABASE_URL) {
     return (
       <PublicPageLayout>
-        <div className="py-8 sm:py-12 px-4 sm:px-6">
+        <div className="py-10 sm:py-16 px-4 sm:px-6">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8 sm:mb-12">
-              <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
+            <div className="text-center mb-10 sm:mb-14">
+              <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-3">
                 Blog
               </h1>
-              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-muted-foreground max-w-xl mx-auto">
                 Updates, announcements, and insights from the Teamy team
               </p>
             </div>
-
-            <div className="text-center py-20">
-              <p className="text-muted-foreground text-lg">No blog posts yet. Check back soon!</p>
+            <div className="text-center py-16 rounded-2xl border border-border bg-card">
+              <p className="text-muted-foreground">No blog posts yet. Check back soon!</p>
             </div>
           </div>
         </div>
@@ -48,21 +47,20 @@ export default async function BlogPage() {
 
   return (
     <PublicPageLayout>
-      <div className="py-8 sm:py-12 px-4 sm:px-6">
+      <div className="py-10 sm:py-16 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8 sm:mb-12">
-            <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
+          <div className="text-center mb-10 sm:mb-14">
+            <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-3">
               Blog
             </h1>
-            <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-xl mx-auto">
               Updates, announcements, and insights from the Teamy team
             </p>
           </div>
 
           {posts.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-muted-foreground text-lg">No blog posts yet. Check back soon!</p>
+            <div className="text-center py-16 rounded-2xl border border-border bg-card">
+              <p className="text-muted-foreground">No blog posts yet. Check back soon!</p>
             </div>
           ) : (
             <BlogPostList
