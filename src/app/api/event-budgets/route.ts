@@ -80,54 +80,45 @@ export async function GET(req: NextRequest) {
       },
     })
 
+    // Batch-fetch all expenses and pending requests for the club's budget events
+    const budgetEventIds = [...new Set(budgets.map(b => b.eventId))]
+
+    const [allExpenses, allPendingRequests] = await Promise.all([
+      budgetEventIds.length > 0
+        ? prisma.expense.findMany({
+            where: { clubId, eventId: { in: budgetEventIds } },
+            select: { amount: true, eventId: true, teamId: true },
+          })
+        : Promise.resolve([]),
+      budgetEventIds.length > 0
+        ? prisma.purchaseRequest.findMany({
+            where: { clubId, eventId: { in: budgetEventIds }, status: 'PENDING' },
+            select: { estimatedAmount: true, eventId: true, teamId: true },
+          })
+        : Promise.resolve([]),
+    ])
+
     // Calculate remaining budget and requested amounts for each event
-    const budgetsWithRemaining = await Promise.all(
-      budgets.map(async (budget) => {
-        // Build where clauses that match the budget's scope (club-wide or team-specific)
-        const expenseWhere: Record<string, unknown> = {
-          clubId,
-          eventId: budget.eventId,
-        }
-        const requestWhere: Record<string, unknown> = {
-          clubId,
-          eventId: budget.eventId,
-          status: 'PENDING',
-        }
+    const budgetsWithRemaining = budgets.map((budget) => {
+      // Filter expenses/requests to match the budget's scope
+      const expenses = allExpenses.filter(e =>
+        e.eventId === budget.eventId && (!budget.teamId || e.teamId === budget.teamId)
+      )
+      const pendingRequests = allPendingRequests.filter(r =>
+        r.eventId === budget.eventId && (!budget.teamId || r.teamId === budget.teamId)
+      )
 
-        // If budget is team-specific, only count expenses/requests for that team
-        // For club-wide budgets (teamId is null), count all expenses/requests for the event
-        if (budget.teamId) {
-          expenseWhere.teamId = budget.teamId
-          requestWhere.teamId = budget.teamId
-        }
+      const totalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0)
+      const totalRequested = pendingRequests.reduce((sum, req) => sum + req.estimatedAmount, 0)
+      const remaining = budget.maxBudget - totalSpent
 
-        const [expenses, pendingRequests] = await Promise.all([
-          prisma.expense.findMany({
-            where: expenseWhere,
-            select: {
-              amount: true,
-            },
-          }),
-          prisma.purchaseRequest.findMany({
-            where: requestWhere,
-            select: {
-              estimatedAmount: true,
-            },
-          }),
-        ])
-
-        const totalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0)
-        const totalRequested = pendingRequests.reduce((sum, req) => sum + req.estimatedAmount, 0)
-        const remaining = budget.maxBudget - totalSpent
-
-        return {
-          ...budget,
-          totalSpent,
-          totalRequested,
-          remaining,
-        }
-      })
-    )
+      return {
+        ...budget,
+        totalSpent,
+        totalRequested,
+        remaining,
+      }
+    })
 
     return NextResponse.json({ budgets: budgetsWithRemaining })
   } catch (error) {

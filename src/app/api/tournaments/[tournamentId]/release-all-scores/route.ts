@@ -91,75 +91,50 @@ export async function POST(
     const regularTests = tournamentTests.filter(tt => tt.test.status === 'PUBLISHED').map(tt => tt.test)
     console.log(`[Release All Scores] Found ${regularTests.length} published regular tests in tournament ${tournamentId}:`, regularTests.map(t => ({ id: t.id, name: t.name, status: t.status })))
 
-    // Update all ESTests to mark scores as released
+    // Batch-update all ESTests to mark scores as released
     let updatedCount = 0
     const esTestIds = esTests.map(t => t.id)
     console.log(`[Release All Scores] Attempting to update ${esTestIds.length} ESTests:`, esTestIds)
-    
-    for (const test of esTests) {
+
+    if (esTestIds.length > 0) {
       try {
-        // First, verify the test exists and get current value
-        const before = await prisma.eSTest.findUnique({
-          where: { id: test.id },
-          select: { id: true, scoresReleased: true, name: true },
-        })
-        console.log(`[Release All Scores] Test ${test.id} (${before?.name}): before update scoresReleased =`, before?.scoresReleased)
-        
-        const updated = await prisma.eSTest.update({
-          where: { id: test.id },
+        const esResult = await prisma.eSTest.updateMany({
+          where: { id: { in: esTestIds } },
           data: { scoresReleased: true },
-          select: { id: true, scoresReleased: true, name: true },
         })
-        console.log(`[Release All Scores] Test ${test.id} (${updated.name}): after update scoresReleased =`, updated.scoresReleased)
-        
-        // Verify the update worked
-        const verify = await prisma.eSTest.findUnique({
-          where: { id: test.id },
-          select: { id: true, scoresReleased: true },
-        })
-        console.log(`[Release All Scores] Test ${test.id}: verification query scoresReleased =`, verify?.scoresReleased)
-        
-        updatedCount++
+        updatedCount += esResult.count
+        console.log(`[Release All Scores] Updated ${esResult.count} ESTests`)
       } catch (error: unknown) {
-        // If the column doesn't exist, skip this test
         const errCode = (error as Record<string, unknown>)?.code
         const errMessage = error instanceof Error ? error.message : undefined
         if (
           errCode === 'P2022' ||
-          errCode === 'P2025' ||
           errMessage?.includes('does not exist') ||
           errMessage?.includes('Unknown argument') ||
           errMessage?.includes('Unknown field')
         ) {
-          console.warn(`scoresReleased column does not exist for test ${test.id}`)
+          console.warn('scoresReleased column does not exist for ESTest')
         } else {
-          console.error(`Error updating ESTest ${test.id}:`, error)
+          console.error('Error batch-updating ESTests:', error)
           throw error
         }
       }
     }
 
-    // Update all regular tests to set releaseScoresAt to now
+    // Batch-update all regular tests to set releaseScoresAt to now
     const releaseTime = new Date()
-    for (const test of regularTests) {
+    const regularTestIds = regularTests.map(t => t.id)
+    if (regularTestIds.length > 0) {
       try {
-        const before = await prisma.test.findUnique({
-          where: { id: test.id },
-          select: { id: true, releaseScoresAt: true, name: true },
-        })
-        console.log(`[Release All Scores] Regular test ${test.id} (${before?.name}): before update releaseScoresAt =`, before?.releaseScoresAt)
-        
-        const updated = await prisma.test.update({
-          where: { id: test.id },
+        const regularResult = await prisma.test.updateMany({
+          where: { id: { in: regularTestIds } },
           data: { releaseScoresAt: releaseTime },
-          select: { id: true, releaseScoresAt: true, name: true },
         })
-        console.log(`[Release All Scores] Regular test ${test.id} (${updated.name}): after update releaseScoresAt =`, updated.releaseScoresAt)
-        
-        updatedCount++
+        updatedCount += regularResult.count
+        console.log(`[Release All Scores] Updated ${regularResult.count} regular tests`)
       } catch (error: unknown) {
-        console.error(`Error updating regular test ${test.id}:`, error)
-        // Don't throw - continue with other tests
+        console.error('Error batch-updating regular tests:', error)
+        // Don't throw - continue
       }
     }
 

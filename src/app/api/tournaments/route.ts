@@ -254,18 +254,29 @@ export async function GET(req: NextRequest) {
       orderBy,
     })
 
+    // Batch-fetch admin status for all tournaments in a single query
+    const tournamentIds = tournaments.map(t => t.id)
+    const adminRecords = tournamentIds.length > 0
+      ? await prisma.tournamentAdmin.findMany({
+          where: {
+            userId: session.user.id,
+            tournamentId: { in: tournamentIds },
+          },
+          select: { tournamentId: true },
+        })
+      : []
+    const adminTournamentIdSet = new Set(adminRecords.map(a => a.tournamentId))
+
     // Add isCreator and isAdmin flags to each tournament for the current user
-    const tournamentsWithFlags = await Promise.all(
-      tournaments.map(async (tournament) => {
-        const isCreator = tournament.createdById === session.user.id
-        const isAdmin = await isTournamentAdmin(session.user.id, tournament.id)
-        return {
-          ...tournament,
-          isCreator,
-          isAdmin: isAdmin || isCreator, // Admins include creators
-        }
-      })
-    )
+    const tournamentsWithFlags = tournaments.map((tournament) => {
+      const isCreator = tournament.createdById === session.user.id
+      const isAdmin = adminTournamentIdSet.has(tournament.id)
+      return {
+        ...tournament,
+        isCreator,
+        isAdmin: isAdmin || isCreator, // Admins include creators
+      }
+    })
 
     // Sort by popularity if needed (since we can't easily do this in Prisma)
     if (sortBy === 'popularity-desc') {

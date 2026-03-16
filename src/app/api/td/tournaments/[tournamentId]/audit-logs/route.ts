@@ -184,11 +184,11 @@ export async function GET(
       }
     })
 
-    // Fetch membership and user info for each audit log
-    const testAuditsWithUsers = await Promise.all(
-      testAudits.map(async (audit) => {
-        const membership = await prisma.membership.findUnique({
-          where: { id: audit.actorMembershipId },
+    // Batch-fetch all memberships needed for audit logs in a single query
+    const membershipIds = [...new Set(testAudits.map(a => a.actorMembershipId))]
+    const memberships = membershipIds.length > 0
+      ? await prisma.membership.findMany({
+          where: { id: { in: membershipIds } },
           include: {
             user: {
               select: {
@@ -199,12 +199,13 @@ export async function GET(
             },
           },
         })
-        return {
-          ...audit,
-          actorMembership: membership,
-        }
-      })
-    )
+      : []
+    const membershipMap = new Map(memberships.map(m => [m.id, m]))
+
+    const testAuditsWithUsers = testAudits.map((audit) => ({
+      ...audit,
+      actorMembership: membershipMap.get(audit.actorMembershipId) ?? null,
+    }))
 
     // Fetch ESTest audit logs (now we have proper audit tracking)
     // Include both existing and deleted tests (testId will be null for deleted tests)

@@ -103,48 +103,30 @@ export async function POST(
       .map(audit => audit.testId)
       .filter((id): id is string => id !== null)
 
-    // Update all matching tests to mark scores as released
+    // Batch-update all matching tests to mark scores as released
     let updatedCount = 0
     console.log(`[Release Trial Event Scores] Found ${matchingTestIds.length} tests for trial event "${decodedEventName}":`, matchingTestIds)
-    
-    for (const testId of matchingTestIds) {
+
+    if (matchingTestIds.length > 0) {
       try {
-        // First, verify the test exists and get current value
-        const before = await prisma.eSTest.findUnique({
-          where: { id: testId },
-          select: { id: true, scoresReleased: true, name: true },
-        })
-        console.log(`[Release Trial Event Scores] Test ${testId} (${before?.name}): before update scoresReleased =`, before?.scoresReleased)
-        
-        const updated = await prisma.eSTest.update({
-          where: { id: testId },
+        const result = await prisma.eSTest.updateMany({
+          where: { id: { in: matchingTestIds } },
           data: { scoresReleased: true },
-          select: { id: true, scoresReleased: true, name: true },
         })
-        console.log(`[Release Trial Event Scores] Test ${testId} (${updated.name}): after update scoresReleased =`, updated.scoresReleased)
-        
-        // Verify the update worked
-        const verify = await prisma.eSTest.findUnique({
-          where: { id: testId },
-          select: { id: true, scoresReleased: true },
-        })
-        console.log(`[Release Trial Event Scores] Test ${testId}: verification query scoresReleased =`, verify?.scoresReleased)
-        
-        updatedCount++
+        updatedCount = result.count
+        console.log(`[Release Trial Event Scores] Updated ${result.count} tests`)
       } catch (error: unknown) {
-        // If the column doesn't exist, skip this test
         const errCode = (error as Record<string, unknown>)?.code
         const errMessage = error instanceof Error ? error.message : undefined
         if (
           errCode === 'P2022' ||
-          errCode === 'P2025' ||
           errMessage?.includes('does not exist') ||
           errMessage?.includes('Unknown argument') ||
           errMessage?.includes('Unknown field')
         ) {
-          console.warn(`scoresReleased column does not exist for test ${testId}`)
+          console.warn('scoresReleased column does not exist for ESTest')
         } else {
-          console.error(`Error updating test ${testId}:`, error)
+          console.error('Error batch-updating trial event tests:', error)
           throw error
         }
       }

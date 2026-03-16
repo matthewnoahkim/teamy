@@ -92,27 +92,32 @@ export async function GET(_req: NextRequest) {
       new Map(registrations.map((registration) => [registration.tournament.id, registration])).values()
     )
 
-    // For each registration, get the user's event assignments and tests
-    const tournamentsWithData = await Promise.all(
-      uniqueRegistrations.map(async (registration) => {
-        // Find the membership that matches this registration
-        // Prefer team-specific membership if teamId is set, otherwise any membership in the club
-        const membership = registration.teamId
-          ? memberships.find(
-              (m) => m.clubId === registration.clubId && m.teamId === registration.teamId
-            )
-          : memberships.find((m) => m.clubId === registration.clubId)
+    // Resolve membership for each registration (in-memory, no DB calls)
+    const registrationMemberships = new Map<string, typeof memberships[number]>()
+    for (const registration of uniqueRegistrations) {
+      const membership = registration.teamId
+        ? memberships.find(
+            (m) => m.clubId === registration.clubId && m.teamId === registration.teamId
+          )
+        : memberships.find((m) => m.clubId === registration.clubId)
+      if (membership) {
+        registrationMemberships.set(registration.id, membership)
+      }
+    }
 
-        if (!membership) {
-          return null
-        }
+    // Filter to registrations that have a matching membership
+    const validRegistrations = uniqueRegistrations.filter(r => registrationMemberships.has(r.id))
+    const validRegistrationIds = validRegistrations.map(r => r.id)
+    const validMembershipIds = [...new Set(validRegistrations.map(r => registrationMemberships.get(r.id)!.id))]
+    const validTournamentIds = [...new Set(validRegistrations.map(r => r.tournamentId))]
 
-        // Tournament-specific member assignments drive portal visibility.
-        const [memberEventAssignments, memberTrialEventAssignments] = await Promise.all([
-          prisma.tournamentMemberEventAssignment.findMany({
+    // Batch-fetch all event assignments and trial event assignments in 2 queries
+    const [allMemberEventAssignments, allMemberTrialEventAssignments] = await Promise.all([
+      validRegistrationIds.length > 0
+        ? prisma.tournamentMemberEventAssignment.findMany({
             where: {
-              registrationId: registration.id,
-              membershipId: membership.id,
+              registrationId: { in: validRegistrationIds },
+              membershipId: { in: validMembershipIds },
             },
             include: {
               event: {
@@ -124,32 +129,48 @@ export async function GET(_req: NextRequest) {
                 },
               },
             },
-          }),
-          prisma.tournamentMemberTrialEventAssignment.findMany({
+          })
+        : Promise.resolve([]),
+      validRegistrationIds.length > 0
+        ? prisma.tournamentMemberTrialEventAssignment.findMany({
             where: {
-              registrationId: registration.id,
-              membershipId: membership.id,
+              registrationId: { in: validRegistrationIds },
+              membershipId: { in: validMembershipIds },
             },
             select: {
+              registrationId: true,
+              membershipId: true,
               eventName: true,
               eventDivision: true,
             },
-          }),
-        ])
+          })
+        : Promise.resolve([]),
+    ])
 
-        const assignedEventIds = memberEventAssignments.map((assignment) => assignment.event.id)
+    // Index event assignments by registration+membership key
+    type EventAssignment = (typeof allMemberEventAssignments)[number]
+    const eventAssignmentsByReg = new Map<string, EventAssignment[]>()
+    for (const a of allMemberEventAssignments) {
+      const key = `${a.registrationId}:${a.membershipId}`
+      const arr = eventAssignmentsByReg.get(key)
+      if (arr) arr.push(a)
+      else eventAssignmentsByReg.set(key, [a])
+    }
+    type TrialAssignment = (typeof allMemberTrialEventAssignments)[number]
+    const trialAssignmentsByReg = new Map<string, TrialAssignment[]>()
+    for (const a of allMemberTrialEventAssignments) {
+      const key = `${a.registrationId}:${a.membershipId}`
+      const arr = trialAssignmentsByReg.get(key)
+      if (arr) arr.push(a)
+      else trialAssignmentsByReg.set(key, [a])
+    }
 
-        // Get released tests for assigned events in this tournament.
-        // Event-less tests are fetched and then split into trial/general buckets below.
-        const [tournamentTests, esTests] = await Promise.all([
-          // Regular Test records linked via TournamentTest
-          prisma.tournamentTest.findMany({
+    // Batch-fetch all tournament tests and ES tests across all valid tournaments in 2 queries
+    const [allTournamentTests, allEsTests] = await Promise.all([
+      validTournamentIds.length > 0
+        ? prisma.tournamentTest.findMany({
             where: {
-              tournamentId: registration.tournamentId,
-              OR: [
-                { eventId: { in: assignedEventIds } },
-                { eventId: null }, // Tests not assigned to a specific event
-              ],
+              tournamentId: { in: validTournamentIds },
             },
             include: {
               test: {
@@ -193,19 +214,17 @@ export async function GET(_req: NextRequest) {
                 },
               },
             },
-          }),
-          // ESTest records (created via TD Portal)
-          prisma.eSTest.findMany({
+          })
+        : Promise.resolve([]),
+      validTournamentIds.length > 0
+        ? prisma.eSTest.findMany({
             where: {
-              tournamentId: registration.tournamentId,
+              tournamentId: { in: validTournamentIds },
               status: 'PUBLISHED',
-              OR: [
-                { eventId: { in: assignedEventIds } },
-                { eventId: null }, // Tests not assigned to a specific event
-              ],
             },
             select: {
               id: true,
+              tournamentId: true,
               name: true,
               description: true,
               instructions: true,
@@ -236,8 +255,48 @@ export async function GET(_req: NextRequest) {
                 },
               },
             },
-          }),
-        ])
+          })
+        : Promise.resolve([]),
+    ])
+
+    // Index tests by tournamentId
+    type TournamentTestEntry = (typeof allTournamentTests)[number]
+    const tournamentTestsByTournament = new Map<string, TournamentTestEntry[]>()
+    for (const tt of allTournamentTests) {
+      const arr = tournamentTestsByTournament.get(tt.tournamentId)
+      if (arr) arr.push(tt)
+      else tournamentTestsByTournament.set(tt.tournamentId, [tt])
+    }
+    type EsTestEntry = (typeof allEsTests)[number]
+    const esTestsByTournament = new Map<string, EsTestEntry[]>()
+    for (const et of allEsTests) {
+      const arr = esTestsByTournament.get(et.tournamentId)
+      if (arr) arr.push(et)
+      else esTestsByTournament.set(et.tournamentId, [et])
+    }
+
+    // Process each registration using the pre-fetched data
+    const tournamentsWithData = await Promise.all(
+      validRegistrations.map(async (registration) => {
+        const membership = registrationMemberships.get(registration.id)!
+        const key = `${registration.id}:${membership.id}`
+
+        const memberEventAssignments = eventAssignmentsByReg.get(key) || []
+        const memberTrialEventAssignments = trialAssignmentsByReg.get(key) || []
+
+        const assignedEventIds = memberEventAssignments.map((assignment) => assignment.event.id)
+        const assignedEventIdSet = new Set(assignedEventIds)
+
+        // Filter pre-fetched tests to this tournament and assigned events
+        const allTT = tournamentTestsByTournament.get(registration.tournamentId) || []
+        const tournamentTests = allTT.filter(
+          tt => tt.eventId === null || assignedEventIdSet.has(tt.eventId!)
+        )
+
+        const allET = esTestsByTournament.get(registration.tournamentId) || []
+        const esTests = allET.filter(
+          et => et.event === null || assignedEventIdSet.has(et.event!.id)
+        )
 
         // Filter to only PUBLISHED tests
         // Note: We show ALL published tests regardless of startAt/endAt times.
