@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -30,6 +30,8 @@ import {
   ChevronRight,
   ChevronDown,
   Pencil,
+  Settings,
+  CreditCard,
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -81,6 +83,9 @@ interface TDPortalClientProps {
 
 export function TDPortalClient({ user, requests, accessibleTournaments }: TDPortalClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const customizationHref = `/customization?from=${encodeURIComponent(pathname || '/')}`
+  const billingHref = `/billing?from=${encodeURIComponent(pathname || '/')}`
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user.name ?? null)
@@ -215,6 +220,22 @@ export function TDPortalClient({ user, requests, accessibleTournaments }: TDPort
                 <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit Username
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(customizationHref)}
+                  onFocus={() => router.prefetch(customizationHref)}
+                  onClick={() => router.push(customizationHref)}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Customization
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(billingHref)}
+                  onFocus={() => router.prefetch(billingHref)}
+                  onClick={() => router.push(billingHref)}
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Billing
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-default">

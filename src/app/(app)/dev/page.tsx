@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
+import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, Megaphone, Tag, History, Pencil } from 'lucide-react'
+import { AlertTriangle, FileText, Shield, CreditCard, LogOut, Trophy, ChevronDown, Mail, BarChart3, Megaphone, Tag, History, Pencil, Settings } from 'lucide-react'
 import { SignInButton } from '@/components/signin-button'
 import {
   DropdownMenu,
@@ -58,6 +59,10 @@ const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
 ]
 
 export default function DevPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const customizationHref = `/customization?from=${encodeURIComponent(pathname || '/')}`
+  const billingHref = `/billing?from=${encodeURIComponent(pathname || '/')}`
   const [activeSection, setActiveSection] = useState<Section>(() => {
     if (typeof window !== 'undefined') {
       const savedSection = localStorage.getItem('dev-panel-active-section') as Section
@@ -263,6 +268,22 @@ export default function DevPage() {
                 <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit Username
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(customizationHref)}
+                  onFocus={() => router.prefetch(customizationHref)}
+                  onClick={() => router.push(customizationHref)}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Customization
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(billingHref)}
+                  onFocus={() => router.prefetch(billingHref)}
+                  onClick={() => router.push(billingHref)}
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Billing
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-default">

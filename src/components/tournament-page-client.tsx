@@ -19,8 +19,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { signOut } from 'next-auth/react'
+import { useRouter, usePathname } from 'next/navigation'
 import { EditUsernameDialog } from '@/components/edit-username-dialog'
-import { Pencil, LogOut, ChevronDown } from 'lucide-react'
+import { Pencil, LogOut, ChevronDown, CreditCard } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { 
   Edit, 
@@ -136,6 +137,10 @@ export function TournamentPageClient({
   initialEventsNotRun = [],
 }: TournamentPageClientProps) {
   const { toast } = useToast()
+  const router = useRouter()
+  const pathname = usePathname()
+  const customizationHref = `/customization?from=${encodeURIComponent(pathname || '/')}`
+  const billingHref = `/billing?from=${encodeURIComponent(pathname || '/')}`
   const [isEditing, setIsEditing] = useState(false)
   const [editUsernameOpen, setEditUsernameOpen] = useState(false)
   const [currentUserName, setCurrentUserName] = useState(user?.name ?? null)
@@ -411,6 +416,22 @@ export function TournamentPageClient({
                   <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
                     <Pencil className="mr-2 h-4 w-4" />
                     Edit Username
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onMouseEnter={() => router.prefetch(customizationHref)}
+                    onFocus={() => router.prefetch(customizationHref)}
+                    onClick={() => router.push(customizationHref)}
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    Customization
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onMouseEnter={() => router.prefetch(billingHref)}
+                    onFocus={() => router.prefetch(billingHref)}
+                    onClick={() => router.push(billingHref)}
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Billing
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-default">

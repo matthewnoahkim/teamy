@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { JSX } from 'react'
 import { signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -63,6 +63,7 @@ import {
   Pencil,
   CheckCircle,
   XCircle,
+  CreditCard,
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -267,6 +268,9 @@ export function TDTournamentManageClient({
   
   const tournamentEnded = isTournamentEnded()
   const router = useRouter()
+  const pathname = usePathname()
+  const customizationHref = `/customization?from=${encodeURIComponent(pathname || '/')}`
+  const billingHref = `/billing?from=${encodeURIComponent(pathname || '/')}`
   const { toast } = useToast()
   
   // Persist active tab in localStorage
@@ -1864,6 +1868,22 @@ export function TDTournamentManageClient({
                 <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit Username
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(customizationHref)}
+                  onFocus={() => router.prefetch(customizationHref)}
+                  onClick={() => router.push(customizationHref)}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Customization
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(billingHref)}
+                  onFocus={() => router.prefetch(billingHref)}
+                  onClick={() => router.push(billingHref)}
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Billing
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-default">

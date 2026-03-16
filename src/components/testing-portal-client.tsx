@@ -19,10 +19,10 @@ import {
 import { EditUsernameDialog } from '@/components/edit-username-dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { PageLoading } from '@/components/ui/loading-spinner'
-import { Calendar, MapPin, Trophy, FileText, ChevronRight, LogOut, Pencil, ChevronDown, Clock, HelpCircle, ListChecks, AlertCircle, Calculator, FileCheck, Play, ArrowRight, Upload, CheckCircle2, XCircle, Eye } from 'lucide-react'
+import { Calendar, MapPin, Trophy, FileText, ChevronRight, LogOut, Pencil, ChevronDown, Clock, HelpCircle, ListChecks, AlertCircle, Calculator, FileCheck, Play, ArrowRight, Upload, CheckCircle2, XCircle, Eye, Settings, CreditCard } from 'lucide-react'
 import { formatDivision } from '@/lib/utils'
 import Link from 'next/link'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { format } from 'date-fns'
 import { isTestAvailable } from '@/lib/test-availability'
 import { NoteSheetUpload } from '@/components/tests/note-sheet-upload'
@@ -169,7 +169,10 @@ const STORAGE_KEY = 'testing-portal-selected-tournament'
 export function TestingPortalClient({ user }: TestingPortalClientProps) {
   const { toast } = useToast()
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
+  const customizationHref = `/customization?from=${encodeURIComponent(pathname || '/')}`
+  const billingHref = `/billing?from=${encodeURIComponent(pathname || '/')}`
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTournament, setSelectedTournament] = useState<string | null>(null)
@@ -551,6 +554,22 @@ export function TestingPortalClient({ user }: TestingPortalClientProps) {
                 <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit Username
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(customizationHref)}
+                  onFocus={() => router.prefetch(customizationHref)}
+                  onClick={() => router.push(customizationHref)}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Customization
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(billingHref)}
+                  onFocus={() => router.prefetch(billingHref)}
+                  onClick={() => router.push(billingHref)}
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Billing
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-default">

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { JSX } from 'react'
 import { signOut } from 'next-auth/react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +48,7 @@ import {
   Eye,
   Copy,
   Settings,
+  CreditCard,
 } from 'lucide-react'
 import { format, isPast, isToday } from 'date-fns'
 import Link from 'next/link'
@@ -195,7 +196,10 @@ const highlightText = (text: string | null | undefined, searchQuery: string): st
 export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, initialTournamentId }: ESPortalClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  
+  const pathname = usePathname()
+  const customizationHref = `/customization?from=${encodeURIComponent(pathname || '/')}`
+  const billingHref = `/billing?from=${encodeURIComponent(pathname || '/')}`
+
   // Use server-provided tournament ID or read from URL, return empty string if none
   const getInitialTab = () => {
     // Prefer server-provided value (avoids hydration mismatch)
@@ -596,6 +600,22 @@ export function ESPortalClient({ user, staffMemberships, initialTimelines = {}, 
                 <DropdownMenuItem onClick={() => setEditUsernameOpen(true)}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit Username
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(customizationHref)}
+                  onFocus={() => router.prefetch(customizationHref)}
+                  onClick={() => router.push(customizationHref)}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Customization
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onMouseEnter={() => router.prefetch(billingHref)}
+                  onFocus={() => router.prefetch(billingHref)}
+                  onClick={() => router.push(billingHref)}
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Billing
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-default">
