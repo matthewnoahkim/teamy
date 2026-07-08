@@ -12,19 +12,6 @@ import {
   validateEnum,
 } from '@/lib/input-validation'
 
-// Helper to check if user is tournament admin
-async function isTournamentAdmin(userId: string, tournamentId: string): Promise<boolean> {
-  const admin = await prisma.tournamentAdmin.findUnique({
-    where: {
-      tournamentId_userId: {
-        tournamentId,
-        userId,
-      },
-    },
-  })
-  return !!admin
-}
-
 const createTournamentSchema = z.object({
   name: z.string().min(1).max(200),
   division: z.enum(['B', 'C']),
@@ -468,4 +455,3 @@ export async function POST(req: NextRequest) {
     }, { status: 500 })
   }
 }
-

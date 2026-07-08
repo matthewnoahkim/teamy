@@ -72,6 +72,7 @@ function makeJsonRequest(url: string, body: unknown, method = 'POST') {
 function makeTournamentTest(testId: string, eventId: string | null, name: string) {
   return {
     testId,
+    tournamentId: 'tour-1',
     eventId,
     event: eventId
       ? {
@@ -296,6 +297,8 @@ test('GET /api/testing/tournaments returns only assigned event and trial tests f
       async () =>
         [
           {
+            registrationId: 'registration-1',
+            membershipId: 'membership-1',
             event: {
               id: 'event-1',
               name: 'Anatomy',
@@ -311,6 +314,8 @@ test('GET /api/testing/tournaments returns only assigned event and trial tests f
       async () =>
         [
           {
+            registrationId: 'registration-1',
+            membershipId: 'membership-1',
             eventName: 'Robot Skills',
             eventDivision: 'C',
           },

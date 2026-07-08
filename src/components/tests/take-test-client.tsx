@@ -717,7 +717,6 @@ export function TakeTestClient({
       if (tickRef.current) clearInterval(tickRef.current)
       tickRef.current = null
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timedState, test.questions])
 
   const revealTimedQuestion = useCallback(async (questionId: string) => {
@@ -787,7 +786,6 @@ export function TakeTestClient({
         submitTimedQuestion(q.id, true)
       }
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick])
 
   // Check if there are unanswered questions - memoized to avoid recalculating on every render

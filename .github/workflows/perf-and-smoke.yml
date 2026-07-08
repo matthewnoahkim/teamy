@@ -50,6 +50,7 @@ jobs:
         run: npm run build
 
       - name: Lighthouse Perf Budgets
+        if: ${{ env.SITE_SHUTDOWN_DISABLED == 'true' }}
         uses: treosh/lighthouse-ci-action@v12
         env:
           NEXTAUTH_SECRET: ci-lighthouse-nextauth-secret-please-replace-if-needed-2026

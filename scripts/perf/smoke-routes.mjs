@@ -7,6 +7,7 @@ const APP_DIR = path.join(process.cwd(), 'src', 'app')
 const BASE_URL = (process.env.SMOKE_BASE_URL || 'http://127.0.0.1:3000').replace(/\/+$/, '')
 const REQUEST_TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 12000)
 const CONCURRENCY = Math.max(1, Number(process.env.SMOKE_CONCURRENCY || 8))
+const SITE_SHUTDOWN_ENABLED = process.env.SITE_SHUTDOWN_DISABLED !== 'true'
 
 /**
  * @typedef {{ route: string, dynamic: boolean }} RouteEntry
@@ -180,6 +181,7 @@ function chunk(items, chunkSize) {
 function shouldFail(result) {
   if (result.error) return true
   if (result.status >= 500) return true
+  if (SITE_SHUTDOWN_ENABLED && result.status === 410) return false
   if (!result.dynamic && result.status >= 400 && result.status !== 401 && result.status !== 403) {
     return true
   }
@@ -188,6 +190,7 @@ function shouldFail(result) {
 
 function shouldWarn(result) {
   if (result.error || result.status === 0) return false
+  if (SITE_SHUTDOWN_ENABLED && result.status === 410) return false
   if (result.status >= 400) return true
   if (result.ms > Number(process.env.SMOKE_ROUTE_WARN_MS || 2000)) return true
   return false
@@ -201,6 +204,9 @@ async function main() {
   }
 
   console.log(`Discovered ${routes.length} routes. Base URL: ${BASE_URL}`)
+  if (SITE_SHUTDOWN_ENABLED) {
+    console.log('Site shutdown mode is enabled; treating 410 Gone as expected.')
+  }
 
   /** @type {SmokeResult[]} */
   const results = []

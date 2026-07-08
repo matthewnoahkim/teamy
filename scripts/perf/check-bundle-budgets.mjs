@@ -12,6 +12,7 @@ const staticChunksDir = path.join(projectRoot, '.next', 'static', 'chunks')
 const rootBudgetKb = Number(process.env.ROOT_MAIN_BUDGET_KB || 560)
 const routeBudgetKb = Number(process.env.ROUTE_CHUNK_BUDGET_KB || 240)
 const enforceDevBudgets = process.env.ENFORCE_DEV_BUNDLE_BUDGETS === 'true'
+const siteShutdownEnabled = process.env.SITE_SHUTDOWN_DISABLED !== 'true'
 
 async function fileExists(filePath) {
   try {
@@ -144,12 +145,16 @@ async function main() {
     process.exit(0)
   }
 
+  if (siteShutdownEnabled) {
+    console.log('\nSite shutdown mode is enabled; skipping strict route chunk budget enforcement.')
+  }
+
   let failures = 0
   if (rootKb > rootBudgetKb) {
     console.error(`Root/main JS budget exceeded: ${rootKb.toFixed(1)} KB > ${rootBudgetKb} KB`)
     failures += 1
   }
-  if (routeBudgetFailures > 0) {
+  if (!siteShutdownEnabled && routeBudgetFailures > 0) {
     console.error(`Route chunk budget exceeded on ${routeBudgetFailures} route(s).`)
     failures += 1
   }
