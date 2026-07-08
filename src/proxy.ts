@@ -1,4 +1,4 @@
-// API logging, rate limiting, and security middleware
+// Site shutdown, API logging, rate limiting, and security middleware
 
 import { NextRequest, NextResponse } from 'next/server'
 import {
@@ -12,6 +12,99 @@ import { shouldRejectPotentialCsrf } from '@/lib/csrf-guard'
 import { getConfiguredAppOrigins } from '@/lib/url-safety'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+const SHUTDOWN_HEADERS = {
+  'Cache-Control': 'no-store',
+  'X-Robots-Tag': 'noindex, nofollow, noarchive',
+} as const
+
+function isSiteShutdownEnabled(): boolean {
+  return process.env.SITE_SHUTDOWN_DISABLED !== 'true'
+}
+
+function getShutdownHtml(): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Site unavailable</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      main {
+        max-width: 520px;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 32px;
+        line-height: 1.1;
+      }
+      p {
+        margin: 0;
+        color: #475569;
+        font-size: 16px;
+        line-height: 1.6;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #020617;
+          color: #f8fafc;
+        }
+        p {
+          color: #cbd5e1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>This site is no longer available.</h1>
+      <p>Teamy has been shut down.</p>
+    </main>
+  </body>
+</html>`
+}
+
+function isApiPath(pathname: string): boolean {
+  return pathname === '/api' || pathname.startsWith('/api/')
+}
+
+function getShutdownResponse(request: NextRequest): NextResponse {
+  const { pathname } = request.nextUrl
+  const headers = { ...SHUTDOWN_HEADERS }
+
+  if (request.method.toUpperCase() === 'HEAD') {
+    return new NextResponse(null, { status: 410, headers })
+  }
+
+  if (isApiPath(pathname)) {
+    return NextResponse.json(
+      {
+        error: 'Gone',
+        message: 'Teamy has been shut down.',
+      },
+      { status: 410, headers },
+    )
+  }
+
+  return new NextResponse(getShutdownHtml(), {
+    status: 410,
+    headers: {
+      ...headers,
+      'Content-Type': 'text/html; charset=utf-8',
+    },
+  })
+}
 
 function shouldTrustForwardedHostOrigin(): boolean {
   return process.env.TRUST_FORWARDED_HOST_ORIGIN === 'true'
@@ -85,6 +178,14 @@ export default async function proxy(request: NextRequest) {
       response.headers.set(key, value)
     })
     return response
+  }
+
+  if (isSiteShutdownEnabled()) {
+    return applySecurityHeaders(getShutdownResponse(request))
+  }
+
+  if (!isApiPath(pathname)) {
+    return NextResponse.next()
   }
 
   // Skip rate limiting for certain paths
@@ -168,6 +269,6 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Restrict middleware execution to API routes to avoid extra work on static/public pages.
-  matcher: ['/api/:path*'],
+  // Run for all routes so the code-level shutdown covers pages, static assets, and APIs.
+  matcher: ['/:path*'],
 }
